@@ -1,0 +1,40 @@
+{
+  "name": "@starville/game-client",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rimraf .turbo coverage dist tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "@starville/config": "workspace:*",
+    "@starville/design-tokens": "workspace:*",
+    "phaser": "3.90.0",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@starville/eslint-config": "workspace:*",
+    "@starville/testing": "workspace:*",
+    "@starville/typescript-config": "workspace:*",
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.3",
+    "eslint": "9.39.4",
+    "jsdom": "29.1.1",
+    "prettier": "3.9.5",
+    "rimraf": "6.1.3",
+    "typescript": "5.9.3",
+    "vite": "8.1.4",
+    "vitest": "4.1.10"
+  }
+}

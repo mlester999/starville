@@ -1,0 +1,23 @@
+packages:
+  - apps/*
+  - packages/*
+
+linkWorkspacePackages: true
+saveWorkspaceProtocol: rolling
+strictPeerDependencies: true
+
+catalog:
+  '@types/node': 22.20.1
+  eslint: 9.39.4
+  prettier: 3.9.5
+  tsx: 4.23.0
+  typescript: 5.9.3
+  vitest: 4.1.10
+
+minimumReleaseAgeExclude:
+  - prettier@3.9.5
+  - vite@8.1.4
+
+allowBuilds:
+  esbuild: true
+  sharp: true

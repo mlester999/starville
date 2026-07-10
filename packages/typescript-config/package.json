@@ -1,0 +1,22 @@
+{
+  "name": "@starville/typescript-config",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./base.json": "./base.json",
+    "./node.json": "./node.json",
+    "./nextjs.json": "./nextjs.json",
+    "./vite-react.json": "./vite-react.json"
+  },
+  "scripts": {
+    "build": "node --test test/config.test.mjs",
+    "lint": "eslint test --max-warnings=0",
+    "typecheck": "node --test test/config.test.mjs",
+    "test": "node --test test/config.test.mjs",
+    "clean": "rimraf .turbo"
+  },
+  "peerDependencies": {
+    "typescript": ">=5.7 <6"
+  }
+}

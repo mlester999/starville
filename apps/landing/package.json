@@ -1,0 +1,36 @@
+{
+  "name": "@starville/landing",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "node ./scripts/run-next.mjs dev",
+    "build": "next build",
+    "start": "node ./scripts/run-next.mjs start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "clean": "rimraf .next .turbo coverage tsconfig.tsbuildinfo"
+  },
+  "dependencies": {
+    "@starville/config": "workspace:*",
+    "@starville/design-tokens": "workspace:*",
+    "next": "16.2.10",
+    "react": "19.2.7",
+    "react-dom": "19.2.7"
+  },
+  "devDependencies": {
+    "@starville/eslint-config": "workspace:*",
+    "@starville/testing": "workspace:*",
+    "@starville/typescript-config": "workspace:*",
+    "@types/node": "22.20.1",
+    "@types/react": "19.2.17",
+    "@types/react-dom": "19.2.3",
+    "eslint": "9.39.4",
+    "prettier": "3.9.5",
+    "rimraf": "6.1.3",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

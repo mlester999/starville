@@ -1,0 +1,20 @@
+{
+  "name": "@starville/testing",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./vitest": "./src/vitest.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src test --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rimraf coverage .turbo"
+  },
+  "peerDependencies": {
+    "vitest": "^4.0.0"
+  }
+}

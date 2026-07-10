@@ -1,0 +1,5 @@
+{
+  "extends": "@starville/typescript-config/node.json",
+  "include": ["src/**/*.ts", "tsup.config.ts"],
+  "exclude": ["dist", "coverage", "node_modules"]
+}

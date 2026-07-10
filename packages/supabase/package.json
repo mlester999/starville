@@ -1,0 +1,24 @@
+{
+  "name": "@starville/supabase",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/browser.ts",
+    "./browser": "./src/browser.ts",
+    "./server": "./src/server.ts",
+    "./types": "./src/types.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src test --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rimraf coverage .turbo"
+  },
+  "dependencies": {
+    "@starville/shared-validation": "workspace:*",
+    "@supabase/supabase-js": "^2.78.0",
+    "zod": "^4.1.12"
+  }
+}
