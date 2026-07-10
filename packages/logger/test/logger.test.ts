@@ -94,4 +94,19 @@ describe('secret redaction', () => {
     expect(output).not.toContain('very-secret-token');
     expect(output).not.toContain('another-secret');
   });
+
+  it('redacts modern Supabase secrets, cookies, and callback codes in free-form errors', () => {
+    const value = redactLogValue({
+      cookies: 'starville-admin-auth=sensitive-cookie',
+      error: new Error(
+        'sb_secret_modernCredential https://admin.example/auth/callback?code=recovery-code',
+      ),
+    });
+    const serialized = JSON.stringify(value);
+
+    expect(serialized).not.toContain('modernCredential');
+    expect(serialized).not.toContain('sensitive-cookie');
+    expect(serialized).not.toContain('recovery-code');
+    expect(serialized).toContain('[REDACTED]');
+  });
 });

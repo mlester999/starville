@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import * as browserEntry from '../src/browser';
+import * as ssrEntry from '../src/ssr';
 import {
   createSupabaseServerClient,
   createSupabaseServiceRoleClient,
   parseServiceRoleSupabaseConfig,
 } from '../src/server';
+import { createSupabaseSsrServerClient } from '../src/ssr';
 
 const serviceRoleJwt = 'eyJhbGciOiJub25lIn0.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.unsigned-placeholder';
 const anonymousJwt = 'eyJhbGciOiJub25lIn0.eyJyb2xlIjoiYW5vbiJ9.unsigned-placeholder';
@@ -14,6 +16,8 @@ describe('Supabase browser boundary', () => {
   it('does not export a privileged client helper', () => {
     expect('createSupabaseServiceRoleClient' in browserEntry).toBe(false);
     expect('parseServiceRoleSupabaseConfig' in browserEntry).toBe(false);
+    expect('createSupabaseServiceRoleClient' in ssrEntry).toBe(false);
+    expect('parseServiceRoleSupabaseConfig' in ssrEntry).toBe(false);
   });
 
   it('rejects known service-role key formats', () => {
@@ -57,6 +61,15 @@ describe('Supabase server boundary', () => {
     expect(privilegedClient.auth).toBeDefined();
   });
 
+  it('creates an SSR client through cookie methods without exposing privileged keys', () => {
+    const client = createSupabaseSsrServerClient(
+      { url: 'https://example.supabase.co', anonKey: anonymousJwt },
+      { getAll: () => [], setAll: () => undefined },
+    );
+
+    expect(client.auth).toBeDefined();
+  });
+
   it('rejects an anonymous JWT at the service-role boundary', () => {
     expect(() =>
       parseServiceRoleSupabaseConfig({
@@ -64,5 +77,20 @@ describe('Supabase server boundary', () => {
         serviceRoleKey: anonymousJwt,
       }),
     ).toThrow('anonymous key cannot be used as a service-role key');
+  });
+
+  it('accepts modern secret keys only at the explicit service-role boundary', () => {
+    expect(
+      parseServiceRoleSupabaseConfig({
+        url: 'https://example.supabase.co',
+        serviceRoleKey: 'sb_secret_server-only-placeholder',
+      }),
+    ).toMatchObject({ serviceRoleKey: 'sb_secret_server-only-placeholder' });
+    expect(() =>
+      parseServiceRoleSupabaseConfig({
+        url: 'https://example.supabase.co',
+        serviceRoleKey: 'sb_publishable_browser-placeholder',
+      }),
+    ).toThrow();
   });
 });

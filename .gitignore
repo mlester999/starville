@@ -29,6 +29,7 @@ secrets/
 credentials/
 infrastructure/supabase/.branches/
 infrastructure/supabase/.temp/
+/supabase/.temp/
 
 # Tooling and operating-system files
 .DS_Store

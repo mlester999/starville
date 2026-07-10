@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApiApp } from './app.js';
-import type { LogContext, ServiceLogger } from './contracts.js';
+import type { AdminAuthGateway, LogContext, ServiceLogger } from './contracts.js';
 
 class SilentLogger implements ServiceLogger {
   child(_bindings: LogContext): ServiceLogger {
@@ -22,6 +22,21 @@ class SilentLogger implements ServiceLogger {
 
 const apps: ReturnType<typeof buildApiApp>[] = [];
 
+const testIdentity = {
+  userId: '11111111-1111-4111-8111-111111111111',
+  authSessionId: '22222222-2222-4222-8222-222222222222',
+  assuranceLevel: 'aal1',
+  authenticationMethods: ['password'],
+} as const;
+
+const inactiveAdminGateway: AdminAuthGateway = {
+  verifyBearer: async () => testIdentity,
+  loadAuthorization: async () => ({ outcome: 'unauthorized' }),
+  createSession: async () => ({ outcome: 'unauthorized' }),
+  revokeCurrentSession: async () => false,
+  recordDenial: async () => undefined,
+};
+
 function createApp() {
   const app = buildApiApp({
     config: {
@@ -31,6 +46,8 @@ function createApp() {
       corsAllowedOrigins: ['http://localhost:3000'],
     },
     logger: new SilentLogger(),
+    adminAuthGateway: inactiveAdminGateway,
+    adminSessionTtlMinutes: 60,
   });
   apps.push(app);
   return app;

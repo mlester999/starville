@@ -1,5 +1,12 @@
 import { parsePublicBrowserConfig } from '@starville/config/browser';
-import { loadApiConfig, loadRealtimeConfig, loadWorkerConfig } from '@starville/config/server';
+import {
+  loadAdminSecurityConfig,
+  loadAdminRecoveryConfig,
+  loadApiConfig,
+  loadHostedSupabaseSafetyConfig,
+  loadRealtimeConfig,
+  loadWorkerConfig,
+} from '@starville/config/server';
 import { environmentNameSchema, portSchema } from '@starville/shared-validation';
 
 function required(name: string): string {
@@ -51,11 +58,24 @@ const serverConfigurations = [
   loadWorkerConfig(process.env),
 ];
 
+const adminSecurity = loadAdminSecurityConfig(process.env);
+loadAdminRecoveryConfig(process.env);
+const hostedSupabase = loadHostedSupabaseSafetyConfig(process.env);
+
 process.stdout.write(
   `${JSON.stringify({
     status: 'ok',
     applications: publicConfigurations.map(({ application }) => application),
     frontendPorts,
     services: serverConfigurations.map(({ application }) => application),
+    adminSessionTtlMinutes: adminSecurity.sessionTtlMinutes,
+    supabase: {
+      environment: hostedSupabase.environment,
+      projectRef: hostedSupabase.projectRef,
+      projectHostname: hostedSupabase.projectHostname,
+      remoteWritesApproved: hostedSupabase.remoteWritesApproved,
+      hostedTestsApproved: hostedSupabase.hostedTestsApproved,
+      bootstrapEnabled: hostedSupabase.bootstrapEnabled,
+    },
   })}\n`,
 );

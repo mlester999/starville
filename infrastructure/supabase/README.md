@@ -1,34 +1,28 @@
-# Supabase local foundation
+# Hosted Supabase development
 
-This directory is the only Supabase CLI work directory for Starville. It is deliberately separate
-from any other project and has no remote project reference.
+This is Starville's only canonical Supabase CLI workdir. Phase 2 uses the approved hosted
+development project; Docker and a local Supabase stack are not used.
 
-## Safe local workflow
-
-Prerequisites are Docker Desktop (or another compatible Docker daemon), Node.js 22+, and pnpm 11+.
-The CLI is version-pinned by the root scripts and downloaded with `pnpm dlx`; a global installation
-is not required.
+All remote commands must go through the gated root scripts or include both
+`--workdir infrastructure` and `--linked`. Generated `.temp` link metadata is ignored and must never
+be committed.
 
 ```bash
-pnpm supabase:start
-pnpm supabase:status
-pnpm supabase:stop
+pnpm db:verify-target
+pnpm db:migrations:list
+pnpm db:migrations:dry-run
 ```
 
-Phase 1 contains no product tables, storage buckets, or production seed data. Authentication signup
-is disabled in the local configuration. Later phases must introduce schema through reviewed SQL
-migrations and enable RLS before exposing a table through the Data API.
-
-Do not run `db reset`, `db push`, `link`, or any remote command against an unknown project. Linking
-a hosted Supabase project and applying remote migrations always requires explicit owner approval.
+Migration push, hosted tests, and bootstrap each require their documented explicit gates. Never run
+reset, migration-down, truncate, schema-drop, or broad cleanup against the hosted project. See the
+[hosted development runbook](../../docs/deployment/hosted-supabase-development.md).
 
 ## Layout
 
-- `config.toml` defines local-only service ports and secure defaults.
-- `migrations/` contains ordered SQL migrations once a phase has an actual schema need.
-- `tests/` will contain database and RLS policy tests alongside the migrations that introduce them.
+- `config.toml` is the canonical CLI configuration.
+- `migrations/` contains immutable ordered schema changes.
+- `tests/` contains pgTAP assertions executed only against the verified linked project.
+- `.temp/` contains ignored machine-local link metadata.
 
-See [the database package guide](../../packages/database/README.md) for naming and type-generation
-rules once that package is installed, and
-[the Phase 1 trust-boundary document](../../docs/security/phase-1-trust-boundaries.md) for access
-rules.
+Phase 2 creates only administrator authorization tables. No player, wallet, gameplay, map, item,
+economy, token, or reward tables are present.

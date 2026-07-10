@@ -1,8 +1,15 @@
-# Database policy tests
+# Hosted database policy tests
 
-Database and Row Level Security tests belong here when a migration first introduces an exposed
-table. Phase 1 has no schema, so there are no fabricated policies to test.
+`admin_authorization.test.sql` uses pgTAP to verify the six-table catalog, deterministic metadata,
+RLS enablement, and absence of direct anonymous/authenticated mutations. Run it only through:
 
-Each future policy suite must cover anonymous, owning player, other player, authenticated non-admin,
-authorized administrator, suspended administrator, and privileged server behavior as applicable.
-Tests must run against the local Supabase stack and never against a hosted production project.
+```bash
+pnpm db:test:hosted
+```
+
+The separate `pnpm rls:test:hosted` suite uses real temporary Auth sessions for RLS, API, and
+revocation behavior. Both commands verify the exact development target and require
+`RUN_HOSTED_SUPABASE_TESTS=true`.
+
+Tests must never reset, truncate, drop, roll back unrelated migrations, or delete unknown data.
+Fixture cleanup is exact-ID scoped and cleanup failure is a test failure.

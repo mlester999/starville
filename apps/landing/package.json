@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "node ./scripts/run-next.mjs dev",
+    "dev": "node ../../scripts/with-env.mjs --profile landing node ./scripts/run-next.mjs dev",
     "build": "next build",
     "start": "node ./scripts/run-next.mjs start",
     "lint": "eslint .",

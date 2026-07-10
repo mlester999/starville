@@ -1,14 +1,34 @@
 import { existsSync, readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import { parse } from 'dotenv';
+import { selectEnvironmentProfile } from './environment-profiles.mjs';
 
 const rawArguments = process.argv.slice(2);
 const explicitEnvironment = {};
+let profileName;
 
-while (rawArguments[0] === '--set') {
-  rawArguments.shift();
+while (rawArguments[0] === '--set' || rawArguments[0] === '--profile') {
+  const option = rawArguments.shift();
+
+  if (option === '--profile') {
+    const value = rawArguments.shift();
+
+    if (value === undefined || value.startsWith('--')) {
+      throw new Error('--profile requires a named environment profile');
+    }
+
+    if (profileName !== undefined) {
+      throw new Error('--profile may be specified only once');
+    }
+
+    profileName = value;
+    continue;
+  }
+
   const assignment = rawArguments.shift();
   const separator = assignment?.indexOf('=') ?? -1;
 
@@ -22,20 +42,30 @@ while (rawArguments[0] === '--set') {
 const [command, ...args] = rawArguments;
 
 if (!command) {
-  process.stderr.write('Usage: node scripts/with-env.mjs [--set NAME=value] <command> [...args]\n');
+  process.stderr.write(
+    'Usage: node scripts/with-env.mjs [--profile NAME] [--set NAME=value] <command> [...args]\n',
+  );
   process.exitCode = 1;
 } else {
-  const readEnvironmentFile = (path) => (existsSync(path) ? parse(readFileSync(path, 'utf8')) : {});
+  const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const readEnvironmentFile = (name) => {
+    const path = resolve(repositoryRoot, name);
+    return existsSync(path) ? parse(readFileSync(path, 'utf8')) : {};
+  };
 
   // Documented values make clean checkouts runnable. Local files override the
   // examples, and explicitly exported shell variables retain highest priority.
-  const environment = {
+  const loadedEnvironment = {
     ...readEnvironmentFile('.env.example'),
     ...readEnvironmentFile('.env'),
     ...readEnvironmentFile('.env.local'),
     ...process.env,
     ...explicitEnvironment,
   };
+  const environment =
+    profileName === undefined
+      ? loadedEnvironment
+      : selectEnvironmentProfile(profileName, loadedEnvironment);
 
   const child = spawn(command, args, {
     env: environment,

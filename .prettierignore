@@ -8,3 +8,4 @@ pnpm-lock.yaml
 packages/database/src/database.types.generated.ts
 AGENTS.md
 docs/STARVILLE_MASTER_SPEC.md
+/supabase/.temp/

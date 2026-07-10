@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { buildApiApp } from './app.js';
-import type { ApiRuntimeConfig, ServiceLogger } from './contracts.js';
+import type { AdminAuthGateway, ApiRuntimeConfig, ServiceLogger } from './contracts.js';
 
 export interface ApiService {
   readonly app: FastifyInstance;
@@ -11,10 +11,17 @@ export interface ApiService {
 export interface CreateApiServiceOptions {
   readonly config: ApiRuntimeConfig;
   readonly logger: ServiceLogger;
+  readonly adminAuthGateway: AdminAuthGateway;
+  readonly adminSessionTtlMinutes: number;
 }
 
-export function createApiService({ config, logger }: CreateApiServiceOptions): ApiService {
-  const app = buildApiApp({ config, logger });
+export function createApiService({
+  config,
+  logger,
+  adminAuthGateway,
+  adminSessionTtlMinutes,
+}: CreateApiServiceOptions): ApiService {
+  const app = buildApiApp({ config, logger, adminAuthGateway, adminSessionTtlMinutes });
 
   return {
     app,

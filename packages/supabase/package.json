@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/browser.ts",
     "./browser": "./src/browser.ts",
+    "./ssr": "./src/ssr.ts",
     "./server": "./src/server.ts",
     "./types": "./src/types.ts"
   },
@@ -19,6 +20,7 @@
   "dependencies": {
     "@starville/shared-validation": "workspace:*",
     "@supabase/supabase-js": "^2.78.0",
+    "@supabase/ssr": "^0.12.0",
     "zod": "^4.1.12"
   }
 }

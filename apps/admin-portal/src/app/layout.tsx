@@ -8,7 +8,7 @@ import type { ReactNode } from 'react';
 // eslint-disable-next-line react-refresh/only-export-components
 export const metadata: Metadata = {
   title: 'Starville Admin',
-  description: 'The Starville administration application foundation.',
+  description: 'Secure administration for authorized Starville staff.',
   robots: {
     index: false,
     follow: false,

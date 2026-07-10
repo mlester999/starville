@@ -1,45 +1,35 @@
 # `@starville/database`
 
-This Phase 1 package owns database conventions and migration-name validation. The canonical Supabase
-project and SQL migration directory live at `infrastructure/supabase/` and
-`infrastructure/supabase/migrations/`; application code must not invent a second migration location.
+This package validates migration naming and statically checks Phase 2 migration invariants. The
+canonical CLI project is `infrastructure/supabase`; application packages must not create another
+migration directory.
 
-## Migrations
-
-Migration files use a valid UTC timestamp followed by a focused lowercase snake-case description:
+Migration files use a valid UTC timestamp and lowercase snake-case description:
 
 ```text
 YYYYMMDDHHMMSS_short_description.sql
 ```
 
-Create changes through the local Supabase CLI, review the generated SQL, and keep each migration
-narrowly reversible. Phase 1 intentionally creates no player, economy, reward, item, map, or
-administrator tables.
+Phase 2 contains three ordered administrator migrations: schema/security triggers, deterministic
+role-permission metadata, then trusted functions/RLS. Existing migration files are immutable after
+hosted application; later changes require a new migration.
 
-Never reset, push, or repair an unknown remote database from a development command. Remote database
-changes require explicit project-owner approval.
+## Generated types
 
-## Local development and generated types
+Generate database definitions only from the verified hosted development project after its migration
+history is current:
 
-Start and inspect the isolated local stack from the repository root:
-
-```sh
-pnpm supabase:start
-pnpm supabase:status
-pnpm supabase:stop
+```bash
+pnpm exec supabase --workdir infrastructure gen types typescript --linked --schema public \
+  > packages/database/src/database.types.generated.ts
 ```
 
-After local migrations are applied, generate TypeScript definitions from the local database only:
+Review generated changes before use. Do not hand-author a file that claims to reflect an unapplied
+database, and never generate from production for local development.
 
-```sh
-pnpm dlx supabase@2.109.1 --workdir infrastructure gen types typescript --local --schema public > packages/database/src/database.types.generated.ts
-```
+## Safety
 
-Generated definitions reflect the database; hand-authored speculative table types are not allowed.
-
-## Development seeds
-
-Seed SQL belongs to the local Supabase project and must contain development-only data. It must never
-contain production exports, real player information, credentials, wallet secrets, or fabricated
-records presented as production data. Production seeding is a separate, explicitly authorized
-deployment operation.
+Use the root target verifier, list, and dry-run commands before any push. No
+reset/down/truncate/drop script exists. System role/permission rows are metadata, not fake
+production users or gameplay data. See
+[hosted Supabase development](../../docs/deployment/hosted-supabase-development.md).

@@ -58,6 +58,10 @@ function isSensitiveKey(key: string): boolean {
     normalized.includes('privatekey') ||
     normalized.includes('seedphrase') ||
     normalized.includes('recoveryphrase') ||
+    normalized.includes('recoverytoken') ||
+    normalized.includes('recoverycode') ||
+    normalized.includes('callbackcode') ||
+    normalized.includes('mfasecret') ||
     normalized.includes('mnemonic') ||
     normalized.includes('servicerole') ||
     normalized.includes('databaseurl') ||
@@ -68,6 +72,7 @@ function isSensitiveKey(key: string): boolean {
     normalized === 'credentials' ||
     normalized.endsWith('credentials') ||
     normalized === 'cookie' ||
+    normalized === 'cookies' ||
     normalized === 'setcookie' ||
     normalized === 'secret' ||
     normalized.endsWith('secret')
@@ -83,11 +88,13 @@ function sanitizeString(value: string): string {
     return '[REDACTED_DATABASE_URL]';
   }
 
-  if (/https?:\/\/\S*(?:api[_-]?key|token|secret|signature)=/i.test(value)) {
+  if (/https?:\/\/\S*(?:api[_-]?key|code|token|secret|signature)=/i.test(value)) {
     return '[REDACTED_SECRET_URL]';
   }
 
   return value
+    .replaceAll(/\bsb_secret_[A-Za-z0-9_-]+\b/g, '[REDACTED_SUPABASE_SECRET]')
+    .replaceAll(/([?&](?:api[_-]?key|code|token|secret|signature)=)[^&#\s]+/gi, '$1[REDACTED]')
     .replaceAll(/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]')
     .replaceAll(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[REDACTED_TOKEN]');
 }

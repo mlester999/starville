@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "node ../../scripts/with-env.mjs --profile game-client vite",
     "build": "vite build",
     "preview": "vite preview",
     "lint": "eslint .",

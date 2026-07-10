@@ -58,6 +58,24 @@ export interface PrivateSupabaseConfig {
   readonly databaseUrl?: string;
 }
 
+export interface AdminSecurityConfig {
+  readonly sessionTtlMinutes: number;
+  readonly requireMfaByDefault: boolean;
+}
+
+export interface AdminRecoveryConfig {
+  readonly cookieSigningSecret: string;
+}
+
+export interface HostedSupabaseSafetyConfig {
+  readonly environment: 'development';
+  readonly projectRef: string;
+  readonly projectHostname: string;
+  readonly remoteWritesApproved: boolean;
+  readonly hostedTestsApproved: boolean;
+  readonly bootstrapEnabled: boolean;
+}
+
 function loadEnvironment(env: EnvironmentVariables): EnvironmentName {
   return environmentNameSchema.parse(env['NODE_ENV'] ?? 'development');
 }
@@ -65,6 +83,21 @@ function loadEnvironment(env: EnvironmentVariables): EnvironmentName {
 function defaultLogLevel(environment: EnvironmentName): LogLevel {
   return environment === 'production' ? 'info' : 'debug';
 }
+
+const strictBooleanSchema = z.enum(['true', 'false']).transform((value) => value === 'true');
+
+function safeBoolean(value: string | undefined, variableName: string): boolean {
+  try {
+    return strictBooleanSchema.parse(value ?? 'false');
+  } catch {
+    throw new Error(`${variableName} must be either true or false`);
+  }
+}
+
+const supabaseProjectRefSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9]{20}$/, 'Supabase project reference must be 20 lowercase characters');
 
 function loadOrigins(
   value: string | undefined,
@@ -130,10 +163,98 @@ export function loadWorkerConfig(env: EnvironmentVariables): WorkerConfig {
   };
 }
 
+export function loadAdminSecurityConfig(env: EnvironmentVariables): AdminSecurityConfig {
+  const sessionTtlMinutes = positiveIntegerSchema
+    .max(60, 'Administrator session TTL must not exceed 60 minutes')
+    .parse(env['ADMIN_SESSION_TTL_MINUTES'] ?? 60);
+
+  return {
+    sessionTtlMinutes,
+    requireMfaByDefault: safeBoolean(
+      env['ADMIN_REQUIRE_MFA_BY_DEFAULT'],
+      'ADMIN_REQUIRE_MFA_BY_DEFAULT',
+    ),
+  };
+}
+
+export function loadAdminRecoveryConfig(env: EnvironmentVariables): AdminRecoveryConfig {
+  return {
+    cookieSigningSecret: z
+      .string()
+      .min(32, 'ADMIN_RECOVERY_COOKIE_SECRET must contain at least 32 characters')
+      .parse(env['ADMIN_RECOVERY_COOKIE_SECRET']),
+  };
+}
+
+export function loadHostedSupabaseSafetyConfig(
+  env: EnvironmentVariables,
+): HostedSupabaseSafetyConfig {
+  const environment = z.literal('development').parse(env['SUPABASE_ENVIRONMENT']);
+  const projectRef = supabaseProjectRefSchema.parse(env['SUPABASE_PROJECT_REF']);
+  const url = httpUrlSchema.parse(env['NEXT_PUBLIC_SUPABASE_URL']);
+  const parsedUrl = new URL(url);
+  const expectedHostname = `${projectRef}.supabase.co`;
+
+  if (parsedUrl.hostname !== expectedHostname) {
+    throw new Error('Supabase URL hostname does not match SUPABASE_PROJECT_REF');
+  }
+
+  return {
+    environment,
+    projectRef,
+    projectHostname: parsedUrl.hostname,
+    remoteWritesApproved: safeBoolean(
+      env['SUPABASE_REMOTE_WRITES_APPROVED'],
+      'SUPABASE_REMOTE_WRITES_APPROVED',
+    ),
+    hostedTestsApproved: safeBoolean(env['RUN_HOSTED_SUPABASE_TESTS'], 'RUN_HOSTED_SUPABASE_TESTS'),
+    bootstrapEnabled: safeBoolean(env['ADMIN_BOOTSTRAP_ENABLED'], 'ADMIN_BOOTSTRAP_ENABLED'),
+  };
+}
+
+export function assertRemoteMigrationWriteApproved(config: HostedSupabaseSafetyConfig): void {
+  if (!config.remoteWritesApproved) {
+    throw new Error(
+      'Remote migration push is blocked: SUPABASE_REMOTE_WRITES_APPROVED is not true',
+    );
+  }
+}
+
+export function assertHostedTestsApproved(config: HostedSupabaseSafetyConfig): void {
+  if (!config.hostedTestsApproved) {
+    throw new Error('Hosted tests are blocked: RUN_HOSTED_SUPABASE_TESTS is not true');
+  }
+}
+
+export function assertAdminBootstrapWriteApproved(config: HostedSupabaseSafetyConfig): void {
+  assertRemoteMigrationWriteApproved(config);
+
+  if (!config.bootstrapEnabled) {
+    throw new Error('Bootstrap is blocked: ADMIN_BOOTSTRAP_ENABLED is not true');
+  }
+}
+
+export function assertDatabaseUrlMatchesProjectRef(databaseUrl: string, projectRef: string): void {
+  const url = new URL(databaseUrl);
+  const directHostname = `db.${projectRef}.supabase.co`;
+  const isDirectProjectHost = url.hostname === directHostname;
+  const isSupabasePooler =
+    url.hostname === 'pooler.supabase.com' || url.hostname.endsWith('.pooler.supabase.com');
+  const decodedUsername = decodeURIComponent(url.username);
+  const isProjectQualifiedPoolerUser = decodedUsername === `postgres.${projectRef}`;
+
+  if (!isDirectProjectHost && !(isSupabasePooler && isProjectQualifiedPoolerUser)) {
+    throw new Error('Supabase database URL does not match the verified project reference');
+  }
+}
+
 const privateSupabaseConfigSchema = z
   .object({
-    url: httpUrlSchema,
-    serviceRoleKey: z.string().trim().min(1, 'Supabase service-role key is required'),
+    url: z.string({ error: 'NEXT_PUBLIC_SUPABASE_URL is required by the API' }).pipe(httpUrlSchema),
+    serviceRoleKey: z
+      .string({ error: 'SUPABASE_SERVICE_ROLE_KEY is required by the API' })
+      .trim()
+      .min(1, 'SUPABASE_SERVICE_ROLE_KEY is required by the API'),
     databaseUrl: z
       .string()
       .trim()
