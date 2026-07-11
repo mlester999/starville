@@ -3,18 +3,21 @@ import { describe, expect, it } from 'vitest';
 import { inspectBrowserOutput } from './browser-secret-boundary';
 
 describe('browser output secret boundary', () => {
-  it.each(['SUPABASE_SERVICE_ROLE_KEY', 'SUPABASE_DATABASE_URL', 'ADMIN_RECOVERY_COOKIE_SECRET'])(
-    'detects the server-only identifier %s',
-    (identifier) => {
-      expect(
-        inspectBrowserOutput({
-          content: Buffer.from(`window.__invalid__ = '${identifier}'`),
-          path: 'fixture.js',
-          secrets: {},
-        }),
-      ).toHaveLength(1);
-    },
-  );
+  it.each([
+    'SUPABASE_SERVICE_ROLE_KEY',
+    'SUPABASE_DATABASE_URL',
+    'ADMIN_RECOVERY_COOKIE_SECRET',
+    'SOLANA_RPC_URL',
+    'TOKEN_ACCESS_COOKIE_SECRET',
+  ])('detects the server-only identifier %s', (identifier) => {
+    expect(
+      inspectBrowserOutput({
+        content: Buffer.from(`window.__invalid__ = '${identifier}'`),
+        path: 'fixture.js',
+        secrets: {},
+      }),
+    ).toHaveLength(1);
+  });
 
   it('detects actual local secret values without printing them', () => {
     expect(

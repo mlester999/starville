@@ -21,6 +21,9 @@ const fixtureEnvironment = {
   NEXT_PUBLIC_ADMIN_URL: 'http://localhost:3002',
   NEXT_PUBLIC_API_URL: 'http://localhost:4000',
   NEXT_PUBLIC_REALTIME_URL: 'ws://localhost:4001',
+  NEXT_PUBLIC_REOWN_PROJECT_ID: 'public-reown-project-id',
+  NEXT_PUBLIC_STARVILLE_X_URL: 'https://x.com/starville',
+  NEXT_PUBLIC_STARVILLE_DISCORD_URL: 'https://discord.gg/starville',
   NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-anonymous-placeholder',
   SUPABASE_SERVICE_ROLE_KEY: 'server-only-placeholder',
@@ -30,6 +33,13 @@ const fixtureEnvironment = {
   RUN_HOSTED_SUPABASE_TESTS: 'false',
   ADMIN_BOOTSTRAP_ENABLED: 'false',
   ADMIN_SESSION_TTL_MINUTES: '60',
+  SOLANA_NETWORK: 'devnet',
+  SOLANA_RPC_URL: 'https://api.devnet.solana.com/private-provider-path',
+  GAME_TOKEN_MINT_ADDRESS: 'So11111111111111111111111111111111111111112',
+  GAME_TOKEN_SYMBOL: 'STAR',
+  GAME_TOKEN_GATE_AMOUNT: '1000',
+  TOKEN_GATE_ENABLED: 'true',
+  TOKEN_ACCESS_COOKIE_SECRET: 'independent-token-access-cookie-secret',
 };
 
 function packageJson(path) {
@@ -78,7 +88,24 @@ describe('development environment profiles', () => {
       const environment = selectEnvironmentProfile(profile, fixtureEnvironment);
       expect(environment).not.toHaveProperty('SUPABASE_SERVICE_ROLE_KEY');
       expect(environment).not.toHaveProperty('SUPABASE_DATABASE_URL');
+      expect(environment).not.toHaveProperty('SOLANA_RPC_URL');
+      expect(environment).not.toHaveProperty('TOKEN_ACCESS_COOKIE_SECRET');
     }
+  });
+
+  it('supplies wallet browser configuration only to landing and private verification only to API', () => {
+    const landing = selectEnvironmentProfile('landing', fixtureEnvironment);
+    const api = selectEnvironmentProfile('api', fixtureEnvironment);
+
+    expect(landing).toHaveProperty('NEXT_PUBLIC_REOWN_PROJECT_ID');
+    expect(landing).toHaveProperty('NEXT_PUBLIC_STARVILLE_X_URL');
+    expect(landing).toHaveProperty('NEXT_PUBLIC_STARVILLE_DISCORD_URL');
+    expect(landing).toHaveProperty('NEXT_PUBLIC_GAME_URL');
+    expect(landing).toHaveProperty('SOLANA_NETWORK', 'devnet');
+    expect(landing).not.toHaveProperty('SOLANA_RPC_URL');
+    expect(api).toHaveProperty('SOLANA_RPC_URL');
+    expect(api).toHaveProperty('TOKEN_ACCESS_COOKIE_SECRET');
+    expect(api).not.toHaveProperty('NEXT_PUBLIC_REOWN_PROJECT_ID');
   });
 
   it('limits the recovery secret to the admin portal server runtime', () => {

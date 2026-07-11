@@ -504,6 +504,30 @@ a {
   grid-column: 3;
 }
 
+.portal-nav {
+  display: flex;
+  min-height: 3.25rem;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem clamp(1.25rem, 5vw, 4rem);
+  border-bottom: 1px solid var(--admin-line);
+  background: rgb(255 255 252 / 48%);
+}
+
+.portal-nav a {
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.55rem;
+  color: var(--admin-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.portal-nav a:hover {
+  color: var(--admin-text);
+  background: rgb(75 128 103 / 8%);
+}
+
 .overview {
   width: min(100% - 2.5rem, 68rem);
   margin: 0 auto;
@@ -625,6 +649,340 @@ a {
   line-height: 1.6;
 }
 
+.token-access-page {
+  width: min(100% - 2.5rem, 82rem);
+  margin: 0 auto;
+  padding: clamp(2.5rem, 6vw, 5rem) 0 5rem;
+}
+
+.token-access-intro {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+}
+
+.token-access-intro h1 {
+  margin: 0;
+  font-family: var(--starville-font-display, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-size: clamp(2.3rem, 5vw, 3.8rem);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1;
+}
+
+.token-access-intro > div > p:last-child {
+  max-width: 45rem;
+  margin: 1rem 0 0;
+  color: var(--admin-text-muted);
+  line-height: 1.7;
+}
+
+.permission-badge,
+.config-status {
+  display: inline-flex;
+  height: fit-content;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.42rem 0.7rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  color: var(--admin-text-muted);
+  background: var(--admin-surface);
+  font-size: 0.66rem;
+  font-weight: 730;
+  white-space: nowrap;
+}
+
+.token-access-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(18rem, 0.75fr);
+  gap: 1.25rem;
+  align-items: start;
+  margin-top: 2.25rem;
+}
+
+.token-config-card,
+.token-metadata,
+.token-access-unavailable {
+  border: 1px solid var(--admin-line);
+  border-radius: 1.1rem;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.token-config-card {
+  padding: clamp(1.4rem, 3vw, 2.25rem);
+}
+
+.token-config-card__header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--admin-line);
+}
+
+.token-config-card h2,
+.token-metadata h2,
+.token-access-unavailable h2 {
+  margin: 0;
+  font-family: var(--starville-font-display, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-size: clamp(1.35rem, 3vw, 1.9rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.config-status {
+  text-transform: capitalize;
+}
+
+.config-status span {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: 50%;
+  background: var(--admin-gold);
+}
+
+.config-status--available {
+  border-color: rgb(40 115 86 / 25%);
+  color: var(--admin-success);
+  background: rgb(40 115 86 / 6%);
+}
+
+.config-status--available span {
+  background: var(--admin-success);
+}
+
+.token-config-form {
+  margin-top: 1.6rem;
+}
+
+.token-config-form fieldset {
+  display: grid;
+  gap: 1.2rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.token-config-form fieldset:disabled {
+  opacity: 0.78;
+}
+
+.token-form-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.field textarea {
+  width: 100%;
+  min-height: 6rem;
+  padding: 0.72rem 0.9rem;
+  resize: vertical;
+  border: 1px solid var(--admin-line-strong);
+  border-radius: 0.7rem;
+  color: var(--admin-text);
+  background: var(--admin-surface-solid);
+}
+
+.field textarea:hover {
+  border-color: var(--admin-forest);
+}
+
+.field textarea:focus {
+  border-color: var(--admin-forest);
+  box-shadow: 0 0 0 0.22rem rgb(51 119 92 / 14%);
+  outline: none;
+}
+
+.field--switch {
+  display: flex;
+  min-height: 4.5rem;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.75rem;
+  background: rgb(65 117 93 / 4%);
+}
+
+.field--switch p {
+  margin: 0.2rem 0 0;
+  color: var(--admin-text-muted);
+  font-size: 0.69rem;
+}
+
+.field--switch input {
+  width: 2.7rem;
+  min-height: 1.45rem;
+  flex: 0 0 auto;
+  accent-color: var(--admin-success);
+}
+
+.confirmation-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid rgb(183 134 47 / 28%);
+  border-radius: 0.7rem;
+  color: var(--admin-text-muted);
+  background: rgb(183 134 47 / 5%);
+  font-size: 0.72rem;
+  line-height: 1.55;
+}
+
+.confirmation-field input {
+  margin-top: 0.2rem;
+  accent-color: var(--admin-gold);
+}
+
+.token-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  padding-top: 0.3rem;
+}
+
+.read-only-notice {
+  margin: 1.3rem 0 0;
+  color: var(--admin-text-muted);
+  font-size: 0.75rem;
+}
+
+.read-only-notice code {
+  color: var(--admin-text);
+}
+
+.admin-action-result {
+  margin-top: 1.2rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.7rem;
+  color: var(--admin-text-muted);
+  background: rgb(255 255 255 / 4%);
+  font-size: 0.75rem;
+}
+
+.admin-action-result--success {
+  border-color: rgb(40 115 86 / 30%);
+  background: rgb(40 115 86 / 5%);
+}
+
+.admin-action-result--error {
+  border-color: rgb(158 73 63 / 30%);
+  background: rgb(158 73 63 / 5%);
+}
+
+.admin-action-result strong {
+  color: var(--admin-text);
+}
+
+.admin-action-result p {
+  margin: 0.25rem 0 0;
+}
+
+.admin-action-result dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin: 0.8rem 0 0;
+}
+
+.admin-action-result dt {
+  font-size: 0.62rem;
+}
+
+.admin-action-result dd {
+  margin: 0.15rem 0 0;
+  overflow: hidden;
+  color: var(--admin-text);
+  font-weight: 650;
+  text-overflow: ellipsis;
+}
+
+.token-metadata {
+  position: sticky;
+  top: 1.25rem;
+  padding: 1.5rem;
+}
+
+.token-metadata > div:first-child > p:last-child {
+  margin: 0.75rem 0 0;
+  color: var(--admin-text-muted);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.token-metadata dl {
+  display: grid;
+  gap: 0;
+  margin: 1.3rem 0 0;
+  border-top: 1px solid var(--admin-line);
+}
+
+.token-metadata dl div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 1rem;
+  padding: 0.72rem 0;
+  border-bottom: 1px solid var(--admin-line);
+}
+
+.token-metadata dt {
+  color: var(--admin-text-muted);
+  font-size: 0.67rem;
+}
+
+.token-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--admin-text);
+  font-size: 0.69rem;
+  font-weight: 680;
+  text-align: right;
+}
+
+.token-security-note {
+  display: flex;
+  gap: 0.65rem;
+  margin-top: 1.25rem;
+  color: var(--admin-text-muted);
+  font-size: 0.68rem;
+  line-height: 1.55;
+}
+
+.token-security-note span {
+  color: var(--admin-mint);
+}
+
+.token-security-note p {
+  margin: 0;
+}
+
+.token-access-unavailable {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1rem;
+  margin-top: 2rem;
+  padding: clamp(1.5rem, 4vw, 2.5rem);
+}
+
+.token-access-unavailable > span {
+  color: var(--admin-gold);
+}
+
+.token-access-unavailable p {
+  max-width: 38rem;
+  margin: 0.65rem 0 1.2rem;
+  color: var(--admin-text-muted);
+}
+
 .state-shell {
   display: grid;
   min-height: 100vh;
@@ -735,6 +1093,14 @@ a {
     grid-row: auto;
     grid-column: 1;
   }
+
+  .token-access-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .token-metadata {
+    position: static;
+  }
 }
 
 @media (max-width: 560px) {
@@ -762,6 +1128,28 @@ a {
   .access-details {
     grid-row: 3;
   }
+
+  .token-access-page {
+    width: min(100% - 1.5rem, 82rem);
+  }
+
+  .token-access-intro {
+    align-items: start;
+    flex-direction: column;
+  }
+
+  .token-form-columns,
+  .admin-action-result dl {
+    grid-template-columns: 1fr;
+  }
+
+  .token-form-actions {
+    display: grid;
+  }
+
+  .token-form-actions .button {
+    width: 100%;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -786,6 +1174,10 @@ a {
 
   .portal-header {
     background: rgb(17 29 25 / 78%);
+  }
+
+  .portal-nav {
+    background: rgb(17 29 25 / 52%);
   }
 
   .notice {

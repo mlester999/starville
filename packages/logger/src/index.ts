@@ -61,6 +61,13 @@ function isSensitiveKey(key: string): boolean {
     normalized.includes('recoverytoken') ||
     normalized.includes('recoverycode') ||
     normalized.includes('callbackcode') ||
+    normalized.includes('walletsignature') ||
+    normalized.includes('signedmessage') ||
+    normalized.includes('challengenonce') ||
+    normalized.includes('sessiontoken') ||
+    normalized.includes('tokensession') ||
+    normalized.includes('accesstokenhash') ||
+    normalized.includes('sessiontokenhash') ||
     normalized.includes('mfasecret') ||
     normalized.includes('mnemonic') ||
     normalized.includes('servicerole') ||
@@ -68,6 +75,8 @@ function isSensitiveKey(key: string): boolean {
     normalized.includes('connectionstring') ||
     normalized.includes('rpcurl') ||
     normalized === 'token' ||
+    normalized === 'signature' ||
+    normalized === 'nonce' ||
     normalized === 'apikey' ||
     normalized === 'credentials' ||
     normalized.endsWith('credentials') ||

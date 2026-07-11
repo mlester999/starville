@@ -4,21 +4,24 @@ Starville is a premium 2D isometric cozy multiplayer life-simulation game platfo
 contains the public website, player client, administrator portal, authoritative API, dedicated
 real-time service, background worker, shared packages, and Supabase infrastructure.
 
-The active implementation scope is **Phase 2 of 9: Administrator Authorization Foundation**. Phase 1
-established the monorepo and six application boundaries; Phase 2 adds Supabase administrator
-identity, database-backed roles and permissions, trusted administrator sessions, protected admin
-routes and API access, MFA-aware authorization, password recovery, audit records, and hosted RLS
-validation. It does not implement Phase 3 wallet or token access or the Phase 5 operations portal.
+The active implementation scope is **Phase 3 of 9: Landing Page and Token Access**. Phase 1
+established the monorepo and six application boundaries; Phase 2 added trusted administrator
+authorization. Phase 3 adds the original fullscreen landing experience, Reown AppKit for Solana
+wallet connection, server-generated signed challenges, exact server-side token verification,
+revocable HttpOnly access sessions, a fail-closed game entry boundary, and the focused protected
+Token Access admin page. It does not implement Phase 4 gameplay or later systems.
 
 ## Requirements
 
 - Node.js 22 or later
 - pnpm 11.9.0 (declared through the `packageManager` field)
-- Access to the approved hosted Starville Development Supabase project for Phase 2 database and Auth
-  integration validation
+- Access to the approved hosted Starville Development Supabase project for database/Auth integration
+  validation after explicit operation approval
+- A Reown project and owner-approved Solana Devnet mint for live wallet acceptance (repository
+  builds and deterministic tests do not require live wallet credentials)
 
-Docker is not required for the selected Phase 2 hosted-development workflow. The repository's
-installed Supabase CLI is used for hosted commands; a global installation is optional.
+Docker is not required for the selected hosted-development workflow. The repository's installed
+Supabase CLI is used for hosted commands; a global installation is optional.
 
 ## Installation
 
@@ -49,9 +52,18 @@ Edit only `.env.local`; it is ignored by Git. Root commands load values in this 
 4. variables already exported by the shell.
 
 Later entries override earlier entries; `pnpm build` then forces only `NODE_ENV=production` for
-framework correctness. Run `pnpm env:check` to validate the application and Phase 2 server
+framework correctness. Run `pnpm env:check` to validate the application and Phase 3 server
 configuration. Never place a Supabase service-role or modern secret key, database password, private
 RPC credential, wallet key, or seed phrase in a public-prefixed variable.
+
+For an existing ignored `.env.local`, the one-time Phase 3 preparation command copies a legacy
+browser-safe Reown identifier to its explicit public name when needed and generates an independent
+cookie secret without printing either value:
+
+```bash
+pnpm env:phase3:prepare
+pnpm env:check
+```
 
 Development package scripts load the root files through explicit service profiles. Turbo remains in
 strict environment mode and never broadcasts the root environment to every task. This means the
@@ -64,13 +76,15 @@ pnpm --filter @starville/api dev
 pnpm --filter @starville/admin-portal dev
 ```
 
-Landing and game processes receive browser-safe values only. The admin Next.js process additionally
-owns its server-only recovery signing secret for server routes; that value is not public-prefixed
-and is checked against compiled browser output by `pnpm security:scan`. The API alone receives the
-Supabase service-role key. No normal application profile receives the database URL or remote
-migration, hosted-test, or bootstrap approvals.
+Landing and game processes receive browser-safe values only. The landing receives the public Reown
+project identifier; it never receives the Solana RPC URL or token-access cookie secret. The admin
+Next.js process additionally owns its server-only recovery signing secret for server routes; that
+value is not public-prefixed and is checked against compiled browser output by `pnpm security:scan`.
+The API alone receives the Supabase service-role key, private Solana RPC, and token-cookie secret.
+No normal application profile receives the database URL or remote migration, hosted-test, or
+bootstrap approvals.
 
-Phase 2 hosted operations additionally require explicitly configured server-only gates:
+Hosted operations and Phase 3 access additionally require explicitly owned values:
 
 ```dotenv
 SUPABASE_ENVIRONMENT=development
@@ -81,12 +95,23 @@ ADMIN_SESSION_TTL_MINUTES=60
 ADMIN_BOOTSTRAP_ENABLED=false
 ADMIN_REQUIRE_MFA_BY_DEFAULT=false
 ADMIN_RECOVERY_COOKIE_SECRET=<at-least-32-random-characters>
+NEXT_PUBLIC_REOWN_PROJECT_ID=<browser-safe-reown-project-id>
+NEXT_PUBLIC_STARVILLE_X_URL=<optional-owner-approved-https-url>
+NEXT_PUBLIC_STARVILLE_DISCORD_URL=<optional-owner-approved-https-url>
+SOLANA_NETWORK=mainnet-beta
+SOLANA_RPC_URL=<server-only-rpc-url>
+GAME_TOKEN_MINT_ADDRESS=<temporary-owner-approved-mainnet-mint>
+TOKEN_ACCESS_COOKIE_SECRET=<independent-random-server-secret>
 ```
 
 The root template contains placeholders only. Preserve existing real values in the ignored
 `.env.local`, never print them, and never enable bootstrap permanently. See
 [the environment ownership guide](docs/deployment/environment-variables.md) for the authoritative
 variable boundary.
+
+Phase 3 currently uses a temporary Mainnet validation token. It is not the official `$STAR` mint and
+must be replaced through configuration before production launch. The mint address is never hardcoded
+in application or migration source.
 
 ## Running applications
 
@@ -140,9 +165,10 @@ environment has been supplied.
 
 ## Hosted Supabase development
 
-Phase 2 uses only the dedicated hosted Starville Development project. The canonical CLI project is
-`infrastructure/supabase`, so every raw remote command must use `--workdir infrastructure` and
-`--linked`. Do not use Docker or local Supabase for the selected Phase 2 workflow.
+Phases 2 and 3 use only the dedicated hosted Starville Development project. The canonical CLI
+project is `infrastructure/supabase`, so every raw remote command must use
+`--workdir infrastructure` and `--linked`. Do not use Docker or local Supabase for the selected
+Phase 2 and Phase 3 workflow.
 
 Safe read and preview sequence:
 
@@ -166,7 +192,8 @@ pnpm rls:test:hosted
 Hosted tests use unique test-owned identities and exact-ID cleanup. They never reset the database,
 truncate tables, delete unknown Auth users, or use service role as the identity under RLS. This
 README does not assert that a migration push or hosted test has passed; the actual command results
-must be reported by the Phase 2 validation run.
+must be reported by the current validation run. The Phase 3 migrations are currently reviewed and
+dry-run only; remote-write and hosted-test gates remain false.
 
 See [the hosted development runbook](docs/deployment/hosted-supabase-development.md) for target
 verification, raw CLI command forms, hosted Auth redirects, fixture safety, and prohibited
@@ -187,6 +214,8 @@ apps/
 packages/
   config/               Browser/server environment boundaries
   admin-auth/           Typed administrator roles, permissions, and authorization decisions
+  wallet-access/        Canonical challenges, public contracts, exact amounts, session hashing
+  solana/               Server-only address, signature, mint, network, and balance verification
   database/             Migration and type-generation conventions
   design-tokens/        Shared visual primitives
   eslint-config/        Shared lint policy
@@ -204,41 +233,33 @@ infrastructure/
 docs/                   Product specification and focused architecture records
 ```
 
-Wallet, Solana, economy, map-engine, game-core, analytics, and shared UI packages remain omitted
-until their approved phases require real implementation. See
-`docs/architecture/phase-1-foundation.md` for the foundation rationale.
+Economy, map-engine, game-core, analytics, and shared UI packages remain omitted until their
+approved phases require real implementation. See `docs/architecture/phase-1-foundation.md` for the
+foundation rationale.
 
-## Phase 2 administrator behavior
+## Phase 3 behavior
 
-- The landing application presents a small accessible Starville foundation screen and development
-  readiness state. It is not the final fullscreen marketing artwork.
-- The game client keeps React UI separate from Phaser and starts only a plain bootstrap scene. It
-  has no map, player, movement, farming, or token gate.
-- The admin portal supports email/password login, callback and recovery flows, server-side protected
-  routing, unauthorized/session-expired states, verified TOTP challenge for MFA-required sessions,
-  and a minimal authenticated overview. There is no public administrator registration or MFA
-  enrollment screen.
-- The API retains its health/readiness and versioned status routes and adds protected current-admin
-  context at `GET /api/v1/admin/me` with verified identity, trusted session, and permission checks.
-- The real-time service establishes health, origin/capacity checks, connection lifecycle, and an
-  empty room abstraction without gameplay synchronization or administrator identity.
-- The worker establishes health, lifecycle, retry policy, and a safe development no-op job without
-  crop, reward, schedule, or blockchain work.
+- The landing is a responsive, accessible, non-pixel Starville hero with an original lantern-village
+  asset and a 20-state wallet/access dialog. Reown is initialized client-side for only the
+  configured Solana network; connection alone never grants access.
+- The API generates a short-lived canonical message, verifies its exact Ed25519 signature, consumes
+  the challenge atomically, validates the configured network genesis/mint/program/decimals, and sums
+  all valid matching token accounts with `bigint`.
+- Eligible wallets receive a short-lived opaque host-only HttpOnly cookie. PostgreSQL stores only an
+  HMAC, configuration/balance snapshot, expiry, and revocation state. Account/network changes,
+  explicit disconnect, expiry, insufficient recheck, and configuration changes fail closed.
+- The game client asks the trusted `/me` endpoint before mounting Phaser and reconciles/rechecks the
+  session on schedule and focus. It contains no wallet SDK or local access bypass.
+- The protected `/token-access` admin page separates `token_gate.read` from `token_gate.configure`,
+  validates mint metadata through the server RPC, uses optimistic config versions, invalidates stale
+  sessions, and writes administrator audit history.
+- The Phase 2 login, MFA-aware authorization, recovery, session revocation, and role/permission
+  controls remain intact. Player wallet access never grants administrator access.
 
-Administrator access requires a verified Supabase Auth identity plus an active trusted `admin_users`
-record, valid role, required permission, non-revoked trusted session, matching session and
-permission versions, and sufficient verified MFA assurance. A normal Auth user, player account,
-wallet, token balance, or client-supplied role never grants access.
-
-Trusted administrator sessions are limited to 60 minutes. Password recovery requires both verified
-`recovery` authentication-method evidence and a signed, ten-minute HttpOnly marker bound to the same
-Auth user and session. An authoritative `auth.users` password-change trigger increments the trusted
-session version, revokes every pending/active administrator session for that user, and records the
-audit event.
-
-The 12-role, 40-permission initial catalog and exact conservative mappings are documented in
-[roles and permissions](docs/admin/roles-and-permissions.md). Administrator-management UI remains
-deferred to Phase 5.
+The hosted development Mainnet row is validated against a temporary Token-2022 mint for Phase 3
+testing. That mint is not the official `$STAR` token and must be replaced through the protected
+configuration flow before production. Live eligible-wallet acceptance still requires an
+owner-controlled wallet holding the configured threshold.
 
 ## Security foundation
 
@@ -246,9 +267,10 @@ deferred to Phase 5.
   Supabase clients; privileged and server-only administrator modules use separate entry points.
 - The service-role client is exposed only through a server entry point and requires explicit
   validated credentials.
-- Logs redact credentials, authorization values, private-key material, database URLs, and secret RPC
-  URLs.
-- CORS and WebSocket origins are validated allowlists.
+- Logs redact credentials, authorization values, private-key material, database URLs, secret RPC
+  URLs, wallet signatures/messages/nonces, and opaque session material.
+- Credentialed CORS uses exact allowlists; cookie-authenticated mutations additionally require an
+  exact Origin and JSON POST body.
 - Normal unit tests remain deterministic and offline. Hosted database and RLS suites are separate,
   opt-in, target-verified commands that may contact only Starville Development.
 - No public administrator registration, metadata-based role, or fake authentication/MFA bypass
@@ -259,12 +281,10 @@ deferred to Phase 5.
 Read [the Phase 1 trust boundaries](docs/security/phase-1-trust-boundaries.md) before adding an
 external integration.
 
-## Intentionally not implemented in Phase 2
+## Intentionally not implemented in Phase 3
 
-The following are **not started by design** in Phase 2:
+The following are **not started by design** in Phase 3:
 
-- Reown AppKit, wallet signatures, Solana RPC checks, token gating, and access sessions;
-- final landing-page artwork or marketing design;
 - isometric maps, player characters, movement, farming, cooking, crafting, housing, or map editing;
 - marketplace, STARDUST economy, Constellation Points, rewards, claims, or treasury operations;
 - social presence, multiplayer gameplay state, friends, chat, visits, trading, or community systems;
@@ -280,6 +300,12 @@ their pages, APIs, or business operations have been implemented.
 - [Phase 1 architecture](docs/architecture/phase-1-foundation.md)
 - [Trust boundaries](docs/security/phase-1-trust-boundaries.md)
 - [Phase 2 administrator authentication](docs/admin/phase-2-admin-authentication.md)
+- [Phase 3 token-access architecture](docs/architecture/phase-3-token-access.md)
+- [Wallet authentication](docs/security/wallet-authentication.md)
+- [Token-gate verification](docs/security/token-gate-verification.md)
+- [Token-access sessions](docs/wallet/token-access-sessions.md)
+- [Token Access administration](docs/admin/token-access-configuration.md)
+- [Phase 3 wallet operations](docs/deployment/phase-3-wallet-operations.md)
 - [First Super Administrator bootstrap](docs/admin/admin-bootstrap.md)
 - [Roles and permissions](docs/admin/roles-and-permissions.md)
 - [Administrator authorization security](docs/security/admin-authorization.md)

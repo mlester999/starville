@@ -6,7 +6,7 @@ parseLandingPublicConfig(process.env);
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
-  transpilePackages: ['@starville/config', '@starville/design-tokens'],
+  transpilePackages: ['@starville/config', '@starville/design-tokens', '@starville/wallet-access'],
 };
 
 export default nextConfig;

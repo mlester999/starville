@@ -1,4 +1,4 @@
-import { parsePublicBrowserConfig } from '@starville/config/browser';
+import { parseAdditionalPublicHttpUrl, parsePublicBrowserConfig } from '@starville/config/browser';
 
 export interface AdminPublicEnvironment {
   readonly [key: string]: string | undefined;
@@ -8,20 +8,6 @@ export interface AdminPublicEnvironment {
   readonly NEXT_PUBLIC_GAME_URL?: string | undefined;
   readonly NEXT_PUBLIC_SUPABASE_URL?: string | undefined;
   readonly NEXT_PUBLIC_SUPABASE_ANON_KEY?: string | undefined;
-}
-
-function parsePublicHttpUrl(value: string | undefined, variableName: string): string {
-  if (value === undefined || value.trim() === '') {
-    throw new Error(`${variableName} is required`);
-  }
-
-  const url = new URL(value);
-
-  if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) {
-    throw new Error(`${variableName} must be a public HTTP or HTTPS URL without credentials`);
-  }
-
-  return url.toString().replace(/\/$/, '');
 }
 
 export function parseAdminPublicConfig(environment: AdminPublicEnvironment) {
@@ -36,6 +22,10 @@ export function parseAdminPublicConfig(environment: AdminPublicEnvironment) {
 
   return {
     ...config,
-    gameUrl: parsePublicHttpUrl(environment.NEXT_PUBLIC_GAME_URL, 'NEXT_PUBLIC_GAME_URL'),
+    gameUrl: parseAdditionalPublicHttpUrl(
+      environment.NEXT_PUBLIC_GAME_URL,
+      environment.NEXT_PUBLIC_APP_ENV,
+      'NEXT_PUBLIC_GAME_URL',
+    ),
   } as const;
 }

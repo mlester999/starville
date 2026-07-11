@@ -109,4 +109,22 @@ describe('secret redaction', () => {
     expect(serialized).not.toContain('recovery-code');
     expect(serialized).toContain('[REDACTED]');
   });
+
+  it('redacts signed wallet challenges, signatures, nonces, and access-session material', () => {
+    const serialized = JSON.stringify(
+      redactLogValue({
+        signedMessage: 'canonical challenge bytes',
+        walletSignature: 'base64-signature',
+        challengeNonce: 'server-generated-nonce',
+        sessionTokenHash: 'opaque-session-hash',
+        walletAddress: 'safe-public-wallet-address',
+      }),
+    );
+
+    expect(serialized).not.toContain('canonical challenge bytes');
+    expect(serialized).not.toContain('base64-signature');
+    expect(serialized).not.toContain('server-generated-nonce');
+    expect(serialized).not.toContain('opaque-session-hash');
+    expect(serialized).toContain('safe-public-wallet-address');
+  });
 });

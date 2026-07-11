@@ -1,8 +1,8 @@
 # Hosted Supabase development workflow
 
-## Selected Phase 2 environment
+## Selected Phase 2 and Phase 3 environment
 
-Phase 2 uses the dedicated hosted Starville Development Supabase project. Docker and the local
+Phases 2 and 3 use the dedicated hosted Starville Development Supabase project. Docker and the local
 Supabase stack are not required for this selected workflow. The development project is the only
 authorized remote target; a production project or unrelated project must never be linked, migrated,
 tested, bootstrapped, or cleaned by these commands.
@@ -20,7 +20,7 @@ Do not run a remote migration command from the repository root without that opti
 ## Required environment gates
 
 Real values belong only in the ignored `.env.local` or an approved secret manager. Phase 2 remote
-operations use:
+and Phase 3 remote operations use:
 
 ```dotenv
 SUPABASE_ENVIRONMENT=development
@@ -114,7 +114,8 @@ pnpm exec supabase --workdir infrastructure db lint --linked --schema public,pri
 The raw commands do not replace the repository target gates. Prefer the root scripts.
 
 No migration application or hosted lint result is asserted by this document; results must be
-reported from the actual command output during final Phase 2 validation.
+reported from the actual command output during the current validation. The Phase 3 operations
+runbook records the present dry-run-only status.
 
 ## Hosted database and RLS tests
 
@@ -125,17 +126,18 @@ pnpm db:test:hosted
 pnpm rls:test:hosted
 ```
 
-The repository executes the committed pgTAP file through its target-bound PostgreSQL connection:
+The repository executes a fixed allowlist of committed pgTAP files through its target-bound
+PostgreSQL connection:
 
 ```bash
 pnpm db:test:hosted
 ```
 
 The installed Supabase CLI advertises `test db --linked` but still invokes Docker to provide its
-pgTAP runner. The selected Phase 2 workflow does not require Docker, so the repository runner reads
-the committed SQL file, verifies the database URL against the independently verified project
-reference, executes it as one transaction, validates the complete TAP plan, and requires its final
-rollback. It never accepts SQL from command-line or user input.
+pgTAP runner. The selected Phase 2 and Phase 3 workflow does not require Docker, so the repository
+runner reads the committed SQL file, verifies the database URL against the independently verified
+project reference, executes it as one transaction, validates the complete TAP plan, and requires its
+final rollback. It never accepts SQL from command-line or user input.
 
 pgTAP tests cover SQL constraints, grants, RLS policies, triggers, and trusted functions. Hosted
 integration tests additionally use real temporary anonymous and authenticated sessions; service role
@@ -146,8 +148,8 @@ printed, and an exact-ID cleanup manifest. Cleanup may delete only records that 
 matching fixture ownership. Wildcard user deletion, global cleanup, table truncation, schema reset,
 or migration rollback is forbidden. A cleanup failure must fail the command and be reported.
 
-No hosted database or RLS test result is asserted by this document. Phase 2 is only fully validated
-after both commands actually pass and fixture cleanup is confirmed.
+No hosted database or RLS test result is asserted by this document. A hosted phase is only fully
+validated after both commands actually pass and fixture cleanup is confirmed.
 
 ## Hosted Auth settings
 
@@ -195,3 +197,6 @@ Do not run `supabase start`, `stop`, `status`, `db reset`, `migration down`, `DR
 Auth-user deletion, `TRUNCATE`, broad fixture cleanup, or migration rollback against the hosted
 project. Do not run a write when target identity is ambiguous, and do not use a production or
 sibling project to unblock development testing.
+
+Phase 3 mint activation, wallet acceptance, cookie deployment, and the current pending external
+setup are documented in [Phase 3 wallet operations](phase-3-wallet-operations.md).

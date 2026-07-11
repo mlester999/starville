@@ -1,9 +1,43 @@
 import { z } from 'zod';
 
-import { APPLICATION_NAMES, ENVIRONMENT_NAMES } from '@starville/shared-types';
+import {
+  APPLICATION_NAMES,
+  ENVIRONMENT_NAMES,
+  type EnvironmentName,
+} from '@starville/shared-types';
 
 const HTTP_PROTOCOLS = new Set(['http:', 'https:']);
 const WEBSOCKET_PROTOCOLS = new Set(['ws:', 'wss:']);
+
+function isLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.toLowerCase();
+  return (
+    normalized === 'localhost' ||
+    normalized.endsWith('.localhost') ||
+    normalized === '127.0.0.1' ||
+    normalized === '[::1]' ||
+    normalized === '::1'
+  );
+}
+
+export function assertSecureUrlForEnvironment(
+  value: string,
+  environment: EnvironmentName,
+  label: string,
+): void {
+  const url = new URL(value);
+  const secure = url.protocol === 'https:' || url.protocol === 'wss:';
+
+  if (secure) {
+    return;
+  }
+
+  const localDevelopment = environment !== 'production' && isLoopbackHostname(url.hostname);
+
+  if (!localDevelopment) {
+    throw new Error(`${label} must use HTTPS or WSS outside local development`);
+  }
+}
 
 function urlWithProtocolsSchema(protocols: ReadonlySet<string>, label: string) {
   return z

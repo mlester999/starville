@@ -7,8 +7,8 @@ import type { ReactNode } from 'react';
 // Next.js requires route metadata to be exported beside the layout component.
 // eslint-disable-next-line react-refresh/only-export-components
 export const metadata: Metadata = {
-  title: 'Starville',
-  description: 'The public home of Starville.',
+  title: 'Starville · A cozy world beneath the stars',
+  description: 'Farm, cook, build, and restore a magical village with friends in Starville.',
 };
 
 interface RootLayoutProps {

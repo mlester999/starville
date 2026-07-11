@@ -1,7 +1,10 @@
+import { isIP } from 'node:net';
+
 import { z } from 'zod';
 
 import type { EnvironmentName } from '@starville/shared-types';
 import {
+  assertSecureUrlForEnvironment,
   environmentNameSchema,
   hostSchema,
   httpUrlSchema,
@@ -11,6 +14,7 @@ import {
   positiveIntegerSchema,
   type LogLevel,
 } from '@starville/shared-validation';
+import type { WalletNetwork } from '@starville/wallet-access';
 
 export type EnvironmentVariables = Readonly<Record<string, string | undefined>>;
 
@@ -26,6 +30,7 @@ export interface ApiConfig {
   readonly host: string;
   readonly port: number;
   readonly corsAllowedOrigins: readonly string[];
+  readonly trustedProxyCidrs: readonly string[];
   readonly logLevel: LogLevel;
 }
 
@@ -76,6 +81,29 @@ export interface HostedSupabaseSafetyConfig {
   readonly bootstrapEnabled: boolean;
 }
 
+export interface TokenAccessServerConfig {
+  readonly network: WalletNetwork;
+  readonly rpcUrl: string;
+  readonly landingUrl: string;
+  readonly gateEnabled: boolean;
+  readonly mintAddress: string;
+  readonly symbol: string;
+  readonly requiredAmount: string;
+  readonly challengeTtlSeconds: number;
+  readonly sessionTtlSeconds: number;
+  readonly recheckIntervalSeconds: number;
+  readonly cookieSecret: string;
+  readonly commitment: 'confirmed' | 'finalized';
+  readonly rpcTimeoutMs: number;
+  readonly rpcMaximumAttempts: number;
+  readonly rateLimits: {
+    readonly challengesPerMinute: number;
+    readonly verificationsPerFiveMinutes: number;
+    readonly rechecksPerMinute: number;
+    readonly adminValidationsPerMinute: number;
+  };
+}
+
 function loadEnvironment(env: EnvironmentVariables): EnvironmentName {
   return environmentNameSchema.parse(env['NODE_ENV'] ?? 'development');
 }
@@ -108,7 +136,52 @@ function loadOrigins(
     throw new Error(`${variableName} is required in production`);
   }
 
-  return originAllowlistSchema.parse(value ?? DEVELOPMENT_ORIGINS);
+  const origins = originAllowlistSchema.parse(value ?? DEVELOPMENT_ORIGINS);
+
+  for (const origin of origins) {
+    assertSecureUrlForEnvironment(origin, environment, variableName);
+  }
+
+  return origins;
+}
+
+function loadTrustedProxyCidrs(value: string | undefined): readonly string[] {
+  if (value === undefined || value.trim() === '') {
+    return [];
+  }
+
+  const entries = [
+    ...new Set(
+      value
+        .split(',')
+        .map((entry) => entry.trim())
+        .filter(Boolean),
+    ),
+  ];
+
+  if (entries.length > 16) {
+    throw new Error('API_TRUSTED_PROXY_CIDRS must contain no more than 16 entries');
+  }
+
+  for (const entry of entries) {
+    const [address, prefix, ...remainder] = entry.split('/');
+    const family = address === undefined ? 0 : isIP(address);
+
+    if (family === 0 || remainder.length > 0) {
+      throw new Error('API_TRUSTED_PROXY_CIDRS must contain only explicit IP addresses or CIDRs');
+    }
+
+    if (prefix !== undefined) {
+      const prefixLength = Number(prefix);
+      const maximum = family === 4 ? 32 : 128;
+
+      if (!Number.isInteger(prefixLength) || prefixLength < 1 || prefixLength > maximum) {
+        throw new Error('API_TRUSTED_PROXY_CIDRS must not contain unrestricted or invalid CIDRs');
+      }
+    }
+  }
+
+  return entries;
 }
 
 export function loadApiConfig(env: EnvironmentVariables): ApiConfig {
@@ -124,6 +197,7 @@ export function loadApiConfig(env: EnvironmentVariables): ApiConfig {
       environment,
       'CORS_ALLOWED_ORIGINS',
     ),
+    trustedProxyCidrs: loadTrustedProxyCidrs(env['API_TRUSTED_PROXY_CIDRS']),
     logLevel: logLevelSchema.parse(env['LOG_LEVEL'] ?? defaultLogLevel(environment)),
   };
 }
@@ -186,12 +260,126 @@ export function loadAdminRecoveryConfig(env: EnvironmentVariables): AdminRecover
   };
 }
 
+const privateRpcUrlSchema = z
+  .string({ error: 'SOLANA_RPC_URL is required by the API' })
+  .trim()
+  .min(1)
+  .superRefine((value, context) => {
+    try {
+      const url = new URL(value);
+
+      if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
+        context.addIssue({
+          code: 'custom',
+          message: 'SOLANA_RPC_URL must be HTTP(S) and must not use URL credentials',
+        });
+      }
+    } catch {
+      context.addIssue({ code: 'custom', message: 'SOLANA_RPC_URL must be a valid URL' });
+    }
+  });
+
+const base58AddressSchema = z
+  .string({ error: 'GAME_TOKEN_MINT_ADDRESS is required by the API' })
+  .trim()
+  .min(32)
+  .max(44)
+  .regex(/^[1-9A-HJ-NP-Za-km-z]+$/u, 'GAME_TOKEN_MINT_ADDRESS must be base58 encoded');
+const decimalTokenAmountSchema = z
+  .string()
+  .trim()
+  .regex(/^\d+(?:\.\d+)?$/u, 'GAME_TOKEN_GATE_AMOUNT must be a positive decimal string')
+  .refine((value) => /[1-9]/u.test(value), 'GAME_TOKEN_GATE_AMOUNT must be greater than zero');
+const boundedInteger = (minimum: number, maximum: number, label: string) =>
+  positiveIntegerSchema.min(minimum, `${label} must be at least ${minimum}`).max(maximum);
+
+export function loadTokenAccessServerConfig(env: EnvironmentVariables): TokenAccessServerConfig {
+  const environment = loadEnvironment(env);
+  const networkName = z.enum(['devnet', 'mainnet-beta']).parse(env['SOLANA_NETWORK']);
+  const challengeTtlSeconds = boundedInteger(60, 600, 'WALLET_CHALLENGE_TTL_SECONDS').parse(
+    env['WALLET_CHALLENGE_TTL_SECONDS'] ?? 300,
+  );
+  const sessionTtlSeconds = boundedInteger(60, 3_600, 'TOKEN_ACCESS_SESSION_TTL_SECONDS').parse(
+    env['TOKEN_ACCESS_SESSION_TTL_SECONDS'] ?? 900,
+  );
+  const recheckIntervalSeconds = boundedInteger(30, 1_800, 'TOKEN_ACCESS_RECHECK_SECONDS').parse(
+    env['TOKEN_ACCESS_RECHECK_SECONDS'] ?? 300,
+  );
+  const cookieSecret = z
+    .string({ error: 'TOKEN_ACCESS_COOKIE_SECRET is required by the API' })
+    .min(32, 'TOKEN_ACCESS_COOKIE_SECRET must contain at least 32 characters')
+    .parse(env['TOKEN_ACCESS_COOKIE_SECRET']);
+  const forbiddenSecretReuse = [
+    env['SUPABASE_SERVICE_ROLE_KEY'],
+    env['ADMIN_RECOVERY_COOKIE_SECRET'],
+    env['NEXT_PUBLIC_REOWN_PROJECT_ID'],
+    env['REOWN_PROJECT_ID'],
+  ].filter((value): value is string => value !== undefined && value.length > 0);
+
+  if (forbiddenSecretReuse.includes(cookieSecret)) {
+    throw new Error('TOKEN_ACCESS_COOKIE_SECRET must be an independent secret');
+  }
+
+  if (recheckIntervalSeconds > sessionTtlSeconds) {
+    throw new Error('TOKEN_ACCESS_RECHECK_SECONDS must not exceed the access-session TTL');
+  }
+
+  const rpcUrl = privateRpcUrlSchema.parse(env['SOLANA_RPC_URL']);
+  const landingUrl = httpUrlSchema.parse(env['NEXT_PUBLIC_LANDING_URL']);
+  assertSecureUrlForEnvironment(rpcUrl, environment, 'SOLANA_RPC_URL');
+  assertSecureUrlForEnvironment(landingUrl, environment, 'NEXT_PUBLIC_LANDING_URL');
+
+  return {
+    network: `solana:${networkName}`,
+    rpcUrl,
+    landingUrl,
+    gateEnabled: safeBoolean(env['TOKEN_GATE_ENABLED'] ?? 'true', 'TOKEN_GATE_ENABLED'),
+    mintAddress: base58AddressSchema.parse(env['GAME_TOKEN_MINT_ADDRESS']),
+    symbol: z
+      .string()
+      .trim()
+      .min(1)
+      .max(16)
+      .regex(/^[A-Z0-9]+$/u)
+      .parse(env['GAME_TOKEN_SYMBOL'] ?? 'STAR'),
+    requiredAmount: decimalTokenAmountSchema.parse(env['GAME_TOKEN_GATE_AMOUNT'] ?? '1000'),
+    challengeTtlSeconds,
+    sessionTtlSeconds,
+    recheckIntervalSeconds,
+    cookieSecret,
+    commitment: z.enum(['confirmed', 'finalized']).parse(env['SOLANA_COMMITMENT'] ?? 'confirmed'),
+    rpcTimeoutMs: boundedInteger(500, 15_000, 'SOLANA_RPC_TIMEOUT_MS').parse(
+      env['SOLANA_RPC_TIMEOUT_MS'] ?? 5_000,
+    ),
+    rpcMaximumAttempts: boundedInteger(1, 3, 'SOLANA_RPC_MAX_ATTEMPTS').parse(
+      env['SOLANA_RPC_MAX_ATTEMPTS'] ?? 2,
+    ),
+    rateLimits: {
+      challengesPerMinute: boundedInteger(1, 60, 'TOKEN_ACCESS_CHALLENGE_RATE_LIMIT').parse(
+        env['TOKEN_ACCESS_CHALLENGE_RATE_LIMIT'] ?? 5,
+      ),
+      verificationsPerFiveMinutes: boundedInteger(1, 10, 'TOKEN_ACCESS_VERIFY_RATE_LIMIT').parse(
+        env['TOKEN_ACCESS_VERIFY_RATE_LIMIT'] ?? 10,
+      ),
+      rechecksPerMinute: boundedInteger(1, 60, 'TOKEN_ACCESS_RECHECK_RATE_LIMIT').parse(
+        env['TOKEN_ACCESS_RECHECK_RATE_LIMIT'] ?? 4,
+      ),
+      adminValidationsPerMinute: boundedInteger(
+        1,
+        60,
+        'TOKEN_GATE_ADMIN_VALIDATE_RATE_LIMIT',
+      ).parse(env['TOKEN_GATE_ADMIN_VALIDATE_RATE_LIMIT'] ?? 5),
+    },
+  };
+}
+
 export function loadHostedSupabaseSafetyConfig(
   env: EnvironmentVariables,
 ): HostedSupabaseSafetyConfig {
   const environment = z.literal('development').parse(env['SUPABASE_ENVIRONMENT']);
   const projectRef = supabaseProjectRefSchema.parse(env['SUPABASE_PROJECT_REF']);
   const url = httpUrlSchema.parse(env['NEXT_PUBLIC_SUPABASE_URL']);
+  assertSecureUrlForEnvironment(url, environment, 'NEXT_PUBLIC_SUPABASE_URL');
   const parsedUrl = new URL(url);
   const expectedHostname = `${projectRef}.supabase.co`;
 
@@ -279,6 +467,7 @@ export function loadPrivateSupabaseConfig(env: EnvironmentVariables): PrivateSup
     serviceRoleKey: env['SUPABASE_SERVICE_ROLE_KEY'],
     databaseUrl: env['SUPABASE_DATABASE_URL'],
   });
+  assertSecureUrlForEnvironment(parsed.url, loadEnvironment(env), 'NEXT_PUBLIC_SUPABASE_URL');
 
   return parsed.databaseUrl === undefined
     ? { url: parsed.url, serviceRoleKey: parsed.serviceRoleKey }

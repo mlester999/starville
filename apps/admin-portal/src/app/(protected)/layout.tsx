@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import Link from 'next/link';
 
 import { AdminBrand } from '../../components/admin-brand';
 import { SubmitButton } from '../../components/submit-button';
@@ -29,6 +30,14 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
           </form>
         </div>
       </header>
+      <nav className="portal-nav" aria-label="Administrator navigation">
+        {context.permissionKeys.includes('overview.read') ? (
+          <Link href="/overview">Overview</Link>
+        ) : null}
+        {context.permissionKeys.includes('token_gate.read') ? (
+          <Link href="/token-access">Token Access</Link>
+        ) : null}
+      </nav>
       {children}
     </div>
   );

@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
     '@starville/config',
     '@starville/design-tokens',
     '@starville/supabase',
+    '@starville/wallet-access',
   ],
 };
 

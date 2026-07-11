@@ -23,6 +23,16 @@ interface FixtureUser {
   readonly email: string;
 }
 
+interface HostedTokenGateResponse {
+  readonly success: boolean;
+  readonly data: {
+    readonly availability: string;
+    readonly configVersion: number;
+    readonly mintAddress: string | null;
+    readonly network: string;
+  };
+}
+
 class RollbackHostedFixture extends Error {}
 
 class HostedTestLogger implements ServiceLogger {
@@ -103,10 +113,35 @@ async function main(): Promise<void> {
   const password = `${randomBytes(24).toString('base64url')}!Aa1`;
   const anonKey = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'];
   const adminPortalUrl = process.env['NEXT_PUBLIC_ADMIN_URL'];
+  const apiUrl = process.env['NEXT_PUBLIC_API_URL'];
+  const configuredNetworkName = process.env['SOLANA_NETWORK'];
+  const configuredMintAddress = process.env['GAME_TOKEN_MINT_ADDRESS'];
+  const configuredTokenSymbol = process.env['GAME_TOKEN_SYMBOL'] ?? 'STAR';
+  const configuredRequiredAmount = process.env['GAME_TOKEN_GATE_AMOUNT'] ?? '1000';
+  const configuredCommitment = process.env['SOLANA_COMMITMENT'] ?? 'confirmed';
 
-  if (anonKey === undefined || adminPortalUrl === undefined) {
-    throw new Error('Hosted RLS tests require the public Supabase key and admin portal URL');
+  if (
+    anonKey === undefined ||
+    adminPortalUrl === undefined ||
+    apiUrl === undefined ||
+    configuredMintAddress === undefined
+  ) {
+    throw new Error(
+      'Hosted RLS tests require public Supabase, admin/API URLs, and token configuration',
+    );
   }
+
+  const configuredNetwork =
+    configuredNetworkName === 'mainnet-beta'
+      ? 'solana:mainnet-beta'
+      : configuredNetworkName === 'devnet'
+        ? 'solana:devnet'
+        : undefined;
+  assert(configuredNetwork !== undefined, 'Hosted RLS tests require a supported Solana network');
+  assert(
+    configuredCommitment === 'confirmed' || configuredCommitment === 'finalized',
+    'Hosted RLS tests require a supported Solana commitment',
+  );
 
   const verifiedAnonKey: string = anonKey;
 
@@ -126,6 +161,7 @@ async function main(): Promise<void> {
       host: '127.0.0.1',
       port: 4000,
       corsAllowedOrigins: ['http://localhost:3002'],
+      trustedProxyCidrs: [],
     },
     logger: new HostedTestLogger(),
     adminAuthGateway: createSupabaseAdminAuthGateway(serviceClient),
@@ -208,6 +244,29 @@ async function main(): Promise<void> {
       'Anonymous caller unexpectedly read administrator records',
     );
 
+    for (const table of [
+      'token_gate_configs',
+      'wallet_auth_challenges',
+      'wallet_auth_rate_limits',
+      'wallet_access_sessions',
+      'wallet_access_events',
+    ]) {
+      const tokenAccessRead = await anonymousClient.from(table).select('*').limit(1);
+      assert(
+        tokenAccessRead.error !== null || tokenAccessRead.data?.length === 0,
+        `Anonymous caller unexpectedly read ${table}`,
+      );
+    }
+
+    const anonymousTrustedConfig = await anonymousClient.rpc('get_token_gate_runtime_config', {
+      p_environment_key: 'development',
+      p_network: 'solana:devnet',
+    });
+    assert(
+      anonymousTrustedConfig.error !== null,
+      'Anonymous caller unexpectedly executed the trusted token-gate config function',
+    );
+
     const normalClient = createSupabaseServerClient({ url: privateConfig.url, anonKey });
     const normalLogin = await normalClient.auth.signInWithPassword({
       email: normal.email,
@@ -245,6 +304,27 @@ async function main(): Promise<void> {
     assert(
       normalRead.error !== null || normalRead.data?.length === 0,
       'Normal authenticated user unexpectedly read administrators',
+    );
+
+    const fakeTokenConfig = await normalClient.from('token_gate_configs').insert({
+      environment_key: `phase3-unsafe-${runId}`,
+      network: 'solana:devnet',
+      symbol: 'STAR',
+      required_display_amount: '1000',
+    });
+    assert(
+      fakeTokenConfig.error !== null,
+      'Normal authenticated user unexpectedly created token-gate configuration',
+    );
+
+    const fakeWalletEvent = await normalClient.from('wallet_access_events').insert({
+      event: 'wallet.access.granted',
+      result: 'success',
+      request_id: requestId,
+    });
+    assert(
+      fakeWalletEvent.error !== null,
+      'Normal authenticated user unexpectedly created a trusted wallet-access event',
     );
     const fakeSession = await normalClient.from('admin_sessions').insert({
       user_id: normal.id,
@@ -537,6 +617,19 @@ async function main(): Promise<void> {
       'The protected overview did not render real administrator context safely',
     );
 
+    const readOnlyTokenAccessResponse = await fetch(new URL('/token-access', adminPortalUrl), {
+      headers: { cookie: activeSession.cookieHeader() },
+      redirect: 'manual',
+    });
+    const readOnlyTokenAccessBody = await readOnlyTokenAccessResponse.text();
+    assert(
+      readOnlyTokenAccessResponse.status === 200 &&
+        readOnlyTokenAccessBody.includes('id="token-access-title"') &&
+        readOnlyTokenAccessBody.includes('Read only') &&
+        !readOnlyTokenAccessBody.includes('Configuration unavailable'),
+      'Read-only Token Access page did not render trusted hosted configuration',
+    );
+
     const normalPortalClient = createCookieBackedSupabaseClient(privateConfig.url, anonKey);
     const normalPortalLogin = await normalPortalClient.client.auth.signInWithPassword({
       email: normal.email,
@@ -766,6 +859,90 @@ async function main(): Promise<void> {
       apiAfterRevocation.statusCode === 403,
       'Revoked session was not denied by the admin API',
     );
+
+    const [blockchainOperatorRole] = await sql<{ id: string }[]>`
+      select id from public.admin_roles where key = 'blockchain_operator'
+    `;
+    assert(blockchainOperatorRole !== undefined, 'Blockchain Operator system role is missing');
+    await sql`
+      update public.admin_users set role_id = ${blockchainOperatorRole.id}
+      where user_id = ${administrator.id}
+    `;
+    const tokenGateFixture = await createActiveAdministratorSession();
+    const tokenGateHeaders = {
+      accept: 'application/json',
+      authorization: `Bearer ${tokenGateFixture.accessToken}`,
+      'content-type': 'application/json',
+      'x-request-id': requestId,
+    };
+    const currentTokenGateResponse = await fetch(new URL('/api/v1/admin/token-gate', apiUrl), {
+      headers: tokenGateHeaders,
+    });
+    const currentTokenGate = (await currentTokenGateResponse.json()) as HostedTokenGateResponse;
+    assert(
+      currentTokenGateResponse.status === 200 &&
+        currentTokenGate.success &&
+        currentTokenGate.data.network === configuredNetwork,
+      'Blockchain Operator could not read the configured token gate',
+    );
+
+    const mintValidationResponse = await fetch(
+      new URL('/api/v1/admin/token-gate/validate', apiUrl),
+      {
+        method: 'POST',
+        headers: tokenGateHeaders,
+        body: JSON.stringify({
+          network: configuredNetwork,
+          mintAddress: configuredMintAddress,
+          commitment: configuredCommitment,
+        }),
+      },
+    );
+    assert(mintValidationResponse.status === 200, 'Configured token mint validation failed');
+
+    const tokenGateUpdateResponse = await fetch(new URL('/api/v1/admin/token-gate', apiUrl), {
+      method: 'PATCH',
+      headers: tokenGateHeaders,
+      body: JSON.stringify({
+        expectedConfigVersion: currentTokenGate.data.configVersion,
+        enabled: true,
+        network: configuredNetwork,
+        mintAddress: configuredMintAddress,
+        symbol: configuredTokenSymbol,
+        requiredAmount: configuredRequiredAmount,
+        commitment: configuredCommitment,
+        sessionTtlSeconds: 900,
+        recheckIntervalSeconds: 300,
+        reason: 'Validate the temporary Phase 3 configured token through the trusted admin path.',
+      }),
+    });
+    const updatedTokenGate = (await tokenGateUpdateResponse.json()) as HostedTokenGateResponse;
+    assert(
+      tokenGateUpdateResponse.status === 200 &&
+        updatedTokenGate.success &&
+        updatedTokenGate.data.availability === 'available' &&
+        updatedTokenGate.data.network === configuredNetwork &&
+        updatedTokenGate.data.mintAddress === configuredMintAddress,
+      'Trusted token-gate configuration update failed',
+    );
+
+    const configurableTokenAccessResponse = await fetch(new URL('/token-access', adminPortalUrl), {
+      headers: { cookie: tokenGateFixture.cookieHeader() },
+      redirect: 'manual',
+    });
+    const configurableTokenAccessBody = await configurableTokenAccessResponse.text();
+    assert(
+      configurableTokenAccessResponse.status === 200 &&
+        configurableTokenAccessBody.includes('id="token-access-title"') &&
+        configurableTokenAccessBody.includes('Configure access') &&
+        configurableTokenAccessBody.includes('available') &&
+        !configurableTokenAccessBody.includes('Configuration unavailable'),
+      'Configurable Token Access page did not render the validated hosted configuration',
+    );
+    await sql`
+      update public.admin_users set role_id = ${role.id}
+      where user_id = ${administrator.id}
+    `;
 
     const passwordChangeFixture = await createActiveAdministratorSession();
     const nextPassword = `${randomBytes(24).toString('base64url')}!Bb2`;

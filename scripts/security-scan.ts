@@ -73,12 +73,32 @@ function safeLocalSecrets(): Readonly<Record<string, string>> {
     'SUPABASE_ACCESS_TOKEN',
     'DATABASE_PASSWORD',
     'ADMIN_RECOVERY_COOKIE_SECRET',
+    'SOLANA_RPC_URL',
+    'TOKEN_ACCESS_COOKIE_SECRET',
   ];
+
+  const isSensitiveValue = (name: string, value: string): boolean => {
+    if (name !== 'SOLANA_RPC_URL') {
+      return value.length >= 8;
+    }
+
+    try {
+      const url = new URL(value);
+      const isPublicDevnetEndpoint =
+        url.origin === 'https://api.devnet.solana.com' &&
+        (url.pathname === '' || url.pathname === '/') &&
+        url.search === '' &&
+        url.hash === '';
+      return !isPublicDevnetEndpoint;
+    } catch {
+      return value.length >= 8;
+    }
+  };
 
   return Object.fromEntries(
     sensitiveNames.flatMap((name) => {
       const value = environment[name];
-      return value === undefined || value.length < 8 ? [] : [[name, value]];
+      return value === undefined || !isSensitiveValue(name, value) ? [] : [[name, value]];
     }),
   );
 }

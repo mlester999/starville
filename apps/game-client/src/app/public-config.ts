@@ -1,8 +1,9 @@
-import { parsePublicBrowserConfig } from '@starville/config/browser';
+import { parseAdditionalPublicHttpUrl, parsePublicBrowserConfig } from '@starville/config/browser';
 
 export interface GameClientPublicEnvironment {
   readonly [key: string]: string | undefined;
   readonly NEXT_PUBLIC_APP_ENV?: string;
+  readonly NEXT_PUBLIC_LANDING_URL?: string;
   readonly NEXT_PUBLIC_GAME_URL?: string;
   readonly NEXT_PUBLIC_API_URL?: string;
   readonly NEXT_PUBLIC_REALTIME_URL?: string;
@@ -11,7 +12,7 @@ export interface GameClientPublicEnvironment {
 }
 
 export function parseGameClientPublicConfig(environment: GameClientPublicEnvironment) {
-  return parsePublicBrowserConfig({
+  const config = parsePublicBrowserConfig({
     application: 'game-client',
     environment: environment.NEXT_PUBLIC_APP_ENV,
     appUrl: environment.NEXT_PUBLIC_GAME_URL,
@@ -20,4 +21,13 @@ export function parseGameClientPublicConfig(environment: GameClientPublicEnviron
     supabaseUrl: environment.NEXT_PUBLIC_SUPABASE_URL,
     supabaseAnonKey: environment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   });
+
+  return {
+    ...config,
+    landingUrl: parseAdditionalPublicHttpUrl(
+      environment.NEXT_PUBLIC_LANDING_URL,
+      environment.NEXT_PUBLIC_APP_ENV,
+      'NEXT_PUBLIC_LANDING_URL',
+    ),
+  } as const;
 }

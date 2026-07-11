@@ -24,23 +24,26 @@ async function main(): Promise<void> {
 
   assertDatabaseUrlMatchesProjectRef(privateConfig.databaseUrl, target.projectRef);
 
-  const testPath = new URL(
-    '../../infrastructure/supabase/tests/admin_authorization.test.sql',
-    import.meta.url,
-  );
-  const testSql = await readFile(testPath, 'utf8');
-
-  if (!/^begin;/iu.test(testSql.trim()) || !/rollback;\s*$/iu.test(testSql)) {
-    throw new Error('Hosted pgTAP SQL must be enclosed by an explicit transaction and rollback');
-  }
+  const reviewedSuites = ['admin_authorization.test.sql', 'token_access.test.sql'] as const;
 
   const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });
 
   try {
-    // The SQL source is a reviewed repository file, never user or command-line input.
-    const resultSets: unknown = await sql.unsafe(testSql).simple();
-    const report = parseTapReport(extractTapLines(resultSets));
-    process.stdout.write(`${JSON.stringify({ status: 'ok', ...report })}\n`);
+    for (const suite of reviewedSuites) {
+      const testPath = new URL(`../../infrastructure/supabase/tests/${suite}`, import.meta.url);
+      const testSql = await readFile(testPath, 'utf8');
+
+      if (!/^begin;/iu.test(testSql.trim()) || !/rollback;\s*$/iu.test(testSql)) {
+        throw new Error(
+          'Hosted pgTAP SQL must be enclosed by an explicit transaction and rollback',
+        );
+      }
+
+      // Each SQL source is selected from the fixed reviewed allowlist above.
+      const resultSets: unknown = await sql.unsafe(testSql).simple();
+      const report = parseTapReport(extractTapLines(resultSets));
+      process.stdout.write(`${JSON.stringify({ status: 'ok', suite, ...report })}\n`);
+    }
   } finally {
     await sql.end();
   }

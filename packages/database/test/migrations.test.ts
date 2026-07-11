@@ -168,3 +168,98 @@ describe('Phase 2 administrator migrations', () => {
     expect(allSql).not.toMatch(/alter\s+table\s+auth\./i);
   });
 });
+
+describe('Phase 3 token-access migrations', () => {
+  const migrationDirectory = new URL(
+    '../../../infrastructure/supabase/migrations/',
+    import.meta.url,
+  );
+  const schemaSql = readFileSync(
+    new URL('20260710100000_token_access_schema.sql', migrationDirectory),
+    'utf8',
+  );
+  const functionsSql = readFileSync(
+    new URL('20260710101000_token_access_functions_rls.sql', migrationDirectory),
+    'utf8',
+  );
+  const allSql = `${schemaSql}\n${functionsSql}`;
+
+  it('parses every Phase 3 migration with the hosted PostgreSQL major version grammar', async () => {
+    const parser = new Parser({ version: 17 });
+
+    for (const sql of [schemaSql, functionsSql]) {
+      const result = await parser.parse(sql);
+      expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('creates the minimum authority tables plus one durable abuse-control table', () => {
+    expect(
+      [...allSql.matchAll(/create table public\.([a-z_]+)/gi)].map((match) => match[1]),
+    ).toEqual([
+      'token_gate_configs',
+      'wallet_auth_challenges',
+      'wallet_auth_rate_limits',
+      'wallet_access_sessions',
+      'wallet_access_events',
+    ]);
+  });
+
+  it('enables RLS and revokes direct service and browser privileges on every table', () => {
+    for (const table of [
+      'token_gate_configs',
+      'wallet_auth_challenges',
+      'wallet_auth_rate_limits',
+      'wallet_access_sessions',
+      'wallet_access_events',
+    ]) {
+      expect(allSql).toContain(`alter table public.${table} enable row level security`);
+      expect(allSql).toContain(
+        `revoke all on table public.${table} from anon, authenticated, service_role`,
+      );
+    }
+
+    expect(allSql).not.toMatch(/create policy/iu);
+  });
+
+  it('stores only fixed-length challenge and session hashes and uses exact numeric amounts', () => {
+    expect(schemaSql).toContain("nonce_hash ~ '^[0-9a-f]{64}$'");
+    expect(schemaSql).toContain("message_hash ~ '^[0-9a-f]{64}$'");
+    expect(schemaSql).toContain("session_token_hash ~ '^[0-9a-f]{64}$'");
+    expect(schemaSql).toContain('required_amount_raw numeric(78, 0)');
+    expect(schemaSql).toContain('observed_balance_raw numeric(78, 0)');
+    expect(allSql).not.toMatch(/double precision|real\b/iu);
+  });
+
+  it('contains one-time challenge, versioned config, durable rate limit, and session invalidation safeguards', () => {
+    expect(functionsSql).toContain('and consumed_at is null');
+    expect(functionsSql).toContain('set consumed_at = now()');
+    expect(functionsSql).toContain('and expired_at is null');
+    expect(functionsSql).toContain('private.claim_wallet_rate_limit');
+    expect(functionsSql).toContain('public.claim_wallet_access_recheck');
+    expect(functionsSql).toContain("revoke_reason = 'stale_balance_slot'");
+    expect(functionsSql).toContain('config.config_version <> challenge.config_version_snapshot');
+    expect(functionsSql).toContain('config_version = config_version + 1');
+    expect(functionsSql).toContain('pg_advisory_xact_lock');
+    expect(functionsSql).toContain("status = 'configuration_changed'");
+    expect(functionsSql).toContain('private.assert_verified_admin_permission');
+  });
+
+  it('grants only narrow trusted functions to service_role and no direct table access', () => {
+    expect(functionsSql).toContain('grant execute on function public.create_wallet_auth_challenge');
+    expect(functionsSql).toContain(
+      'grant execute on function public.get_wallet_access_session(text) to service_role',
+    );
+    expect(functionsSql).toContain(
+      'grant execute on function public.update_admin_token_gate_config',
+    );
+    expect(allSql).not.toMatch(/grant\s+(?:select|insert|update|delete|all)\s+on\s+table/iu);
+  });
+
+  it('never includes destructive hosted-database operations or Phase 4 tables', () => {
+    expect(allSql).not.toMatch(/drop\s+schema|truncate\s+|alter\s+table\s+auth\./iu);
+    expect(allSql).not.toMatch(
+      /create table public\.(?:players|inventories|items|crops|recipes|houses|marketplace|rewards)/iu,
+    );
+  });
+});

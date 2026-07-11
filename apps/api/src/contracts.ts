@@ -8,6 +8,7 @@ export interface ApiRuntimeConfig {
   readonly host: string;
   readonly port: number;
   readonly corsAllowedOrigins: readonly string[];
+  readonly trustedProxyCidrs: readonly string[];
 }
 
 export interface VerifiedSupabaseIdentity {

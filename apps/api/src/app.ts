@@ -1,17 +1,29 @@
 import cors from '@fastify/cors';
+import cookie from '@fastify/cookie';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { AdminAuthGateway, ApiRuntimeConfig, ServiceLogger } from './contracts.js';
 import { formatApiError, formatNotFoundError } from './errors.js';
 import { resolveRequestId } from './request-id.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerAdminRoutes } from './routes/admin.js';
+import { registerAdminTokenGateRoutes } from './routes/admin-token-gate.js';
 import { registerStatusRoutes } from './routes/status.js';
+import { registerTokenAccessRoutes } from './routes/token-access.js';
+import type { TokenAccessService } from './token-access/contracts.js';
+
+export interface ApiTokenAccessOptions {
+  readonly service: TokenAccessService;
+  readonly cookieHashSecret: string;
+  readonly cookieSecure: boolean;
+  readonly cookieMaxAgeSeconds: number;
+}
 
 export interface BuildApiAppOptions {
   readonly config: ApiRuntimeConfig;
   readonly logger: ServiceLogger;
   readonly adminAuthGateway: AdminAuthGateway;
   readonly adminSessionTtlMinutes: number;
+  readonly tokenAccess?: ApiTokenAccessOptions;
 }
 
 function requestPath(url: string): string {
@@ -23,16 +35,19 @@ export function buildApiApp({
   logger,
   adminAuthGateway,
   adminSessionTtlMinutes,
+  tokenAccess,
 }: BuildApiAppOptions): FastifyInstance {
   const allowedOrigins = new Set(config.corsAllowedOrigins);
   const app = Fastify({
     logger: false,
     genReqId: resolveRequestId,
+    trustProxy: config.trustedProxyCidrs.length === 0 ? false : [...config.trustedProxyCidrs],
   });
 
+  void app.register(cookie);
   void app.register(cors, {
-    credentials: false,
-    methods: ['GET', 'POST', 'DELETE', 'HEAD', 'OPTIONS'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
     origin(origin, callback) {
       callback(null, origin === undefined || allowedOrigins.has(origin));
     },
@@ -79,6 +94,23 @@ export function buildApiApp({
     logger,
     sessionTtlMinutes: adminSessionTtlMinutes,
   });
+
+  if (tokenAccess !== undefined) {
+    registerTokenAccessRoutes(app, {
+      service: tokenAccess.service,
+      cookieHashSecret: tokenAccess.cookieHashSecret,
+      cookie: {
+        secure: tokenAccess.cookieSecure,
+        maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+      },
+      allowedOrigins,
+    });
+    registerAdminTokenGateRoutes(app, {
+      adminGateway: adminAuthGateway,
+      service: tokenAccess.service,
+      logger,
+    });
+  }
 
   return app;
 }

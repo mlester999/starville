@@ -1,10 +1,11 @@
-import { parsePublicBrowserConfig } from '@starville/config/browser';
+import { parsePublicBrowserConfig, parsePublicWalletConfig } from '@starville/config/browser';
 import {
   loadAdminSecurityConfig,
   loadAdminRecoveryConfig,
   loadApiConfig,
   loadHostedSupabaseSafetyConfig,
   loadRealtimeConfig,
+  loadTokenAccessServerConfig,
   loadWorkerConfig,
 } from '@starville/config/server';
 import { environmentNameSchema, portSchema } from '@starville/shared-validation';
@@ -60,6 +61,13 @@ const serverConfigurations = [
 
 const adminSecurity = loadAdminSecurityConfig(process.env);
 loadAdminRecoveryConfig(process.env);
+const walletPublic = parsePublicWalletConfig({
+  environment,
+  reownProjectId: required('NEXT_PUBLIC_REOWN_PROJECT_ID'),
+  gameUrl: required('NEXT_PUBLIC_GAME_URL'),
+  network: required('SOLANA_NETWORK'),
+});
+const tokenAccess = loadTokenAccessServerConfig(process.env);
 const hostedSupabase = loadHostedSupabaseSafetyConfig(process.env);
 
 process.stdout.write(
@@ -69,6 +77,17 @@ process.stdout.write(
     frontendPorts,
     services: serverConfigurations.map(({ application }) => application),
     adminSessionTtlMinutes: adminSecurity.sessionTtlMinutes,
+    wallet: {
+      network: walletPublic.network,
+      reownConfigured: walletPublic.reownProjectId.length >= 8,
+    },
+    tokenAccess: {
+      network: tokenAccess.network,
+      enabled: tokenAccess.gateEnabled,
+      challengeTtlSeconds: tokenAccess.challengeTtlSeconds,
+      sessionTtlSeconds: tokenAccess.sessionTtlSeconds,
+      recheckIntervalSeconds: tokenAccess.recheckIntervalSeconds,
+    },
     supabase: {
       environment: hostedSupabase.environment,
       projectRef: hostedSupabase.projectRef,

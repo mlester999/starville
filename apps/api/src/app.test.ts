@@ -44,6 +44,7 @@ function createApp() {
       host: '127.0.0.1',
       port: 4000,
       corsAllowedOrigins: ['http://localhost:3000'],
+      trustedProxyCidrs: [],
     },
     logger: new SilentLogger(),
     adminAuthGateway: inactiveAdminGateway,

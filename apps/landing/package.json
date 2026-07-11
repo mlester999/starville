@@ -14,8 +14,11 @@
     "clean": "rimraf .next .turbo coverage tsconfig.tsbuildinfo"
   },
   "dependencies": {
+    "@reown/appkit": "1.8.22",
+    "@reown/appkit-adapter-solana": "1.8.22",
     "@starville/config": "workspace:*",
     "@starville/design-tokens": "workspace:*",
+    "@starville/wallet-access": "workspace:*",
     "next": "16.2.10",
     "react": "19.2.7",
     "react-dom": "19.2.7"

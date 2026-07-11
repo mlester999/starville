@@ -2,6 +2,7 @@
 
 interface ImportMetaEnv {
   readonly NEXT_PUBLIC_APP_ENV?: string;
+  readonly NEXT_PUBLIC_LANDING_URL?: string;
   readonly NEXT_PUBLIC_GAME_URL?: string;
   readonly NEXT_PUBLIC_API_URL?: string;
   readonly NEXT_PUBLIC_REALTIME_URL?: string;

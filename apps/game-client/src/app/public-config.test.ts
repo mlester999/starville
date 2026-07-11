@@ -4,6 +4,7 @@ import { parseGameClientPublicConfig } from './public-config';
 
 const validEnvironment = {
   NEXT_PUBLIC_APP_ENV: 'development',
+  NEXT_PUBLIC_LANDING_URL: 'http://localhost:3000',
   NEXT_PUBLIC_GAME_URL: 'http://localhost:3001',
   NEXT_PUBLIC_API_URL: 'http://localhost:4000',
   NEXT_PUBLIC_REALTIME_URL: 'ws://localhost:4001',
@@ -19,6 +20,7 @@ describe('parseGameClientPublicConfig', () => {
       application: 'game-client',
       environment: 'development',
       appUrl: 'http://localhost:3001',
+      landingUrl: 'http://localhost:3000',
       apiUrl: 'http://localhost:4000',
       realtimeUrl: 'ws://localhost:4001',
       supabase: {
@@ -34,6 +36,15 @@ describe('parseGameClientPublicConfig', () => {
       parseGameClientPublicConfig({
         ...validEnvironment,
         NEXT_PUBLIC_REALTIME_URL: 'not-a-url',
+      }),
+    ).toThrow();
+  });
+
+  it('rejects a credential-bearing landing URL', () => {
+    expect(() =>
+      parseGameClientPublicConfig({
+        ...validEnvironment,
+        NEXT_PUBLIC_LANDING_URL: 'https://user:password@example.com',
       }),
     ).toThrow();
   });

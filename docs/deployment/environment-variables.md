@@ -1,6 +1,6 @@
 # Environment-variable ownership
 
-The root [`.env.example`](../../.env.example) is the committed Phase 2 template. Its values are
+The root [`.env.example`](../../.env.example) is the committed Phase 3 template. Its values are
 non-working placeholders. Real development values belong only in ignored `.env.local`; commands must
 never print private values.
 
@@ -12,6 +12,9 @@ never print private values.
 - `NEXT_PUBLIC_ADMIN_URL`
 - `NEXT_PUBLIC_API_URL`
 - `NEXT_PUBLIC_REALTIME_URL`
+- `NEXT_PUBLIC_REOWN_PROJECT_ID`
+- `NEXT_PUBLIC_STARVILLE_X_URL` (optional; HTTPS only)
+- `NEXT_PUBLIC_STARVILLE_DISCORD_URL` (optional; HTTPS only)
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
@@ -26,6 +29,8 @@ These are server/process values required for normal development:
 - `NODE_ENV`, `LOG_LEVEL`
 - `LANDING_PORT`, `GAME_CLIENT_PORT`, `ADMIN_PORT`
 - `API_HOST`, `API_PORT`
+- `API_TRUSTED_PROXY_CIDRS` is empty by default. Deployments may list at most 16 exact proxy IPs or
+  bounded CIDRs; unrestricted `/0`, hostnames, and implicit trust of forwarded headers are rejected.
 - `REALTIME_HOST`, `REALTIME_PORT`
 - `WORKER_HOST`, `WORKER_HEALTH_PORT`
 - `CORS_ALLOWED_ORIGINS`, `REALTIME_ALLOWED_ORIGINS`
@@ -33,7 +38,8 @@ These are server/process values required for normal development:
 - `WORKER_CONCURRENCY`, `WORKER_MAX_ATTEMPTS`, `WORKER_RETRY_BASE_DELAY_MS`
 
 The browser applications use their `NEXT_PUBLIC_*_URL` values; port variables control only local
-process binding.
+process binding. Production public URLs and origin allowlists must use HTTPS/WSS. Cleartext HTTP/WS
+is accepted only for loopback hosts outside production.
 
 ## Administrator authorization controls
 
@@ -50,7 +56,7 @@ None of these values are browser-safe.
 
 ## Hosted Supabase target and approvals
 
-- `SUPABASE_ENVIRONMENT` must equal `development` for Phase 2 hosted tooling.
+- `SUPABASE_ENVIRONMENT` must equal `development` for Phase 2 and Phase 3 hosted tooling.
 - `SUPABASE_PROJECT_REF` must match both the public Supabase hostname and canonical CLI link.
 - `SUPABASE_REMOTE_WRITES_APPROVED` is a deny-by-default migration/bootstrap write gate.
 - `RUN_HOSTED_SUPABASE_TESTS` is a separate deny-by-default fixture-write gate.
@@ -69,11 +75,39 @@ is a permanent deployment approval. Keep both false except during the reviewed o
 The public config and SSR packages do not export privileged client construction. Browser code must
 not import `@starville/supabase/server`, `@starville/config/server`, or server-only admin modules.
 
-## Reserved for Phase 3
+## Wallet and token-access controls
 
-`REOWN_PROJECT_ID`, `SOLANA_NETWORK`, `SOLANA_RPC_URL`, `GAME_TOKEN_MINT_ADDRESS`,
-`GAME_TOKEN_SYMBOL`, and `GAME_TOKEN_GATE_AMOUNT` are documentation placeholders only. Phase 2 does
-not implement wallet connection, signatures, token checks, or gating.
+Browser-safe:
+
+- `NEXT_PUBLIC_REOWN_PROJECT_ID` identifies the Reown application. It is intentionally visible and
+  is owned only by the landing profile.
+- `NEXT_PUBLIC_STARVILLE_X_URL` and `NEXT_PUBLIC_STARVILLE_DISCORD_URL` are optional, owner-approved
+  HTTPS destinations. When absent, the landing page renders honest disabled social marks instead of
+  placeholder links.
+- The public token requirement is returned by the trusted API; the browser does not receive the RPC
+  URL or cookie secret.
+
+API-owned and server-only:
+
+- `TOKEN_GATE_ENABLED` is a fail-closed operational kill switch. `false` reports token access as
+  disabled even when a valid database configuration exists; it never grants or bypasses access.
+- `SOLANA_RPC_URL` may contain provider credentials in its path or query. It is available only to
+  the API profile and must never be logged or bundled.
+- `TOKEN_ACCESS_COOKIE_SECRET` is an independent high-entropy value of at least 32 characters. It
+  HMACs session tokens and hashed client context. Never reuse a service-role key, admin recovery
+  secret, database password, RPC credential, or Reown ID.
+- `SOLANA_COMMITMENT`, `SOLANA_RPC_TIMEOUT_MS`, and `SOLANA_RPC_MAX_ATTEMPTS` bound private RPC
+  work.
+- Challenge/session TTL, recheck interval, and abuse-limit variables are bounded at startup.
+
+Public identifiers used by the API are `SOLANA_NETWORK` (`devnet` or `mainnet-beta`),
+`GAME_TOKEN_MINT_ADDRESS`, `GAME_TOKEN_SYMBOL`, and `GAME_TOKEN_GATE_AMOUNT`. They are not
+authorization: the validated, versioned `token_gate_configs` row is authoritative. A missing,
+nonexistent, or wrong-network mint remains fail-closed.
+
+For an existing ignored `.env.local`, `pnpm env:phase3:prepare` creates the independent cookie
+secret when missing and migrates a legacy browser-safe `REOWN_PROJECT_ID` name without printing
+either value.
 
 ## Loading precedence
 
@@ -91,17 +125,18 @@ copied into an application directory.
 
 | Runtime          | Variables owned by the profile                                                                   |
 | ---------------- | ------------------------------------------------------------------------------------------------ |
-| Landing          | Landing/API/Supabase public values and `LANDING_PORT`                                            |
-| Game client      | Game/API/realtime/Supabase public values and `GAME_CLIENT_PORT`                                  |
+| Landing          | Landing/game/API/Supabase public values, public Reown ID, and `LANDING_PORT`                     |
+| Game client      | Landing/game/API/realtime/Supabase public values and `GAME_CLIENT_PORT`                          |
 | Admin portal     | Admin/API/game/Supabase public values, `ADMIN_PORT`, and the server-only recovery signing secret |
-| API              | API bind/CORS/log values, Supabase URL and service-role key, and administrator session controls  |
+| API              | API/CORS/log values, service-role key, admin controls, private RPC, token-cookie and gate limits |
 | Real-time server | Realtime bind/origin/capacity/log values                                                         |
 | Worker           | Worker bind/concurrency/retry/log values                                                         |
 
 The admin portal is a hybrid Next.js process. Its profile supplies `ADMIN_RECOVERY_COOKIE_SECRET`
 only for server route/action execution; Next.js exposes only `NEXT_PUBLIC_*` values to browser code.
 The post-build `pnpm security:scan` checks the actual browser outputs for the recovery secret,
-Supabase service-role key, database URL, and known local secret values.
+Supabase service-role key, database URL, Solana RPC identifier/value when private, token-access
+cookie secret, and known local secret values.
 
 Database credentials and hosted-operation approvals are not part of any normal runtime profile.
 `SUPABASE_DATABASE_URL`, `SUPABASE_REMOTE_WRITES_APPROVED`, `RUN_HOSTED_SUPABASE_TESTS`, and

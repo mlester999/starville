@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { buildApiApp } from './app.js';
+import { buildApiApp, type ApiTokenAccessOptions } from './app.js';
 import type { AdminAuthGateway, ApiRuntimeConfig, ServiceLogger } from './contracts.js';
 
 export interface ApiService {
@@ -13,6 +13,7 @@ export interface CreateApiServiceOptions {
   readonly logger: ServiceLogger;
   readonly adminAuthGateway: AdminAuthGateway;
   readonly adminSessionTtlMinutes: number;
+  readonly tokenAccess?: ApiTokenAccessOptions;
 }
 
 export function createApiService({
@@ -20,8 +21,15 @@ export function createApiService({
   logger,
   adminAuthGateway,
   adminSessionTtlMinutes,
+  tokenAccess,
 }: CreateApiServiceOptions): ApiService {
-  const app = buildApiApp({ config, logger, adminAuthGateway, adminSessionTtlMinutes });
+  const app = buildApiApp({
+    config,
+    logger,
+    adminAuthGateway,
+    adminSessionTtlMinutes,
+    ...(tokenAccess === undefined ? {} : { tokenAccess }),
+  });
 
   return {
     app,

@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title id="title">Starville</title>
+  <defs>
+    <linearGradient id="field" x1="18" y1="10" x2="110" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1d4b3a" />
+      <stop offset="1" stop-color="#0b2119" />
+    </linearGradient>
+    <linearGradient id="star" x1="40" y1="32" x2="88" y2="96" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff0b2" />
+      <stop offset="1" stop-color="#e4b94e" />
+    </linearGradient>
+  </defs>
+  <rect width="128" height="128" rx="30" fill="url(#field)" />
+  <rect x="1" y="1" width="126" height="126" rx="29" fill="none" stroke="#f5dc91" stroke-opacity=".28" stroke-width="2" />
+  <path d="M64 22 72.4 55.6 106 64l-33.6 8.4L64 106l-8.4-33.6L22 64l33.6-8.4L64 22Z" fill="none" stroke="url(#star)" stroke-linejoin="round" stroke-width="4" />
+  <circle cx="64" cy="64" r="9" fill="url(#star)" />
+</svg>

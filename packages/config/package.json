@@ -18,6 +18,7 @@
   "dependencies": {
     "@starville/shared-types": "workspace:*",
     "@starville/shared-validation": "workspace:*",
+    "@starville/wallet-access": "workspace:*",
     "zod": "^4.1.12"
   }
 }

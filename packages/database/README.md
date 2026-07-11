@@ -1,8 +1,8 @@
 # `@starville/database`
 
-This package validates migration naming and statically checks Phase 2 migration invariants. The
-canonical CLI project is `infrastructure/supabase`; application packages must not create another
-migration directory.
+This package validates migration naming and statically checks Phase 2 and Phase 3 migration
+invariants. The canonical CLI project is `infrastructure/supabase`; application packages must not
+create another migration directory.
 
 Migration files use a valid UTC timestamp and lowercase snake-case description:
 
@@ -12,7 +12,8 @@ YYYYMMDDHHMMSS_short_description.sql
 
 Phase 2 contains three ordered administrator migrations: schema/security triggers, deterministic
 role-permission metadata, then trusted functions/RLS. Existing migration files are immutable after
-hosted application; later changes require a new migration.
+hosted application. Phase 3 follows them with two ordered token-access migrations: schema first,
+then trusted functions/RLS. Later changes require a new migration.
 
 ## Generated types
 

@@ -95,6 +95,7 @@ function createApp(gateway: AdminAuthGateway, logger: ServiceLogger = new Captur
       host: '127.0.0.1',
       port: 4000,
       corsAllowedOrigins: ['http://localhost:3002'],
+      trustedProxyCidrs: [],
     },
     logger,
     adminAuthGateway: gateway,
