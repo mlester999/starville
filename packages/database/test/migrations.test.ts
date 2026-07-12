@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
-import { ADMIN_ROLE_KEYS, INITIAL_ROLE_PERMISSIONS } from '@starville/admin-auth';
+import {
+  ADMIN_PERMISSION_KEYS,
+  ADMIN_ROLE_KEYS,
+  INITIAL_ROLE_PERMISSIONS,
+} from '@starville/admin-auth';
 import Parser from '@pgsql/parser';
 
 import {
@@ -462,6 +467,7 @@ describe('Phase 5 secure player-operations migration', () => {
 
 describe('Phase 6 world-management migrations', () => {
   const directory = new URL('../../../infrastructure/supabase/migrations/', import.meta.url);
+  const testDirectory = new URL('../../../infrastructure/supabase/tests/', import.meta.url);
   const schemaSql = readFileSync(
     new URL('20260712100000_world_management_schema.sql', directory),
     'utf8',
@@ -482,6 +488,10 @@ describe('Phase 6 world-management migrations', () => {
     new URL('20260712104000_world_management_player_admin.sql', directory),
     'utf8',
   );
+  const adminAuthorizationTestSql = readFileSync(
+    new URL('admin_authorization.test.sql', testDirectory),
+    'utf8',
+  );
   const allSql = `${schemaSql}\n${functionsSql}\n${seedSql}\n${adminSql}\n${playerAdminSql}`;
 
   it('parses every forward-only Phase 6 migration with PostgreSQL 17 grammar', async () => {
@@ -490,6 +500,26 @@ describe('Phase 6 world-management migrations', () => {
       const result = await parser.parse(sql);
       expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
     }
+  });
+
+  it('keeps the already-applied Phase 6 schema migration byte-for-byte immutable', () => {
+    expect(createHash('sha256').update(schemaSql).digest('hex')).toBe(
+      'dea85de062aaa494cda38e7f1c893606ab77e2b9500c1ecf9dd5c621798987df',
+    );
+  });
+
+  it('ties hosted authorization assertions to the exact current permission catalog', () => {
+    const expectedCatalogFixture = adminAuthorizationTestSql.slice(
+      adminAuthorizationTestSql.indexOf('insert into expected_phase6_admin_permissions'),
+      adminAuthorizationTestSql.indexOf("select has_table('public', 'admin_roles'"),
+    );
+    const assertedKeys = [...expectedCatalogFixture.matchAll(/\('([^']+)'\)/gu)]
+      .flatMap((match) => (match[1] === undefined ? [] : [match[1]]))
+      .sort();
+    expect(assertedKeys).toEqual([...ADMIN_PERMISSION_KEYS].sort());
+    expect(new Set(assertedKeys).size).toBe(ADMIN_PERMISSION_KEYS.length);
+    expect(assertedKeys).toContain('maps.preview');
+    expect(assertedKeys).toContain('maps.audit_read');
   });
 
   it('creates only the narrow world authority, catalog, audit, and rate-limit tables', () => {
@@ -524,6 +554,39 @@ describe('Phase 6 world-management migrations', () => {
     expect(allSql).not.toMatch(/create policy/iu);
   });
 
+  it('closes every Phase 6 SECURITY DEFINER helper before later RPC grants', () => {
+    for (const signature of [
+      'private.world_manifest_checksum(jsonb)',
+      'private.valid_world_reason(text)',
+      'private.claim_world_rate_limit(text, text, integer, integer)',
+      'private.world_map_json(public.world_maps)',
+      'private.world_version_json(public.world_map_versions)',
+      'private.world_player_state_json(public.player_profiles)',
+      'private.point_inside_world_bounds(jsonb, numeric, numeric)',
+      'private.point_blocked_by_world_manifest(jsonb, numeric, numeric, numeric)',
+      'private.world_validation_issue(text, text, text)',
+      'private.validate_world_manifest(uuid, jsonb)',
+      'private.sync_world_version_assets(uuid, jsonb)',
+      'private.player_profile_json(public.player_profiles)',
+      'private.set_player_profile_updated_at()',
+    ]) {
+      expect(functionsSql).toContain(
+        `revoke all on function ${signature}\n  from public, anon, authenticated, service_role`,
+      );
+    }
+
+    for (const signature of [
+      'public.get_current_published_world(text, text, integer)',
+      'public.get_published_world_manifest(text, text, text, integer)',
+      'public.transition_player_world(text, text, integer, uuid, text, integer)',
+      'public.save_player_game_state(text, text, numeric, numeric, text, integer, text, integer)',
+    ]) {
+      expect(functionsSql).toContain(
+        `revoke all on function ${signature}\n  from public, anon, authenticated`,
+      );
+    }
+  });
+
   it('seeds exactly the five approved graph maps and truthful procedural assets', () => {
     for (const slug of [
       'lantern-square',
@@ -539,6 +602,20 @@ describe('Phase 6 world-management migrations', () => {
     expect(seedSql).not.toMatch(/https?:\/\//iu);
   });
 
+  it('keeps the safe Phase 6 seed replay idempotent', () => {
+    for (const conflictTarget of [
+      'on conflict (asset_key) do nothing',
+      'on conflict (slug) do nothing',
+      'on conflict (world_map_id, version_number) do nothing',
+      'on conflict (world_map_version_id, world_asset_id) do nothing',
+    ]) {
+      expect(seedSql).toContain(conflictTarget);
+    }
+    expect(seedSql).toContain('map.active_published_version_id is distinct from version.id');
+    expect(seedSql).toContain("existing.metadata ->> 'seeded' = 'true'");
+    expect(seedSql).toContain("existing.metadata ->> 'assetKey' = asset.asset_key");
+  });
+
   it('keeps map loading and transitions server-authoritative and stale-save safe', () => {
     expect(functionsSql).toContain('public.get_current_published_world');
     expect(functionsSql).toContain('public.get_published_world_manifest');
@@ -548,6 +625,38 @@ describe('Phase 6 world-management migrations', () => {
     expect(functionsSql).not.toMatch(/p_destination_(?:map|spawn|x|y)/iu);
     expect(functionsSql).toContain('game_state_version = game_state_version + 1');
     expect(functionsSql).toContain("lifecycle_status in ('published', 'superseded')");
+  });
+
+  it('loads paired map and version composites through one record target', () => {
+    for (const sql of [functionsSql, playerAdminSql]) {
+      expect(sql).not.toMatch(
+        /select\s+map\.\*,\s*version\.\*\s+into\s+[a-z_][a-z0-9_]*\s*,\s*[a-z_][a-z0-9_]*/iu,
+      );
+    }
+
+    expect(
+      functionsSql.match(/select map as map_row, version as version_row\s+into selected_world/gu),
+    ).toHaveLength(6);
+    expect(
+      playerAdminSql.match(/select map as map_row, version as version_row\s+into selected_world/gu),
+    ).toHaveLength(1);
+
+    const replayBranch = functionsSql.slice(
+      functionsSql.indexOf('if profile.last_transition_request_id = p_request_id then'),
+      functionsSql.indexOf('if profile.game_state_version <> p_expected_game_state_version'),
+    );
+    expect(replayBranch.indexOf('if not found then')).toBeGreaterThanOrEqual(0);
+    expect(replayBranch.indexOf('if not found then')).toBeLessThan(
+      replayBranch.indexOf('destination_map := selected_world.map_row'),
+    );
+  });
+
+  it('keeps manifest validation free of ambiguous variables and operator precedence traps', () => {
+    expect(functionsSql).not.toContain('where asset.asset_key = asset_key');
+    expect(functionsSql).toContain('where asset.asset_key = requested_asset_key');
+    expect(functionsSql).toContain(
+      "or not ((p_manifest -> 'assets') ? (map_object ->> 'assetId')) then",
+    );
   });
 
   it('aligns Phase 5 player administration with published multi-map state', () => {

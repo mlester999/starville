@@ -3,7 +3,60 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(34);
+select plan(38);
+
+create temporary table expected_phase6_admin_permissions (
+  key text primary key
+) on commit drop;
+
+insert into expected_phase6_admin_permissions (key)
+values
+  ('overview.read'),
+  ('players.read'),
+  ('players.suspend'),
+  ('players.ban'),
+  ('players.manage_sessions'),
+  ('wallets.read'),
+  ('wallets.force_reverify'),
+  ('inventories.read'),
+  ('inventories.adjust'),
+  ('items.read'),
+  ('items.create'),
+  ('items.update'),
+  ('items.publish'),
+  ('maps.read'),
+  ('maps.edit'),
+  ('maps.preview'),
+  ('maps.publish'),
+  ('maps.audit_read'),
+  ('assets.read'),
+  ('assets.upload'),
+  ('assets.publish'),
+  ('economy.read'),
+  ('economy.adjust_stardust'),
+  ('economy.configure_rewards'),
+  ('rewards.read'),
+  ('rewards.simulate'),
+  ('rewards.approve'),
+  ('claims.read'),
+  ('claims.open'),
+  ('claims.pause'),
+  ('claims.reconcile'),
+  ('blockchain.read'),
+  ('blockchain.configure'),
+  ('token_gate.read'),
+  ('token_gate.configure'),
+  ('moderation.read'),
+  ('moderation.act'),
+  ('roles.read'),
+  ('roles.manage'),
+  ('audit_logs.read'),
+  ('system_settings.read'),
+  ('system_settings.manage'),
+  ('operations.read'),
+  ('players.reset_position'),
+  ('players.require_rename'),
+  ('player_audit.read');
 
 select has_table('public', 'admin_roles', 'admin_roles exists');
 select has_table('public', 'admin_permissions', 'admin_permissions exists');
@@ -19,18 +72,61 @@ select is(
 );
 select is(
   (select count(*)::integer from public.admin_permissions where is_system),
-  44,
-  'exactly forty-four system permissions are seeded through Phase 5'
+  (select count(*)::integer from expected_phase6_admin_permissions),
+  'the system-permission count matches the explicit Phase 1-6 catalog'
+);
+select is(
+  (
+    select count(*)::integer from expected_phase6_admin_permissions as expected
+    where not exists (
+      select 1 from public.admin_permissions as permission
+      where permission.key = expected.key and permission.is_system
+    )
+  ),
+  0,
+  'every explicit Phase 1-6 permission key is seeded as system metadata'
+);
+select is(
+  (
+    select count(*)::integer from public.admin_permissions as permission
+    where permission.is_system
+      and not exists (
+        select 1 from expected_phase6_admin_permissions as expected
+        where expected.key = permission.key
+      )
+  ),
+  0,
+  'the system catalog contains no unexpected permission key'
+);
+select is(
+  (select count(distinct key)::integer from public.admin_permissions where is_system),
+  (select count(*)::integer from expected_phase6_admin_permissions),
+  'the explicit system permission catalog contains no duplicate key'
+);
+select is(
+  (
+    select count(*)::integer from expected_phase6_admin_permissions as expected
+    where not exists (
+      select 1
+      from public.admin_role_permissions as mapping
+      join public.admin_roles as role on role.id = mapping.role_id
+      join public.admin_permissions as permission on permission.id = mapping.permission_id
+      where role.key = 'super_admin' and permission.key = expected.key
+    )
+  ),
+  0,
+  'Super Admin receives every explicit Phase 1-6 permission'
 );
 select is(
   (
     select count(*)::integer
     from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
-    where role.key = 'super_admin'
+    join public.admin_permissions as permission on permission.id = mapping.permission_id
+    where role.key = 'super_admin' and permission.is_system
   ),
-  44,
-  'Super Admin receives every permission'
+  (select count(*)::integer from expected_phase6_admin_permissions),
+  'Super Admin has exactly one mapping for each seeded system permission'
 );
 select is(
   (

@@ -290,7 +290,7 @@ declare
   destination_map public.world_maps%rowtype;
   destination_manifest jsonb;
   destination_spawn jsonb;
-  asset_key text;
+  requested_asset_key text;
   width_value numeric;
   height_value numeric;
   camera_bounds jsonb;
@@ -467,13 +467,16 @@ begin
         'DUPLICATE_ASSET_REFERENCE', '$.assets', 'Asset references must be unique.'
       ));
     end if;
-    for asset_key in select value from jsonb_array_elements_text(p_manifest -> 'assets') loop
+    for requested_asset_key in
+      select value from jsonb_array_elements_text(p_manifest -> 'assets')
+    loop
       if not exists (
         select 1 from public.world_assets as asset
-        where asset.asset_key = asset_key and asset.approval_status = 'approved'
+        where asset.asset_key = requested_asset_key and asset.approval_status = 'approved'
       ) then
         errors := errors || jsonb_build_array(private.world_validation_issue(
-          'UNAPPROVED_ASSET', '$.assets', 'Asset ' || asset_key || ' is missing or not approved.'
+          'UNAPPROVED_ASSET', '$.assets',
+          'Asset ' || requested_asset_key || ' is missing or not approved.'
         ));
       end if;
     end loop;
@@ -656,7 +659,7 @@ begin
          or not private.point_inside_world_bounds(
            safe_bounds, (map_object ->> 'x')::numeric, (map_object ->> 'y')::numeric
          )
-         or not (p_manifest -> 'assets') ? (map_object ->> 'assetId') then
+         or not ((p_manifest -> 'assets') ? (map_object ->> 'assetId')) then
         errors := errors || jsonb_build_array(private.world_validation_issue(
           'INVALID_MAP_OBJECT', '$.objects', 'A map object is malformed, outside safe bounds, or uses an undeclared asset.'
         ));
@@ -987,6 +990,7 @@ declare
   profile public.player_profiles%rowtype;
   moderation public.player_moderation_states%rowtype;
   selected_rows record;
+  selected_world record;
   selected_map public.world_maps%rowtype;
   selected_version public.world_map_versions%rowtype;
   selected_spawn jsonb;
@@ -1025,8 +1029,8 @@ begin
     return jsonb_build_object('status', 'rename_required');
   end if;
 
-  select map.*, version.*
-  into selected_map, selected_version
+  select map as map_row, version as version_row
+  into selected_world
   from public.world_maps as map
   join public.world_map_versions as version on version.id = map.active_published_version_id
   where map.slug = profile.current_map_id
@@ -1034,8 +1038,8 @@ begin
     and version.lifecycle_status = 'published';
 
   if not found then
-    select map.*, version.*
-    into selected_map, selected_version
+    select map as map_row, version as version_row
+    into selected_world
     from public.world_maps as map
     join public.world_map_versions as version on version.id = map.active_published_version_id
     where map.slug = 'lantern-square'
@@ -1045,7 +1049,12 @@ begin
       return jsonb_build_object('status', 'world_unavailable');
     end if;
     needs_reconciliation := true;
-  elsif profile.current_map_version_id is distinct from selected_version.id then
+  end if;
+
+  selected_map := selected_world.map_row;
+  selected_version := selected_world.version_row;
+
+  if profile.current_map_version_id is distinct from selected_version.id then
     needs_reconciliation := true;
   end if;
 
@@ -1114,6 +1123,7 @@ declare
   profile public.player_profiles%rowtype;
   moderation public.player_moderation_states%rowtype;
   selected_rows record;
+  selected_world record;
   selected_map public.world_maps%rowtype;
   selected_version public.world_map_versions%rowtype;
 begin
@@ -1150,8 +1160,8 @@ begin
     return jsonb_build_object('status', 'rename_required');
   end if;
 
-  select map.*, version.*
-  into selected_map, selected_version
+  select map as map_row, version as version_row
+  into selected_world
   from public.world_maps as map
   join public.world_map_versions as version on version.id = map.active_published_version_id
   where map.slug = p_map_slug
@@ -1160,6 +1170,9 @@ begin
   if not found then
     return jsonb_build_object('status', 'map_not_found');
   end if;
+
+  selected_map := selected_world.map_row;
+  selected_version := selected_world.version_row;
 
   return jsonb_build_object(
     'status', 'loaded',
@@ -1188,6 +1201,7 @@ declare
   profile public.player_profiles%rowtype;
   moderation public.player_moderation_states%rowtype;
   selected_rows record;
+  selected_world record;
   source_map public.world_maps%rowtype;
   source_version public.world_map_versions%rowtype;
   exit_definition jsonb;
@@ -1235,11 +1249,16 @@ begin
   end if;
 
   if profile.last_transition_request_id = p_request_id then
-    select map.*, version.*
-    into destination_map, destination_version
+    select map as map_row, version as version_row
+    into selected_world
     from public.world_maps as map
     join public.world_map_versions as version on version.id = profile.current_map_version_id
     where map.slug = profile.current_map_id and version.world_map_id = map.id;
+    if not found then
+      return jsonb_build_object('status', 'destination_unavailable');
+    end if;
+    destination_map := selected_world.map_row;
+    destination_version := selected_world.version_row;
     select value into replayed_spawn
     from jsonb_array_elements(destination_version.manifest -> 'spawns')
     where coalesce((value ->> 'enabled')::boolean, false)
@@ -1271,8 +1290,8 @@ begin
     return jsonb_build_object('status', 'rate_limited');
   end if;
 
-  select map.*, version.*
-  into source_map, source_version
+  select map as map_row, version as version_row
+  into selected_world
   from public.world_maps as map
   join public.world_map_versions as version on version.id = profile.current_map_version_id
   where map.slug = profile.current_map_id
@@ -1281,6 +1300,8 @@ begin
   if not found then
     return jsonb_build_object('status', 'destination_unavailable');
   end if;
+  source_map := selected_world.map_row;
+  source_version := selected_world.version_row;
 
   select value into exit_definition
   from jsonb_array_elements(source_version.manifest -> 'exits')
@@ -1291,8 +1312,8 @@ begin
     return jsonb_build_object('status', 'invalid_exit');
   end if;
 
-  select map.*, version.*
-  into destination_map, destination_version
+  select map as map_row, version as version_row
+  into selected_world
   from public.world_maps as map
   join public.world_map_versions as version on version.id = map.active_published_version_id
   where map.slug = exit_definition ->> 'destinationMapId'
@@ -1301,6 +1322,8 @@ begin
   if not found then
     return jsonb_build_object('status', 'destination_unavailable');
   end if;
+  destination_map := selected_world.map_row;
+  destination_version := selected_world.version_row;
 
   select value into destination_spawn
   from jsonb_array_elements(destination_version.manifest -> 'spawns')
@@ -1463,3 +1486,47 @@ begin
   return private.player_entry_json(profile, moderation);
 end;
 $$;
+
+-- Phase 2 grants authenticated administrators schema usage for narrowly granted
+-- helpers. PostgreSQL grants EXECUTE on newly created functions to PUBLIC by
+-- default, so every Phase 6 private helper must be closed explicitly before a
+-- later migration grants only the reviewed public RPCs.
+revoke all on function private.world_manifest_checksum(jsonb)
+  from public, anon, authenticated, service_role;
+revoke all on function private.valid_world_reason(text)
+  from public, anon, authenticated, service_role;
+revoke all on function private.claim_world_rate_limit(text, text, integer, integer)
+  from public, anon, authenticated, service_role;
+revoke all on function private.world_map_json(public.world_maps)
+  from public, anon, authenticated, service_role;
+revoke all on function private.world_version_json(public.world_map_versions)
+  from public, anon, authenticated, service_role;
+revoke all on function private.world_player_state_json(public.player_profiles)
+  from public, anon, authenticated, service_role;
+revoke all on function private.point_inside_world_bounds(jsonb, numeric, numeric)
+  from public, anon, authenticated, service_role;
+revoke all on function private.point_blocked_by_world_manifest(jsonb, numeric, numeric, numeric)
+  from public, anon, authenticated, service_role;
+revoke all on function private.world_validation_issue(text, text, text)
+  from public, anon, authenticated, service_role;
+revoke all on function private.validate_world_manifest(uuid, jsonb)
+  from public, anon, authenticated, service_role;
+revoke all on function private.sync_world_version_assets(uuid, jsonb)
+  from public, anon, authenticated, service_role;
+revoke all on function private.player_profile_json(public.player_profiles)
+  from public, anon, authenticated, service_role;
+revoke all on function private.set_player_profile_updated_at()
+  from public, anon, authenticated, service_role;
+
+-- Keep browser roles outside every player-facing SECURITY DEFINER function
+-- throughout the migration sequence. New world RPC service-role grants are
+-- applied by the later admin migration; the existing save RPC retains its
+-- previously reviewed service-role grant.
+revoke all on function public.get_current_published_world(text, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.get_published_world_manifest(text, text, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.transition_player_world(text, text, integer, uuid, text, integer)
+  from public, anon, authenticated;
+revoke all on function public.save_player_game_state(text, text, numeric, numeric, text, integer, text, integer)
+  from public, anon, authenticated;

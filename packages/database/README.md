@@ -1,6 +1,6 @@
 # `@starville/database`
 
-This package validates migration naming and statically checks Phase 2 and Phase 3 migration
+This package validates migration naming and statically checks Phase 2 through Phase 6 migration
 invariants. The canonical CLI project is `infrastructure/supabase`; application packages must not
 create another migration directory.
 
@@ -14,6 +14,19 @@ Phase 2 contains three ordered administrator migrations: schema/security trigger
 role-permission metadata, then trusted functions/RLS. Existing migration files are immutable after
 hosted application. Phase 3 follows them with two ordered token-access migrations: schema first,
 then trusted functions/RLS. Later changes require a new migration.
+
+Phase 6 also has a real PostgreSQL execution gate:
+
+```bash
+pnpm db:test:local:world
+```
+
+This command uses an isolated temporary PostgreSQL cluster and executes the full migration order,
+replays the safe Phase 6 seed to prove it does not duplicate catalog data, then covers
+published-world loading, moderation denial, authoritative travel and replay, safe destination
+handling, and the administrator derive/validate/preview/publish lifecycle. It fails clearly when
+PostgreSQL binaries are unavailable; set `STARVILLE_POSTGRES_BIN` when their directory is not on
+`PATH`.
 
 ## Generated types
 

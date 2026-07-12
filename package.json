@@ -38,6 +38,7 @@
     "db:migrations:push": "node scripts/with-env.mjs tsx scripts/supabase/remote-command.ts push",
     "db:lint:hosted": "node scripts/with-env.mjs tsx scripts/supabase/remote-command.ts lint",
     "db:test:hosted": "node scripts/with-env.mjs tsx scripts/supabase/hosted-database-tests.ts",
+    "db:test:local:world": "tsx scripts/supabase/local-world-postgres-tests.ts",
     "rls:test:hosted": "node scripts/with-env.mjs tsx scripts/supabase/hosted-rls-tests.ts",
     "admin:bootstrap": "node scripts/with-env.mjs tsx scripts/supabase/bootstrap-admin.ts",
     "supabase:start": "pnpm dlx supabase@2.109.1 --workdir infrastructure start",

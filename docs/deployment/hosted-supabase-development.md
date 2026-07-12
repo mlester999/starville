@@ -124,6 +124,15 @@ dry-run-only status.
 
 Run hosted tests only after the migration is confirmed and the exact target is reverified:
 
+The RLS runner exercises both Supabase and the configured application URLs. When
+`NEXT_PUBLIC_API_URL` or `NEXT_PUBLIC_ADMIN_URL` points to loopback, start `pnpm dev` in a separate
+terminal and wait for the API and admin portal to become ready before running the tests. Deployed
+URLs may be used only when they target the same approved development environment. The runner checks
+API `/ready` and admin `/login` before creating any hosted fixture, and stops with a safe bounded
+diagnostic if either application is unavailable. Direct application requests and Supabase SDK
+requests share the same bounded, path-redacted transport diagnostics; cleanup steps and database
+statements are also time-limited and reported as a structured cleanup result.
+
 ```bash
 pnpm db:test:hosted
 pnpm rls:test:hosted

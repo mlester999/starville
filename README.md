@@ -181,6 +181,13 @@ pnpm db:migrations:list
 pnpm db:migrations:dry-run
 ```
 
+Phase 6 migration repairs also have an isolated stock-PostgreSQL execution gate that never uses
+hosted credentials:
+
+```bash
+pnpm db:test:local:world
+```
+
 Only after the exact development environment, project ref, Supabase URL hostname, canonical CLI
 link, and write approval all match:
 
@@ -196,9 +203,10 @@ Hosted tests use unique test-owned identities and exact-ID cleanup. They never r
 truncate tables, delete unknown Auth users, or use service role as the identity under RLS. This
 README does not replace command evidence; every hosted result must be reported by the current
 validation run. The approved development project currently has the additive Phase 4 and dependent
-Phase 5 migrations in remote history. The Phase 6 migrations are local and pending owner-authorized
-deployment. Any hosted operation remains subject to the owner gates and must be verified against the
-current migration list rather than assumed from this document.
+Phase 5 migrations plus the Phase 6 schema migration in remote history. The remaining four Phase 6
+migrations are local and pending owner-authorized deployment. Any hosted operation remains subject
+to the owner gates and must be verified against the current migration list rather than assumed from
+this document.
 
 See [the hosted development runbook](docs/deployment/hosted-supabase-development.md) for target
 verification, raw CLI command forms, hosted Auth redirects, fixture safety, and prohibited

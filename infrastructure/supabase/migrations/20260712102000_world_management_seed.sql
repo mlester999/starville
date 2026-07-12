@@ -62,7 +62,8 @@ select
   'approved',
   true,
   now()
-from asset_seed;
+from asset_seed
+on conflict (asset_key) do nothing;
 
 with seed(slug, display_name, description, default_spawn_id, manifest) as (
   values
@@ -80,7 +81,8 @@ insert into public.world_maps (
   default_spawn_id
 )
 select slug, display_name, description, 'active', default_spawn_id
-from seed;
+from seed
+on conflict (slug) do nothing;
 
 with seed(slug, display_name, description, default_spawn_id, manifest) as (
   values
@@ -119,7 +121,8 @@ select
   now(),
   'Initial reviewed Phase 6 development world publication.'
 from seed
-join public.world_maps as map on map.slug = seed.slug;
+join public.world_maps as map on map.slug = seed.slug
+on conflict (world_map_id, version_number) do nothing;
 
 select set_config('starville.world_publication_transition', 'true', true);
 
@@ -129,7 +132,8 @@ set active_published_version_id = version.id,
 from public.world_map_versions as version
 where version.world_map_id = map.id
   and version.version_number = 1
-  and version.lifecycle_status = 'published';
+  and version.lifecycle_status = 'published'
+  and map.active_published_version_id is distinct from version.id;
 
 select set_config('starville.world_publication_transition', 'false', true);
 
@@ -138,7 +142,8 @@ select version.id, asset.id
 from public.world_map_versions as version
 cross join lateral jsonb_array_elements_text(version.manifest -> 'assets') as requested(asset_key)
 join public.world_assets as asset on asset.asset_key = requested.asset_key
-where version.version_number = 1;
+where version.version_number = 1
+on conflict (world_map_version_id, world_asset_id) do nothing;
 
 insert into public.world_audit_events (
   event_key,
@@ -162,7 +167,16 @@ select
     'seeded', true
   )
 from public.world_maps as map
-join public.world_map_versions as version on version.id = map.active_published_version_id;
+join public.world_map_versions as version on version.id = map.active_published_version_id
+where not exists (
+  select 1
+  from public.world_audit_events as existing
+  where existing.event_key = 'world.version_published'
+    and existing.actor_type = 'system'
+    and existing.target_world_map_id = map.id
+    and existing.target_world_map_version_id = version.id
+    and existing.metadata ->> 'seeded' = 'true'
+);
 
 insert into public.world_audit_events (
   event_key,
@@ -183,5 +197,12 @@ select
     'sourceType', asset.source_type,
     'contentHash', asset.content_hash
   )
-from public.world_assets as asset;
-
+from public.world_assets as asset
+where not exists (
+  select 1
+  from public.world_audit_events as existing
+  where existing.event_key = 'world.asset_registered'
+    and existing.actor_type = 'system'
+    and existing.target_world_asset_id = asset.id
+    and existing.metadata ->> 'assetKey' = asset.asset_key
+);

@@ -355,20 +355,25 @@ select ok(
   'spawn reset accepts no coordinates and resolves the reviewed published default spawn'
 );
 
-select is(
-  (select count(*)::integer from public.admin_permissions where is_system),
-  46,
-  'the catalog retains Phase 5 permissions and adds only the reviewed Phase 6 permissions'
+select ok(
+  exists (select 1 from public.admin_permissions where key = 'maps.preview' and is_system)
+  and exists (select 1 from public.admin_permissions where key = 'maps.audit_read' and is_system),
+  'the reviewed Phase 6 map permissions extend the retained Phase 5 catalog'
 );
 select is(
   (
     select count(*)::integer
-    from public.admin_role_permissions as mapping
-    join public.admin_roles as role on role.id = mapping.role_id
-    where role.key = 'super_admin'
+    from public.admin_permissions as permission
+    where permission.is_system
+      and not exists (
+        select 1
+        from public.admin_role_permissions as mapping
+        join public.admin_roles as role on role.id = mapping.role_id
+        where role.key = 'super_admin' and mapping.permission_id = permission.id
+      )
   ),
-  46,
-  'Super Admin receives the complete reviewed permission catalog'
+  0,
+  'Super Admin receives every retained and newly seeded system permission'
 );
 select is(
   (

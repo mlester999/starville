@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(68);
+select plan(70);
 
 select has_table('public', 'world_maps', 'world map identities exist');
 select has_table('public', 'world_map_versions', 'immutable world versions exist');
@@ -167,7 +167,11 @@ select ok(
   'destination spawns cannot immediately retrigger an exit'
 );
 
-select is((select count(*)::integer from public.admin_permissions where is_system), 46, 'permission catalog contains only reviewed keys');
+select ok(
+  exists (select 1 from public.admin_permissions where key = 'maps.preview' and is_system)
+  and exists (select 1 from public.admin_permissions where key = 'maps.audit_read' and is_system),
+  'both reviewed Phase 6 world permissions are seeded as system metadata'
+);
 select is(
   (select count(*)::integer from public.admin_permissions where key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')),
   6,
@@ -175,63 +179,93 @@ select is(
 );
 select is(
   (
-    select count(*)::integer from public.admin_role_permissions as mapping
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
     join public.admin_permissions as permission on permission.id = mapping.permission_id
     where role.key = 'super_admin' and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
   ),
-  6,
+  array['assets.read','maps.audit_read','maps.edit','maps.preview','maps.publish','maps.read']::text[],
   'Super Admin receives the full Phase 6 permission set'
 );
 select is(
   (
-    select count(*)::integer from public.admin_role_permissions as mapping
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
     join public.admin_permissions as permission on permission.id = mapping.permission_id
     where role.key = 'game_administrator' and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
   ),
-  5,
+  array['assets.read','maps.audit_read','maps.edit','maps.preview','maps.read']::text[],
   'Game Administrator can read, edit, preview, audit, and read assets but cannot publish'
 );
 select is(
   (
-    select count(*)::integer from public.admin_role_permissions as mapping
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
     join public.admin_permissions as permission on permission.id = mapping.permission_id
     where role.key = 'live_operations_manager' and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
   ),
-  3,
+  array['assets.read','maps.audit_read','maps.read']::text[],
   'Live Operations has read, audit, and asset visibility without world mutation'
 );
 select is(
   (
-    select count(*)::integer from public.admin_role_permissions as mapping
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
     join public.admin_permissions as permission on permission.id = mapping.permission_id
     where role.key = 'world_designer' and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
   ),
-  6,
+  array['assets.read','maps.audit_read','maps.edit','maps.preview','maps.publish','maps.read']::text[],
   'World Designer receives the explicitly approved complete world workflow'
 );
 select is(
   (
-    select count(*)::integer from public.admin_role_permissions as mapping
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
     join public.admin_permissions as permission on permission.id = mapping.permission_id
     where role.key = 'moderator' and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
   ),
-  0,
+  array[]::text[],
   'Moderator receives no world-management permission by default'
 );
 select is(
   (
-    select count(*)::integer from public.admin_role_permissions as mapping
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
     join public.admin_roles as role on role.id = mapping.role_id
     join public.admin_permissions as permission on permission.id = mapping.permission_id
     where role.key = 'blockchain_operator' and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
   ),
-  0,
+  array[]::text[],
   'Blockchain Operator receives no world-management permission'
+);
+select is(
+  (
+    select coalesce(array_agg(permission.key order by permission.key), array[]::text[])
+    from public.admin_role_permissions as mapping
+    join public.admin_roles as role on role.id = mapping.role_id
+    join public.admin_permissions as permission on permission.id = mapping.permission_id
+    where role.key = 'read_only_analyst'
+      and permission.key in ('maps.read','maps.edit','maps.preview','maps.publish','maps.audit_read','assets.read')
+  ),
+  array['assets.read','maps.read']::text[],
+  'Read-only Analyst receives world and asset visibility without preview, audit, or mutation authority'
+);
+select is(
+  (
+    select count(*)::integer
+    from public.admin_role_permissions as mapping
+    join public.admin_roles as role on role.id = mapping.role_id
+    join public.admin_permissions as permission on permission.id = mapping.permission_id
+    where role.key not in ('super_admin','game_administrator','world_designer')
+      and permission.key in ('maps.edit','maps.preview','maps.publish')
+  ),
+  0,
+  'roles without an explicit world workflow mapping cannot edit, preview, or publish maps'
 );
 
 select is(

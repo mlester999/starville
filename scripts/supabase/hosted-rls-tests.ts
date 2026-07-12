@@ -20,6 +20,14 @@ import { buildApiApp } from '../../apps/api/src/app';
 import type { LogContext, ServiceLogger } from '../../apps/api/src/contracts';
 import { createSupabaseAdminWorldGateway } from '../../apps/api/src/world/admin-gateway';
 import { createAdminWorldService } from '../../apps/api/src/world/admin-service';
+import {
+  createHostedFetch,
+  decodeHostedJson,
+  hostedFetch,
+  hostedResponseFailure,
+  safeHostedTransportCode,
+  withHostedCleanupTimeout,
+} from './hosted-rls-diagnostics';
 import { safeHostedTargetSummary, verifyCanonicalHostedTarget } from './safety';
 
 interface FixtureUser {
@@ -80,7 +88,11 @@ function authorizationOutcome(value: unknown): string | undefined {
     : undefined;
 }
 
-function createCookieBackedSupabaseClient(url: string, anonKey: string) {
+function createCookieBackedSupabaseClient(
+  url: string,
+  anonKey: string,
+  hostedClientFetch: typeof globalThis.fetch,
+) {
   const cookieJar = new Map<string, string>();
   const client = createSupabaseSsrServerClient(
     { url, anonKey },
@@ -103,6 +115,7 @@ function createCookieBackedSupabaseClient(url: string, anonKey: string) {
         sameSite: 'lax',
         secure: false,
       },
+      fetch: hostedClientFetch,
     },
   );
 
@@ -165,14 +178,68 @@ async function main(): Promise<void> {
   const verifiedAdminPortalUrl: string = adminPortalUrl;
   const verifiedConfiguredNetwork: 'solana:devnet' | 'solana:mainnet-beta' = configuredNetwork;
 
+  const apiReadinessUrl = new URL('/ready', apiUrl);
+  const apiReadinessResponse = await hostedFetch(
+    'api-readiness-preflight',
+    apiReadinessUrl,
+    requestId,
+    { headers: { 'x-request-id': requestId } },
+  );
+  assert(
+    apiReadinessResponse.status === 200,
+    hostedResponseFailure(
+      'api-readiness-preflight',
+      apiReadinessUrl,
+      apiReadinessResponse,
+      requestId,
+    ),
+  );
+
+  const adminReadinessUrl = new URL('/login', adminPortalUrl);
+  const adminReadinessResponse = await hostedFetch(
+    'admin-portal-readiness-preflight',
+    adminReadinessUrl,
+    requestId,
+    { headers: { 'x-request-id': requestId }, redirect: 'manual' },
+  );
+  assert(
+    adminReadinessResponse.status === 200,
+    hostedResponseFailure(
+      'admin-portal-readiness-preflight',
+      adminReadinessUrl,
+      adminReadinessResponse,
+      requestId,
+    ),
+  );
+
   process.stdout.write(`${JSON.stringify({ testRunId: runId, mode: 'hosted-rls' })}\n`);
 
-  const serviceClient = createSupabaseServiceRoleClient({
-    url: privateConfig.url,
-    serviceRoleKey: privateConfig.serviceRoleKey,
+  const serviceClientFetch = createHostedFetch('supabase-service-request', requestId);
+  const anonymousClientFetch = createHostedFetch('supabase-anonymous-request', requestId);
+  const sessionClientFetch = createHostedFetch('supabase-session-request', requestId);
+  const serviceClient = createSupabaseServiceRoleClient(
+    {
+      url: privateConfig.url,
+      serviceRoleKey: privateConfig.serviceRoleKey,
+    },
+    { fetch: serviceClientFetch },
+  );
+  const anonymousClient = createSupabaseServerClient(
+    { url: privateConfig.url, anonKey },
+    { fetch: anonymousClientFetch },
+  );
+  const sql = postgres(privateConfig.databaseUrl, {
+    max: 1,
+    ssl: 'require',
+    connect_timeout: 20,
+    idle_timeout: 20,
+    connection: {
+      application_name: 'starville_hosted_rls',
+      statement_timeout: 20_000,
+      lock_timeout: 10_000,
+      idle_in_transaction_session_timeout: 20_000,
+    },
   });
-  const anonymousClient = createSupabaseServerClient({ url: privateConfig.url, anonKey });
-  const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });
   const fixtures: FixtureUser[] = [];
   const testRoleIds: string[] = [];
   let phase5PlayerFixture:
@@ -383,7 +450,10 @@ async function main(): Promise<void> {
       'Anonymous caller unexpectedly executed the administrator world directory',
     );
 
-    const normalClient = createSupabaseServerClient({ url: privateConfig.url, anonKey });
+    const normalClient = createSupabaseServerClient(
+      { url: privateConfig.url, anonKey },
+      { fetch: sessionClientFetch },
+    );
     const normalLogin = await normalClient.auth.signInWithPassword({
       email: normal.email,
       password,
@@ -667,7 +737,10 @@ async function main(): Promise<void> {
     `;
 
     for (const deniedFixture of [invited, suspended, disabled]) {
-      const deniedClient = createSupabaseServerClient({ url: privateConfig.url, anonKey });
+      const deniedClient = createSupabaseServerClient(
+        { url: privateConfig.url, anonKey },
+        { fetch: sessionClientFetch },
+      );
       const deniedLogin = await deniedClient.auth.signInWithPassword({
         email: deniedFixture.email,
         password,
@@ -696,7 +769,10 @@ async function main(): Promise<void> {
       );
     }
 
-    const mfaClient = createSupabaseServerClient({ url: privateConfig.url, anonKey });
+    const mfaClient = createSupabaseServerClient(
+      { url: privateConfig.url, anonKey },
+      { fetch: sessionClientFetch },
+    );
     const mfaLogin = await mfaClient.auth.signInWithPassword({
       email: mfaRequired.email,
       password,
@@ -719,7 +795,11 @@ async function main(): Promise<void> {
     );
 
     async function createActiveAdministratorSession() {
-      const cookieClient = createCookieBackedSupabaseClient(privateConfig.url, verifiedAnonKey);
+      const cookieClient = createCookieBackedSupabaseClient(
+        privateConfig.url,
+        verifiedAnonKey,
+        sessionClientFetch,
+      );
       const client = cookieClient.client;
       const login = await client.auth.signInWithPassword({
         email: activeAdministrator.email,
@@ -815,12 +895,16 @@ async function main(): Promise<void> {
     });
     assert(apiAuthorization.statusCode === 200, 'Real bearer session was denied by the admin API');
 
-    const overviewResponse = await fetch(new URL('/overview', adminPortalUrl), {
-      headers: { cookie: activeSession.cookieHeader() },
+    const overviewUrl = new URL('/overview', adminPortalUrl);
+    const overviewResponse = await hostedFetch('admin-overview', overviewUrl, requestId, {
+      headers: { cookie: activeSession.cookieHeader(), 'x-request-id': requestId },
       redirect: 'manual',
     });
     const overviewBody = await overviewResponse.text();
-    assert(overviewResponse.status === 200, 'Active administrator was denied by /overview');
+    assert(
+      overviewResponse.status === 200,
+      hostedResponseFailure('admin-overview', overviewUrl, overviewResponse, requestId),
+    );
     assert(
       overviewBody.includes('id="overview-title"') &&
         overviewBody.includes('Phase 2 Test Analyst') &&
@@ -829,20 +913,35 @@ async function main(): Promise<void> {
       'The protected overview did not render real administrator context safely',
     );
 
-    const readOnlyTokenAccessResponse = await fetch(new URL('/token-access', adminPortalUrl), {
-      headers: { cookie: activeSession.cookieHeader() },
-      redirect: 'manual',
-    });
+    const readOnlyTokenAccessUrl = new URL('/token-access', adminPortalUrl);
+    const readOnlyTokenAccessResponse = await hostedFetch(
+      'read-only-token-access-page',
+      readOnlyTokenAccessUrl,
+      requestId,
+      {
+        headers: { cookie: activeSession.cookieHeader(), 'x-request-id': requestId },
+        redirect: 'manual',
+      },
+    );
     const readOnlyTokenAccessBody = await readOnlyTokenAccessResponse.text();
     assert(
       readOnlyTokenAccessResponse.status === 200 &&
         readOnlyTokenAccessBody.includes('id="token-access-title"') &&
         readOnlyTokenAccessBody.includes('Read only') &&
         !readOnlyTokenAccessBody.includes('Configuration unavailable'),
-      'Read-only Token Access page did not render trusted hosted configuration',
+      `Read-only Token Access page did not render trusted hosted configuration. ${hostedResponseFailure(
+        'read-only-token-access-page',
+        readOnlyTokenAccessUrl,
+        readOnlyTokenAccessResponse,
+        requestId,
+      )}`,
     );
 
-    const normalPortalClient = createCookieBackedSupabaseClient(privateConfig.url, anonKey);
+    const normalPortalClient = createCookieBackedSupabaseClient(
+      privateConfig.url,
+      anonKey,
+      sessionClientFetch,
+    );
     const normalPortalLogin = await normalPortalClient.client.auth.signInWithPassword({
       email: normal.email,
       password,
@@ -851,16 +950,27 @@ async function main(): Promise<void> {
       !normalPortalLogin.error && normalPortalLogin.data.session !== null,
       'Normal portal test login failed',
     );
-    const normalOverviewResponse = await fetch(new URL('/overview', adminPortalUrl), {
-      headers: { cookie: normalPortalClient.cookieHeader() },
-      redirect: 'manual',
-    });
+    const normalOverviewUrl = new URL('/overview', adminPortalUrl);
+    const normalOverviewResponse = await hostedFetch(
+      'normal-user-overview-denial',
+      normalOverviewUrl,
+      requestId,
+      {
+        headers: { cookie: normalPortalClient.cookieHeader(), 'x-request-id': requestId },
+        redirect: 'manual',
+      },
+    );
     const normalOverviewLocation = normalOverviewResponse.headers.get('location');
     assert(
       normalOverviewResponse.status === 307 &&
         normalOverviewLocation !== null &&
         new URL(normalOverviewLocation, adminPortalUrl).pathname === '/unauthorized',
-      'Normal authenticated user was not denied by the protected overview route',
+      `Normal authenticated user was not denied by the protected overview route. ${hostedResponseFailure(
+        'normal-user-overview-denial',
+        normalOverviewUrl,
+        normalOverviewResponse,
+        requestId,
+      )}`,
     );
 
     const currentAuthorization = await adminClient.rpc('get_current_admin_authorization');
@@ -1087,19 +1197,38 @@ async function main(): Promise<void> {
       'content-type': 'application/json',
       'x-request-id': requestId,
     };
-    const currentTokenGateResponse = await fetch(new URL('/api/v1/admin/token-gate', apiUrl), {
-      headers: tokenGateHeaders,
-    });
-    const currentTokenGate = (await currentTokenGateResponse.json()) as HostedTokenGateResponse;
+    const currentTokenGateUrl = new URL('/api/v1/admin/token-gate', apiUrl);
+    const currentTokenGateResponse = await hostedFetch(
+      'admin-token-gate-read',
+      currentTokenGateUrl,
+      requestId,
+      { headers: tokenGateHeaders },
+    );
     assert(
-      currentTokenGateResponse.status === 200 &&
-        currentTokenGate.success &&
-        currentTokenGate.data.network === configuredNetwork,
-      'Blockchain Operator could not read the configured token gate',
+      currentTokenGateResponse.status === 200,
+      hostedResponseFailure(
+        'admin-token-gate-read',
+        currentTokenGateUrl,
+        currentTokenGateResponse,
+        requestId,
+      ),
+    );
+    const currentTokenGate = await decodeHostedJson<HostedTokenGateResponse>(
+      'admin-token-gate-read',
+      currentTokenGateUrl,
+      currentTokenGateResponse,
+      requestId,
+    );
+    assert(
+      currentTokenGate.success && currentTokenGate.data.network === configuredNetwork,
+      'Blockchain Operator received an invalid configured token-gate response',
     );
 
-    const mintValidationResponse = await fetch(
-      new URL('/api/v1/admin/token-gate/validate', apiUrl),
+    const mintValidationUrl = new URL('/api/v1/admin/token-gate/validate', apiUrl);
+    const mintValidationResponse = await hostedFetch(
+      'admin-token-gate-validation',
+      mintValidationUrl,
+      requestId,
       {
         method: 'POST',
         headers: tokenGateHeaders,
@@ -1110,7 +1239,15 @@ async function main(): Promise<void> {
         }),
       },
     );
-    assert(mintValidationResponse.status === 200, 'Configured token mint validation failed');
+    assert(
+      mintValidationResponse.status === 200,
+      hostedResponseFailure(
+        'admin-token-gate-validation',
+        mintValidationUrl,
+        mintValidationResponse,
+        requestId,
+      ),
+    );
 
     assert(
       currentTokenGate.data.enabled &&
@@ -1125,10 +1262,16 @@ async function main(): Promise<void> {
       'Hosted tests require the owner-reviewed token gate to be configured before the run; the test refuses to mutate it',
     );
 
-    const configurableTokenAccessResponse = await fetch(new URL('/token-access', adminPortalUrl), {
-      headers: { cookie: tokenGateFixture.cookieHeader() },
-      redirect: 'manual',
-    });
+    const configurableTokenAccessUrl = new URL('/token-access', adminPortalUrl);
+    const configurableTokenAccessResponse = await hostedFetch(
+      'configurable-token-access-page',
+      configurableTokenAccessUrl,
+      requestId,
+      {
+        headers: { cookie: tokenGateFixture.cookieHeader(), 'x-request-id': requestId },
+        redirect: 'manual',
+      },
+    );
     const configurableTokenAccessBody = await configurableTokenAccessResponse.text();
     assert(
       configurableTokenAccessResponse.status === 200 &&
@@ -1136,7 +1279,12 @@ async function main(): Promise<void> {
         configurableTokenAccessBody.includes('Configure access') &&
         configurableTokenAccessBody.includes('available') &&
         !configurableTokenAccessBody.includes('Configuration unavailable'),
-      'Configurable Token Access page did not render the validated hosted configuration',
+      `Configurable Token Access page did not render the validated hosted configuration. ${hostedResponseFailure(
+        'configurable-token-access-page',
+        configurableTokenAccessUrl,
+        configurableTokenAccessResponse,
+        requestId,
+      )}`,
     );
 
     const phase5WalletAddress = randomBase58Address();
@@ -1534,16 +1682,30 @@ async function main(): Promise<void> {
       'Player operations did not append matching player and administrator audit records',
     );
 
-    const gameAdminDetailPage = await fetch(new URL(`/players/${phase5PlayerId}`, adminPortalUrl), {
-      headers: { cookie: gameAdministratorFixture.cookieHeader() },
-      redirect: 'manual',
-    });
+    const gameAdminDetailUrl = new URL(`/players/${phase5PlayerId}`, adminPortalUrl);
+    const gameAdminDetailPage = await hostedFetch(
+      'game-admin-player-detail',
+      gameAdminDetailUrl,
+      requestId,
+      {
+        headers: {
+          cookie: gameAdministratorFixture.cookieHeader(),
+          'x-request-id': requestId,
+        },
+        redirect: 'manual',
+      },
+    );
     const gameAdminDetailBody = await gameAdminDetailPage.text();
     assert(
       gameAdminDetailPage.status === 200 &&
         gameAdminDetailBody.includes('Reset to spawn') &&
         gameAdminDetailBody.includes('Require rename'),
-      'Permission-aware player-management controls did not render for Game Administrator',
+      `Permission-aware player-management controls did not render for Game Administrator. ${hostedResponseFailure(
+        'game-admin-player-detail',
+        gameAdminDetailUrl,
+        gameAdminDetailPage,
+        requestId,
+      )}`,
     );
 
     await sql`
@@ -1551,17 +1713,28 @@ async function main(): Promise<void> {
       where user_id = ${administrator.id}
     `;
     const readOnlyPhase5Fixture = await createActiveAdministratorSession();
-    const readOnlyDetailPage = await fetch(new URL(`/players/${phase5PlayerId}`, adminPortalUrl), {
-      headers: { cookie: readOnlyPhase5Fixture.cookieHeader() },
-      redirect: 'manual',
-    });
+    const readOnlyDetailUrl = new URL(`/players/${phase5PlayerId}`, adminPortalUrl);
+    const readOnlyDetailPage = await hostedFetch(
+      'read-only-player-detail',
+      readOnlyDetailUrl,
+      requestId,
+      {
+        headers: { cookie: readOnlyPhase5Fixture.cookieHeader(), 'x-request-id': requestId },
+        redirect: 'manual',
+      },
+    );
     const readOnlyDetailBody = await readOnlyDetailPage.text();
     assert(
       readOnlyDetailPage.status === 200 &&
         !readOnlyDetailBody.includes('Suspend player') &&
         !readOnlyDetailBody.includes('Reset to spawn') &&
         !readOnlyDetailBody.includes('Revoke sessions'),
-      'Read-only staff unexpectedly saw enabled player mutation controls',
+      `Read-only staff unexpectedly saw enabled player mutation controls. ${hostedResponseFailure(
+        'read-only-player-detail',
+        readOnlyDetailUrl,
+        readOnlyDetailPage,
+        requestId,
+      )}`,
     );
 
     const passwordChangeFixture = await createActiveAdministratorSession();
@@ -1603,89 +1776,107 @@ async function main(): Promise<void> {
       assert(auditEventKeys.has(expectedEvent), `Missing expected audit event: ${expectedEvent}`);
     }
 
-    process.stdout.write('Hosted RLS, authorization, revocation, and cleanup assertions passed.\n');
+    process.stdout.write('Hosted RLS, authorization, and revocation assertions passed.\n');
   } finally {
-    await api.close();
-    const fixtureIds = fixtures.map(({ id }) => id);
-    const cleanupFailures: string[] = [];
-
-    if (phase5PlayerFixture === undefined && phase5PendingFixture !== undefined) {
+    const cleanupFailures: Array<{ readonly code: string; readonly operation: string }> = [];
+    const recordCleanupFailure = (operation: string, error?: unknown, code?: string): void => {
+      cleanupFailures.push({
+        operation,
+        code: code ?? safeHostedTransportCode(error) ?? 'HOSTED_CLEANUP_FAILURE',
+      });
+    };
+    const runCleanupStep = async (
+      operation: string,
+      task: () => Promise<unknown>,
+    ): Promise<void> => {
       try {
+        await withHostedCleanupTimeout(task);
+      } catch (error) {
+        recordCleanupFailure(operation, error);
+      }
+    };
+
+    await runCleanupStep('close-local-api', async () => api.close());
+    const fixtureIds = fixtures.map(({ id }) => id);
+    const pendingPlayerFixture = phase5PendingFixture;
+
+    if (phase5PlayerFixture === undefined && pendingPlayerFixture !== undefined) {
+      await runCleanupStep('phase5-cleanup-target-lookup', async () => {
         const [pendingProfile] = await sql<{ id: string }[]>`
           select id
           from public.player_profiles
-          where wallet_address = ${phase5PendingFixture.walletAddress}
+          where wallet_address = ${pendingPlayerFixture.walletAddress}
             and display_name like 'P5Test%'
         `;
         if (pendingProfile !== undefined) {
           phase5PlayerFixture = {
             id: pendingProfile.id,
-            walletAddress: phase5PendingFixture.walletAddress,
-            adminUserId: phase5PendingFixture.adminUserId,
+            walletAddress: pendingPlayerFixture.walletAddress,
+            adminUserId: pendingPlayerFixture.adminUserId,
           };
         }
-      } catch {
-        cleanupFailures.push('Phase 5 cleanup target lookup');
-      }
+      });
     }
 
-    if (phase5PlayerFixture !== undefined) {
-      try {
+    const cleanupPlayerFixture = phase5PlayerFixture;
+    if (cleanupPlayerFixture !== undefined) {
+      await runCleanupStep('phase5-player-operations', async () => {
         await sql`select private.cleanup_phase5_test_player(
           ${runId}::uuid,
-          ${phase5PlayerFixture.id}::uuid,
-          ${phase5PlayerFixture.walletAddress},
-          ${phase5PlayerFixture.adminUserId}::uuid
+          ${cleanupPlayerFixture.id}::uuid,
+          ${cleanupPlayerFixture.walletAddress},
+          ${cleanupPlayerFixture.adminUserId}::uuid
         )`;
         const [remainingPhase5Profile] = await sql<{ count: string }[]>`
           select count(*)::text as count
           from public.player_profiles
-          where id = ${phase5PlayerFixture.id}
+          where id = ${cleanupPlayerFixture.id}
         `;
         if (remainingPhase5Profile?.count !== '0') {
-          cleanupFailures.push('test-owned Phase 5 player profile');
+          recordCleanupFailure('phase5-player-profile', undefined, 'FIXTURE_REMAINS');
         }
-      } catch {
-        cleanupFailures.push('test-owned Phase 5 player operations fixture');
-      }
+      });
     }
 
     if (fixtureIds.length > 0) {
-      try {
+      await runCleanupStep('administrator-rows', async () => {
         await sql`delete from public.admin_sessions where user_id in ${sql(fixtureIds)}`;
         await sql`delete from public.admin_users where user_id in ${sql(fixtureIds)}`;
-      } catch {
-        cleanupFailures.push('test-owned administrator rows');
-      }
+      });
     }
 
     if (testRoleIds.length > 0) {
-      try {
+      await runCleanupStep('test-roles', async () => {
         await sql`delete from public.admin_roles where id in ${sql(testRoleIds)}`;
-      } catch {
-        cleanupFailures.push('test-owned roles');
-      }
+      });
     }
 
-    try {
+    await runCleanupStep('audit-rows', async () => {
       await sql`select private.cleanup_phase2_test_audit_logs(${runId}::uuid)`;
-    } catch {
-      cleanupFailures.push('test-owned audit rows');
-    }
+    });
 
     for (const fixture of fixtures) {
-      const deleted = await serviceClient.auth.admin.deleteUser(fixture.id);
-      if (deleted.error) {
-        process.stderr.write(`Cleanup failed for test-owned Auth user ${fixture.id}.\n`);
-        cleanupFailures.push(`Auth user ${fixture.id}`);
-      }
+      await runCleanupStep('auth-user', async () => {
+        const deleted = await serviceClient.auth.admin.deleteUser(fixture.id);
+        if (deleted.error) {
+          recordCleanupFailure('auth-user', deleted.error);
+        }
+      });
     }
 
-    await sql.end();
+    await runCleanupStep('close-database-connection', async () => sql.end({ timeout: 5 }));
 
+    const cleanupDiagnostic = {
+      operation: 'hosted-fixture-cleanup',
+      requestId,
+      result: cleanupFailures.length === 0 ? 'passed' : 'failed',
+      failures: cleanupFailures,
+    } as const;
     if (cleanupFailures.length > 0) {
-      process.stderr.write(`Hosted cleanup failed for: ${cleanupFailures.join(', ')}\n`);
+      process.stderr.write(`${JSON.stringify(cleanupDiagnostic)}\n`);
       process.exitCode = 1;
+    } else {
+      process.stdout.write(`${JSON.stringify(cleanupDiagnostic)}\n`);
     }
   }
 }

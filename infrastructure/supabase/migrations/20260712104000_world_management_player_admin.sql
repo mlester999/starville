@@ -191,6 +191,7 @@ declare
   profile public.player_profiles%rowtype;
   moderation public.player_moderation_states%rowtype;
   selected_rows record;
+  selected_world record;
   default_map public.world_maps%rowtype;
   default_version public.world_map_versions%rowtype;
   default_spawn jsonb;
@@ -248,8 +249,8 @@ begin
     return jsonb_build_object('status', 'version_conflict');
   end if;
 
-  select map.*, version.*
-  into default_map, default_version
+  select map as map_row, version as version_row
+  into selected_world
   from public.world_maps as map
   join public.world_map_versions as version on version.id = map.active_published_version_id
   where map.slug = 'lantern-square'
@@ -260,6 +261,9 @@ begin
   if not found then
     return jsonb_build_object('status', 'state_conflict', 'code', 'WORLD_DEFAULT_UNAVAILABLE');
   end if;
+
+  default_map := selected_world.map_row;
+  default_version := selected_world.version_row;
 
   select value into default_spawn
   from jsonb_array_elements(default_version.manifest -> 'spawns')

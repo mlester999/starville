@@ -70,6 +70,39 @@ describe('Supabase server boundary', () => {
     expect(client.auth).toBeDefined();
   });
 
+  it('allows server test clients to use a bounded instrumented transport', async () => {
+    const requestedPaths: string[] = [];
+    const instrumentedFetch: typeof globalThis.fetch = async (input) => {
+      const url =
+        typeof input === 'string'
+          ? new URL(input)
+          : input instanceof URL
+            ? input
+            : new URL(input.url);
+      requestedPaths.push(url.pathname);
+      return new Response('[]', {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    };
+    const serverClient = createSupabaseServerClient(
+      { url: 'https://example.supabase.co', anonKey: anonymousJwt },
+      { fetch: instrumentedFetch },
+    );
+    const ssrClient = createSupabaseSsrServerClient(
+      { url: 'https://example.supabase.co', anonKey: anonymousJwt },
+      { getAll: () => [], setAll: () => undefined },
+      { fetch: instrumentedFetch },
+    );
+
+    const serverResult = await serverClient.from('world_maps').select('id').limit(1);
+    const ssrResult = await ssrClient.from('world_maps').select('id').limit(1);
+
+    expect(serverResult.error).toBeNull();
+    expect(ssrResult.error).toBeNull();
+    expect(requestedPaths).toEqual(['/rest/v1/world_maps', '/rest/v1/world_maps']);
+  });
+
   it('rejects an anonymous JWT at the service-role boundary', () => {
     expect(() =>
       parseServiceRoleSupabaseConfig({

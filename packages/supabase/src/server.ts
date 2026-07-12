@@ -5,6 +5,10 @@ import { httpUrlSchema } from '@starville/shared-validation';
 
 import type { AnonymousSupabaseConfig, ServiceRoleSupabaseConfig } from './types';
 
+export interface SupabaseServerClientOptions {
+  readonly fetch?: typeof globalThis.fetch;
+}
+
 const anonymousServerConfigSchema = z
   .object({
     url: httpUrlSchema,
@@ -52,7 +56,10 @@ export function parseServiceRoleSupabaseConfig(input: unknown): ServiceRoleSupab
   return config;
 }
 
-export function createSupabaseServerClient(input: unknown): SupabaseClient {
+export function createSupabaseServerClient(
+  input: unknown,
+  options: SupabaseServerClientOptions = {},
+): SupabaseClient {
   const config: AnonymousSupabaseConfig = anonymousServerConfigSchema.parse(input);
 
   return createClient(config.url, config.anonKey, {
@@ -61,10 +68,14 @@ export function createSupabaseServerClient(input: unknown): SupabaseClient {
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(options.fetch === undefined ? {} : { global: { fetch: options.fetch } }),
   });
 }
 
-export function createSupabaseServiceRoleClient(input: unknown): SupabaseClient {
+export function createSupabaseServiceRoleClient(
+  input: unknown,
+  options: SupabaseServerClientOptions = {},
+): SupabaseClient {
   const config = parseServiceRoleSupabaseConfig(input);
 
   return createClient(config.url, config.serviceRoleKey, {
@@ -73,6 +84,7 @@ export function createSupabaseServiceRoleClient(input: unknown): SupabaseClient 
       detectSessionInUrl: false,
       persistSession: false,
     },
+    ...(options.fetch === undefined ? {} : { global: { fetch: options.fetch } }),
   });
 }
 
