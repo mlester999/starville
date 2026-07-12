@@ -62,10 +62,10 @@ export default async function OverviewPage() {
       <aside className="phase-note" aria-label="Current phase scope">
         <span aria-hidden="true">✦</span>
         <div>
-          <strong>Phase 2 is intentionally focused.</strong>
+          <strong>Phase 5 operations are available by permission.</strong>
           <p>
-            Operational dashboards, player data, live-economy controls, and content tools are not
-            implemented in this phase.
+            Player operations use real stored records and append-only audits. World editing, economy
+            controls, and later-phase systems remain intentionally unavailable.
           </p>
         </div>
       </aside>

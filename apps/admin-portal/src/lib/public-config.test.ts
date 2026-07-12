@@ -19,6 +19,7 @@ describe('parseAdminPublicConfig', () => {
       application: 'admin-portal',
       environment: 'development',
       appUrl: 'http://localhost:3002',
+      appOrigin: 'http://localhost:3002',
       apiUrl: 'http://localhost:4000',
       gameUrl: 'http://localhost:3001',
       supabase: {
@@ -27,6 +28,16 @@ describe('parseAdminPublicConfig', () => {
       },
     });
     expect(config).not.toHaveProperty('serviceRoleKey');
+  });
+
+  it('normalizes a configured path or trailing slash to the exact mutation origin', () => {
+    const config = parseAdminPublicConfig({
+      ...validEnvironment,
+      NEXT_PUBLIC_ADMIN_URL: 'http://localhost:3002/admin/',
+    });
+
+    expect(config.appUrl).toBe('http://localhost:3002/admin/');
+    expect(config.appOrigin).toBe('http://localhost:3002');
   });
 
   it('rejects an invalid API URL', () => {

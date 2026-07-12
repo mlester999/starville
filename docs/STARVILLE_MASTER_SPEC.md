@@ -3343,6 +3343,10 @@ PHASE 6: WORLD MANAGEMENT
 - Publishing
 - Versioning
 - Rollback
+- Four visible directional exits per playable map, centered on the north, east, south, and west edges
+- Validated adjacent-map destinations, transition regions, directional destination spawns, and safe persistence
+- Approximately one-to-two-second fade/travel presentation with truthful loading and safe failure recovery
+- No arbitrary client-selected destination or immediate arrival re-trigger loop
 
 PHASE 7: COZY SYSTEMS
 
@@ -3368,6 +3372,11 @@ PHASE 8: SOCIAL MULTIPLAYER
 - Trading
 - Community projects
 - Events
+- Approximately 40 active characters per authenticated server channel with safe, truthful channel switching
+- Bottom-left rate-limited, sanitized, moderated local/channel chat
+- Nearby N-key labels with defined range and safe public display fields only
+- Server-proximity-validated Inspect Character, Gift, and mutually accepted atomic Trade interactions
+- No cross-channel interaction, client-authoritative transfer, or ordinary blockchain transfer
 - Neighborhoods
 - Guilds
 

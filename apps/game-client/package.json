@@ -17,10 +17,14 @@
   "dependencies": {
     "@starville/config": "workspace:*",
     "@starville/design-tokens": "workspace:*",
+    "@starville/game-core": "workspace:*",
+    "@starville/game-content": "workspace:*",
+    "@starville/player-operations": "workspace:*",
     "@starville/wallet-access": "workspace:*",
     "phaser": "3.90.0",
     "react": "19.2.7",
-    "react-dom": "19.2.7"
+    "react-dom": "19.2.7",
+    "zod": "4.1.12"
   },
   "devDependencies": {
     "@starville/eslint-config": "workspace:*",

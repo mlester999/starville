@@ -2,20 +2,33 @@ import {
   loadAdminSecurityConfig,
   loadApiConfig,
   loadPrivateSupabaseConfig,
+  loadOperationsHealthConfig,
   loadTokenAccessServerConfig,
+  loadWorldManagementConfig,
 } from '@starville/config/server';
 import { createLogger } from '@starville/logger';
 import { createSolanaTokenVerifier } from '@starville/solana';
 import { createSupabaseServiceRoleClient } from '@starville/supabase/server';
 import { createSupabaseAdminAuthGateway } from './admin-auth-gateway.js';
 import { createApiService } from './service.js';
+import { createSupabasePlayerGateway } from './player/gateway.js';
+import { createPlayerService } from './player/service.js';
 import { createSupabaseTokenAccessGateway } from './token-access/gateway.js';
 import { createTokenAccessService } from './token-access/service.js';
+import { createSupabaseAdminOperationsGateway } from './admin-operations/gateway.js';
+import { createOperationsHealthReader } from './admin-operations/health.js';
+import { createAdminOperationsService } from './admin-operations/service.js';
+import { createSupabasePlayerWorldGateway } from './world/player-gateway.js';
+import { createPlayerWorldService } from './world/player-service.js';
+import { createSupabaseAdminWorldGateway } from './world/admin-gateway.js';
+import { createAdminWorldService } from './world/admin-service.js';
 
 const config = loadApiConfig(process.env);
 const adminSecurity = loadAdminSecurityConfig(process.env);
 const supabaseConfig = loadPrivateSupabaseConfig(process.env);
 const tokenAccessConfig = loadTokenAccessServerConfig(process.env);
+const operationsConfig = loadOperationsHealthConfig(process.env);
+const worldConfig = loadWorldManagementConfig(process.env);
 const logger = createLogger({
   service: config.application,
   environment: config.environment,
@@ -26,6 +39,21 @@ const privilegedSupabase = createSupabaseServiceRoleClient({
   serviceRoleKey: supabaseConfig.serviceRoleKey,
 });
 const adminAuthGateway = createSupabaseAdminAuthGateway(privilegedSupabase);
+const playerWorldGateway = createSupabasePlayerWorldGateway(privilegedSupabase);
+const playerWorldService = createPlayerWorldService({
+  gateway: playerWorldGateway,
+  logger,
+  manifestReadRateLimit: worldConfig.playerManifestReadRateLimit,
+  transitionRateLimit: worldConfig.playerTransitionRateLimit,
+});
+const playerService = createPlayerService({
+  gateway: createSupabasePlayerGateway(privilegedSupabase),
+  logger,
+  worldManifestLoader: async (walletAddress, mapId, requestId) => {
+    const world = await playerWorldService.loadPublishedManifest(walletAddress, mapId, requestId);
+    return world.manifest;
+  },
+});
 const tokenAccessService = createTokenAccessService({
   environment: config.environment,
   config: tokenAccessConfig,
@@ -39,6 +67,25 @@ const tokenAccessService = createTokenAccessService({
   }),
   logger,
 });
+const adminOperationsService = createAdminOperationsService({
+  gateway: createSupabaseAdminOperationsGateway(privilegedSupabase, {
+    environmentKey: config.environment,
+    network: tokenAccessConfig.network,
+  }),
+  healthReader: createOperationsHealthReader(operationsConfig),
+  logger,
+  actionRateLimit: operationsConfig.playerActionRateLimit,
+});
+const adminWorldService = createAdminWorldService({
+  gateway: createSupabaseAdminWorldGateway(privilegedSupabase),
+  logger,
+  manifestMaximumBytes: worldConfig.manifestMaximumBytes,
+  readRateLimit: worldConfig.adminReadRateLimit,
+  draftWriteRateLimit: worldConfig.adminDraftWriteRateLimit,
+  validationRateLimit: worldConfig.adminValidationRateLimit,
+  publishRateLimit: worldConfig.adminPublishRateLimit,
+  deriveRateLimit: worldConfig.adminDeriveRateLimit,
+});
 const service = createApiService({
   config,
   logger,
@@ -49,6 +96,16 @@ const service = createApiService({
     cookieHashSecret: tokenAccessConfig.cookieSecret,
     cookieSecure: config.environment === 'production',
     cookieMaxAgeSeconds: tokenAccessConfig.sessionTtlSeconds,
+    playerService,
+    worldService: playerWorldService,
+  },
+  adminOperations: {
+    service: adminOperationsService,
+    readRateLimit: operationsConfig.operationsReadRateLimit,
+  },
+  adminWorld: {
+    service: adminWorldService,
+    manifestMaximumBytes: worldConfig.manifestMaximumBytes,
   },
 });
 

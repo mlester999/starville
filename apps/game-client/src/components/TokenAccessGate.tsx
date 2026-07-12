@@ -2,35 +2,26 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   GameAccessRequestError,
-  formatTokenAmount,
   loadTrustedTokenAccess,
   recheckTrustedTokenAccess,
+  revokeTrustedTokenAccess,
   screenForAccess,
-  shortenWalletAddress,
   type GateScreen,
   type TrustedTokenAccess,
 } from '../app/token-access-client';
-import { GameCanvas } from './GameCanvas';
+import { PlayerExperience } from './PlayerExperience';
 
 interface TokenAccessGateProps {
   readonly apiUrl: string;
   readonly landingUrl: string;
 }
 
-function formatDate(value: string | undefined): string {
-  if (value === undefined || Number.isNaN(new Date(value).valueOf())) {
-    return 'Unavailable';
-  }
-
-  return new Intl.DateTimeFormat('en', {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
+const SESSION_RECONCILE_INTERVAL_MS = 30_000;
 
 export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
   const [screen, setScreen] = useState<GateScreen>('checking');
   const [access, setAccess] = useState<TrustedTokenAccess>();
+  const [rechecking, setRechecking] = useState(false);
   const activeRequest = useRef<AbortController | undefined>(undefined);
 
   const applyAccess = useCallback((nextAccess: TrustedTokenAccess) => {
@@ -38,35 +29,40 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
     setScreen(screenForAccess(nextAccess));
   }, []);
 
-  const checkSession = useCallback(async () => {
-    activeRequest.current?.abort();
-    const controller = new AbortController();
-    activeRequest.current = controller;
-    setScreen('checking');
+  const checkSession = useCallback(
+    async (background = false) => {
+      activeRequest.current?.abort();
+      const controller = new AbortController();
+      activeRequest.current = controller;
+      if (!background) setScreen('checking');
+      setRechecking(background);
 
-    try {
-      applyAccess(await loadTrustedTokenAccess(apiUrl, controller.signal));
-    } catch (error) {
-      if (!controller.signal.aborted) {
-        setAccess(undefined);
-        setScreen(
-          error instanceof GameAccessRequestError && error.status === 401
-            ? 'required'
-            : 'unavailable',
-        );
+      try {
+        applyAccess(await loadTrustedTokenAccess(apiUrl, controller.signal));
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setAccess(undefined);
+          setScreen(
+            error instanceof GameAccessRequestError && error.status === 401
+              ? 'required'
+              : 'unavailable',
+          );
+        }
+      } finally {
+        if (activeRequest.current === controller) {
+          activeRequest.current = undefined;
+          setRechecking(false);
+        }
       }
-    } finally {
-      if (activeRequest.current === controller) {
-        activeRequest.current = undefined;
-      }
-    }
-  }, [apiUrl, applyAccess]);
+    },
+    [apiUrl, applyAccess],
+  );
 
   const recheckSession = useCallback(async () => {
     activeRequest.current?.abort();
     const controller = new AbortController();
     activeRequest.current = controller;
-    setScreen('checking');
+    setRechecking(true);
 
     try {
       applyAccess(await recheckTrustedTokenAccess(apiUrl, controller.signal));
@@ -78,12 +74,13 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
     } finally {
       if (activeRequest.current === controller) {
         activeRequest.current = undefined;
+        setRechecking(false);
       }
     }
   }, [apiUrl, applyAccess]);
 
   useEffect(() => {
-    void checkSession();
+    void checkSession(false);
     return () => activeRequest.current?.abort();
   }, [checkSession]);
 
@@ -99,9 +96,18 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
   }, [access, recheckSession]);
 
   useEffect(() => {
+    if (access?.access !== 'granted') return;
+    const interval = window.setInterval(
+      () => void checkSession(true),
+      SESSION_RECONCILE_INTERVAL_MS,
+    );
+    return () => window.clearInterval(interval);
+  }, [access?.access, checkSession]);
+
+  useEffect(() => {
     function reconcileSession() {
       if (document.visibilityState === 'visible') {
-        void checkSession();
+        void checkSession(true);
       }
     }
 
@@ -114,67 +120,35 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
     };
   }, [checkSession]);
 
+  const leaveVillage = useCallback(async () => {
+    activeRequest.current?.abort();
+    setAccess(undefined);
+    setScreen('checking');
+    try {
+      await revokeTrustedTokenAccess(apiUrl);
+      setScreen('required');
+    } catch (error) {
+      setScreen('unavailable');
+      throw error;
+    }
+  }, [apiUrl]);
+
+  const handleAccessInvalid = useCallback(() => {
+    void checkSession(false);
+  }, [checkSession]);
+
   if (screen === 'granted' && access?.access === 'granted') {
     return (
-      <main className="game-shell game-shell--granted">
-        <header className="game-header">
-          <div>
-            <p className="game-kicker">Access verified</p>
-            <h1>STARVILLE</h1>
-          </div>
-          <span className="game-access-chip">
-            <span aria-hidden="true" />
-            Village access active
-          </span>
-        </header>
-
-        <section className="game-welcome" aria-labelledby="game-welcome-title">
-          <div className="game-welcome__copy">
-            <p className="game-kicker">The gate is open</p>
-            <h2 id="game-welcome-title">Welcome beneath the stars.</h2>
-            <p>
-              Your trusted wallet session is active. Starville gameplay begins in Phase 4; this
-              foundation scene remains intentionally free of movement and game systems.
-            </p>
-            <dl>
-              <div>
-                <dt>Wallet</dt>
-                <dd>
-                  {access.walletAddress === undefined
-                    ? 'Verified by server'
-                    : shortenWalletAddress(access.walletAddress)}
-                </dd>
-              </div>
-              <div>
-                <dt>Network</dt>
-                <dd>Solana Devnet</dd>
-              </div>
-              <div>
-                <dt>Requirement</dt>
-                <dd>
-                  {formatTokenAmount(access.requiredAmount)} {access.symbol}
-                </dd>
-              </div>
-              <div>
-                <dt>Session expires</dt>
-                <dd>{formatDate(access.expiresAt)}</dd>
-              </div>
-            </dl>
-          </div>
-          <button className="game-recheck" type="button" onClick={() => void recheckSession()}>
-            Recheck access
-          </button>
-        </section>
-
-        <section className="runtime-panel" aria-labelledby="runtime-title">
-          <div className="runtime-copy">
-            <p className="game-kicker">Phase 3 boundary</p>
-            <h2 id="runtime-title">Starville is being prepared</h2>
-            <p>The Phaser runtime starts only after this trusted access check succeeds.</p>
-          </div>
-          <GameCanvas />
-        </section>
-      </main>
+      <PlayerExperience
+        access={access}
+        apiUrl={apiUrl}
+        key={`${access.walletAddress}:${access.network}`}
+        landingUrl={landingUrl}
+        onAccessInvalid={handleAccessInvalid}
+        onLeaveVillage={leaveVillage}
+        onRecheck={recheckSession}
+        rechecking={rechecking}
+      />
     );
   }
 

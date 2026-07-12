@@ -1,0 +1,275 @@
+import { act } from 'react';
+import { createRoot } from 'react-dom/client';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { GameWorld } from './GameWorld';
+import { lanternSquareManifest } from '@starville/game-core';
+import { getWorldManifest } from '@starville/game-content';
+
+const persistenceMocks = vi.hoisted(() => ({
+  checkpoint: vi.fn(),
+  noteState: vi.fn(),
+  flushBeforeLeave: vi.fn(async () => undefined),
+  beginTransition: vi.fn(async () => 1),
+  acceptAuthoritativeTransition: vi.fn(),
+  cancelTransition: vi.fn(),
+}));
+const canvasCapture = vi.hoisted(() => ({ props: undefined as unknown }));
+
+vi.mock('../app/use-player-persistence', () => ({
+  usePlayerPersistence: () => ({
+    status: 'ready',
+    ...persistenceMocks,
+  }),
+}));
+vi.mock('../app/use-narrow-game-viewport', () => ({ useNarrowGameViewport: () => false }));
+vi.mock('./GameCanvas', () => ({
+  GameCanvas: (props: { readonly inputBlocked: boolean }) => {
+    canvasCapture.props = props;
+    return (
+      <div data-testid="game-canvas-boundary" data-input-blocked={String(props.inputBlocked)} />
+    );
+  },
+}));
+
+let container: HTMLDivElement;
+let root: ReturnType<typeof createRoot>;
+const originalFetch = globalThis.fetch;
+
+beforeEach(() => {
+  Reflect.set(globalThis, 'IS_REACT_ACT_ENVIRONMENT', true);
+  Reflect.set(window, 'matchMedia', () => ({
+    matches: false,
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addListener: () => undefined,
+    removeListener: () => undefined,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+    dispatchEvent: () => false,
+  }));
+  localStorage.clear();
+  container = document.createElement('div');
+  document.body.append(container);
+  root = createRoot(container);
+  for (const mock of Object.values(persistenceMocks)) mock.mockClear();
+  persistenceMocks.beginTransition.mockResolvedValue(1);
+  canvasCapture.props = undefined;
+  globalThis.fetch = vi.fn(async () =>
+    Response.json({
+      success: true,
+      data: {
+        map: {
+          id: '11111111-1111-4111-8111-111111111111',
+          slug: 'lantern-square',
+          displayName: 'Lantern Square',
+          description: 'The lantern-lit village center.',
+        },
+        version: {
+          id: '22222222-2222-4222-8222-222222222222',
+          versionNumber: 1,
+          checksum: 'a'.repeat(64),
+          publishedAt: '2026-07-12T04:00:00.000Z',
+        },
+        manifest: lanternSquareManifest(),
+        playerState: {
+          mapId: 'lantern-square',
+          mapVersionId: '22222222-2222-4222-8222-222222222222',
+          x: 12,
+          y: 7.5,
+          facingDirection: 'south',
+          gameStateVersion: 1,
+          updatedAt: '2026-07-12T04:00:00.000Z',
+          lastTransitionAt: null,
+        },
+      },
+    }),
+  );
+});
+
+afterEach(async () => {
+  await act(async () => root.unmount());
+  container.remove();
+  globalThis.fetch = originalFetch;
+  Reflect.deleteProperty(globalThis, 'IS_REACT_ACT_ENVIRONMENT');
+});
+
+describe('GameWorld controls and settings boundary', () => {
+  it('shows WASD, Shift, E and Settings without arrows and blocks runtime input when open', async () => {
+    await act(async () => {
+      root.render(
+        <GameWorld
+          apiUrl="http://localhost:4000"
+          landingUrl="http://localhost:3000"
+          profile={{
+            id: '11111111-1111-4111-8111-111111111111',
+            displayName: 'Luna Vale',
+            appearancePreset: 'moss',
+            mapId: 'lantern-square',
+            x: 12,
+            y: 7.5,
+            facingDirection: 'south',
+            gameStateVersion: 1,
+            createdAt: '2026-07-11T04:00:00.000Z',
+            updatedAt: '2026-07-11T04:00:00.000Z',
+            lastEnteredAt: '2026-07-11T04:00:00.000Z',
+          }}
+          access={{
+            access: 'granted',
+            walletAddress: '11111111111111111111111111111111',
+            network: 'solana:mainnet-beta',
+            symbol: 'STAR',
+            requiredAmount: '1000',
+            observedAmount: '1000',
+            expiresAt: '2099-07-11T05:00:00.000Z',
+          }}
+          rechecking={false}
+          onRecheck={vi.fn(async () => undefined)}
+          onAccessInvalid={vi.fn()}
+          onLeaveVillage={vi.fn(async () => undefined)}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain('WASD');
+    expect(container.textContent).toContain('Shift');
+    expect(container.textContent).toContain('Interact');
+    expect(container.textContent).not.toMatch(/[↑↓←→]/u);
+    expect(
+      container
+        .querySelector('[data-testid="game-canvas-boundary"]')
+        ?.getAttribute('data-input-blocked'),
+    ).toBe('false');
+
+    const settings = [...container.querySelectorAll('button')].find(
+      (button) => button.textContent === 'Settings',
+    );
+    expect(settings?.classList.contains('world-settings-button')).toBe(true);
+    expect(settings?.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => settings?.click());
+    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(
+      container
+        .querySelector('[data-testid="game-canvas-boundary"]')
+        ?.getAttribute('data-input-blocked'),
+    ).toBe('true');
+  });
+
+  it('keeps one runtime, applies only the server-authoritative destination, and updates the HUD', async () => {
+    await act(async () => {
+      root.render(
+        <GameWorld
+          apiUrl="http://localhost:4000"
+          landingUrl="http://localhost:3000"
+          profile={{
+            id: '11111111-1111-4111-8111-111111111111',
+            displayName: 'Luna Vale',
+            appearancePreset: 'moss',
+            mapId: 'lantern-square',
+            x: 12,
+            y: 7.5,
+            facingDirection: 'south',
+            gameStateVersion: 1,
+            createdAt: '2026-07-11T04:00:00.000Z',
+            updatedAt: '2026-07-11T04:00:00.000Z',
+            lastEnteredAt: '2026-07-11T04:00:00.000Z',
+          }}
+          access={{
+            access: 'granted',
+            walletAddress: '11111111111111111111111111111111',
+            network: 'solana:mainnet-beta',
+            symbol: 'STAR',
+            requiredAmount: '1000',
+            observedAmount: '1000',
+            expiresAt: '2099-07-11T05:00:00.000Z',
+          }}
+          rechecking={false}
+          onRecheck={vi.fn(async () => undefined)}
+          onAccessInvalid={vi.fn()}
+          onLeaveVillage={vi.fn(async () => undefined)}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const runtime = {
+      interact: vi.fn(),
+      loadWorld: vi.fn(),
+      cancelTransition: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const props = canvasCapture.props as {
+      readonly onRuntimeCreated: (value: typeof runtime) => void;
+      readonly onExitRequested: (request: {
+        readonly exitId: string;
+        readonly mapId: 'lantern-square';
+        readonly mapVersionId: string;
+        readonly destinationLabel: string;
+      }) => void;
+    };
+    props.onRuntimeCreated(runtime);
+    globalThis.fetch = vi.fn(async () =>
+      Response.json({
+        success: true,
+        data: {
+          map: {
+            id: '33333333-3333-4333-8333-333333333333',
+            slug: 'moonpetal-meadow',
+            displayName: 'Moonpetal Meadow',
+            description: 'A moonlit flower meadow gathered around a quiet stone marker and pond.',
+          },
+          version: {
+            id: '44444444-4444-4444-8444-444444444444',
+            versionNumber: 1,
+            checksum: 'b'.repeat(64),
+            publishedAt: '2026-07-12T04:01:00.000Z',
+          },
+          manifest: getWorldManifest('moonpetal-meadow'),
+          playerState: {
+            mapId: 'moonpetal-meadow',
+            mapVersionId: '44444444-4444-4444-8444-444444444444',
+            x: 10,
+            y: 14.5,
+            facingDirection: 'north',
+            gameStateVersion: 2,
+            updatedAt: '2026-07-12T04:01:00.000Z',
+            lastTransitionAt: '2026-07-12T04:01:00.000Z',
+          },
+          transition: {
+            exitId: 'exit-north',
+            fromMapId: 'lantern-square',
+            toMapId: 'moonpetal-meadow',
+            destinationSpawnId: 'from-south',
+            completedAt: '2026-07-12T04:01:00.000Z',
+          },
+        },
+      }),
+    );
+    vi.spyOn(performance, 'now').mockReturnValueOnce(0).mockReturnValue(2_000);
+
+    await act(async () => {
+      props.onExitRequested({
+        exitId: 'exit-north',
+        mapId: 'lantern-square',
+        mapVersionId: '22222222-2222-4222-8222-222222222222',
+        destinationLabel: 'Moonpetal Meadow',
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(persistenceMocks.beginTransition).toHaveBeenCalledTimes(1);
+    expect(persistenceMocks.acceptAuthoritativeTransition).toHaveBeenCalledWith(
+      expect.objectContaining({ mapId: 'moonpetal-meadow', gameStateVersion: 2 }),
+    );
+    expect(runtime.loadWorld).toHaveBeenCalledWith(
+      expect.objectContaining({
+        manifest: expect.objectContaining({ id: 'moonpetal-meadow' }),
+        versionId: '44444444-4444-4444-8444-444444444444',
+      }),
+      expect.objectContaining({ mapId: 'moonpetal-meadow', x: 10, y: 14.5 }),
+    );
+    expect(container.textContent).toContain('Moonpetal Meadow');
+  });
+});

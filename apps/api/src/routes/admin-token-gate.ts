@@ -1,18 +1,12 @@
-import type { AdminPermissionKey } from '@starville/admin-auth';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 
 import { walletAddressSchema, walletNetworkSchema } from '@starville/wallet-access';
 
-import {
-  authenticateSupabaseUser,
-  denialReason,
-  requireActiveAdmin,
-  requirePermission,
-} from '../admin-authorization.js';
+import { authorizeAdminRequest } from '../admin-authorization.js';
 import type { AdminAuthGateway, ServiceLogger } from '../contracts.js';
 import { PublicApiError } from '../errors.js';
-import type { AdminGatewayIdentity, TokenAccessService } from '../token-access/contracts.js';
+import type { TokenAccessService } from '../token-access/contracts.js';
 import { disableResponseCaching } from '../token-access/http.js';
 
 interface RegisterAdminTokenGateRoutesOptions {
@@ -64,37 +58,6 @@ function parseBody<T>(schema: z.ZodType<T>, body: unknown): T {
   return parsed.data;
 }
 
-async function authorize(
-  request: FastifyRequest,
-  gateway: AdminAuthGateway,
-  logger: ServiceLogger,
-  permission: AdminPermissionKey,
-): Promise<AdminGatewayIdentity> {
-  const identity = await authenticateSupabaseUser(request, gateway);
-  const result = await gateway.loadAuthorization(identity);
-
-  if (result.outcome !== 'authorized') {
-    await gateway.recordDenial(identity, request.id, denialReason(result)).catch((error) => {
-      logger.child({ requestId: request.id }).warn('admin.authorization.audit_failed', { error });
-    });
-  }
-
-  const context = requireActiveAdmin(result);
-
-  if (!context.permissionKeys.includes(permission)) {
-    await gateway.recordDenial(identity, request.id, 'MISSING_PERMISSION').catch((error) => {
-      logger.child({ requestId: request.id }).warn('admin.authorization.audit_failed', { error });
-    });
-  }
-
-  requirePermission(context, permission);
-  return {
-    userId: identity.userId,
-    authSessionId: identity.authSessionId,
-    assuranceLevel: identity.assuranceLevel,
-  };
-}
-
 export function registerAdminTokenGateRoutes(
   app: FastifyInstance,
   options: RegisterAdminTokenGateRoutesOptions,
@@ -103,7 +66,7 @@ export function registerAdminTokenGateRoutes(
 
   app.get('/api/v1/admin/token-gate', async (request, reply) => {
     disableResponseCaching(reply);
-    const identity = await authorize(request, adminGateway, logger, 'token_gate.read');
+    const identity = await authorizeAdminRequest(request, adminGateway, logger, 'token_gate.read');
     return {
       success: true,
       data: await service.getAdminConfig(identity),
@@ -113,7 +76,12 @@ export function registerAdminTokenGateRoutes(
 
   app.post('/api/v1/admin/token-gate/validate', async (request, reply) => {
     disableResponseCaching(reply);
-    const identity = await authorize(request, adminGateway, logger, 'token_gate.configure');
+    const identity = await authorizeAdminRequest(
+      request,
+      adminGateway,
+      logger,
+      'token_gate.configure',
+    );
 
     const input = parseBody(validateSchema, request.body);
     return {
@@ -130,7 +98,12 @@ export function registerAdminTokenGateRoutes(
 
   app.patch('/api/v1/admin/token-gate', async (request, reply) => {
     disableResponseCaching(reply);
-    const identity = await authorize(request, adminGateway, logger, 'token_gate.configure');
+    const identity = await authorizeAdminRequest(
+      request,
+      adminGateway,
+      logger,
+      'token_gate.configure',
+    );
     const input = parseBody(updateSchema, request.body);
     return {
       success: true,

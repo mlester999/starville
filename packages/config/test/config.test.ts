@@ -10,9 +10,11 @@ import {
   loadAdminRecoveryConfig,
   loadApiConfig,
   loadHostedSupabaseSafetyConfig,
+  loadOperationsHealthConfig,
   loadPrivateSupabaseConfig,
   loadRealtimeConfig,
   loadTokenAccessServerConfig,
+  loadWorldManagementConfig,
   loadWorkerConfig,
 } from '../src/server';
 
@@ -227,6 +229,44 @@ describe('private server configuration', () => {
     expect(() => loadAdminRecoveryConfig({ ADMIN_RECOVERY_COOKIE_SECRET: 'too-short' })).toThrow(
       'at least 32 characters',
     );
+  });
+
+  it('loads bounded server-only Phase 5 health and action controls', () => {
+    expect(loadOperationsHealthConfig({})).toEqual({
+      realtimeReadyUrl: 'http://127.0.0.1:4001/ready',
+      workerReadyUrl: 'http://127.0.0.1:4002/ready',
+      timeoutMs: 1500,
+      playerActionRateLimit: 20,
+      operationsReadRateLimit: 120,
+    });
+    expect(() => loadOperationsHealthConfig({ ADMIN_HEALTH_CHECK_TIMEOUT_MS: '10000' })).toThrow();
+    expect(() => loadOperationsHealthConfig({ ADMIN_PLAYER_ACTION_RATE_LIMIT: '0' })).toThrow();
+    expect(() => loadOperationsHealthConfig({ ADMIN_OPERATIONS_READ_RATE_LIMIT: '601' })).toThrow();
+    expect(() =>
+      loadOperationsHealthConfig({
+        NODE_ENV: 'production',
+        REALTIME_HEALTH_URL: 'http://internal.example/ready',
+        WORKER_HEALTH_URL: 'https://worker.example/ready',
+      }),
+    ).toThrow('must use HTTPS or WSS');
+  });
+
+  it('loads bounded Phase 6 world-content and transition controls', () => {
+    expect(loadWorldManagementConfig({})).toEqual({
+      manifestMaximumBytes: 262_144,
+      transitionTimeoutMs: 15_000,
+      playerManifestReadRateLimit: 120,
+      playerTransitionRateLimit: 12,
+      adminReadRateLimit: 120,
+      adminDraftWriteRateLimit: 30,
+      adminValidationRateLimit: 12,
+      adminPublishRateLimit: 4,
+      adminDeriveRateLimit: 8,
+    });
+    expect(() => loadWorldManagementConfig({ WORLD_MANIFEST_MAX_BYTES: '1000' })).toThrow();
+    expect(() => loadWorldManagementConfig({ WORLD_MANIFEST_MAX_BYTES: '262145' })).toThrow();
+    expect(() => loadWorldManagementConfig({ WORLD_ADMIN_PUBLISH_RATE_LIMIT: '13' })).toThrow();
+    expect(() => loadWorldManagementConfig({ WORLD_TRANSITION_TIMEOUT_MS: '0' })).toThrow();
   });
 
   it('loads bounded server-only token-access configuration without exposing it publicly', () => {

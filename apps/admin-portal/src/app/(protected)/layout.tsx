@@ -34,8 +34,21 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
         {context.permissionKeys.includes('overview.read') ? (
           <Link href="/overview">Overview</Link>
         ) : null}
+        {context.permissionKeys.includes('operations.read') ? (
+          <Link href="/operations">Operations</Link>
+        ) : null}
+        {context.permissionKeys.includes('players.read') ? (
+          <Link href="/players">Players</Link>
+        ) : null}
         {context.permissionKeys.includes('token_gate.read') ? (
           <Link href="/token-access">Token Access</Link>
+        ) : null}
+        {context.permissionKeys.includes('maps.read') ? <Link href="/worlds">Worlds</Link> : null}
+        {context.permissionKeys.includes('assets.read') ? (
+          <Link href="/world-assets">World Assets</Link>
+        ) : null}
+        {context.permissionKeys.includes('maps.audit_read') ? (
+          <Link href="/world-audit">World Audit</Link>
         ) : null}
       </nav>
       {children}

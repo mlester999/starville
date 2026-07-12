@@ -1,0 +1,29 @@
+{
+  "name": "@starville/game-content",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src test --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rimraf coverage .turbo"
+  },
+  "dependencies": {
+    "@starville/game-core": "workspace:*",
+    "zod": "4.1.12"
+  },
+  "devDependencies": {
+    "@starville/eslint-config": "workspace:*",
+    "@starville/typescript-config": "workspace:*",
+    "@types/node": "^22.20.1",
+    "eslint": "^9.39.4",
+    "rimraf": "^6.1.3",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.10"
+  }
+}

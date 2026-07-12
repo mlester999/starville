@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   ADMIN_PERMISSION_KEYS,
+  ADMIN_PLAYER_ACTION_PERMISSIONS,
   ADMIN_ROLE_KEYS,
   INITIAL_ROLE_PERMISSIONS,
   adminAuthorizationResultSchema,
@@ -35,7 +36,7 @@ const authorized = {
 describe('admin authorization catalog', () => {
   it('contains the required stable roles and permission catalog', () => {
     expect(ADMIN_ROLE_KEYS).toHaveLength(12);
-    expect(ADMIN_PERMISSION_KEYS).toHaveLength(40);
+    expect(ADMIN_PERMISSION_KEYS).toHaveLength(46);
     expect(INITIAL_ROLE_PERMISSIONS.super_admin).toEqual(ADMIN_PERMISSION_KEYS);
   });
 
@@ -43,7 +44,43 @@ describe('admin authorization catalog', () => {
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('players.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('roles.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('audit_logs.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('player_audit.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('operations.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('economy.adjust_stardust');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('maps.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.preview');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.audit_read');
+  });
+
+  it('keeps Phase 6 world permissions narrow and role-specific', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining(['maps.read', 'maps.edit', 'maps.preview', 'maps.audit_read']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).not.toContain('maps.publish');
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining(['maps.read', 'maps.audit_read']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('maps.edit');
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('maps.publish');
+    expect(INITIAL_ROLE_PERMISSIONS.world_designer).toEqual(
+      expect.arrayContaining([
+        'maps.read',
+        'maps.edit',
+        'maps.preview',
+        'maps.publish',
+        'maps.audit_read',
+      ]),
+    );
+  });
+
+  it('maps every Phase 5 player action to one exact server permission', () => {
+    expect(ADMIN_PLAYER_ACTION_PERMISSIONS).toEqual({
+      suspend: 'players.suspend',
+      restore: 'players.suspend',
+      'reset-position': 'players.reset_position',
+      'require-rename': 'players.require_rename',
+      'revoke-sessions': 'players.manage_sessions',
+    });
   });
 });
 

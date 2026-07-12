@@ -48,4 +48,19 @@ describe('parseGameClientPublicConfig', () => {
       }),
     ).toThrow();
   });
+
+  it('validates the optional collision-development flag', () => {
+    expect(
+      parseGameClientPublicConfig({
+        ...validEnvironment,
+        NEXT_PUBLIC_GAME_COLLISION_DEBUG: 'true',
+      }).collisionDebug,
+    ).toBe(true);
+    expect(() =>
+      parseGameClientPublicConfig({
+        ...validEnvironment,
+        NEXT_PUBLIC_GAME_COLLISION_DEBUG: 'yes',
+      }),
+    ).toThrow(/must be true or false/u);
+  });
 });

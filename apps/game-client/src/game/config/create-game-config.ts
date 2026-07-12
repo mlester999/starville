@@ -1,14 +1,20 @@
 import Phaser from 'phaser';
 
-import { FoundationScene } from '../scenes/FoundationScene';
+import type { GameRuntimeOptions } from '../contracts';
+import { WorldScene } from '../scenes/WorldScene';
 
-export function createGameConfig(parent: HTMLElement | string): Phaser.Types.Core.GameConfig {
+export function createGameConfig(
+  parent: HTMLElement | string,
+  options: GameRuntimeOptions,
+  scene: WorldScene = new WorldScene(options),
+): Phaser.Types.Core.GameConfig {
   return {
     type: Phaser.AUTO,
     parent,
     width: 960,
     height: 540,
-    backgroundColor: '#17251f',
+    backgroundColor: '#17382b',
+    banner: false,
     render: {
       antialias: true,
       pixelArt: false,
@@ -18,6 +24,10 @@ export function createGameConfig(parent: HTMLElement | string): Phaser.Types.Cor
       mode: Phaser.Scale.RESIZE,
       autoCenter: Phaser.Scale.CENTER_BOTH,
     },
-    scene: [FoundationScene],
+    fps: {
+      target: 60,
+      smoothStep: true,
+    },
+    scene: [scene],
   };
 }

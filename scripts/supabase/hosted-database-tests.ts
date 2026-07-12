@@ -24,7 +24,13 @@ async function main(): Promise<void> {
 
   assertDatabaseUrlMatchesProjectRef(privateConfig.databaseUrl, target.projectRef);
 
-  const reviewedSuites = ['admin_authorization.test.sql', 'token_access.test.sql'] as const;
+  const reviewedSuites = [
+    'admin_authorization.test.sql',
+    'token_access.test.sql',
+    'player_vertical_slice.test.sql',
+    'secure_player_operations.test.sql',
+    'world_management.test.sql',
+  ] as const;
 
   const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });
 

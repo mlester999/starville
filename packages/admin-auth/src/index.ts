@@ -2,8 +2,13 @@ import { z } from 'zod';
 
 import { ADMIN_PERMISSION_KEYS, ADMIN_ROLE_KEYS } from './catalog';
 
-export { ADMIN_PERMISSION_KEYS, ADMIN_ROLE_KEYS, INITIAL_ROLE_PERMISSIONS } from './catalog';
-export type { AdminPermissionKey, AdminRoleKey } from './catalog';
+export {
+  ADMIN_PERMISSION_KEYS,
+  ADMIN_PLAYER_ACTION_PERMISSIONS,
+  ADMIN_ROLE_KEYS,
+  INITIAL_ROLE_PERMISSIONS,
+} from './catalog';
+export type { AdminPermissionKey, AdminPlayerActionKey, AdminRoleKey } from './catalog';
 
 export const ADMIN_STATUSES = ['invited', 'active', 'suspended', 'disabled'] as const;
 export const ADMIN_SESSION_STATUSES = ['pending_mfa', 'active', 'revoked', 'expired'] as const;

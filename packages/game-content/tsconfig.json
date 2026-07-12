@@ -1,0 +1,4 @@
+{
+  "extends": "@starville/typescript-config/base.json",
+  "include": ["src", "test"]
+}

@@ -14,8 +14,12 @@ import { createSupabaseSsrServerClient } from '@starville/supabase/ssr';
 import postgres from 'postgres';
 
 import { createSupabaseAdminAuthGateway } from '../../apps/api/src/admin-auth-gateway';
+import { createSupabaseAdminOperationsGateway } from '../../apps/api/src/admin-operations/gateway';
+import { createAdminOperationsService } from '../../apps/api/src/admin-operations/service';
 import { buildApiApp } from '../../apps/api/src/app';
 import type { LogContext, ServiceLogger } from '../../apps/api/src/contracts';
+import { createSupabaseAdminWorldGateway } from '../../apps/api/src/world/admin-gateway';
+import { createAdminWorldService } from '../../apps/api/src/world/admin-service';
 import { safeHostedTargetSummary, verifyCanonicalHostedTarget } from './safety';
 
 interface FixtureUser {
@@ -27,9 +31,15 @@ interface HostedTokenGateResponse {
   readonly success: boolean;
   readonly data: {
     readonly availability: string;
+    readonly commitment: string;
     readonly configVersion: number;
+    readonly enabled: boolean;
     readonly mintAddress: string | null;
     readonly network: string;
+    readonly recheckIntervalSeconds: number;
+    readonly requiredAmount: string;
+    readonly sessionTtlSeconds: number;
+    readonly symbol: string;
   };
 }
 
@@ -46,6 +56,14 @@ class HostedTestLogger implements ServiceLogger {
   warn(_message: string, _context?: LogContext): void {}
   error(_message: string, _context?: LogContext): void {}
   fatal(_message: string, _context?: LogContext): void {}
+}
+
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+function randomBase58Address(): string {
+  return [...randomBytes(44)]
+    .map((value) => BASE58_ALPHABET[value % BASE58_ALPHABET.length])
+    .join('');
 }
 
 function assert(condition: unknown, message: string): asserts condition {
@@ -144,6 +162,8 @@ async function main(): Promise<void> {
   );
 
   const verifiedAnonKey: string = anonKey;
+  const verifiedAdminPortalUrl: string = adminPortalUrl;
+  const verifiedConfiguredNetwork: 'solana:devnet' | 'solana:mainnet-beta' = configuredNetwork;
 
   process.stdout.write(`${JSON.stringify({ testRunId: runId, mode: 'hosted-rls' })}\n`);
 
@@ -155,6 +175,52 @@ async function main(): Promise<void> {
   const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });
   const fixtures: FixtureUser[] = [];
   const testRoleIds: string[] = [];
+  let phase5PlayerFixture:
+    | { readonly id: string; readonly walletAddress: string; readonly adminUserId: string }
+    | undefined;
+  let phase5PendingFixture:
+    { readonly walletAddress: string; readonly adminUserId: string } | undefined;
+  const logger = new HostedTestLogger();
+  const adminOperationsService = createAdminOperationsService({
+    gateway: createSupabaseAdminOperationsGateway(serviceClient, {
+      environmentKey: process.env['NODE_ENV'] ?? 'development',
+      network: configuredNetwork,
+    }),
+    healthReader: {
+      read: async () => [
+        {
+          service: 'api' as const,
+          status: 'healthy' as const,
+          checkedAt: new Date().toISOString(),
+          responseTimeMs: null,
+        },
+        {
+          service: 'realtime-server' as const,
+          status: 'unknown' as const,
+          checkedAt: new Date().toISOString(),
+          responseTimeMs: null,
+        },
+        {
+          service: 'worker' as const,
+          status: 'unknown' as const,
+          checkedAt: new Date().toISOString(),
+          responseTimeMs: null,
+        },
+      ],
+    },
+    logger,
+    actionRateLimit: 20,
+  });
+  const adminWorldService = createAdminWorldService({
+    gateway: createSupabaseAdminWorldGateway(serviceClient),
+    logger,
+    manifestMaximumBytes: 262_144,
+    readRateLimit: 120,
+    draftWriteRateLimit: 30,
+    validationRateLimit: 20,
+    publishRateLimit: 5,
+    deriveRateLimit: 10,
+  });
   const api = buildApiApp({
     config: {
       environment: 'test',
@@ -163,9 +229,11 @@ async function main(): Promise<void> {
       corsAllowedOrigins: ['http://localhost:3002'],
       trustedProxyCidrs: [],
     },
-    logger: new HostedTestLogger(),
+    logger,
     adminAuthGateway: createSupabaseAdminAuthGateway(serviceClient),
     adminSessionTtlMinutes: 60,
+    adminOperations: { service: adminOperationsService, readRateLimit: 120 },
+    adminWorld: { service: adminWorldService, manifestMaximumBytes: 262_144 },
   });
 
   try {
@@ -250,6 +318,17 @@ async function main(): Promise<void> {
       'wallet_auth_rate_limits',
       'wallet_access_sessions',
       'wallet_access_events',
+      'player_profiles',
+      'player_api_rate_limits',
+      'player_moderation_states',
+      'player_operation_audit_logs',
+      'admin_player_operation_rate_limits',
+      'world_maps',
+      'world_map_versions',
+      'world_assets',
+      'world_map_version_assets',
+      'world_audit_events',
+      'world_operation_rate_limits',
     ]) {
       const tokenAccessRead = await anonymousClient.from(table).select('*').limit(1);
       assert(
@@ -265,6 +344,43 @@ async function main(): Promise<void> {
     assert(
       anonymousTrustedConfig.error !== null,
       'Anonymous caller unexpectedly executed the trusted token-gate config function',
+    );
+    const anonymousPlayerDirectory = await anonymousClient.rpc('list_admin_players', {
+      p_user_id: randomUUID(),
+      p_auth_session_id: randomUUID(),
+      p_assurance_level: 'aal1',
+      p_environment_key: 'development',
+      p_network: configuredNetwork,
+      p_page: 1,
+      p_page_size: 1,
+      p_search: '',
+      p_status: 'all',
+      p_rename_filter: 'all',
+      p_map_id: 'all',
+      p_recent_days: null,
+      p_sort: 'last_entered_at',
+      p_direction: 'desc',
+    });
+    assert(
+      anonymousPlayerDirectory.error !== null,
+      'Anonymous caller unexpectedly executed the administrator player directory',
+    );
+    const anonymousWorldDirectory = await anonymousClient.rpc('list_admin_world_maps', {
+      p_user_id: randomUUID(),
+      p_auth_session_id: randomUUID(),
+      p_assurance_level: 'aal1',
+      p_page: 1,
+      p_page_size: 1,
+      p_search: '',
+      p_status: 'all',
+      p_sort: 'updated_at',
+      p_direction: 'desc',
+      p_request_id: `phase6-test:${runId}:anonymous-worlds`,
+      p_rate_limit: 10,
+    });
+    assert(
+      anonymousWorldDirectory.error !== null,
+      'Anonymous caller unexpectedly executed the administrator world directory',
     );
 
     const normalClient = createSupabaseServerClient({ url: privateConfig.url, anonKey });
@@ -304,6 +420,51 @@ async function main(): Promise<void> {
     assert(
       normalRead.error !== null || normalRead.data?.length === 0,
       'Normal authenticated user unexpectedly read administrators',
+    );
+    const normalModerationRead = await normalClient
+      .from('player_moderation_states')
+      .select('player_profile_id')
+      .limit(1);
+    assert(
+      normalModerationRead.error !== null || normalModerationRead.data?.length === 0,
+      'Normal authenticated user unexpectedly read player moderation state',
+    );
+    const forgedPlayerAudit = await normalClient.from('player_operation_audit_logs').insert({
+      player_profile_id: randomUUID(),
+      wallet_address_snapshot: '11111111111111111111111111111111',
+      event_key: 'player.suspended',
+      actor_type: 'system',
+      outcome: 'success',
+    });
+    assert(
+      forgedPlayerAudit.error !== null,
+      'Normal authenticated user unexpectedly forged a player operation audit',
+    );
+
+    const serviceRoleModerationRead = await serviceClient
+      .from('player_moderation_states')
+      .select('player_profile_id')
+      .limit(1);
+    assert(
+      serviceRoleModerationRead.error !== null,
+      'Service role unexpectedly bypassed the Phase 5 RPC-only table boundary',
+    );
+    const serviceRoleWorldRead = await serviceClient
+      .from('world_map_versions')
+      .select('id')
+      .limit(1);
+    assert(
+      serviceRoleWorldRead.error !== null,
+      'Service role unexpectedly bypassed the Phase 6 RPC-only world boundary',
+    );
+    const forgedWorldAudit = await normalClient.from('world_audit_events').insert({
+      event_key: 'world.preview_opened',
+      actor_type: 'system',
+      outcome: 'success',
+    });
+    assert(
+      forgedWorldAudit.error !== null,
+      'Normal authenticated user unexpectedly forged a world audit event',
     );
 
     const fakeTokenConfig = await normalClient.from('token_gate_configs').insert({
@@ -588,6 +749,57 @@ async function main(): Promise<void> {
         authSessionId,
         cookieHeader: cookieClient.cookieHeader,
       };
+    }
+
+    async function createPhase5AccessSession(walletAddress: string, suffix: string) {
+      const [tokenConfig] = await sql<
+        {
+          id: string;
+          config_version: number;
+          required_amount_raw: string;
+          last_validated_slot: string;
+        }[]
+      >`
+        select id, config_version, required_amount_raw::text, last_validated_slot::text
+        from public.token_gate_configs
+        where environment_key = ${process.env['NODE_ENV'] ?? 'development'}
+          and network = ${verifiedConfiguredNetwork}
+          and enabled
+          and validation_state = 'validated'
+      `;
+      assert(tokenConfig !== undefined, 'Validated Phase 5 token configuration is missing');
+
+      const challengeRequestId = `phase5-test:${runId}:${suffix}-challenge`;
+      const [challenge] = await sql<{ id: string }[]>`
+        insert into public.wallet_auth_challenges (
+          wallet_address, network, token_gate_config_id, config_version_snapshot,
+          nonce_hash, message_hash, domain, uri, issued_at, expires_at, consumed_at,
+          request_id, ip_hash, user_agent_hash
+        ) values (
+          ${walletAddress}, ${verifiedConfiguredNetwork}, ${tokenConfig.id}, ${tokenConfig.config_version},
+          ${randomBytes(32).toString('hex')}, ${randomBytes(32).toString('hex')},
+          ${new URL(verifiedAdminPortalUrl).host}, ${verifiedAdminPortalUrl}, now(), now() + interval '5 minutes', now(),
+          ${challengeRequestId}, ${randomBytes(32).toString('hex')}, null
+        )
+        returning id
+      `;
+      assert(challenge !== undefined, 'Phase 5 access challenge fixture was not created');
+
+      const [session] = await sql<{ id: string }[]>`
+        insert into public.wallet_access_sessions (
+          challenge_id, wallet_address, network, token_gate_config_id,
+          config_version_snapshot, session_token_hash, status, observed_balance_raw,
+          required_balance_raw, checked_slot, last_balance_check_at, expires_at
+        ) values (
+          ${challenge.id}, ${walletAddress}, ${verifiedConfiguredNetwork}, ${tokenConfig.id},
+          ${tokenConfig.config_version}, ${randomBytes(32).toString('hex')}, 'active',
+          ${tokenConfig.required_amount_raw}, ${tokenConfig.required_amount_raw},
+          ${tokenConfig.last_validated_slot}, now(), now() + interval '15 minutes'
+        )
+        returning id
+      `;
+      assert(session !== undefined, 'Phase 5 access-session fixture was not created');
+      return session.id;
     }
 
     const activeSession = await createActiveAdministratorSession();
@@ -900,30 +1112,17 @@ async function main(): Promise<void> {
     );
     assert(mintValidationResponse.status === 200, 'Configured token mint validation failed');
 
-    const tokenGateUpdateResponse = await fetch(new URL('/api/v1/admin/token-gate', apiUrl), {
-      method: 'PATCH',
-      headers: tokenGateHeaders,
-      body: JSON.stringify({
-        expectedConfigVersion: currentTokenGate.data.configVersion,
-        enabled: true,
-        network: configuredNetwork,
-        mintAddress: configuredMintAddress,
-        symbol: configuredTokenSymbol,
-        requiredAmount: configuredRequiredAmount,
-        commitment: configuredCommitment,
-        sessionTtlSeconds: 900,
-        recheckIntervalSeconds: 300,
-        reason: 'Validate the temporary Phase 3 configured token through the trusted admin path.',
-      }),
-    });
-    const updatedTokenGate = (await tokenGateUpdateResponse.json()) as HostedTokenGateResponse;
     assert(
-      tokenGateUpdateResponse.status === 200 &&
-        updatedTokenGate.success &&
-        updatedTokenGate.data.availability === 'available' &&
-        updatedTokenGate.data.network === configuredNetwork &&
-        updatedTokenGate.data.mintAddress === configuredMintAddress,
-      'Trusted token-gate configuration update failed',
+      currentTokenGate.data.enabled &&
+        currentTokenGate.data.availability === 'available' &&
+        currentTokenGate.data.network === configuredNetwork &&
+        currentTokenGate.data.mintAddress === configuredMintAddress &&
+        currentTokenGate.data.symbol === configuredTokenSymbol &&
+        currentTokenGate.data.requiredAmount === configuredRequiredAmount &&
+        currentTokenGate.data.commitment === configuredCommitment &&
+        currentTokenGate.data.sessionTtlSeconds === 900 &&
+        currentTokenGate.data.recheckIntervalSeconds === 300,
+      'Hosted tests require the owner-reviewed token gate to be configured before the run; the test refuses to mutate it',
     );
 
     const configurableTokenAccessResponse = await fetch(new URL('/token-access', adminPortalUrl), {
@@ -939,10 +1138,431 @@ async function main(): Promise<void> {
         !configurableTokenAccessBody.includes('Configuration unavailable'),
       'Configurable Token Access page did not render the validated hosted configuration',
     );
+
+    const phase5WalletAddress = randomBase58Address();
+    const phase5DisplayName = `P5Test${runId.replaceAll('-', '').slice(0, 8)}`;
+    phase5PendingFixture = {
+      walletAddress: phase5WalletAddress,
+      adminUserId: administrator.id,
+    };
+    const phase5Create = await serviceClient.rpc('create_player_profile', {
+      p_wallet_address: phase5WalletAddress,
+      p_display_name: phase5DisplayName,
+      p_appearance_preset: 'river',
+      p_request_id: `phase5-test:${runId}:profile-create`,
+      p_rate_limit: 10,
+    });
+    assert(!phase5Create.error, 'Temporary Phase 5 player profile creation failed');
+    const [phase5Player] = await sql<{ id: string }[]>`
+      select id from public.player_profiles where wallet_address = ${phase5WalletAddress}
+    `;
+    assert(phase5Player !== undefined, 'Temporary Phase 5 player profile is missing');
+    const phase5PlayerId = phase5Player.id;
+    phase5PlayerFixture = {
+      id: phase5PlayerId,
+      walletAddress: phase5WalletAddress,
+      adminUserId: administrator.id,
+    };
+
+    const forbiddenPhase5Action = await api.inject({
+      method: 'POST',
+      url: `/api/v1/admin/players/${phase5PlayerId}/suspend`,
+      headers: {
+        authorization: `Bearer ${tokenGateFixture.accessToken}`,
+        origin: 'http://localhost:3002',
+        'x-request-id': `phase5-test:${runId}:blockchain-denied`,
+      },
+      payload: { expectedVersion: 1, reason: 'Verify narrow blockchain role boundaries.' },
+    });
+    assert(
+      forbiddenPhase5Action.statusCode === 403,
+      'Blockchain Operator unexpectedly performed player moderation',
+    );
+    const forbiddenWorldDirectory = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/worlds?page=1&pageSize=10',
+      headers: {
+        authorization: `Bearer ${tokenGateFixture.accessToken}`,
+        'x-request-id': `phase6-test:${runId}:blockchain-worlds-denied`,
+      },
+    });
+    assert(
+      forbiddenWorldDirectory.statusCode === 403,
+      'Blockchain Operator unexpectedly accessed world management',
+    );
+
+    const [gameAdministratorRole] = await sql<{ id: string }[]>`
+      select id from public.admin_roles where key = 'game_administrator'
+    `;
+    assert(gameAdministratorRole !== undefined, 'Game Administrator system role is missing');
+    await sql`
+      update public.admin_users set role_id = ${gameAdministratorRole.id}
+      where user_id = ${administrator.id}
+    `;
+    const gameAdministratorFixture = await createActiveAdministratorSession();
+    const phase5ReadHeaders = {
+      authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
+      'x-request-id': `phase5-test:${runId}:read`,
+    };
+
+    const directoryResponse = await api.inject({
+      method: 'GET',
+      url: `/api/v1/admin/players?search=${phase5DisplayName}&status=active&page=1&pageSize=10&sort=display_name&direction=asc`,
+      headers: phase5ReadHeaders,
+    });
+    assert(
+      directoryResponse.statusCode === 200 &&
+        directoryResponse.body.includes(phase5DisplayName) &&
+        !directoryResponse.body.includes('@example.com'),
+      'Authorized Phase 5 player directory search was not safe and successful',
+    );
+
+    const worldDirectoryResponse = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/worlds?search=&status=all&sort=display_name&direction=asc&limit=10&offset=0',
+      headers: {
+        authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
+        'x-request-id': `phase6-test:${runId}:world-directory`,
+      },
+    });
+    assert(
+      worldDirectoryResponse.statusCode === 200 &&
+        worldDirectoryResponse.body.includes('Lantern Square') &&
+        worldDirectoryResponse.body.includes('Moonpetal Meadow') &&
+        worldDirectoryResponse.body.includes('Brooklight Crossing') &&
+        worldDirectoryResponse.body.includes('Hearthfield Road') &&
+        worldDirectoryResponse.body.includes('Whisperpine Gate'),
+      'Authorized Phase 6 world directory did not return the five published maps',
+    );
+
+    const detailResponse = await api.inject({
+      method: 'GET',
+      url: `/api/v1/admin/players/${phase5PlayerId}`,
+      headers: phase5ReadHeaders,
+    });
+    assert(
+      detailResponse.statusCode === 200 && detailResponse.body.includes(phase5DisplayName),
+      'Authorized Phase 5 player detail failed',
+    );
+
+    const operationsResponse = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/operations/summary',
+      headers: phase5ReadHeaders,
+    });
+    assert(
+      operationsResponse.statusCode === 200 &&
+        operationsResponse.body.includes(
+          'Unexpired, unrevoked sessions valid for the current token config',
+        ) &&
+        !operationsResponse.body.toLowerCase().includes('playersonline'),
+      'Truthful Phase 5 operations summary failed',
+    );
+
+    async function currentPlayerState() {
+      const [state] = await sql<
+        {
+          moderation_status: string;
+          rename_required: boolean;
+          moderation_version: number;
+          game_state_version: number;
+          safe_position_x: string;
+          safe_position_y: string;
+          facing_direction: string;
+        }[]
+      >`
+        select
+          moderation.status as moderation_status,
+          moderation.rename_required,
+          moderation.version as moderation_version,
+          profile.game_state_version,
+          profile.safe_position_x::text,
+          profile.safe_position_y::text,
+          profile.facing_direction
+        from public.player_profiles as profile
+        join public.player_moderation_states as moderation
+          on moderation.player_profile_id = profile.id
+        where profile.id = ${phase5PlayerId}
+      `;
+      assert(state !== undefined, 'Phase 5 player state disappeared during the test');
+      return state;
+    }
+
+    async function performPhase5Action(
+      action: 'suspend' | 'restore' | 'reset-position' | 'require-rename' | 'revoke-sessions',
+      expectedVersion: number,
+      suffix: string,
+    ) {
+      return api.inject({
+        method: 'POST',
+        url: `/api/v1/admin/players/${phase5PlayerId}/${action}`,
+        headers: {
+          authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
+          origin: 'http://localhost:3002',
+          'x-request-id': `phase5-test:${runId}:${suffix}`,
+        },
+        payload: {
+          expectedVersion,
+          reason: `Reviewed hosted Phase 5 ${action} fixture operation.`,
+        },
+      });
+    }
+
+    const suspensionSessionId = await createPhase5AccessSession(phase5WalletAddress, 'suspension');
+    const initialState = await currentPlayerState();
+    const suspendResponse = await performPhase5Action(
+      'suspend',
+      initialState.moderation_version,
+      'suspend',
+    );
+    assert(suspendResponse.statusCode === 200, 'Authorized player suspension failed');
+    const suspendedState = await currentPlayerState();
+    const [suspendedSession] = await sql<{ status: string; revoke_reason: string }[]>`
+      select status, revoke_reason
+      from public.wallet_access_sessions
+      where id = ${suspensionSessionId}
+    `;
+    assert(
+      suspendedState.moderation_status === 'suspended' &&
+        suspendedSession?.status === 'revoked' &&
+        suspendedSession.revoke_reason === 'administrative',
+      'Suspension was not atomic with active-session revocation',
+    );
+
+    const suspendedEntry = await serviceClient.rpc('load_player_entry_state', {
+      p_wallet_address: phase5WalletAddress,
+      p_request_id: `phase5-test:${runId}:suspended-entry`,
+      p_touch_entry: true,
+    });
+    assert(
+      !suspendedEntry.error &&
+        typeof suspendedEntry.data === 'object' &&
+        suspendedEntry.data !== null &&
+        Reflect.get(suspendedEntry.data, 'entryState') === 'suspended',
+      'Suspended player entry was not blocked',
+    );
+    const suspendedSave = await serviceClient.rpc('save_player_game_state', {
+      p_wallet_address: phase5WalletAddress,
+      p_map_id: 'lantern-square',
+      p_position_x: 13,
+      p_position_y: 8,
+      p_facing_direction: 'east',
+      p_expected_game_state_version: suspendedState.game_state_version,
+      p_request_id: `phase5-test:${runId}:suspended-save`,
+      p_rate_limit: 60,
+    });
+    assert(
+      !suspendedSave.error &&
+        typeof suspendedSave.data === 'object' &&
+        suspendedSave.data !== null &&
+        Reflect.get(suspendedSave.data, 'status') === 'suspended',
+      'Suspended player unexpectedly changed saved state',
+    );
+
+    const duplicateSuspend = await performPhase5Action(
+      'suspend',
+      suspendedState.moderation_version,
+      'already-suspended',
+    );
+    assert(duplicateSuspend.statusCode === 409, 'Already-suspended state was not rejected');
+    const staleRestore = await performPhase5Action(
+      'restore',
+      suspendedState.moderation_version - 1,
+      'stale-restore',
+    );
+    assert(staleRestore.statusCode === 409, 'Stale restoration version was not rejected');
+    const suspendedPeriodSessionId = await createPhase5AccessSession(
+      phase5WalletAddress,
+      'suspended-period',
+    );
+    const restoreResponse = await performPhase5Action(
+      'restore',
+      suspendedState.moderation_version,
+      'restore',
+    );
+    assert(restoreResponse.statusCode === 200, 'Authorized player restoration failed');
+    const restoredState = await currentPlayerState();
+    const [activeAfterRestore] = await sql<{ count: string }[]>`
+      select count(*)::text as count
+      from public.wallet_access_sessions
+      where wallet_address = ${phase5WalletAddress}
+        and status = 'active'
+        and expires_at > now()
+    `;
+    const [suspendedPeriodSession] = await sql<{ status: string }[]>`
+      select status
+      from public.wallet_access_sessions
+      where id = ${suspendedPeriodSessionId}
+    `;
+    assert(
+      restoredState.moderation_status === 'active' &&
+        activeAfterRestore?.count === '0' &&
+        suspendedPeriodSession?.status === 'revoked',
+      'Restoration created or retained an access session',
+    );
+
+    const renameSessionId = await createPhase5AccessSession(phase5WalletAddress, 'rename');
+    const requireRenameResponse = await performPhase5Action(
+      'require-rename',
+      restoredState.moderation_version,
+      'require-rename',
+    );
+    assert(requireRenameResponse.statusCode === 200, 'Require-rename operation failed');
+    const renameState = await currentPlayerState();
+    const [renameSession] = await sql<{ status: string }[]>`
+      select status from public.wallet_access_sessions where id = ${renameSessionId}
+    `;
+    assert(
+      renameState.rename_required && renameSession?.status === 'revoked',
+      'Require-rename did not block entry and revoke the current session',
+    );
+    const renameEntry = await serviceClient.rpc('load_player_entry_state', {
+      p_wallet_address: phase5WalletAddress,
+      p_request_id: `phase5-test:${runId}:rename-entry`,
+      p_touch_entry: true,
+    });
+    assert(
+      !renameEntry.error &&
+        typeof renameEntry.data === 'object' &&
+        renameEntry.data !== null &&
+        Reflect.get(renameEntry.data, 'entryState') === 'rename_required',
+      'Rename-required player was not routed away from the map',
+    );
+
+    await createPhase5AccessSession(phase5WalletAddress, 'rename-completion');
+    const renameCompletion = await serviceClient.rpc('complete_required_player_rename', {
+      p_wallet_address: phase5WalletAddress,
+      p_display_name: `${phase5DisplayName}R`,
+      p_request_id: `phase5-test:${runId}:rename-complete`,
+      p_rate_limit: 20,
+    });
+    assert(!renameCompletion.error, 'Protected player rename completion failed');
+    const renamedState = await currentPlayerState();
+    assert(!renamedState.rename_required, 'Valid player rename did not clear the requirement');
+
+    const movedState = await serviceClient.rpc('save_player_game_state', {
+      p_wallet_address: phase5WalletAddress,
+      p_map_id: 'lantern-square',
+      p_position_x: 18,
+      p_position_y: 10,
+      p_facing_direction: 'east',
+      p_expected_game_state_version: renamedState.game_state_version,
+      p_request_id: `phase5-test:${runId}:move-before-reset`,
+      p_rate_limit: 60,
+    });
+    assert(!movedState.error, 'Temporary pre-reset state update failed');
+    const beforeReset = await currentPlayerState();
+    const resetResponse = await performPhase5Action(
+      'reset-position',
+      beforeReset.moderation_version,
+      'reset-position',
+    );
+    assert(resetResponse.statusCode === 200, 'Authorized position reset failed');
+    const resetState = await currentPlayerState();
+    assert(
+      Number(resetState.safe_position_x) === 12 &&
+        Number(resetState.safe_position_y) === 7.5 &&
+        resetState.facing_direction === 'south' &&
+        resetState.game_state_version > beforeReset.game_state_version,
+      'Position reset did not use the reviewed server spawn and increment state version',
+    );
+
+    await createPhase5AccessSession(phase5WalletAddress, 'explicit-revocation');
+    const beforeRevocation = await currentPlayerState();
+    const revokeResponse = await performPhase5Action(
+      'revoke-sessions',
+      beforeRevocation.moderation_version,
+      'revoke-sessions',
+    );
+    assert(revokeResponse.statusCode === 200, 'Authorized session revocation failed');
+    const replayedRevocation = await performPhase5Action(
+      'revoke-sessions',
+      beforeRevocation.moderation_version,
+      'revoke-sessions',
+    );
+    assert(replayedRevocation.statusCode === 200, 'Idempotent session revocation replay failed');
+    const [sessionHistory] = await sql<{ total: string; active: string }[]>`
+      select
+        count(*)::text as total,
+        count(*) filter (where status = 'active' and expires_at > now())::text as active
+      from public.wallet_access_sessions
+      where wallet_address = ${phase5WalletAddress}
+    `;
+    assert(
+      Number(sessionHistory?.total ?? 0) >= 4 && sessionHistory?.active === '0',
+      'Session revocation removed history or left an active session',
+    );
+
+    const missingTargetResponse = await api.inject({
+      method: 'POST',
+      url: `/api/v1/admin/players/${randomUUID()}/reset-position`,
+      headers: {
+        authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
+        origin: 'http://localhost:3002',
+        'x-request-id': `phase5-test:${runId}:missing-target`,
+      },
+      payload: { expectedVersion: 1, reason: 'Verify a missing cross-player target is rejected.' },
+    });
+    assert(missingTargetResponse.statusCode === 404, 'Missing player target was not rejected');
+
+    const activityResponse = await api.inject({
+      method: 'GET',
+      url: `/api/v1/admin/players/${phase5PlayerId}/activity?limit=25`,
+      headers: phase5ReadHeaders,
+    });
+    assert(
+      activityResponse.statusCode === 200 &&
+        activityResponse.body.includes('player.suspended') &&
+        activityResponse.body.includes('wallet.access.revoked'),
+      'Bounded player and safe access audit history was incomplete',
+    );
+    const [auditPairCounts] = await sql<{ player_audits: string; admin_audits: string }[]>`
+      select
+        (
+          select count(*)::text from public.player_operation_audit_logs
+          where player_profile_id = ${phase5PlayerId}
+            and actor_type = 'admin'
+        ) as player_audits,
+        (
+          select count(*)::text from public.admin_audit_logs
+          where metadata ->> 'playerProfileId' = ${phase5PlayerId}
+        ) as admin_audits
+    `;
+    assert(
+      Number(auditPairCounts?.player_audits ?? 0) >= 5 &&
+        auditPairCounts?.player_audits === auditPairCounts?.admin_audits,
+      'Player operations did not append matching player and administrator audit records',
+    );
+
+    const gameAdminDetailPage = await fetch(new URL(`/players/${phase5PlayerId}`, adminPortalUrl), {
+      headers: { cookie: gameAdministratorFixture.cookieHeader() },
+      redirect: 'manual',
+    });
+    const gameAdminDetailBody = await gameAdminDetailPage.text();
+    assert(
+      gameAdminDetailPage.status === 200 &&
+        gameAdminDetailBody.includes('Reset to spawn') &&
+        gameAdminDetailBody.includes('Require rename'),
+      'Permission-aware player-management controls did not render for Game Administrator',
+    );
+
     await sql`
       update public.admin_users set role_id = ${role.id}
       where user_id = ${administrator.id}
     `;
+    const readOnlyPhase5Fixture = await createActiveAdministratorSession();
+    const readOnlyDetailPage = await fetch(new URL(`/players/${phase5PlayerId}`, adminPortalUrl), {
+      headers: { cookie: readOnlyPhase5Fixture.cookieHeader() },
+      redirect: 'manual',
+    });
+    const readOnlyDetailBody = await readOnlyDetailPage.text();
+    assert(
+      readOnlyDetailPage.status === 200 &&
+        !readOnlyDetailBody.includes('Suspend player') &&
+        !readOnlyDetailBody.includes('Reset to spawn') &&
+        !readOnlyDetailBody.includes('Revoke sessions'),
+      'Read-only staff unexpectedly saw enabled player mutation controls',
+    );
 
     const passwordChangeFixture = await createActiveAdministratorSession();
     const nextPassword = `${randomBytes(24).toString('base64url')}!Bb2`;
@@ -988,6 +1608,47 @@ async function main(): Promise<void> {
     await api.close();
     const fixtureIds = fixtures.map(({ id }) => id);
     const cleanupFailures: string[] = [];
+
+    if (phase5PlayerFixture === undefined && phase5PendingFixture !== undefined) {
+      try {
+        const [pendingProfile] = await sql<{ id: string }[]>`
+          select id
+          from public.player_profiles
+          where wallet_address = ${phase5PendingFixture.walletAddress}
+            and display_name like 'P5Test%'
+        `;
+        if (pendingProfile !== undefined) {
+          phase5PlayerFixture = {
+            id: pendingProfile.id,
+            walletAddress: phase5PendingFixture.walletAddress,
+            adminUserId: phase5PendingFixture.adminUserId,
+          };
+        }
+      } catch {
+        cleanupFailures.push('Phase 5 cleanup target lookup');
+      }
+    }
+
+    if (phase5PlayerFixture !== undefined) {
+      try {
+        await sql`select private.cleanup_phase5_test_player(
+          ${runId}::uuid,
+          ${phase5PlayerFixture.id}::uuid,
+          ${phase5PlayerFixture.walletAddress},
+          ${phase5PlayerFixture.adminUserId}::uuid
+        )`;
+        const [remainingPhase5Profile] = await sql<{ count: string }[]>`
+          select count(*)::text as count
+          from public.player_profiles
+          where id = ${phase5PlayerFixture.id}
+        `;
+        if (remainingPhase5Profile?.count !== '0') {
+          cleanupFailures.push('test-owned Phase 5 player profile');
+        }
+      } catch {
+        cleanupFailures.push('test-owned Phase 5 player operations fixture');
+      }
+    }
 
     if (fixtureIds.length > 0) {
       try {

@@ -22,6 +22,7 @@ export function parseAdminPublicConfig(environment: AdminPublicEnvironment) {
 
   return {
     ...config,
+    appOrigin: new URL(config.appUrl).origin,
     gameUrl: parseAdditionalPublicHttpUrl(
       environment.NEXT_PUBLIC_GAME_URL,
       environment.NEXT_PUBLIC_APP_ENV,

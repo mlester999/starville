@@ -17,10 +17,14 @@ export type AdminRoleKey = (typeof ADMIN_ROLE_KEYS)[number];
 
 export const ADMIN_PERMISSION_KEYS = [
   'overview.read',
+  'operations.read',
   'players.read',
   'players.suspend',
   'players.ban',
   'players.manage_sessions',
+  'players.reset_position',
+  'players.require_rename',
+  'player_audit.read',
   'wallets.read',
   'wallets.force_reverify',
   'inventories.read',
@@ -31,7 +35,9 @@ export const ADMIN_PERMISSION_KEYS = [
   'items.publish',
   'maps.read',
   'maps.edit',
+  'maps.preview',
   'maps.publish',
+  'maps.audit_read',
   'assets.read',
   'assets.upload',
   'assets.publish',
@@ -60,18 +66,37 @@ export const ADMIN_PERMISSION_KEYS = [
 
 export type AdminPermissionKey = (typeof ADMIN_PERMISSION_KEYS)[number];
 
+export const ADMIN_PLAYER_ACTION_PERMISSIONS = {
+  suspend: 'players.suspend',
+  restore: 'players.suspend',
+  'reset-position': 'players.reset_position',
+  'require-rename': 'players.require_rename',
+  'revoke-sessions': 'players.manage_sessions',
+} as const satisfies Readonly<Record<string, AdminPermissionKey>>;
+
+export type AdminPlayerActionKey = keyof typeof ADMIN_PLAYER_ACTION_PERMISSIONS;
+
 const readOnlyPermissions = ADMIN_PERMISSION_KEYS.filter((permission) =>
   permission.endsWith('.read'),
-).filter((permission) => permission !== 'roles.read' && permission !== 'audit_logs.read');
+).filter(
+  (permission) =>
+    permission !== 'roles.read' &&
+    permission !== 'audit_logs.read' &&
+    permission !== 'player_audit.read',
+);
 
 export const INITIAL_ROLE_PERMISSIONS = {
   super_admin: ADMIN_PERMISSION_KEYS,
   game_administrator: [
     'overview.read',
+    'operations.read',
     'players.read',
     'players.suspend',
     'players.ban',
     'players.manage_sessions',
+    'players.reset_position',
+    'players.require_rename',
+    'player_audit.read',
     'wallets.read',
     'wallets.force_reverify',
     'inventories.read',
@@ -81,6 +106,9 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'items.update',
     'items.publish',
     'maps.read',
+    'maps.edit',
+    'maps.preview',
+    'maps.audit_read',
     'assets.read',
     'economy.read',
     'rewards.read',
@@ -103,10 +131,15 @@ export const INITIAL_ROLE_PERMISSIONS = {
   ],
   live_operations_manager: [
     'overview.read',
+    'operations.read',
     'players.read',
+    'players.manage_sessions',
+    'players.reset_position',
+    'player_audit.read',
     'inventories.read',
     'items.read',
     'maps.read',
+    'maps.audit_read',
     'assets.read',
     'economy.read',
     'rewards.read',
@@ -133,7 +166,9 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'items.read',
     'maps.read',
     'maps.edit',
+    'maps.preview',
     'maps.publish',
+    'maps.audit_read',
     'assets.read',
     'assets.upload',
   ],
@@ -151,6 +186,8 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'players.suspend',
     'players.ban',
     'players.manage_sessions',
+    'players.require_rename',
+    'player_audit.read',
     'wallets.read',
     'moderation.read',
     'moderation.act',
@@ -158,6 +195,7 @@ export const INITIAL_ROLE_PERMISSIONS = {
   customer_support: [
     'overview.read',
     'players.read',
+    'player_audit.read',
     'wallets.read',
     'inventories.read',
     'items.read',
@@ -178,6 +216,7 @@ export const INITIAL_ROLE_PERMISSIONS = {
   ],
   blockchain_operator: [
     'overview.read',
+    'operations.read',
     'wallets.read',
     'rewards.read',
     'claims.read',

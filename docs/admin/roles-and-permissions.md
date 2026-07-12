@@ -6,10 +6,9 @@ Starville administrator authorization uses stable role and permission keys store
 PostgreSQL tables. Display names and descriptions may evolve, but code, migrations, tests, API
 checks, and audit records use the stable keys documented here.
 
-The canonical TypeScript catalog is `packages/admin-auth/src/catalog.ts`. The migration must seed
-the same 12 roles, 40 permissions, and initial mappings. A role shown here does not create a Phase 2
-page or operation; future Phase 5 services must still implement and enforce the corresponding
-permission.
+The canonical TypeScript catalog is `packages/admin-auth/src/catalog.ts`. The migrations seed the
+same 12 roles, 46 permissions, and current mappings. Phase 6 implements the narrow world permissions
+documented below; other reserved keys still do not imply an implemented feature.
 
 Permission changes invalidate stale administrator authorization through `permission_version`. Role
 or status changes invalidate affected trusted sessions. Hiding a navigation item is never a
@@ -19,7 +18,7 @@ substitute for API and database enforcement.
 
 | Stable key                | Intended responsibility                                                                                                                   |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
-| `super_admin`             | Recovery and unrestricted administrator authority; receives all 40 permissions and is protected by the last-active-Super-Admin invariant. |
+| `super_admin`             | Recovery and unrestricted administrator authority; receives all 46 permissions and is protected by the last-active-Super-Admin invariant. |
 | `game_administrator`      | Broad day-to-day game administration without role, audit, blockchain, token-gate, reward-approval, or system-setting mutation authority.  |
 | `economy_manager`         | STARDUST adjustments and reward-rule configuration without claim opening, blockchain configuration, or reward approval.                   |
 | `live_operations_manager` | Read-oriented operational oversight plus reward simulation and claim opening/pausing.                                                     |
@@ -37,46 +36,52 @@ renamed accidentally. Phase 2 does not provide role-management UI.
 
 ## Permission catalog
 
-| Category        | Stable permission keys                                                      |
-| --------------- | --------------------------------------------------------------------------- |
-| Overview        | `overview.read`                                                             |
-| Players         | `players.read`, `players.suspend`, `players.ban`, `players.manage_sessions` |
-| Wallets         | `wallets.read`, `wallets.force_reverify`                                    |
-| Inventories     | `inventories.read`, `inventories.adjust`                                    |
-| Items           | `items.read`, `items.create`, `items.update`, `items.publish`               |
-| Maps            | `maps.read`, `maps.edit`, `maps.publish`                                    |
-| Assets          | `assets.read`, `assets.upload`, `assets.publish`                            |
-| Economy         | `economy.read`, `economy.adjust_stardust`, `economy.configure_rewards`      |
-| Rewards         | `rewards.read`, `rewards.simulate`, `rewards.approve`                       |
-| Claims          | `claims.read`, `claims.open`, `claims.pause`, `claims.reconcile`            |
-| Blockchain      | `blockchain.read`, `blockchain.configure`                                   |
-| Token gate      | `token_gate.read`, `token_gate.configure`                                   |
-| Moderation      | `moderation.read`, `moderation.act`                                         |
-| Administration  | `roles.read`, `roles.manage`, `audit_logs.read`                             |
-| System settings | `system_settings.read`, `system_settings.manage`                            |
+| Category        | Stable permission keys                                                                                                          |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| Overview        | `overview.read`                                                                                                                 |
+| Operations      | `operations.read`                                                                                                               |
+| Players         | `players.read`, `players.suspend`, `players.ban`, `players.manage_sessions`, `players.reset_position`, `players.require_rename` |
+| Player audit    | `player_audit.read`                                                                                                             |
+| Wallets         | `wallets.read`, `wallets.force_reverify`                                                                                        |
+| Inventories     | `inventories.read`, `inventories.adjust`                                                                                        |
+| Items           | `items.read`, `items.create`, `items.update`, `items.publish`                                                                   |
+| Maps            | `maps.read`, `maps.edit`, `maps.preview`, `maps.publish`, `maps.audit_read`                                                     |
+| Assets          | `assets.read`, `assets.upload`, `assets.publish`                                                                                |
+| Economy         | `economy.read`, `economy.adjust_stardust`, `economy.configure_rewards`                                                          |
+| Rewards         | `rewards.read`, `rewards.simulate`, `rewards.approve`                                                                           |
+| Claims          | `claims.read`, `claims.open`, `claims.pause`, `claims.reconcile`                                                                |
+| Blockchain      | `blockchain.read`, `blockchain.configure`                                                                                       |
+| Token gate      | `token_gate.read`, `token_gate.configure`                                                                                       |
+| Moderation      | `moderation.read`, `moderation.act`                                                                                             |
+| Administration  | `roles.read`, `roles.manage`, `audit_logs.read`                                                                                 |
+| System settings | `system_settings.read`, `system_settings.manage`                                                                                |
 
 ## Complete initial matrix
 
 The following lists are exact. An omitted permission is denied. Counts are included to make drift
 between this document, the TypeScript catalog, migrations, and tests visible during review.
 
-### `super_admin` — 40 permissions
+### `super_admin` — 46 permissions
 
-`overview.read`, `players.read`, `players.suspend`, `players.ban`, `players.manage_sessions`,
+`overview.read`, `operations.read`, `players.read`, `players.suspend`, `players.ban`,
+`players.manage_sessions`, `players.reset_position`, `players.require_rename`, `player_audit.read`,
 `wallets.read`, `wallets.force_reverify`, `inventories.read`, `inventories.adjust`, `items.read`,
-`items.create`, `items.update`, `items.publish`, `maps.read`, `maps.edit`, `maps.publish`,
-`assets.read`, `assets.upload`, `assets.publish`, `economy.read`, `economy.adjust_stardust`,
-`economy.configure_rewards`, `rewards.read`, `rewards.simulate`, `rewards.approve`, `claims.read`,
-`claims.open`, `claims.pause`, `claims.reconcile`, `blockchain.read`, `blockchain.configure`,
-`token_gate.read`, `token_gate.configure`, `moderation.read`, `moderation.act`, `roles.read`,
-`roles.manage`, `audit_logs.read`, `system_settings.read`, `system_settings.manage`.
+`items.create`, `items.update`, `items.publish`, `maps.read`, `maps.edit`, `maps.preview`,
+`maps.publish`, `maps.audit_read`, `assets.read`, `assets.upload`, `assets.publish`, `economy.read`,
+`economy.adjust_stardust`, `economy.configure_rewards`, `rewards.read`, `rewards.simulate`,
+`rewards.approve`, `claims.read`, `claims.open`, `claims.pause`, `claims.reconcile`,
+`blockchain.read`, `blockchain.configure`, `token_gate.read`, `token_gate.configure`,
+`moderation.read`, `moderation.act`, `roles.read`, `roles.manage`, `audit_logs.read`,
+`system_settings.read`, `system_settings.manage`.
 
-### `game_administrator` — 21 permissions
+### `game_administrator` — 28 permissions
 
-`overview.read`, `players.read`, `players.suspend`, `players.ban`, `players.manage_sessions`,
+`overview.read`, `operations.read`, `players.read`, `players.suspend`, `players.ban`,
+`players.manage_sessions`, `players.reset_position`, `players.require_rename`, `player_audit.read`,
 `wallets.read`, `wallets.force_reverify`, `inventories.read`, `inventories.adjust`, `items.read`,
-`items.create`, `items.update`, `items.publish`, `maps.read`, `assets.read`, `economy.read`,
-`rewards.read`, `claims.read`, `moderation.read`, `moderation.act`, `system_settings.read`.
+`items.create`, `items.update`, `items.publish`, `maps.read`, `maps.edit`, `maps.preview`,
+`maps.audit_read`, `assets.read`, `economy.read`, `rewards.read`, `claims.read`, `moderation.read`,
+`moderation.act`, `system_settings.read`.
 
 ### `economy_manager` — 10 permissions
 
@@ -84,52 +89,53 @@ between this document, the TypeScript catalog, migrations, and tests visible dur
 `economy.adjust_stardust`, `economy.configure_rewards`, `rewards.read`, `rewards.simulate`,
 `claims.read`.
 
-### `live_operations_manager` — 14 permissions
+### `live_operations_manager` — 19 permissions
 
-`overview.read`, `players.read`, `inventories.read`, `items.read`, `maps.read`, `assets.read`,
-`economy.read`, `rewards.read`, `rewards.simulate`, `claims.read`, `claims.open`, `claims.pause`,
-`moderation.read`, `system_settings.read`.
+`overview.read`, `operations.read`, `players.read`, `players.manage_sessions`,
+`players.reset_position`, `player_audit.read`, `inventories.read`, `items.read`, `maps.read`,
+`maps.audit_read`, `assets.read`, `economy.read`, `rewards.read`, `rewards.simulate`, `claims.read`,
+`claims.open`, `claims.pause`, `moderation.read`, `system_settings.read`.
 
 ### `content_manager` — 9 permissions
 
 `overview.read`, `items.read`, `items.create`, `items.update`, `items.publish`, `maps.read`,
 `assets.read`, `assets.upload`, `assets.publish`.
 
-### `world_designer` — 7 permissions
+### `world_designer` — 9 permissions
 
-`overview.read`, `items.read`, `maps.read`, `maps.edit`, `maps.publish`, `assets.read`,
-`assets.upload`.
+`overview.read`, `items.read`, `maps.read`, `maps.edit`, `maps.preview`, `maps.publish`,
+`maps.audit_read`, `assets.read`, `assets.upload`.
 
 ### `asset_manager` — 6 permissions
 
 `overview.read`, `items.read`, `maps.read`, `assets.read`, `assets.upload`, `assets.publish`.
 
-### `moderator` — 8 permissions
+### `moderator` — 10 permissions
 
 `overview.read`, `players.read`, `players.suspend`, `players.ban`, `players.manage_sessions`,
-`wallets.read`, `moderation.read`, `moderation.act`.
+`players.require_rename`, `player_audit.read`, `wallets.read`, `moderation.read`, `moderation.act`.
 
-### `customer_support` — 8 permissions
+### `customer_support` — 9 permissions
 
-`overview.read`, `players.read`, `wallets.read`, `inventories.read`, `items.read`, `rewards.read`,
-`claims.read`, `moderation.read`.
+`overview.read`, `players.read`, `player_audit.read`, `wallets.read`, `inventories.read`,
+`items.read`, `rewards.read`, `claims.read`, `moderation.read`.
 
 ### `financial_reviewer` — 9 permissions
 
 `overview.read`, `economy.read`, `rewards.read`, `rewards.simulate`, `rewards.approve`,
 `claims.read`, `claims.reconcile`, `blockchain.read`, `audit_logs.read`.
 
-### `blockchain_operator` — 11 permissions
+### `blockchain_operator` — 12 permissions
 
-`overview.read`, `wallets.read`, `rewards.read`, `claims.read`, `claims.open`, `claims.pause`,
-`claims.reconcile`, `blockchain.read`, `blockchain.configure`, `token_gate.read`,
+`overview.read`, `operations.read`, `wallets.read`, `rewards.read`, `claims.read`, `claims.open`,
+`claims.pause`, `claims.reconcile`, `blockchain.read`, `blockchain.configure`, `token_gate.read`,
 `token_gate.configure`.
 
-### `read_only_analyst` — 14 permissions
+### `read_only_analyst` — 15 permissions
 
-`overview.read`, `players.read`, `wallets.read`, `inventories.read`, `items.read`, `maps.read`,
-`assets.read`, `economy.read`, `rewards.read`, `claims.read`, `blockchain.read`, `token_gate.read`,
-`moderation.read`, `system_settings.read`.
+`overview.read`, `operations.read`, `players.read`, `wallets.read`, `inventories.read`,
+`items.read`, `maps.read`, `assets.read`, `economy.read`, `rewards.read`, `claims.read`,
+`blockchain.read`, `token_gate.read`, `moderation.read`, `system_settings.read`.
 
 ## Sensitive assignments
 
@@ -141,6 +147,13 @@ between this document, the TypeScript catalog, migrations, and tests visible dur
 - `rewards.approve` is assigned only to `super_admin` and `financial_reviewer`.
 - `audit_logs.read` is assigned only to `super_admin` and `financial_reviewer`.
 - `claims.reconcile` is limited to `super_admin`, `financial_reviewer`, and `blockchain_operator`.
+- `players.reset_position`, `players.require_rename`, `players.manage_sessions`, and
+  `player_audit.read` follow the explicit Phase 5 mappings above. `blockchain_operator` receives
+  none of the player mutations, and `read_only_analyst` does not receive player-audit reasons.
+- `maps.publish` is limited to `super_admin` and `world_designer`; `game_administrator` can read,
+  edit, preview, validate, and audit but cannot publish. `live_operations_manager` receives map read
+  and audit visibility without edit/preview/publish. Moderator, Customer Support, and Blockchain
+  Operator receive no Phase 6 world permission by default.
 
 These mappings are intentionally conservative. Any future change requires a reviewed migration,
 version invalidation for affected administrators, tests, and an audit record; changing only this

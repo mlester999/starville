@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
@@ -37,5 +38,36 @@ describe('administrator interface components', () => {
 
     expect(markup).toContain('role="status"');
     expect(markup).toContain('Unable to verify access.');
+  });
+
+  it('keeps sensitive player operations semantic, reasoned, and wallet-identified', () => {
+    const source = readFileSync(new URL('./player-action-dialog.tsx', import.meta.url), 'utf8');
+
+    expect(source).toContain('<dialog');
+    expect(source).toContain('aria-describedby');
+    expect(source).toContain('aria-labelledby');
+    expect(source).toContain('minLength={12}');
+    expect(source).toContain('maxLength={500}');
+    expect(source).toContain('name="requestId"');
+    expect(source).toContain('value={props.idempotencyKey}');
+    expect(source).toContain('Wallet:');
+    expect(source).toContain('if (pending) event.preventDefault()');
+    expect(source).toContain('triggerRef.current?.focus()');
+  });
+
+  it('keeps the world editor structured, guarded, and free of raw-manifest editing', () => {
+    const editor = readFileSync(new URL('./world-editor.tsx', import.meta.url), 'utf8');
+    const preview = readFileSync(new URL('./world-draft-preview.tsx', import.meta.url), 'utf8');
+
+    expect(editor).toContain('unsaved world changes');
+    expect(editor).toContain('Undo');
+    expect(editor).toContain('Redo');
+    expect(editor).toContain('World Y / depth base');
+    expect(editor).toContain("addCollision('capsule')");
+    expect(editor).toContain('Validate saved draft');
+    expect(editor).not.toMatch(/<textarea[^>]+name=["'](?:json|manifest)/u);
+    expect(preview).toContain('DRAFT PREVIEW');
+    expect(preview).toContain('no player persistence');
+    expect(preview).toContain('Preview exits are inert');
   });
 });

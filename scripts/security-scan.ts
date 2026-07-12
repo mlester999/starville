@@ -75,6 +75,9 @@ function safeLocalSecrets(): Readonly<Record<string, string>> {
     'ADMIN_RECOVERY_COOKIE_SECRET',
     'SOLANA_RPC_URL',
     'TOKEN_ACCESS_COOKIE_SECRET',
+    'GAME_TOKEN_MINT_ADDRESS',
+    'REALTIME_HEALTH_URL',
+    'WORKER_HEALTH_URL',
   ];
 
   const isSensitiveValue = (name: string, value: string): boolean => {

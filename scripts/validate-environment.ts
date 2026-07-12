@@ -4,8 +4,10 @@ import {
   loadAdminRecoveryConfig,
   loadApiConfig,
   loadHostedSupabaseSafetyConfig,
+  loadOperationsHealthConfig,
   loadRealtimeConfig,
   loadTokenAccessServerConfig,
+  loadWorldManagementConfig,
   loadWorkerConfig,
 } from '@starville/config/server';
 import { environmentNameSchema, portSchema } from '@starville/shared-validation';
@@ -68,6 +70,8 @@ const walletPublic = parsePublicWalletConfig({
   network: required('SOLANA_NETWORK'),
 });
 const tokenAccess = loadTokenAccessServerConfig(process.env);
+const operations = loadOperationsHealthConfig(process.env);
+const worldManagement = loadWorldManagementConfig(process.env);
 const hostedSupabase = loadHostedSupabaseSafetyConfig(process.env);
 
 process.stdout.write(
@@ -87,6 +91,19 @@ process.stdout.write(
       challengeTtlSeconds: tokenAccess.challengeTtlSeconds,
       sessionTtlSeconds: tokenAccess.sessionTtlSeconds,
       recheckIntervalSeconds: tokenAccess.recheckIntervalSeconds,
+    },
+    operations: {
+      healthCheckTimeoutMs: operations.timeoutMs,
+      playerActionRateLimit: operations.playerActionRateLimit,
+      operationsReadRateLimit: operations.operationsReadRateLimit,
+    },
+    worldManagement: {
+      manifestMaximumBytes: worldManagement.manifestMaximumBytes,
+      transitionTimeoutMs: worldManagement.transitionTimeoutMs,
+      playerManifestReadRateLimit: worldManagement.playerManifestReadRateLimit,
+      playerTransitionRateLimit: worldManagement.playerTransitionRateLimit,
+      adminReadRateLimit: worldManagement.adminReadRateLimit,
+      adminPublishRateLimit: worldManagement.adminPublishRateLimit,
     },
     supabase: {
       environment: hostedSupabase.environment,

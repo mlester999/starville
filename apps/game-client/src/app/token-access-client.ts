@@ -99,6 +99,26 @@ export function recheckTrustedTokenAccess(
   return requestAccess(apiUrl, '/api/v1/token-access/recheck', 'POST', signal);
 }
 
+export async function revokeTrustedTokenAccess(
+  apiUrl: string,
+  signal?: AbortSignal,
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(new URL('/api/v1/token-access/session', apiUrl), {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { accept: 'application/json' },
+      cache: 'no-store',
+      ...(signal === undefined ? {} : { signal }),
+    });
+  } catch {
+    throw new GameAccessRequestError(503);
+  }
+
+  if (!response.ok) throw new GameAccessRequestError(response.status);
+}
+
 export function shortenWalletAddress(address: string): string {
   return address.length <= 12 ? address : `${address.slice(0, 5)}…${address.slice(-5)}`;
 }

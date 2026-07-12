@@ -93,8 +93,8 @@ See [wallet authentication](../security/wallet-authentication.md),
 | `PATCH /api/v1/admin/token-gate`         | Validate and apply a versioned configuration update       | `token_gate.configure`, expected version, reason, audit  |
 
 All token-access responses use `Cache-Control: no-store`. Mutating player endpoints require an exact
-allowlisted `Origin`; POST requests require JSON. CORS permits credentials only for configured
-origins and does not use a wildcard.
+allowlisted `Origin`; POST, PATCH, and PUT requests require JSON. CORS permits credentials only for
+configured origins and does not use a wildcard.
 
 ## Database model
 

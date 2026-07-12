@@ -12,6 +12,8 @@ import type { FastifyRequest } from 'fastify';
 import type {
   AdminAuthGateway,
   AdminAuthorizationDenialReason,
+  AdminDatabaseIdentity,
+  ServiceLogger,
   VerifiedSupabaseIdentity,
 } from './contracts.js';
 
@@ -76,4 +78,34 @@ export function requirePermission(
   permission: AdminPermissionKey,
 ): void {
   assertAdminPermission(context, permission);
+}
+
+export async function authorizeAdminRequest(
+  request: FastifyRequest,
+  gateway: AdminAuthGateway,
+  logger: ServiceLogger,
+  permission: AdminPermissionKey | readonly AdminPermissionKey[],
+): Promise<AdminDatabaseIdentity> {
+  const identity = await authenticateSupabaseUser(request, gateway);
+  const result = await gateway.loadAuthorization(identity);
+
+  if (result.outcome !== 'authorized') {
+    await gateway.recordDenial(identity, request.id, denialReason(result)).catch((error) => {
+      logger.child({ requestId: request.id }).warn('admin.authorization.audit_failed', { error });
+    });
+  }
+
+  const context = requireActiveAdmin(result);
+  const permissions = typeof permission === 'string' ? [permission] : permission;
+  const missingPermission = permissions.find((key) => !context.permissionKeys.includes(key));
+  if (missingPermission !== undefined) {
+    await gateway.recordDenial(identity, request.id, 'MISSING_PERMISSION').catch((error) => {
+      logger.child({ requestId: request.id }).warn('admin.authorization.audit_failed', { error });
+    });
+  }
+
+  for (const requiredPermission of permissions) {
+    requirePermission(context, requiredPermission);
+  }
+  return identity;
 }

@@ -72,6 +72,26 @@ export interface AdminRecoveryConfig {
   readonly cookieSigningSecret: string;
 }
 
+export interface OperationsHealthConfig {
+  readonly realtimeReadyUrl: string;
+  readonly workerReadyUrl: string;
+  readonly timeoutMs: number;
+  readonly playerActionRateLimit: number;
+  readonly operationsReadRateLimit: number;
+}
+
+export interface WorldManagementConfig {
+  readonly manifestMaximumBytes: number;
+  readonly transitionTimeoutMs: number;
+  readonly playerManifestReadRateLimit: number;
+  readonly playerTransitionRateLimit: number;
+  readonly adminReadRateLimit: number;
+  readonly adminDraftWriteRateLimit: number;
+  readonly adminValidationRateLimit: number;
+  readonly adminPublishRateLimit: number;
+  readonly adminDeriveRateLimit: number;
+}
+
 export interface HostedSupabaseSafetyConfig {
   readonly environment: 'development';
   readonly projectRef: string;
@@ -257,6 +277,64 @@ export function loadAdminRecoveryConfig(env: EnvironmentVariables): AdminRecover
       .string()
       .min(32, 'ADMIN_RECOVERY_COOKIE_SECRET must contain at least 32 characters')
       .parse(env['ADMIN_RECOVERY_COOKIE_SECRET']),
+  };
+}
+
+export function loadOperationsHealthConfig(env: EnvironmentVariables): OperationsHealthConfig {
+  const environment = loadEnvironment(env);
+  const realtimeReadyUrl = httpUrlSchema.parse(
+    env['REALTIME_HEALTH_URL'] ?? 'http://127.0.0.1:4001/ready',
+  );
+  const workerReadyUrl = httpUrlSchema.parse(
+    env['WORKER_HEALTH_URL'] ?? 'http://127.0.0.1:4002/ready',
+  );
+  assertSecureUrlForEnvironment(realtimeReadyUrl, environment, 'REALTIME_HEALTH_URL');
+  assertSecureUrlForEnvironment(workerReadyUrl, environment, 'WORKER_HEALTH_URL');
+
+  return {
+    realtimeReadyUrl,
+    workerReadyUrl,
+    timeoutMs: boundedInteger(250, 5_000, 'ADMIN_HEALTH_CHECK_TIMEOUT_MS').parse(
+      env['ADMIN_HEALTH_CHECK_TIMEOUT_MS'] ?? 1_500,
+    ),
+    playerActionRateLimit: boundedInteger(1, 60, 'ADMIN_PLAYER_ACTION_RATE_LIMIT').parse(
+      env['ADMIN_PLAYER_ACTION_RATE_LIMIT'] ?? 20,
+    ),
+    operationsReadRateLimit: boundedInteger(10, 600, 'ADMIN_OPERATIONS_READ_RATE_LIMIT').parse(
+      env['ADMIN_OPERATIONS_READ_RATE_LIMIT'] ?? 120,
+    ),
+  };
+}
+
+export function loadWorldManagementConfig(env: EnvironmentVariables): WorldManagementConfig {
+  return {
+    manifestMaximumBytes: boundedInteger(16_384, 262_144, 'WORLD_MANIFEST_MAX_BYTES').parse(
+      env['WORLD_MANIFEST_MAX_BYTES'] ?? 262_144,
+    ),
+    transitionTimeoutMs: boundedInteger(3_000, 30_000, 'WORLD_TRANSITION_TIMEOUT_MS').parse(
+      env['WORLD_TRANSITION_TIMEOUT_MS'] ?? 15_000,
+    ),
+    playerManifestReadRateLimit: boundedInteger(10, 600, 'WORLD_PLAYER_READ_RATE_LIMIT').parse(
+      env['WORLD_PLAYER_READ_RATE_LIMIT'] ?? 120,
+    ),
+    playerTransitionRateLimit: boundedInteger(2, 60, 'WORLD_PLAYER_TRANSITION_RATE_LIMIT').parse(
+      env['WORLD_PLAYER_TRANSITION_RATE_LIMIT'] ?? 12,
+    ),
+    adminReadRateLimit: boundedInteger(10, 600, 'WORLD_ADMIN_READ_RATE_LIMIT').parse(
+      env['WORLD_ADMIN_READ_RATE_LIMIT'] ?? 120,
+    ),
+    adminDraftWriteRateLimit: boundedInteger(2, 120, 'WORLD_ADMIN_DRAFT_WRITE_RATE_LIMIT').parse(
+      env['WORLD_ADMIN_DRAFT_WRITE_RATE_LIMIT'] ?? 30,
+    ),
+    adminValidationRateLimit: boundedInteger(1, 60, 'WORLD_ADMIN_VALIDATION_RATE_LIMIT').parse(
+      env['WORLD_ADMIN_VALIDATION_RATE_LIMIT'] ?? 12,
+    ),
+    adminPublishRateLimit: boundedInteger(1, 12, 'WORLD_ADMIN_PUBLISH_RATE_LIMIT').parse(
+      env['WORLD_ADMIN_PUBLISH_RATE_LIMIT'] ?? 4,
+    ),
+    adminDeriveRateLimit: boundedInteger(1, 30, 'WORLD_ADMIN_DERIVE_RATE_LIMIT').parse(
+      env['WORLD_ADMIN_DERIVE_RATE_LIMIT'] ?? 8,
+    ),
   };
 }
 

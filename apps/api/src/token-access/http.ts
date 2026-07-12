@@ -51,7 +51,7 @@ export function assertTrustedBrowserMutation(
     throw new PublicApiError(403, 'ORIGIN_NOT_ALLOWED');
   }
 
-  if (request.method === 'POST') {
+  if (request.method === 'POST' || request.method === 'PATCH' || request.method === 'PUT') {
     const contentType = request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase();
 
     if (contentType !== 'application/json') {

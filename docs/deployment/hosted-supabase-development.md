@@ -1,11 +1,11 @@
 # Hosted Supabase development workflow
 
-## Selected Phase 2 and Phase 3 environment
+## Selected Phase 2 through Phase 5 environment
 
-Phases 2 and 3 use the dedicated hosted Starville Development Supabase project. Docker and the local
-Supabase stack are not required for this selected workflow. The development project is the only
-authorized remote target; a production project or unrelated project must never be linked, migrated,
-tested, bootstrapped, or cleaned by these commands.
+Phases 2 through 5 use the dedicated hosted Starville Development Supabase project. Docker and the
+local Supabase stack are not required for this selected workflow. The development project is the
+only authorized remote target; a production project or unrelated project must never be linked,
+migrated, tested, bootstrapped, or cleaned by these commands.
 
 The canonical CLI project is `infrastructure/supabase`. Because the CLI expects a directory that
 contains a `supabase/` child directory, every raw CLI command uses:
@@ -19,8 +19,8 @@ Do not run a remote migration command from the repository root without that opti
 
 ## Required environment gates
 
-Real values belong only in the ignored `.env.local` or an approved secret manager. Phase 2 remote
-and Phase 3 remote operations use:
+Real values belong only in the ignored `.env.local` or an approved secret manager. Phase 2 through
+Phase 4 and Phase 5 remote operations use:
 
 ```dotenv
 SUPABASE_ENVIRONMENT=development
@@ -114,8 +114,11 @@ pnpm exec supabase --workdir infrastructure db lint --linked --schema public,pri
 The raw commands do not replace the repository target gates. Prefer the root scripts.
 
 No migration application or hosted lint result is asserted by this document; results must be
-reported from the actual command output during the current validation. The Phase 3 operations
-runbook records the present dry-run-only status.
+reported from the actual command output during the current validation. Phase 5 depends on the
+pending Phase 4 player migration, so the reviewed deployment order is
+`20260711100000_player_vertical_slice.sql` followed by
+`20260711110000_secure_player_operations.sql`. See the Phase 5 migration runbook for the current
+dry-run-only status.
 
 ## Hosted database and RLS tests
 

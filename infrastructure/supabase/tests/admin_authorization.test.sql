@@ -19,8 +19,8 @@ select is(
 );
 select is(
   (select count(*)::integer from public.admin_permissions where is_system),
-  40,
-  'exactly forty system permissions are seeded'
+  44,
+  'exactly forty-four system permissions are seeded through Phase 5'
 );
 select is(
   (
@@ -29,7 +29,7 @@ select is(
     join public.admin_roles as role on role.id = mapping.role_id
     where role.key = 'super_admin'
   ),
-  40,
+  44,
   'Super Admin receives every permission'
 );
 select is(

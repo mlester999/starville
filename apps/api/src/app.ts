@@ -9,13 +9,25 @@ import { registerAdminRoutes } from './routes/admin.js';
 import { registerAdminTokenGateRoutes } from './routes/admin-token-gate.js';
 import { registerStatusRoutes } from './routes/status.js';
 import { registerTokenAccessRoutes } from './routes/token-access.js';
+import { registerPlayerRoutes } from './routes/player.js';
+import type { PlayerService } from './player/contracts.js';
+import type { AdminOperationsService } from './admin-operations/contracts.js';
+import { FixedWindowAdminRateLimiter } from './admin-operations/rate-limit.js';
+import { registerAdminPlayerRoutes } from './routes/admin-players.js';
+import { registerAdminOperationsRoutes } from './routes/admin-operations.js';
 import type { TokenAccessService } from './token-access/contracts.js';
+import type { PlayerWorldService } from './world/player-contracts.js';
+import { registerPlayerWorldRoutes } from './routes/world.js';
+import type { AdminWorldService } from './world/admin-contracts.js';
+import { registerAdminWorldRoutes } from './routes/admin-worlds.js';
 
 export interface ApiTokenAccessOptions {
   readonly service: TokenAccessService;
   readonly cookieHashSecret: string;
   readonly cookieSecure: boolean;
   readonly cookieMaxAgeSeconds: number;
+  readonly playerService?: PlayerService;
+  readonly worldService?: PlayerWorldService;
 }
 
 export interface BuildApiAppOptions {
@@ -24,6 +36,14 @@ export interface BuildApiAppOptions {
   readonly adminAuthGateway: AdminAuthGateway;
   readonly adminSessionTtlMinutes: number;
   readonly tokenAccess?: ApiTokenAccessOptions;
+  readonly adminOperations?: {
+    readonly service: AdminOperationsService;
+    readonly readRateLimit?: number;
+  };
+  readonly adminWorld?: {
+    readonly service: AdminWorldService;
+    readonly manifestMaximumBytes: number;
+  };
 }
 
 function requestPath(url: string): string {
@@ -36,6 +56,8 @@ export function buildApiApp({
   adminAuthGateway,
   adminSessionTtlMinutes,
   tokenAccess,
+  adminOperations,
+  adminWorld,
 }: BuildApiAppOptions): FastifyInstance {
   const allowedOrigins = new Set(config.corsAllowedOrigins);
   const app = Fastify({
@@ -47,7 +69,7 @@ export function buildApiApp({
   void app.register(cookie);
   void app.register(cors, {
     credentials: true,
-    methods: ['GET', 'POST', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
     origin(origin, callback) {
       callback(null, origin === undefined || allowedOrigins.has(origin));
     },
@@ -95,6 +117,36 @@ export function buildApiApp({
     sessionTtlMinutes: adminSessionTtlMinutes,
   });
 
+  if (adminOperations !== undefined) {
+    const readLimiter = new FixedWindowAdminRateLimiter(
+      adminOperations.readRateLimit ?? 120,
+      60_000,
+    );
+    registerAdminPlayerRoutes(app, {
+      adminGateway: adminAuthGateway,
+      service: adminOperations.service,
+      logger,
+      allowedOrigins,
+      readLimiter,
+    });
+    registerAdminOperationsRoutes(app, {
+      adminGateway: adminAuthGateway,
+      service: adminOperations.service,
+      logger,
+      readLimiter,
+    });
+  }
+
+  if (adminWorld !== undefined) {
+    registerAdminWorldRoutes(app, {
+      adminGateway: adminAuthGateway,
+      service: adminWorld.service,
+      logger,
+      allowedOrigins,
+      manifestMaximumBytes: adminWorld.manifestMaximumBytes,
+    });
+  }
+
   if (tokenAccess !== undefined) {
     registerTokenAccessRoutes(app, {
       service: tokenAccess.service,
@@ -110,6 +162,29 @@ export function buildApiApp({
       service: tokenAccess.service,
       logger,
     });
+    if (tokenAccess.playerService !== undefined) {
+      registerPlayerRoutes(app, {
+        playerService: tokenAccess.playerService,
+        tokenAccessService: tokenAccess.service,
+        cookie: {
+          secure: tokenAccess.cookieSecure,
+          maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+        },
+        allowedOrigins,
+      });
+      if (tokenAccess.worldService !== undefined) {
+        registerPlayerWorldRoutes(app, {
+          worldService: tokenAccess.worldService,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          allowedOrigins,
+        });
+      }
+    }
   }
 
   return app;

@@ -1,6 +1,6 @@
 # Environment-variable ownership
 
-The root [`.env.example`](../../.env.example) is the committed Phase 3 template. Its values are
+The root [`.env.example`](../../.env.example) is the committed Phase 6 template. Its values are
 non-working placeholders. Real development values belong only in ignored `.env.local`; commands must
 never print private values.
 
@@ -15,6 +15,8 @@ never print private values.
 - `NEXT_PUBLIC_REOWN_PROJECT_ID`
 - `NEXT_PUBLIC_STARVILLE_X_URL` (optional; HTTPS only)
 - `NEXT_PUBLIC_STARVILLE_DISCORD_URL` (optional; HTTPS only)
+- `NEXT_PUBLIC_GAME_COLLISION_DEBUG` (optional; `false` by default; explicit map-development builds
+  only)
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
@@ -36,6 +38,23 @@ These are server/process values required for normal development:
 - `CORS_ALLOWED_ORIGINS`, `REALTIME_ALLOWED_ORIGINS`
 - `REALTIME_MAX_CONNECTIONS`
 - `WORKER_CONCURRENCY`, `WORKER_MAX_ATTEMPTS`, `WORKER_RETRY_BASE_DELAY_MS`
+- `REALTIME_HEALTH_URL`, `WORKER_HEALTH_URL` are server-only API readiness targets; production
+  values require HTTPS and are never returned to browsers.
+- `ADMIN_HEALTH_CHECK_TIMEOUT_MS` bounds each Phase 5 readiness request to 250–5,000 ms.
+- `ADMIN_PLAYER_ACTION_RATE_LIMIT` bounds each sensitive administrator action to 1–60 attempts per
+  minute; PostgreSQL persists the actual fixed-window counters.
+- `ADMIN_OPERATIONS_READ_RATE_LIMIT` bounds each administrator and route scope per API instance to
+  10–600 reads per minute; bounded database pagination remains the primary query limit.
+- `WORLD_MANIFEST_MAX_BYTES` bounds structured map content to at most 256 KiB in both API and
+  database validation.
+- `WORLD_TRANSITION_TIMEOUT_MS` bounds the client-visible transition request to 3–30 seconds; the
+  default is 15 seconds and adds no artificial loading delay.
+- `WORLD_PLAYER_READ_RATE_LIMIT` and `WORLD_PLAYER_TRANSITION_RATE_LIMIT` bound published reads and
+  transition attempts. PostgreSQL also enforces a one-second successful-transition cooldown.
+- `WORLD_ADMIN_READ_RATE_LIMIT`, `WORLD_ADMIN_DRAFT_WRITE_RATE_LIMIT`,
+  `WORLD_ADMIN_VALIDATION_RATE_LIMIT`, `WORLD_ADMIN_PUBLISH_RATE_LIMIT`, and
+  `WORLD_ADMIN_DERIVE_RATE_LIMIT` are durable database operation bounds. Publication is the
+  strictest operation.
 
 The browser applications use their `NEXT_PUBLIC_*_URL` values; port variables control only local
 process binding. Production public URLs and origin allowlists must use HTTPS/WSS. Cleartext HTTP/WS
@@ -123,14 +142,14 @@ application package invokes the root loader from its own `dev` script, so both `
 `pnpm --filter @starville/<application> dev` read the same root `.env.local`. No environment file is
 copied into an application directory.
 
-| Runtime          | Variables owned by the profile                                                                   |
-| ---------------- | ------------------------------------------------------------------------------------------------ |
-| Landing          | Landing/game/API/Supabase public values, public Reown ID, and `LANDING_PORT`                     |
-| Game client      | Landing/game/API/realtime/Supabase public values and `GAME_CLIENT_PORT`                          |
-| Admin portal     | Admin/API/game/Supabase public values, `ADMIN_PORT`, and the server-only recovery signing secret |
-| API              | API/CORS/log values, service-role key, admin controls, private RPC, token-cookie and gate limits |
-| Real-time server | Realtime bind/origin/capacity/log values                                                         |
-| Worker           | Worker bind/concurrency/retry/log values                                                         |
+| Runtime          | Variables owned by the profile                                                                                                            |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Landing          | Landing/game/API/Supabase public values, public Reown ID, and `LANDING_PORT`                                                              |
+| Game client      | Landing/game/API/realtime/Supabase public values and `GAME_CLIENT_PORT`                                                                   |
+| Admin portal     | Admin/API/game/Supabase public values, `ADMIN_PORT`, and the server-only recovery signing secret                                          |
+| API              | API/CORS/log values, service-role key, admin controls, private RPC, token-cookie/gate limits, operations health, and Phase 6 world limits |
+| Real-time server | Realtime bind/origin/capacity/log values                                                                                                  |
+| Worker           | Worker bind/concurrency/retry/log values                                                                                                  |
 
 The admin portal is a hybrid Next.js process. Its profile supplies `ADMIN_RECOVERY_COOKIE_SECRET`
 only for server route/action execution; Next.js exposes only `NEXT_PUBLIC_*` values to browser code.

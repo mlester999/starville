@@ -18,6 +18,8 @@ export interface VerifiedSupabaseIdentity {
   readonly authenticationMethods: readonly string[];
 }
 
+export type AdminDatabaseIdentity = VerifiedSupabaseIdentity;
+
 export type AdminAuthorizationDenialReason =
   'ADMIN_ACCESS_DENIED' | 'ADMIN_SESSION_INVALID' | 'MFA_REQUIRED' | 'MISSING_PERMISSION';
 
