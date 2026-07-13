@@ -5,6 +5,7 @@ import type { PlayerProfile } from '@starville/game-core';
 import type { LogContext, ServiceLogger } from '../contracts.js';
 import type { PublicApiError } from '../errors.js';
 import type { PlayerGateway } from './contracts.js';
+import { PlayerPersistenceError } from './gateway.js';
 import { createPlayerService } from './service.js';
 
 class SilentLogger implements ServiceLogger {
@@ -24,10 +25,13 @@ const profile: PlayerProfile = {
   displayName: 'Luna Vale',
   appearancePreset: 'moss',
   mapId: 'lantern-square',
+  mapVersionId: null,
   x: 12,
   y: 7.5,
   facingDirection: 'south',
   gameStateVersion: 1,
+  stateVersion: 1,
+  lastTransitionAt: null,
   createdAt: '2026-07-11T04:00:00.000Z',
   updatedAt: '2026-07-11T04:00:00.000Z',
   lastEnteredAt: '2026-07-11T04:00:00.000Z',
@@ -210,7 +214,9 @@ describe('player service', () => {
   it('does not leak persistence failures through raw errors', async () => {
     const gateway = createGateway();
     vi.mocked(gateway.loadEntry).mockRejectedValueOnce(new Error('private database detail'));
-    const service = createPlayerService({ gateway, logger: new SilentLogger() });
+    const logger = new SilentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const service = createPlayerService({ gateway, logger });
 
     await expect(service.loadEntry('server-wallet', 'request-failure', true)).rejects.toEqual(
       expect.objectContaining({
@@ -218,6 +224,45 @@ describe('player service', () => {
         statusCode: 503,
         message: 'The player service is temporarily unavailable.',
       } satisfies Partial<PublicApiError>),
+    );
+    expect(errorSpy).toHaveBeenCalledWith(
+      'player.persistence.unavailable',
+      expect.objectContaining({
+        operation: 'loadEntry',
+        stage: 'unknown',
+        failureName: 'Error',
+      }),
+    );
+    expect(JSON.stringify(errorSpy.mock.calls)).not.toContain('private database detail');
+  });
+
+  it('logs sanitized PlayerPersistenceError diagnostics for Phase 6 parse failures', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.loadEntry).mockRejectedValueOnce(
+      new PlayerPersistenceError('parse', 'load_player_entry_state', {
+        rpcName: 'load_player_entry_state',
+        parseIssues: ['profile.mapVersionId', 'profile.stateVersion'],
+      }),
+    );
+    const logger = new SilentLogger();
+    const errorSpy = vi.spyOn(logger, 'error');
+    const service = createPlayerService({ gateway, logger });
+
+    await expect(service.loadEntry('server-wallet', 'request-parse', true)).rejects.toEqual(
+      expect.objectContaining({
+        code: 'PLAYER_PERSISTENCE_UNAVAILABLE',
+        statusCode: 503,
+      }),
+    );
+    expect(errorSpy).toHaveBeenCalledWith(
+      'player.persistence.unavailable',
+      expect.objectContaining({
+        operation: 'loadEntry',
+        stage: 'parse',
+        rpcName: 'load_player_entry_state',
+        parseIssues: ['profile.mapVersionId', 'profile.stateVersion'],
+        failureName: 'PlayerPersistenceError',
+      }),
     );
   });
 });

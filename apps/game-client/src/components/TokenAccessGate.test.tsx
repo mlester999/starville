@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -33,6 +33,10 @@ vi.mock('./PlayerExperience', async () => {
     },
   };
 });
+
+vi.mock('./LiveOperationsBoundary', () => ({
+  LiveOperationsBoundary: ({ children }: { readonly children: ReactNode }) => children,
+}));
 
 let container: HTMLDivElement;
 let root: Root;
@@ -186,6 +190,40 @@ describe('TokenAccessGate bootstrap boundary', () => {
     expect(container.querySelector('canvas')).toBeNull();
     expect(runtimeLifecycle.destroyed).toBe(1);
     expect(container.textContent).not.toContain('Private player runtime');
+  });
+
+  it('keeps the protected runtime mounted when a background focus recheck fails temporarily', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: {
+            access: 'granted',
+            walletAddress: '11111111111111111111111111111111',
+            network: 'solana:mainnet-beta',
+            symbol: 'STAR',
+            requiredAmount: '1000',
+            observedAmount: '1000',
+            expiresAt: '2099-07-11T05:00:00.000Z',
+            recheckAfter: '2099-07-11T04:05:00.000Z',
+          },
+        }),
+      )
+      .mockRejectedValueOnce(new TypeError('network interrupted'));
+
+    await renderGate();
+    expect(container.querySelector('[data-testid="protected-player-experience"]')).not.toBeNull();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector('[data-testid="protected-player-experience"]')).not.toBeNull();
+    expect(runtimeLifecycle.destroyed).toBe(0);
+    expect(container.textContent).toContain('Private player runtime');
   });
 
   it('replaces the player experience when the trusted session changes wallet accounts', async () => {

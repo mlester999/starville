@@ -5,17 +5,25 @@ import type { OperationsSummary, PlayerActivity, PlayerDetail } from '@starville
 
 import { buildApiApp } from '../app.js';
 import type { AdminAuthGateway, LogContext, ServiceLogger } from '../contracts.js';
+import { PublicApiError } from '../errors.js';
 import type { AdminOperationsService } from './contracts.js';
 
 class SilentLogger implements ServiceLogger {
-  child(_bindings: LogContext): ServiceLogger {
-    return this;
+  constructor(
+    readonly entries: Array<{ readonly context: LogContext; readonly message: string }> = [],
+    private readonly bindings: LogContext = {},
+  ) {}
+
+  child(bindings: LogContext): ServiceLogger {
+    return new SilentLogger(this.entries, { ...this.bindings, ...bindings });
   }
   trace(_message: string): void {}
   debug(_message: string): void {}
   info(_message: string): void {}
   warn(_message: string): void {}
-  error(_message: string): void {}
+  error(message: string, context?: LogContext): void {
+    this.entries.push({ message, context: { ...this.bindings, ...context } });
+  }
   fatal(_message: string): void {}
 }
 
@@ -33,10 +41,13 @@ const playerDetail: PlayerDetail = {
     walletAddress: '11111111111111111111111111111111',
     appearancePreset: 'moonberry',
     mapId: 'lantern-square',
+    mapVersionId: '55555555-5555-4555-8555-555555555555',
     x: 12,
     y: 7.5,
     facingDirection: 'south',
     gameStateVersion: 1,
+    stateVersion: 1,
+    lastTransitionAt: null,
     createdAt: '2026-07-11T09:00:00.000Z',
     updatedAt: '2026-07-11T09:00:00.000Z',
     lastEnteredAt: '2026-07-11T09:00:00.000Z',
@@ -59,7 +70,15 @@ const playerDetail: PlayerDetail = {
   access: { activeSessions: 0, latestSessionStatus: null, latestSessionAt: null },
 };
 
-const playerActivity: PlayerActivity = { items: [], accessEvents: [], nextCursor: null };
+const playerActivity: PlayerActivity = {
+  items: [],
+  accessEvents: [],
+  accessPage: 1,
+  accessPageSize: 10,
+  accessTotal: 0,
+  accessTotalPages: 0,
+  nextCursor: null,
+};
 
 const operationsSummary: OperationsSummary = {
   generatedAt: '2026-07-11T10:00:00.000Z',
@@ -150,7 +169,11 @@ function operationsService(): AdminOperationsService {
 
 const apps: ReturnType<typeof buildApiApp>[] = [];
 
-function createApp(permissions: readonly AdminPermissionKey[], service = operationsService()) {
+function createApp(
+  permissions: readonly AdminPermissionKey[],
+  service = operationsService(),
+  logger = new SilentLogger(),
+) {
   const app = buildApiApp({
     config: {
       environment: 'test',
@@ -159,7 +182,7 @@ function createApp(permissions: readonly AdminPermissionKey[], service = operati
       corsAllowedOrigins: ['http://localhost:3002'],
       trustedProxyCidrs: [],
     },
-    logger: new SilentLogger(),
+    logger,
     adminAuthGateway: adminGateway(permissions),
     adminSessionTtlMinutes: 60,
     adminOperations: { service },
@@ -207,7 +230,51 @@ describe('administrator player routes', () => {
     });
 
     expect(denied.statusCode).toBe(403);
+    expect(denied.json()).toMatchObject({ error: { code: 'ADMIN_ACCESS_DENIED' } });
     expect(allowed.statusCode).toBe(200);
+    expect(allowed.json()).toMatchObject({
+      data: {
+        profile: {
+          mapId: 'lantern-square',
+          mapVersionId: '55555555-5555-4555-8555-555555555555',
+          stateVersion: 1,
+        },
+        moderation: { status: 'active' },
+        access: { activeSessions: 0 },
+      },
+    });
+  });
+
+  it('returns and logs a safe correlated player-detail service failure', async () => {
+    const service = operationsService();
+    const logger = new SilentLogger();
+    vi.mocked(service.getPlayer).mockRejectedValue(
+      new PublicApiError(503, 'OPERATIONS_UNAVAILABLE'),
+    );
+    const response = await createApp(['players.read'], service, logger).inject({
+      method: 'GET',
+      url: '/api/v1/admin/players/44444444-4444-4444-8444-444444444444',
+      headers: {
+        authorization: 'Bearer verified',
+        'x-request-id': 'phase5-test:local:detail',
+      },
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      error: { code: 'OPERATIONS_UNAVAILABLE' },
+      requestId: 'phase5-test:local:detail',
+    });
+    expect(logger.entries).toContainEqual({
+      message: 'api.request.failed',
+      context: expect.objectContaining({
+        requestId: 'phase5-test:local:detail',
+        method: 'GET',
+        path: '/api/v1/admin/players/44444444-4444-4444-8444-444444444444',
+        statusCode: 503,
+        error: expect.objectContaining({ code: 'OPERATIONS_UNAVAILABLE' }),
+      }),
+    });
   });
 
   it('requires both player-read and player-audit permissions for activity', async () => {
@@ -315,6 +382,40 @@ describe('administrator player routes', () => {
       '44444444-4444-4444-8444-444444444444',
       action,
       { expectedVersion: 1, reason: 'Reviewed operation reason' },
+      expect.any(String),
+    );
+  });
+
+  it('requires players.rename for a direct administrator rename', async () => {
+    const deniedService = operationsService();
+    const denied = await createApp(['players.require_rename'], deniedService).inject({
+      method: 'POST',
+      url: '/api/v1/admin/players/44444444-4444-4444-8444-444444444444/rename',
+      headers: { authorization: 'Bearer verified', origin: 'http://localhost:3002' },
+      payload: {
+        expectedVersion: 1,
+        reason: 'Reviewed direct rename reason',
+        displayName: 'Willow Vale',
+      },
+    });
+    const allowedService = operationsService();
+    const allowed = await createApp(['players.rename'], allowedService).inject({
+      method: 'POST',
+      url: '/api/v1/admin/players/44444444-4444-4444-8444-444444444444/rename',
+      headers: { authorization: 'Bearer verified', origin: 'http://localhost:3002' },
+      payload: {
+        expectedVersion: 1,
+        reason: 'Reviewed direct rename reason',
+        displayName: 'Willow Vale',
+      },
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(allowed.statusCode).toBe(200);
+    expect(allowedService.performPlayerAction).toHaveBeenCalledWith(
+      identity,
+      '44444444-4444-4444-8444-444444444444',
+      'rename',
+      { expectedVersion: 1, reason: 'Reviewed direct rename reason', displayName: 'Willow Vale' },
       expect.any(String),
     );
   });

@@ -33,4 +33,24 @@ describe('administrator token-access boundary', () => {
     expect(form).not.toMatch(/name=["'](?:rpc|rpcUrl|serviceRole|secret)/u);
     expect(form).toContain('server-owned RPC');
   });
+
+  it('locks Network to Solana Mainnet and does not offer Devnet in the administrator UI', () => {
+    const form = readSource('src/components/token-gate-form.tsx');
+
+    expect(form).toContain('LockedConfigField');
+    expect(form).toContain('Solana Mainnet');
+    expect(form).toContain('MAINNET');
+    expect(form).toContain('solana:mainnet-beta');
+    expect(form).not.toContain('Solana Devnet');
+    expect(form).not.toContain('solana:devnet');
+    expect(form).not.toMatch(/<select[\s>]/u);
+  });
+
+  it('locks RPC commitment as system-managed while preserving form submission fields', () => {
+    const form = readSource('src/components/token-gate-form.tsx');
+
+    expect(form).toContain('Managed by system configuration');
+    expect(form).toContain('name="commitment"');
+    expect(form).toContain('config.commitment');
+  });
 });

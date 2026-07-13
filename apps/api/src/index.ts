@@ -22,6 +22,14 @@ import { createSupabasePlayerWorldGateway } from './world/player-gateway.js';
 import { createPlayerWorldService } from './world/player-service.js';
 import { createSupabaseAdminWorldGateway } from './world/admin-gateway.js';
 import { createAdminWorldService } from './world/admin-service.js';
+import { createSupabaseLiveOperationsGateway } from './live-operations/gateway.js';
+import { createLiveOperationsService } from './live-operations/service.js';
+import { createAdminCozyService } from './cozy-gameplay/admin.js';
+import { createSupabaseCozyGameplayGateway } from './cozy-gameplay/gateway.js';
+import { createCozyGameplayService } from './cozy-gameplay/service.js';
+import { createSupabaseAdminAssetGateway } from './asset-management/gateway.js';
+import { createAdminAssetService } from './asset-management/service.js';
+import { createSupabaseAssetStorage } from './asset-management/storage.js';
 
 const config = loadApiConfig(process.env);
 const adminSecurity = loadAdminSecurityConfig(process.env);
@@ -38,13 +46,19 @@ const privilegedSupabase = createSupabaseServiceRoleClient({
   url: supabaseConfig.url,
   serviceRoleKey: supabaseConfig.serviceRoleKey,
 });
+const liveOperationsService = createLiveOperationsService({
+  gateway: createSupabaseLiveOperationsGateway(privilegedSupabase),
+  logger,
+});
 const adminAuthGateway = createSupabaseAdminAuthGateway(privilegedSupabase);
+const assetStorage = createSupabaseAssetStorage(privilegedSupabase);
 const playerWorldGateway = createSupabasePlayerWorldGateway(privilegedSupabase);
 const playerWorldService = createPlayerWorldService({
   gateway: playerWorldGateway,
   logger,
   manifestReadRateLimit: worldConfig.playerManifestReadRateLimit,
   transitionRateLimit: worldConfig.playerTransitionRateLimit,
+  publicAssetUrl: (path) => assetStorage.publicUrl(path),
 });
 const playerService = createPlayerService({
   gateway: createSupabasePlayerGateway(privilegedSupabase),
@@ -54,6 +68,11 @@ const playerService = createPlayerService({
     return world.manifest;
   },
 });
+const cozyGameplayService = createCozyGameplayService({
+  gateway: createSupabaseCozyGameplayGateway(privilegedSupabase),
+  logger,
+});
+const adminCozyService = createAdminCozyService(privilegedSupabase);
 const tokenAccessService = createTokenAccessService({
   environment: config.environment,
   config: tokenAccessConfig,
@@ -86,6 +105,13 @@ const adminWorldService = createAdminWorldService({
   publishRateLimit: worldConfig.adminPublishRateLimit,
   deriveRateLimit: worldConfig.adminDeriveRateLimit,
 });
+const adminAssetService = createAdminAssetService({
+  gateway: createSupabaseAdminAssetGateway(privilegedSupabase),
+  storage: assetStorage,
+  logger,
+  readRateLimit: worldConfig.adminReadRateLimit,
+  mutationRateLimit: worldConfig.adminDraftWriteRateLimit,
+});
 const service = createApiService({
   config,
   logger,
@@ -98,6 +124,7 @@ const service = createApiService({
     cookieMaxAgeSeconds: tokenAccessConfig.sessionTtlSeconds,
     playerService,
     worldService: playerWorldService,
+    cozyGameplayService,
   },
   adminOperations: {
     service: adminOperationsService,
@@ -107,6 +134,9 @@ const service = createApiService({
     service: adminWorldService,
     manifestMaximumBytes: worldConfig.manifestMaximumBytes,
   },
+  liveOperations: { service: liveOperationsService },
+  adminCozy: { service: adminCozyService },
+  adminAssets: { service: adminAssetService },
 });
 
 let isShuttingDown = false;

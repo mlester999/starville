@@ -4,13 +4,12 @@ Starville is a premium 2D isometric cozy multiplayer life-simulation game platfo
 contains the public website, player client, administrator portal, authoritative API, dedicated
 real-time service, background worker, shared packages, and Supabase infrastructure.
 
-The active implementation scope is **Phase 6 of 9: World Management, Multi-Map Travel, and Versioned
-Content**. Phase 4 implementation and owner gameplay acceptance are complete. Phase 5 implementation
-and hosted automated validation are complete; Phase 5 owner administrator acceptance remains
-pending. Phase 6 adds the local five-map published world graph, authoritative travel, versioned map
-storage, and protected administrator world-management workflow. Phase 6 hosted deployment and
-authenticated owner acceptance remain pending the maintenance gates. Phases 7 through 9 remain
-outside the current scope.
+The active implementation scope is **Phase 7.5A: World Asset Manager and Production Art Pipeline**.
+Phases 4–7 remain intact. Phase 7.5A adds the local, permission-controlled foundation for PNG/WebP
+intake, authoritative image validation, immutable derivatives and versions, review, activation,
+asset previews, and safe draft-world visual replacement. It does not include final production
+artwork or automatic asset/map publication. All new migrations remain local until an owner
+explicitly approves hosted deployment. Phases 8 and 9 remain outside the current scope.
 
 ## Requirements
 
@@ -202,11 +201,10 @@ pnpm rls:test:hosted
 Hosted tests use unique test-owned identities and exact-ID cleanup. They never reset the database,
 truncate tables, delete unknown Auth users, or use service role as the identity under RLS. This
 README does not replace command evidence; every hosted result must be reported by the current
-validation run. The approved development project currently has the additive Phase 4 and dependent
-Phase 5 migrations plus the Phase 6 schema migration in remote history. The remaining four Phase 6
-migrations are local and pending owner-authorized deployment. Any hosted operation remains subject
-to the owner gates and must be verified against the current migration list rather than assumed from
-this document.
+validation run. The current hosted migration state must be verified with `pnpm db:migrations:list`;
+this repository does not infer deployment from local files. All four Phase 7 migrations are local
+and pending owner-authorized deployment. Any hosted operation remains subject to the owner gates and
+must be verified against the current migration list rather than assumed from this document.
 
 See [the hosted development runbook](docs/deployment/hosted-supabase-development.md) for target
 verification, raw CLI command forms, hosted Auth redirects, fixture safety, and prohibited
@@ -231,7 +229,9 @@ packages/
   solana/               Server-only address, signature, mint, network, and balance verification
   game-core/            Renderer-agnostic map, movement, collision, depth, and player contracts
   game-content/         Five-map manifests, approved assets, and world-management contracts
+  asset-management/     Asset profiles, lifecycle, configuration, and safe delivery contracts
   player-operations/    Strict moderation, directory, audit, and operations contracts
+  cozy-gameplay/        Strict Phase 7 DUST, inventory, farm, shop, recipe, and home contracts
   database/             Migration and type-generation conventions
   design-tokens/        Shared visual primitives
   eslint-config/        Shared lint policy
@@ -249,9 +249,11 @@ infrastructure/
 docs/                   Product specification and focused architecture records
 ```
 
-Economy, analytics, and shared UI packages remain omitted until their approved phases require real
-implementation. The Phase 6 visual editor lives in the administrator application and reuses the
-canonical `game-core` and `game-content` contracts rather than creating a duplicate editor package.
+Analytics and shared UI packages remain omitted until their approved phases require real
+implementation. Phase 7 economy contracts live in the focused `cozy-gameplay` package rather than a
+speculative generic economy package. The Phase 6 visual editor lives in the administrator
+application and reuses the canonical `game-core` and `game-content` contracts rather than creating a
+duplicate editor package.
 
 ## Phase 4 behavior
 
@@ -346,6 +348,49 @@ owner-controlled wallet holding the configured threshold.
   reconcile to the active publication at the next safe load or transition; objects from two versions
   are never mixed in one scene.
 
+## Phase 7 behavior
+
+- A valid, non-maintenance player bootstrap creates one integer DUST account, an append-only ledger,
+  a 24-slot inventory, eight quickbar assignments, a permanent watering can, six private plots, one
+  pinned starter home, and one starter chair. The 250 DUST grant and starter items are exactly-once.
+- Item, crop, recipe, shop, offer, furniture, and home-template definitions are strict, versioned
+  content. Browser requests never provide prices, balances, readiness timestamps, yields, recipe
+  outputs, ownership decisions, or accepted furniture positions.
+- Database transactions and row locks keep purchases, sales, planting, watering, harvesting,
+  cooking, crafting, and furniture changes atomic and idempotent. Crop growth uses database time and
+  deterministic configured yields.
+- React owns the DUST HUD, persistent eight-slot quickbar, inventory, shop, recipe, farm, and
+  private-home panels without recreating Phaser. Typed `E` interactions remain data-only world
+  anchors; modal activity blocks movement and preserves keyboard focus rules.
+- Phase 7 interaction anchors exist only in new local derived world drafts. Existing published world
+  history remains unchanged, and normal players cannot load those draft interactions until an owner
+  explicitly validates and publishes them.
+- `/game-content` and player detail provide bounded, permission-protected, read-only Phase 7
+  visibility. There is no administrator DUST or inventory adjustment endpoint.
+- DUST is off-chain, non-transferable, non-withdrawable, unrelated to token-gate eligibility, and is
+  never displayed as `$DUST`. Phase 7 adds no `$STAR` reward or blockchain gameplay mutation.
+
+## Phase 7.5A behavior
+
+- Authorized operators can manage raster production candidates through a versioned directory,
+  upload/processing flow, configuration and isometric preview, review queue, approval, activation,
+  deprecation, references, and append-only audit history. Upload and every lifecycle action are
+  separately permission checked.
+- The trusted API accepts one bounded PNG/WebP, inspects actual decoded content, rejects animation,
+  malformed or excessive images, computes SHA-256, detects duplicates, strips metadata through
+  re-encoding, and produces normalized WebP delivery, preview, and thumbnail variants. Private
+  intake object identifiers are never exposed to browsers.
+- Asset identities have immutable versions. Map-version references pin the exact visual version;
+  activating a newer version cannot silently alter an existing published world. Public delivery
+  contains sanitized immutable derivatives only.
+- World Editor normally offers only active approved production versions. Development markers use an
+  explicit filter. Draft-only replacement preserves object identity, position, interactions,
+  destinations, and gameplay configuration, keeps collision by default, and synchronizes manifest
+  references in one undoable operation.
+- The game client can resolve version-pinned production delivery descriptors and falls back to the
+  existing procedural marker for an individual load failure without changing collision, saving,
+  travel, access, or server authority.
+
 ## Security foundation
 
 - Browser code can import only explicitly public environment values and anonymous/publishable
@@ -366,17 +411,18 @@ owner-controlled wallet holding the configured threshold.
 Read [the Phase 1 trust boundaries](docs/security/phase-1-trust-boundaries.md) before adding an
 external integration.
 
-## Intentionally not implemented in Phase 6
+## Intentionally not implemented in Phase 7.5A
 
-The following are **not started by design** in Phase 6:
+The following are **not started by design** in Phase 7.5A:
 
-- farming, harvesting, cooking, crafting, housing, inventory, equipment, quests, combat, NPC
-  schedules, or shops;
-- marketplace, STARDUST economy, Constellation Points, rewards, claims, or treasury operations;
+- equipment, quests, combat, animals, NPC schedules, player businesses, stamina, hunger, health, or
+  durability;
+- player marketplace, gifting, trading, Constellation Points, rewards, claims, or treasury
+  operations;
 - realtime player synchronization, chat, channels, friends, parties, guilds, trading, visits,
   leaderboards, or nearby-player interactions;
-- secure browser world-asset upload, production art, realtime collaborative editing, or arbitrary
-  new map-identity creation;
+- final production artwork, automated art generation, automatic asset/map approval or publication,
+  realtime collaborative editing, or arbitrary new map-identity creation;
 - administrator invitation/management UI, role editing, permission editing, session-listing UI, or a
   global administrator audit browser;
 - production Supabase setup, production deployment, and monitoring-provider configuration.
@@ -413,6 +459,19 @@ their pages, APIs, or business operations have been implemented.
 - [Phase 6 trust boundary](docs/security/phase-6-world-trust-boundary.md)
 - [Phase 6 migration runbook](docs/deployment/phase-6-world-migration.md)
 - [Phase 6 asset boundary](docs/assets/phase-6-world-assets.md)
+- [Phase 7 cozy architecture](docs/architecture/phase-7-cozy-gameplay.md)
+- [Phase 7 DUST and inventory integrity](docs/economy/phase-7-dust-and-inventory.md)
+- [Phase 7 gameplay loop](docs/game-design/phase-7-cozy-systems.md)
+- [Phase 7 API](docs/api/phase-7-cozy-gameplay-api.md)
+- [Phase 7 trust boundary](docs/security/phase-7-cozy-gameplay-boundary.md)
+- [Phase 7 migration runbook](docs/deployment/phase-7-cozy-gameplay-migration.md)
+- [Phase 7 manual acceptance](docs/deployment/phase-7-manual-qa.md)
+- [Phase 7.5A asset architecture](docs/architecture/phase-7-5a-world-assets.md)
+- [World Asset Manager guide and owner checklist](docs/assets/world-asset-manager.md)
+- [Phase 7.5A World Asset API](docs/api/phase-7-5a-world-assets-api.md)
+- [World asset storage security](docs/security/world-asset-storage.md)
+- [World asset administrator runbook](docs/admin/world-asset-runbook.md)
+- [Phase 7.5A deployment runbook](docs/deployment/phase-7-5a-world-assets.md)
 - [First Super Administrator bootstrap](docs/admin/admin-bootstrap.md)
 - [Roles and permissions](docs/admin/roles-and-permissions.md)
 - [Administrator authorization security](docs/security/admin-authorization.md)

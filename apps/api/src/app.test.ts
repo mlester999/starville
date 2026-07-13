@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { buildApiApp } from './app.js';
 import type { AdminAuthGateway, LogContext, ServiceLogger } from './contracts.js';
+import type { LiveOperationsService } from './live-operations/contracts.js';
 
 class SilentLogger implements ServiceLogger {
   child(_bindings: LogContext): ServiceLogger {
@@ -54,11 +55,74 @@ function createApp() {
   return app;
 }
 
+const liveOperations: LiveOperationsService = {
+  getPublic: async () => ({
+    maintenance: {
+      state: 'active',
+      active: true,
+      revision: 2,
+      title: 'SERVER PAUSED',
+      message: 'A safe player message.',
+      updateDetails: [],
+      expectedEndAt: null,
+      expectedReturnMessage: null,
+      showReturnToLanding: true,
+      ctaLabel: null,
+      ctaUrl: null,
+      updatedAt: '2026-07-13T00:00:00.000Z',
+    },
+    announcements: [],
+    generatedAt: '2026-07-13T00:00:00.000Z',
+  }),
+  getAdmin: async () => {
+    throw new Error('not used');
+  },
+  updateMaintenance: async () => {
+    throw new Error('not used');
+  },
+  saveAnnouncement: async () => {
+    throw new Error('not used');
+  },
+  setAnnouncementStatus: async () => {
+    throw new Error('not used');
+  },
+};
+
+function createLiveOperationsApp() {
+  const app = buildApiApp({
+    config: {
+      environment: 'test',
+      host: '127.0.0.1',
+      port: 4000,
+      corsAllowedOrigins: ['http://localhost:3000'],
+      trustedProxyCidrs: [],
+    },
+    logger: new SilentLogger(),
+    adminAuthGateway: inactiveAdminGateway,
+    adminSessionTtlMinutes: 60,
+    liveOperations: { service: liveOperations },
+  });
+  apps.push(app);
+  return app;
+}
+
 afterEach(async () => {
   await Promise.all(apps.splice(0).map(async (app) => app.close()));
 });
 
 describe('API foundation', () => {
+  it('returns a no-store server-authoritative maintenance snapshot', async () => {
+    const response = await createLiveOperationsApp().inject({
+      method: 'GET',
+      url: '/api/v1/live-operations',
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toContain('no-store');
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: { maintenance: { active: true, state: 'active' }, announcements: [] },
+    });
+  });
   it('returns a healthy response without exposing configuration', async () => {
     const response = await createApp().inject({ method: 'GET', url: '/health' });
 

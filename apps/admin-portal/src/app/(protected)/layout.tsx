@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
-import Link from 'next/link';
-
 import { AdminBrand } from '../../components/admin-brand';
+import { AdminNavigation } from '../../components/admin-navigation';
+import type { AdminNavigationItem } from '../../components/admin-navigation-state';
 import { SubmitButton } from '../../components/submit-button';
 import { requireAuthorizedAdmin } from '../../lib/auth/authorization';
 import { logoutAction } from '../actions/auth';
@@ -15,6 +15,23 @@ export const revalidate = 0;
 
 export default async function ProtectedLayout({ children }: ProtectedLayoutProps) {
   const context = await requireAuthorizedAdmin();
+  const navigation: AdminNavigationItem[] = [];
+  if (context.permissionKeys.includes('overview.read'))
+    navigation.push({ href: '/overview', label: 'Overview', exact: true });
+  if (context.permissionKeys.includes('operations.read'))
+    navigation.push({ href: '/operations', label: 'Operations' });
+  if (context.permissionKeys.includes('players.read'))
+    navigation.push({ href: '/players', label: 'Players' });
+  if (context.permissionKeys.includes('token_gate.read'))
+    navigation.push({ href: '/token-access', label: 'Token Access' });
+  if (context.permissionKeys.includes('maps.read'))
+    navigation.push({ href: '/worlds', label: 'Worlds' });
+  if (context.permissionKeys.includes('assets.read'))
+    navigation.push({ href: '/world-assets', label: 'World Assets' });
+  if (context.permissionKeys.includes('items.read'))
+    navigation.push({ href: '/game-content', label: 'Game Content' });
+  if (context.permissionKeys.includes('maps.audit_read'))
+    navigation.push({ href: '/world-audit', label: 'World Audit' });
 
   return (
     <div className="portal-shell">
@@ -30,27 +47,7 @@ export default async function ProtectedLayout({ children }: ProtectedLayoutProps
           </form>
         </div>
       </header>
-      <nav className="portal-nav" aria-label="Administrator navigation">
-        {context.permissionKeys.includes('overview.read') ? (
-          <Link href="/overview">Overview</Link>
-        ) : null}
-        {context.permissionKeys.includes('operations.read') ? (
-          <Link href="/operations">Operations</Link>
-        ) : null}
-        {context.permissionKeys.includes('players.read') ? (
-          <Link href="/players">Players</Link>
-        ) : null}
-        {context.permissionKeys.includes('token_gate.read') ? (
-          <Link href="/token-access">Token Access</Link>
-        ) : null}
-        {context.permissionKeys.includes('maps.read') ? <Link href="/worlds">Worlds</Link> : null}
-        {context.permissionKeys.includes('assets.read') ? (
-          <Link href="/world-assets">World Assets</Link>
-        ) : null}
-        {context.permissionKeys.includes('maps.audit_read') ? (
-          <Link href="/world-audit">World Audit</Link>
-        ) : null}
-      </nav>
+      <AdminNavigation items={navigation} />
       {children}
     </div>
   );

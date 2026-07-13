@@ -30,6 +30,7 @@ const options: GameRuntimeOptions = {
     manifest: lanternSquareManifest(),
     versionId: '11111111-1111-4111-8111-111111111111',
     checksum: 'a'.repeat(64),
+    assetDeliveries: [],
   },
   appearancePreset: 'moss',
   reducedMotion: false,
@@ -45,6 +46,7 @@ const options: GameRuntimeOptions = {
     onSettingsRequested() {},
     onExitRequested() {},
     onMapChanged() {},
+    onWorldAssetFallback() {},
   },
 };
 

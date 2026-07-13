@@ -5,6 +5,7 @@ import type { TokenAccessSessionView } from '@starville/wallet-access';
 
 import { buildApiApp } from '../app.js';
 import type { AdminAuthGateway, LogContext, ServiceLogger } from '../contracts.js';
+import { PublicApiError } from '../errors.js';
 import type { PlayerService } from './contracts.js';
 import type { RuntimeTokenGateConfig, TokenAccessService } from '../token-access/contracts.js';
 
@@ -33,10 +34,13 @@ const profile: PlayerProfile = {
   displayName: 'Luna Vale',
   appearancePreset: 'moonberry',
   mapId: 'lantern-square',
+  mapVersionId: null,
   x: 12,
   y: 7.5,
   facingDirection: 'south',
   gameStateVersion: 1,
+  stateVersion: 1,
+  lastTransitionAt: null,
   createdAt: '2026-07-11T04:00:00.000Z',
   updatedAt: '2026-07-11T04:00:00.000Z',
   lastEnteredAt: '2026-07-11T04:00:00.000Z',
@@ -266,6 +270,61 @@ describe('protected player routes', () => {
     expect(response.json()).toMatchObject({
       success: false,
       error: { code: 'PLAYER_SUSPENDED' },
+    });
+  });
+
+  it('returns a sanitized 503 when player persistence is unavailable', async () => {
+    const players = playerService();
+    vi.mocked(players.loadEntry).mockRejectedValue(
+      new PublicApiError(503, 'PLAYER_PERSISTENCE_UNAVAILABLE'),
+    );
+    const response = await createApp(tokenService(), players).inject({
+      method: 'GET',
+      url: '/api/v1/token-access/player/profile',
+    });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      success: false,
+      error: {
+        code: 'PLAYER_PERSISTENCE_UNAVAILABLE',
+        message: 'The player service is temporarily unavailable.',
+      },
+    });
+    expect(JSON.stringify(response.json())).not.toContain('mapVersionId');
+    expect(JSON.stringify(response.json())).not.toContain('Zod');
+    expect(JSON.stringify(response.json())).not.toContain('postgres');
+  });
+
+  it('allows a restored active player with Phase 6 multi-map profile fields', async () => {
+    const restoredProfile = {
+      ...profile,
+      mapVersionId: '55555555-5555-4555-8555-555555555555',
+      gameStateVersion: 3,
+      stateVersion: 3,
+      lastTransitionAt: '2026-07-12T12:00:00.000Z',
+    };
+    const players = playerService();
+    vi.mocked(players.loadEntry).mockResolvedValue({
+      entryState: 'active',
+      profile: restoredProfile,
+    });
+    const response = await createApp(tokenService(), players).inject({
+      method: 'GET',
+      url: '/api/v1/token-access/player/profile',
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      success: true,
+      data: {
+        entryState: 'active',
+        profile: {
+          mapVersionId: restoredProfile.mapVersionId,
+          stateVersion: 3,
+          lastTransitionAt: restoredProfile.lastTransitionAt,
+        },
+      },
     });
   });
 

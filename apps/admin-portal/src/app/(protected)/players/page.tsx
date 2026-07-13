@@ -3,6 +3,7 @@ import Link from 'next/link';
 
 import { MAP_IDS, type MapId } from '@starville/game-core';
 
+import { PremiumSelect } from '../../../components/premium-select';
 import { AdminApiError } from '../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../lib/auth/authorization';
 import { loadAdminPlayers } from '../../../lib/player-operations/api';
@@ -64,55 +65,87 @@ export default async function PlayersPage(props: {
           </label>
           <label>
             Moderation
-            <select defaultValue={query.status} name="status">
-              <option value="all">All states</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-            </select>
+            <PremiumSelect
+              aria-label="Moderation"
+              defaultValue={query.status}
+              name="status"
+              options={[
+                { value: 'all', label: 'All states' },
+                { value: 'active', label: 'Active' },
+                { value: 'suspended', label: 'Suspended' },
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Rename
-            <select defaultValue={query.rename} name="rename">
-              <option value="all">All</option>
-              <option value="required">Required</option>
-              <option value="clear">Not required</option>
-            </select>
+            <PremiumSelect
+              aria-label="Rename"
+              defaultValue={query.rename}
+              name="rename"
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'required', label: 'Required' },
+                { value: 'clear', label: 'Not required' },
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Recent entry
-            <select defaultValue={query.recentDays ?? ''} name="recentDays">
-              <option value="">Any time</option>
-              <option value="1">Last 24 hours</option>
-              <option value="7">Last 7 days</option>
-              <option value="30">Last 30 days</option>
-            </select>
+            <PremiumSelect
+              aria-label="Recent entry"
+              defaultValue={query.recentDays === undefined ? '' : String(query.recentDays)}
+              name="recentDays"
+              options={[
+                { value: '', label: 'Any time' },
+                { value: '1', label: 'Last 24 hours' },
+                { value: '7', label: 'Last 7 days' },
+                { value: '30', label: 'Last 30 days' },
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Map
-            <select defaultValue={query.mapId} name="mapId">
-              <option value="all">All maps</option>
-              {MAP_IDS.map((mapId) => (
-                <option key={mapId} value={mapId}>
-                  {MAP_LABELS[mapId]}
-                </option>
-              ))}
-            </select>
+            <PremiumSelect
+              aria-label="Map"
+              defaultValue={query.mapId}
+              name="mapId"
+              options={[
+                { value: 'all', label: 'All maps' },
+                ...MAP_IDS.map((mapId) => ({ value: mapId, label: MAP_LABELS[mapId] })),
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Sort
-            <select defaultValue={query.sort} name="sort">
-              <option value="last_entered_at">Last entered</option>
-              <option value="display_name">Display name</option>
-              <option value="created_at">Created</option>
-              <option value="moderation_status">Moderation</option>
-            </select>
+            <PremiumSelect
+              aria-label="Sort"
+              defaultValue={query.sort}
+              name="sort"
+              options={[
+                { value: 'last_entered_at', label: 'Last entered' },
+                { value: 'display_name', label: 'Display name' },
+                { value: 'created_at', label: 'Created' },
+                { value: 'moderation_status', label: 'Moderation' },
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Direction
-            <select defaultValue={query.direction} name="direction">
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
+            <PremiumSelect
+              aria-label="Direction"
+              defaultValue={query.direction}
+              name="direction"
+              options={[
+                { value: 'desc', label: 'Descending' },
+                { value: 'asc', label: 'Ascending' },
+              ]}
+              size="compact"
+            />
           </label>
           <input name="pageSize" type="hidden" value={query.pageSize} />
           <button className="button button--primary" type="submit">

@@ -8,6 +8,7 @@ import {
   worldDraftLoadSchema,
   worldDraftSchema,
   worldPreviewSchema,
+  publishedWorldTopologySchema,
   worldPublishResponseSchema,
   worldValidationResponseSchema,
 } from '@starville/game-content';
@@ -177,6 +178,11 @@ export function createAdminWorldService(options: {
             p_rate_limit: options.readRateLimit,
           }),
         ),
+      );
+    },
+    async getPublishedTopology(identity, requestId) {
+      return guarded(requestId, async () =>
+        parseResponse(publishedWorldTopologySchema, await gateway.getPublishedTopology(identity)),
       );
     },
     async getWorld(identity, mapId, requestId) {

@@ -6,10 +6,11 @@ import type {
   GameRuntimeCallbacks,
   GameRuntimeHandle,
   ExitTransitionRequest,
-  InteractionDialogue,
   InteractionPrompt,
   RuntimeWorld,
 } from '../game/contracts';
+import { WORLD_ASSET_FALLBACK_EVENT_NAME } from '../game/contracts';
+import type { WorldInteraction } from '@starville/game-core';
 import type { GameSettings } from '../app/game-settings';
 
 interface GameCanvasProps {
@@ -24,7 +25,7 @@ interface GameCanvasProps {
   readonly onCheckpoint: (state: PlayerStateUpdate) => void;
   readonly onFinalState: (state: PlayerStateUpdate) => void;
   readonly onInteractionTarget: (prompt: InteractionPrompt | null) => void;
-  readonly onInteractionOpen: (dialogue: InteractionDialogue) => void;
+  readonly onInteractionOpen: (interaction: WorldInteraction) => void;
   readonly onSettingsRequested: () => void;
   readonly onExitRequested: (request: ExitTransitionRequest) => void;
   readonly onMapChanged: (world: RuntimeWorld) => void;
@@ -48,6 +49,12 @@ export function GameCanvas(props: GameCanvasProps) {
     onSettingsRequested: props.onSettingsRequested,
     onExitRequested: props.onExitRequested,
     onMapChanged: props.onMapChanged,
+    onWorldAssetFallback: (event) =>
+      window.dispatchEvent(
+        new CustomEvent(WORLD_ASSET_FALLBACK_EVENT_NAME, {
+          detail: event,
+        }),
+      ),
   });
   callbacksRef.current = {
     onReady: props.onReady,
@@ -59,6 +66,12 @@ export function GameCanvas(props: GameCanvasProps) {
     onSettingsRequested: props.onSettingsRequested,
     onExitRequested: props.onExitRequested,
     onMapChanged: props.onMapChanged,
+    onWorldAssetFallback: (event) =>
+      window.dispatchEvent(
+        new CustomEvent(WORLD_ASSET_FALLBACK_EVENT_NAME, {
+          detail: event,
+        }),
+      ),
   };
   const lifecycleRef = useRef({
     onFinalState: props.onFinalState,
@@ -87,10 +100,11 @@ export function GameCanvas(props: GameCanvasProps) {
           onStateChanged: (state) => callbacksRef.current.onStateChanged(state),
           onCheckpoint: (state) => callbacksRef.current.onCheckpoint(state),
           onInteractionTarget: (prompt) => callbacksRef.current.onInteractionTarget(prompt),
-          onInteractionOpen: (dialogue) => callbacksRef.current.onInteractionOpen(dialogue),
+          onInteractionOpen: (interaction) => callbacksRef.current.onInteractionOpen(interaction),
           onSettingsRequested: () => callbacksRef.current.onSettingsRequested(),
           onExitRequested: (request) => callbacksRef.current.onExitRequested(request),
           onMapChanged: (world) => callbacksRef.current.onMapChanged(world),
+          onWorldAssetFallback: (event) => callbacksRef.current.onWorldAssetFallback(event),
         };
         runtimeRef.current = startGame(host, {
           initialState: initialStateRef.current,

@@ -5,6 +5,7 @@ export interface AdminWorldGateway {
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
+  getPublishedTopology(identity: AdminDatabaseIdentity): Promise<unknown>;
   getWorld(
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
@@ -49,6 +50,7 @@ export interface AdminWorldGateway {
 
 export interface AdminWorldService {
   listWorlds(identity: AdminDatabaseIdentity, query: unknown, requestId: string): Promise<unknown>;
+  getPublishedTopology(identity: AdminDatabaseIdentity, requestId: string): Promise<unknown>;
   getWorld(identity: AdminDatabaseIdentity, mapId: unknown, requestId: string): Promise<unknown>;
   getDraft(
     identity: AdminDatabaseIdentity,

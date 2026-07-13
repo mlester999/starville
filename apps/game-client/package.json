@@ -15,16 +15,19 @@
     "clean": "rimraf .turbo coverage dist tsconfig.tsbuildinfo"
   },
   "dependencies": {
+    "@starville/asset-management": "workspace:*",
+    "@starville/cozy-gameplay": "workspace:*",
     "@starville/config": "workspace:*",
     "@starville/design-tokens": "workspace:*",
     "@starville/game-core": "workspace:*",
     "@starville/game-content": "workspace:*",
+    "@starville/live-operations": "workspace:*",
     "@starville/player-operations": "workspace:*",
     "@starville/wallet-access": "workspace:*",
     "phaser": "3.90.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "zod": "4.1.12"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@starville/eslint-config": "workspace:*",

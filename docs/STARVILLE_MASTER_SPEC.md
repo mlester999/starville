@@ -47,7 +47,7 @@ STARVILLE
 
 Normal in-game currency:
 
-STARDUST
+DUST
 
 Blockchain token:
 
@@ -229,7 +229,7 @@ Players can:
 - Visit friends
 - Participate in festivals
 - Help restore the village
-- Earn STARDUST
+- Earn DUST
 - Earn Constellation Points
 - Become eligible for controlled $STAR rewards
 
@@ -274,7 +274,7 @@ Cook food and craft products
 ↓
 Complete NPC, player, business, and community orders
 ↓
-Earn STARDUST and progression rewards
+Earn DUST and progression rewards
 ↓
 Upgrade tools, land, house, recipes, and businesses
 ↓
@@ -828,7 +828,7 @@ Validate:
 - Object limits
 - Permissions
 
-Basic construction and expansion must remain available through normal gameplay and STARDUST.
+Basic construction and expansion must remain available through normal gameplay and DUST.
 
 Premium appearances may use $STAR, but must not block essential housing progression.
 
@@ -844,7 +844,7 @@ Players collectively contribute:
 - Stone
 - Food
 - Crafted materials
-- STARDUST
+- DUST
 - Event resources
 - Optional $STAR contributions
 
@@ -957,7 +957,7 @@ ECONOMY OVERVIEW
 
 STARVILLE uses three connected systems:
 
-1. STARDUST
+1. DUST
 2. CONSTELLATION POINTS
 3. $STAR
 
@@ -966,12 +966,12 @@ Each system has a separate purpose.
 Do not confuse them.
 
 ==================================================
-STARDUST
+DUST
 ==================================================
 
-STARDUST is the normal in-game currency.
+DUST is the normal in-game currency.
 
-STARDUST is:
+DUST is:
 
 - Off-chain
 - Not cryptocurrency
@@ -980,7 +980,7 @@ STARDUST is:
 - Earned through normal gameplay
 - Used for standard progression
 
-Players may earn STARDUST through:
+Players may earn DUST through:
 
 - Selling crops
 - Selling meals
@@ -998,7 +998,7 @@ Players may earn STARDUST through:
 - Seasonal activities
 - Marketplace sales where supported
 
-Players may spend STARDUST on:
+Players may spend DUST on:
 
 - Seeds
 - Animals
@@ -1019,9 +1019,9 @@ Players may spend STARDUST on:
 - Repairs
 - Services
 
-STARDUST must have recurring sources and sinks.
+DUST must have recurring sources and sinks.
 
-STARDUST must not automatically convert into $STAR.
+DUST must not automatically convert into $STAR.
 
 ==================================================
 CONSTELLATION POINTS
@@ -1548,7 +1548,7 @@ Use Supabase for:
 - Farming data
 - Housing data
 - Businesses
-- STARDUST ledgers
+- DUST ledgers
 - Constellation Point ledgers
 - Reward records
 - Game configuration
@@ -1995,7 +1995,7 @@ Examples:
 - Changing token-gate requirements
 - Approving a reward pool
 - Opening reward claims
-- Adjusting STARDUST
+- Adjusting DUST
 - Removing player items
 - Changing administrator roles
 - Publishing production maps
@@ -2028,7 +2028,7 @@ Example permissions:
 - assets.upload
 - assets.publish
 - economy.read
-- economy.adjust_stardust
+- economy.adjust_dust
 - economy.configure_rewards
 - rewards.simulate
 - rewards.approve
@@ -2153,7 +2153,7 @@ World
 - Assets
 
 Economy
-- STARDUST
+- DUST
 - Constellation Points
 - $STAR
 - Token Gate
@@ -2211,9 +2211,9 @@ Display real data for:
 - Token-gate attempts
 - Token-gate passes
 - Token-gate failures
-- STARDUST created
-- STARDUST spent
-- Current STARDUST supply
+- DUST created
+- DUST spent
+- Current DUST supply
 - Constellation Points issued
 - Current $STAR reward pool
 - Pending claims
@@ -2253,7 +2253,7 @@ For every player, authorized administrators may view:
 - Skills
 - Inventory
 - Equipped items
-- STARDUST balance
+- DUST balance
 - Constellation Points
 - $STAR reward history
 - Houses
@@ -2309,7 +2309,7 @@ Administrators with permission may:
 - Set categories
 - Set rarity
 - Set stack size
-- Set STARDUST value
+- Set DUST value
 - Set marketplace eligibility
 - Set tradability
 - Set giftability
@@ -2386,8 +2386,8 @@ History categories include:
 - Character created
 - Item acquired
 - Item removed
-- STARDUST earned
-- STARDUST spent
+- DUST earned
+- DUST spent
 - Constellation Points earned
 - Constellation Points removed
 - Reward allocated
@@ -2736,7 +2736,7 @@ The backend is authoritative for:
 - Cooking
 - Quests
 - Businesses
-- STARDUST
+- DUST
 - Constellation Points
 - Reward eligibility
 - Marketplace
@@ -2873,7 +2873,7 @@ Important entities include:
 - guilds
 - marketplace_listings
 - marketplace_transactions
-- stardust_ledger
+- dust_ledger
 - constellation_point_ledger
 - reward_periods
 - reward_allocations
@@ -2941,10 +2941,10 @@ ECONOMY ADMINISTRATION
 
 The admin portal must include:
 
-- STARDUST sources
-- STARDUST sinks
-- STARDUST issuance
-- STARDUST spending
+- DUST sources
+- DUST sinks
+- DUST issuance
+- DUST spending
 - Inflation reports
 - Item pricing
 - Shop pricing
@@ -3313,7 +3313,7 @@ PHASE 4: BASIC GAME VERTICAL SLICE
 - Watering
 - Harvesting
 - Inventory update
-- STARDUST reward
+- DUST reward
 - Persistence
 
 PHASE 5: ADMIN OPERATIONS
@@ -3348,18 +3348,32 @@ PHASE 6: WORLD MANAGEMENT
 - Approximately one-to-two-second fade/travel presentation with truthful loading and safe failure recovery
 - No arbitrary client-selected destination or immediate arrival re-trigger loop
 
+Phase 6 live-operations extension:
+
+- Server-authoritative immediate and scheduled game maintenance using database timestamps
+- Fixed nonblank application fallback when trusted maintenance configuration is unavailable
+- Distinct maintenance denial for new playable-world bootstrap without changing wallet, token,
+  moderation, rename, or saved player state
+- Existing clients reconcile maintenance every 30 seconds and on focus or visibility changes
+- Admin-managed draft, scheduled, active, expired, deactivated, and archived announcements
+- Responsive game announcement ticker with severity, priority, safe CTA, reduced motion, and
+  device-local per-revision dismissal
+- Narrow live-operations read/manage permissions and append-only mutation audit history
+- Admin portal and landing page remain available during game maintenance
+- No maintenance bypass until a trusted administrator-to-player-wallet identity boundary exists
+
 PHASE 7: COZY SYSTEMS
 
-- Expanded farming
-- Animals
-- Cooking
-- Crafting
-- Quests
-- NPC shops
-- Item definitions
-- House building
-- Furniture placement
-- Player businesses
+- Off-chain DUST account and append-only ledger
+- Strict item definitions and persistent inventory
+- Persistent eight-slot quickbar
+- Six private farming plots with planting, watering, server-time growth, and deterministic harvesting
+- Four cooking recipes and two basic crafting recipes
+- One fixed-price, server-authoritative seed and general-goods system shop
+- One private, version-pinned starter-home instance per player
+- Owned furniture placement, movement, rotation, and removal
+- Read-only administrator gameplay and content visibility
+- No animals, quests, player businesses, trading, social multiplayer, or play-to-earn in this phase
 
 PHASE 8: SOCIAL MULTIPLAYER
 
@@ -3434,7 +3448,7 @@ The first complete vertical slice must include:
 32. Planting
 33. Watering
 34. Harvesting
-35. STARDUST reward
+35. DUST reward
 36. Inventory persistence
 37. Player account lookup
 38. Player wallet view

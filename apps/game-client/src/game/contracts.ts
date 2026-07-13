@@ -4,6 +4,7 @@ import type {
   PlayerStateUpdate,
   WorldInteraction,
 } from '@starville/game-core';
+import type { WorldAssetDelivery } from '@starville/asset-management';
 
 export interface InteractionPrompt {
   readonly id: string;
@@ -20,6 +21,7 @@ export interface RuntimeWorld {
   readonly manifest: MapManifest;
   readonly versionId: string;
   readonly checksum: string;
+  readonly assetDeliveries: readonly WorldAssetDelivery[];
 }
 
 export interface ExitTransitionRequest {
@@ -29,16 +31,30 @@ export interface ExitTransitionRequest {
   readonly destinationLabel: string | null;
 }
 
+/**
+ * Sanitized, non-fatal runtime signal for an immutable production texture that
+ * could not be loaded. Delivery URLs, checksums, loader internals, and network
+ * errors are intentionally excluded from this browser-observable boundary.
+ */
+export interface WorldAssetFallbackEvent {
+  readonly code: 'WORLD_ASSET_LOAD_FAILED';
+  readonly assetKey: string;
+  readonly versionId: string;
+}
+
+export const WORLD_ASSET_FALLBACK_EVENT_NAME = 'starville:world-asset-fallback';
+
 export interface GameRuntimeCallbacks {
   readonly onReady: () => void;
   readonly onError: (message: string) => void;
   readonly onStateChanged: (state: PlayerStateUpdate) => void;
   readonly onCheckpoint: (state: PlayerStateUpdate) => void;
   readonly onInteractionTarget: (prompt: InteractionPrompt | null) => void;
-  readonly onInteractionOpen: (dialogue: InteractionDialogue) => void;
+  readonly onInteractionOpen: (interaction: WorldInteraction) => void;
   readonly onSettingsRequested: () => void;
   readonly onExitRequested: (request: ExitTransitionRequest) => void;
   readonly onMapChanged: (world: RuntimeWorld) => void;
+  readonly onWorldAssetFallback: (event: WorldAssetFallbackEvent) => void;
 }
 
 export interface MasterAudioSettings {

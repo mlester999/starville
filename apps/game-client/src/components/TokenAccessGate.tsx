@@ -10,6 +10,7 @@ import {
   type TrustedTokenAccess,
 } from '../app/token-access-client';
 import { PlayerExperience } from './PlayerExperience';
+import { LiveOperationsBoundary } from './LiveOperationsBoundary';
 
 interface TokenAccessGateProps {
   readonly apiUrl: string;
@@ -18,15 +19,30 @@ interface TokenAccessGateProps {
 
 const SESSION_RECONCILE_INTERVAL_MS = 30_000;
 
+function isConfirmedAccessDenial(error: unknown): boolean {
+  return error instanceof GameAccessRequestError && error.status === 401;
+}
+
 export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
   const [screen, setScreen] = useState<GateScreen>('checking');
   const [access, setAccess] = useState<TrustedTokenAccess>();
   const [rechecking, setRechecking] = useState(false);
+  const [connectionWarning, setConnectionWarning] = useState(false);
   const activeRequest = useRef<AbortController | undefined>(undefined);
+  const lastGrantedAccess = useRef<TrustedTokenAccess | undefined>(undefined);
+  const maintenanceFlush = useRef<(() => Promise<void>) | undefined>(undefined);
+  const flushBeforeMaintenance = useCallback(
+    () => maintenanceFlush.current?.() ?? Promise.resolve(),
+    [],
+  );
 
   const applyAccess = useCallback((nextAccess: TrustedTokenAccess) => {
     setAccess(nextAccess);
     setScreen(screenForAccess(nextAccess));
+    if (nextAccess.access === 'granted') {
+      lastGrantedAccess.current = nextAccess;
+      setConnectionWarning(false);
+    }
   }, []);
 
   const checkSession = useCallback(
@@ -34,20 +50,29 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
       activeRequest.current?.abort();
       const controller = new AbortController();
       activeRequest.current = controller;
+      // Never flip a playable session into the blocking gate loader for background rechecks.
       if (!background) setScreen('checking');
       setRechecking(background);
 
       try {
         applyAccess(await loadTrustedTokenAccess(apiUrl, controller.signal));
       } catch (error) {
-        if (!controller.signal.aborted) {
-          setAccess(undefined);
-          setScreen(
-            error instanceof GameAccessRequestError && error.status === 401
-              ? 'required'
-              : 'unavailable',
-          );
+        if (controller.signal.aborted) return;
+
+        if (
+          background &&
+          lastGrantedAccess.current?.access === 'granted' &&
+          !isConfirmedAccessDenial(error)
+        ) {
+          // Temporary network failure: keep last trusted grant and warn softly.
+          setConnectionWarning(true);
+          return;
         }
+
+        lastGrantedAccess.current = undefined;
+        setAccess(undefined);
+        setConnectionWarning(false);
+        setScreen(isConfirmedAccessDenial(error) ? 'required' : 'unavailable');
       } finally {
         if (activeRequest.current === controller) {
           activeRequest.current = undefined;
@@ -66,11 +91,18 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
 
     try {
       applyAccess(await recheckTrustedTokenAccess(apiUrl, controller.signal));
-    } catch {
-      if (!controller.signal.aborted) {
-        setAccess(undefined);
-        setScreen('unavailable');
+    } catch (error) {
+      if (controller.signal.aborted) return;
+
+      if (lastGrantedAccess.current?.access === 'granted' && !isConfirmedAccessDenial(error)) {
+        setConnectionWarning(true);
+        return;
       }
+
+      lastGrantedAccess.current = undefined;
+      setAccess(undefined);
+      setConnectionWarning(false);
+      setScreen('unavailable');
     } finally {
       if (activeRequest.current === controller) {
         activeRequest.current = undefined;
@@ -82,7 +114,9 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
   useEffect(() => {
     void checkSession(false);
     return () => activeRequest.current?.abort();
-  }, [checkSession]);
+    // Initial bootstrap only — checkSession identity changes should not restart cold load.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional cold-start mount
+  }, [apiUrl]);
 
   useEffect(() => {
     if (access?.access !== 'granted' || access.recheckAfter === undefined) {
@@ -106,7 +140,10 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
 
   useEffect(() => {
     function reconcileSession() {
-      if (document.visibilityState === 'visible') {
+      if (
+        document.visibilityState === 'visible' &&
+        lastGrantedAccess.current?.access === 'granted'
+      ) {
         void checkSession(true);
       }
     }
@@ -122,35 +159,22 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
 
   const leaveVillage = useCallback(async () => {
     activeRequest.current?.abort();
+    lastGrantedAccess.current = undefined;
     setAccess(undefined);
+    setConnectionWarning(false);
     setScreen('checking');
     try {
       await revokeTrustedTokenAccess(apiUrl);
       setScreen('required');
-    } catch (error) {
+    } catch {
       setScreen('unavailable');
-      throw error;
     }
   }, [apiUrl]);
 
   const handleAccessInvalid = useCallback(() => {
+    lastGrantedAccess.current = undefined;
     void checkSession(false);
   }, [checkSession]);
-
-  if (screen === 'granted' && access?.access === 'granted') {
-    return (
-      <PlayerExperience
-        access={access}
-        apiUrl={apiUrl}
-        key={`${access.walletAddress}:${access.network}`}
-        landingUrl={landingUrl}
-        onAccessInvalid={handleAccessInvalid}
-        onLeaveVillage={leaveVillage}
-        onRecheck={recheckSession}
-        rechecking={rechecking}
-      />
-    );
-  }
 
   const stateCopy = {
     checking: {
@@ -188,33 +212,59 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
     },
   }[screen];
 
-  return (
-    <main className="gate-shell">
-      <div className="gate-constellation" aria-hidden="true" />
-      <section className="gate-card" aria-labelledby="gate-title" aria-live="polite">
-        <div className="gate-mark" aria-hidden="true">
-          ✦
-        </div>
-        <p className="game-kicker">{stateCopy.kicker}</p>
-        <h1 id="gate-title">{stateCopy.title}</h1>
-        <p>{stateCopy.description}</p>
+  const playable = screen === 'granted' && access?.access === 'granted';
 
-        {screen === 'checking' ? (
-          <span className="game-loader" aria-label="Checking access" />
-        ) : (
-          <div className="gate-actions">
-            <a className="gate-primary" href={landingUrl}>
-              Go to Starville
-              <span aria-hidden="true">→</span>
-            </a>
-            {screen === 'unavailable' ? (
-              <button type="button" onClick={() => void checkSession()}>
-                Try again
-              </button>
-            ) : null}
-          </div>
-        )}
-      </section>
-    </main>
+  return (
+    <LiveOperationsBoundary
+      apiUrl={apiUrl}
+      beforeMaintenance={flushBeforeMaintenance}
+      connectionWarning={connectionWarning && playable}
+      landingUrl={landingUrl}
+      sessionSyncing={rechecking && playable}
+    >
+      {playable ? (
+        <PlayerExperience
+          access={access}
+          apiUrl={apiUrl}
+          key={`${access.walletAddress}:${access.network}`}
+          landingUrl={landingUrl}
+          onAccessInvalid={handleAccessInvalid}
+          onLeaveVillage={leaveVillage}
+          onRegisterMaintenanceFlush={(handler) => {
+            maintenanceFlush.current = handler;
+          }}
+          onRecheck={recheckSession}
+          rechecking={rechecking}
+        />
+      ) : (
+        <main className="gate-shell">
+          <div className="gate-constellation" aria-hidden="true" />
+          <section className="gate-card" aria-labelledby="gate-title" aria-live="polite">
+            <div className="gate-mark" aria-hidden="true">
+              ✦
+            </div>
+            <p className="game-kicker">{stateCopy.kicker}</p>
+            <h1 id="gate-title">{stateCopy.title}</h1>
+            <p>{stateCopy.description}</p>
+
+            {screen === 'checking' ? (
+              <span className="game-loader" aria-label="Checking access" />
+            ) : (
+              <div className="gate-actions">
+                <a className="gate-primary" href={landingUrl}>
+                  Go to Starville
+                  <span aria-hidden="true">→</span>
+                </a>
+                {screen === 'unavailable' ? (
+                  <button type="button" onClick={() => void checkSession()}>
+                    Try again
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </section>
+        </main>
+      )}
+    </LiveOperationsBoundary>
   );
 }

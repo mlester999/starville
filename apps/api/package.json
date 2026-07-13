@@ -20,11 +20,15 @@
   "dependencies": {
     "@fastify/cookie": "11.1.1",
     "@fastify/cors": "^11.3.0",
+    "@fastify/multipart": "10.1.0",
     "@starville/admin-auth": "workspace:*",
+    "@starville/asset-management": "workspace:*",
     "@starville/config": "workspace:*",
+    "@starville/cozy-gameplay": "workspace:*",
     "@starville/game-core": "workspace:*",
     "@starville/game-content": "workspace:*",
     "@starville/logger": "workspace:*",
+    "@starville/live-operations": "workspace:*",
     "@starville/player-operations": "workspace:*",
     "@starville/solana": "workspace:*",
     "@starville/shared-types": "workspace:*",
@@ -32,6 +36,7 @@
     "@starville/wallet-access": "workspace:*",
     "@supabase/supabase-js": "^2.110.1",
     "fastify": "^5.10.0",
+    "sharp": "0.34.5",
     "zod": "^4.1.12"
   },
   "devDependencies": {

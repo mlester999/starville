@@ -60,6 +60,13 @@ export default async function OperationsPage() {
           </div>
           <span className="permission-badge">Observed {formatDate(summary.generatedAt)}</span>
         </header>
+        {hasAdminPermission(context, 'live_operations.read') ? (
+          <p>
+            <Link className="button button--primary" href="/operations/live">
+              Manage live operations
+            </Link>
+          </p>
+        ) : null}
 
         <section aria-labelledby="metrics-title">
           <h2 id="metrics-title">Measured state</h2>

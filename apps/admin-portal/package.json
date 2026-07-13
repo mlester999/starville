@@ -15,10 +15,13 @@
   },
   "dependencies": {
     "@starville/admin-auth": "workspace:*",
+    "@starville/asset-management": "workspace:*",
     "@starville/config": "workspace:*",
+    "@starville/cozy-gameplay": "workspace:*",
     "@starville/design-tokens": "workspace:*",
     "@starville/game-content": "workspace:*",
     "@starville/game-core": "workspace:*",
+    "@starville/live-operations": "workspace:*",
     "@starville/player-operations": "workspace:*",
     "@starville/supabase": "workspace:*",
     "@starville/wallet-access": "workspace:*",

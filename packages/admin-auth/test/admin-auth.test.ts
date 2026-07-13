@@ -36,8 +36,24 @@ const authorized = {
 describe('admin authorization catalog', () => {
   it('contains the required stable roles and permission catalog', () => {
     expect(ADMIN_ROLE_KEYS).toHaveLength(12);
-    expect(ADMIN_PERMISSION_KEYS).toHaveLength(46);
+    expect(ADMIN_PERMISSION_KEYS).toHaveLength(59);
     expect(INITIAL_ROLE_PERMISSIONS.super_admin).toEqual(ADMIN_PERMISSION_KEYS);
+  });
+
+  it('keeps live-operations mutation authority narrow', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining([
+        'live_operations.read',
+        'live_operations.manage',
+        'announcements.read',
+        'announcements.manage',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toEqual(
+      expect.arrayContaining(['live_operations.read', 'announcements.read']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('live_operations.manage');
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('announcements.manage');
   });
 
   it('keeps sensitive permissions out of the read-only role', () => {
@@ -50,6 +66,29 @@ describe('admin authorization catalog', () => {
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('maps.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.preview');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.audit_read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('assets.audit_read');
+  });
+
+  it('separates asset upload, review, approval, and activation authority', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'assets.upload',
+        'assets.edit',
+        'assets.validate',
+        'assets.review',
+        'assets.approve',
+        'assets.activate',
+        'assets.deprecate',
+        'assets.audit_read',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.asset_manager).toEqual(
+      expect.arrayContaining(['assets.upload', 'assets.approve', 'assets.activate']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toContain('assets.read');
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('assets.upload');
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('assets.approve');
+    expect(INITIAL_ROLE_PERMISSIONS.customer_support).not.toContain('assets.edit');
   });
 
   it('keeps Phase 6 world permissions narrow and role-specific', () => {
@@ -79,6 +118,7 @@ describe('admin authorization catalog', () => {
       restore: 'players.suspend',
       'reset-position': 'players.reset_position',
       'require-rename': 'players.require_rename',
+      rename: 'players.rename',
       'revoke-sessions': 'players.manage_sessions',
     });
   });

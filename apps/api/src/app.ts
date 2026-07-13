@@ -1,5 +1,6 @@
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
 import type { AdminAuthGateway, ApiRuntimeConfig, ServiceLogger } from './contracts.js';
 import { formatApiError, formatNotFoundError } from './errors.js';
@@ -20,6 +21,15 @@ import type { PlayerWorldService } from './world/player-contracts.js';
 import { registerPlayerWorldRoutes } from './routes/world.js';
 import type { AdminWorldService } from './world/admin-contracts.js';
 import { registerAdminWorldRoutes } from './routes/admin-worlds.js';
+import type { LiveOperationsService } from './live-operations/contracts.js';
+import { registerLiveOperationsRoutes } from './routes/live-operations.js';
+import type { CozyGameplayService } from './cozy-gameplay/contracts.js';
+import { FixedWindowPlayerRateLimiter } from './cozy-gameplay/rate-limit.js';
+import { registerCozyGameplayRoutes } from './routes/cozy-gameplay.js';
+import type { AdminCozyService } from './cozy-gameplay/admin.js';
+import { registerAdminCozyGameplayRoutes } from './routes/admin-cozy-gameplay.js';
+import type { AdminAssetService } from './asset-management/contracts.js';
+import { registerAdminAssetRoutes } from './routes/admin-assets.js';
 
 export interface ApiTokenAccessOptions {
   readonly service: TokenAccessService;
@@ -28,6 +38,7 @@ export interface ApiTokenAccessOptions {
   readonly cookieMaxAgeSeconds: number;
   readonly playerService?: PlayerService;
   readonly worldService?: PlayerWorldService;
+  readonly cozyGameplayService?: CozyGameplayService;
 }
 
 export interface BuildApiAppOptions {
@@ -44,6 +55,9 @@ export interface BuildApiAppOptions {
     readonly service: AdminWorldService;
     readonly manifestMaximumBytes: number;
   };
+  readonly liveOperations?: { readonly service: LiveOperationsService };
+  readonly adminCozy?: { readonly service: AdminCozyService };
+  readonly adminAssets?: { readonly service: AdminAssetService };
 }
 
 function requestPath(url: string): string {
@@ -58,6 +72,9 @@ export function buildApiApp({
   tokenAccess,
   adminOperations,
   adminWorld,
+  liveOperations,
+  adminCozy,
+  adminAssets,
 }: BuildApiAppOptions): FastifyInstance {
   const allowedOrigins = new Set(config.corsAllowedOrigins);
   const app = Fastify({
@@ -67,6 +84,15 @@ export function buildApiApp({
   });
 
   void app.register(cookie);
+  if (adminAssets !== undefined) {
+    void app.register(multipart, {
+      limits: {
+        files: 1,
+        fields: 1,
+        parts: 2,
+      },
+    });
+  }
   void app.register(cors, {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'],
@@ -111,6 +137,14 @@ export function buildApiApp({
 
   registerHealthRoutes(app, config);
   registerStatusRoutes(app);
+  if (liveOperations !== undefined) {
+    registerLiveOperationsRoutes(app, {
+      service: liveOperations.service,
+      adminGateway: adminAuthGateway,
+      logger,
+      allowedOrigins,
+    });
+  }
   registerAdminRoutes(app, {
     gateway: adminAuthGateway,
     logger,
@@ -135,6 +169,14 @@ export function buildApiApp({
       logger,
       readLimiter,
     });
+    if (adminCozy !== undefined) {
+      registerAdminCozyGameplayRoutes(app, {
+        adminGateway: adminAuthGateway,
+        service: adminCozy.service,
+        logger,
+        readLimiter,
+      });
+    }
   }
 
   if (adminWorld !== undefined) {
@@ -144,6 +186,16 @@ export function buildApiApp({
       logger,
       allowedOrigins,
       manifestMaximumBytes: adminWorld.manifestMaximumBytes,
+      includeLegacyAssetDirectory: adminAssets === undefined,
+    });
+  }
+
+  if (adminAssets !== undefined) {
+    registerAdminAssetRoutes(app, {
+      adminGateway: adminAuthGateway,
+      service: adminAssets.service,
+      logger,
+      allowedOrigins,
     });
   }
 
@@ -171,6 +223,7 @@ export function buildApiApp({
           maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
         },
         allowedOrigins,
+        ...(liveOperations === undefined ? {} : { liveOperationsService: liveOperations.service }),
       });
       if (tokenAccess.worldService !== undefined) {
         registerPlayerWorldRoutes(app, {
@@ -182,6 +235,23 @@ export function buildApiApp({
             maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
           },
           allowedOrigins,
+        });
+      }
+      if (tokenAccess.cozyGameplayService !== undefined) {
+        registerCozyGameplayRoutes(app, {
+          service: tokenAccess.cozyGameplayService,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          allowedOrigins,
+          readLimiter: new FixedWindowPlayerRateLimiter(120, 60_000),
+          mutationLimiter: new FixedWindowPlayerRateLimiter(30, 60_000),
+          ...(liveOperations === undefined
+            ? {}
+            : { liveOperationsService: liveOperations.service }),
         });
       }
     }

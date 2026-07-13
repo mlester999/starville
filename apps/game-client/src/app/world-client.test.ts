@@ -54,6 +54,7 @@ describe('published world client boundary', () => {
     globalThis.fetch = vi.fn(async () => success(lanternWorld));
     await expect(loadCurrentPublishedWorld('http://localhost:4000')).resolves.toMatchObject({
       map: { slug: 'lantern-square' },
+      assetDeliveries: [],
       playerState: { mapVersionId: lanternVersionId },
     });
     expect(globalThis.fetch).toHaveBeenCalledWith(
@@ -78,6 +79,56 @@ describe('published world client boundary', () => {
         'http://localhost:4000/api/v1/token-access/player/world/maps/lantern-square/manifest',
       ),
       expect.objectContaining({ method: 'GET' }),
+    );
+  });
+
+  it('accepts only version-pinned production deliveries declared by the manifest', async () => {
+    const manifest = {
+      ...lanternWorld.manifest,
+      assets: [...lanternWorld.manifest.assets, 'moonpetal-cottage'],
+      objects: [
+        { ...lanternWorld.manifest.objects[0]!, assetId: 'moonpetal-cottage' },
+        ...lanternWorld.manifest.objects.slice(1),
+      ],
+    };
+    const delivery = {
+      assetKey: 'moonpetal-cottage',
+      versionId: '55555555-5555-4555-8555-555555555555',
+      checksum: 'c'.repeat(64),
+      url: 'https://assets.example.test/storage/v1/object/public/game-assets/starville/moonpetal-cottage/v1/source.webp',
+      mediaType: 'image/webp',
+      width: 1024,
+      height: 1024,
+      renderWidth: 256,
+      renderHeight: 256,
+      scale: 1,
+      anchorX: 0.5,
+      anchorY: 1,
+      footAnchorX: 0.5,
+      footAnchorY: 1,
+      depthAnchorX: 0.5,
+      depthAnchorY: 1,
+      collision: { shape: 'none', blocking: false },
+      supportedRotations: [0],
+      defaultRotation: 0,
+      developmentMarker: false,
+    } as const;
+
+    globalThis.fetch = vi.fn(async () =>
+      success({ ...lanternWorld, manifest, assetDeliveries: [delivery] }),
+    );
+    await expect(loadCurrentPublishedWorld('http://localhost:4000')).resolves.toMatchObject({
+      assetDeliveries: [{ assetKey: 'moonpetal-cottage', versionId: delivery.versionId }],
+    });
+
+    globalThis.fetch = vi.fn(async () =>
+      success({
+        ...lanternWorld,
+        assetDeliveries: [{ ...delivery, assetKey: 'undeclared-production-asset' }],
+      }),
+    );
+    await expect(loadCurrentPublishedWorld('http://localhost:4000')).rejects.toEqual(
+      expect.objectContaining({ code: 'INVALID_WORLD_RESPONSE', status: 502 }),
     );
   });
 

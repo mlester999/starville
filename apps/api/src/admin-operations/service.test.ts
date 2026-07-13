@@ -130,6 +130,51 @@ describe('admin operations service', () => {
     expect(target.performPlayerAction).not.toHaveBeenCalled();
   });
 
+  it('normalizes server-side access pagination and accepts only reviewed page sizes', async () => {
+    const { target, service } = createService();
+    vi.mocked(target.getPlayerActivity).mockResolvedValue({
+      items: [],
+      accessEvents: [],
+      accessPage: 3,
+      accessPageSize: 50,
+      accessTotal: 0,
+      accessTotalPages: 0,
+      nextCursor: null,
+    });
+    await service.getPlayerActivity(identity, actionResult.playerId, {
+      limit: '25',
+      accessPage: '3',
+      accessPageSize: '50',
+    });
+    expect(target.getPlayerActivity).toHaveBeenCalledWith(identity, actionResult.playerId, {
+      limit: 25,
+      accessPage: 3,
+      accessPageSize: 50,
+    });
+    await expect(
+      service.getPlayerActivity(identity, actionResult.playerId, { accessPageSize: '20' }),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_PLAYER_OPERATION' }));
+  });
+
+  it('requires a display name only for the narrowly scoped rename action', async () => {
+    const { target, service } = createService();
+    await service.performPlayerAction(
+      identity,
+      actionResult.playerId,
+      'rename',
+      { expectedVersion: 1, reason: 'Reviewed direct rename reason', displayName: 'Willow Vale' },
+      'rename-request',
+    );
+    expect(target.performPlayerAction).toHaveBeenCalledWith(
+      identity,
+      actionResult.playerId,
+      'rename',
+      { expectedVersion: 1, reason: 'Reviewed direct rename reason', displayName: 'Willow Vale' },
+      'rename-request',
+      20,
+    );
+  });
+
   it('maps optimistic concurrency and rate limits to safe errors', async () => {
     const target = gateway();
     vi.mocked(target.performPlayerAction)

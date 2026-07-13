@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AppearancePreset, PlayerProfile } from '@starville/game-core';
 
@@ -16,7 +16,10 @@ interface PlayerExperienceProps {
   readonly onRecheck: () => Promise<void>;
   readonly onAccessInvalid: () => void;
   readonly onLeaveVillage: () => Promise<void>;
+  readonly onRegisterMaintenanceFlush?: (handler: (() => Promise<void>) | undefined) => void;
 }
+
+const PROFILE_RECONCILIATION_INTERVAL_MS = 60_000;
 
 export function PlayerExperience({
   apiUrl,
@@ -26,6 +29,7 @@ export function PlayerExperience({
   onRecheck,
   onAccessInvalid,
   onLeaveVillage,
+  onRegisterMaintenanceFlush,
 }: PlayerExperienceProps) {
   const [profile, setProfile] = useState<PlayerProfile | null>();
   const [entryState, setEntryState] = useState<'active' | 'rename_required' | 'suspended'>(
@@ -33,16 +37,23 @@ export function PlayerExperience({
   );
   const [loadError, setLoadError] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
+  const [backgroundWarning, setBackgroundWarning] = useState(false);
+  const profileRef = useRef<PlayerProfile | null | undefined>(undefined);
+  profileRef.current = profile;
 
   useEffect(() => {
     const controller = new AbortController();
     setLoadError(false);
-    setProfile(undefined);
+    // Only block the full-screen loader when no usable profile is loaded yet.
+    if (profileRef.current === undefined || profileRef.current === null) {
+      setProfile(undefined);
+    }
 
     void loadPlayerEntry(apiUrl, controller.signal)
       .then((entry) => {
         setProfile(entry.profile);
         setEntryState(entry.entryState);
+        setBackgroundWarning(false);
       })
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -51,6 +62,9 @@ export function PlayerExperience({
           setProfile(null);
         } else if (error instanceof PlayerRequestError && error.status === 401) {
           onAccessInvalid();
+        } else if (profileRef.current !== undefined && profileRef.current !== null) {
+          // Keep the last valid profile during temporary failures after first load.
+          setBackgroundWarning(true);
         } else {
           setLoadError(true);
         }
@@ -58,6 +72,58 @@ export function PlayerExperience({
 
     return () => controller.abort();
   }, [access.network, access.walletAddress, apiUrl, onAccessInvalid, retryVersion]);
+
+  useEffect(() => {
+    if (profile === undefined || profile === null || entryState !== 'active') return;
+    let active = true;
+    async function reconcileProfile() {
+      try {
+        const entry = await loadPlayerEntry(apiUrl);
+        if (!active) return;
+        setProfile(entry.profile);
+        setEntryState(entry.entryState);
+        setBackgroundWarning(false);
+      } catch (error) {
+        if (!active) return;
+        if (error instanceof PlayerRequestError && error.code === 'PLAYER_SUSPENDED') {
+          setEntryState('suspended');
+          setProfile(null);
+        } else if (error instanceof PlayerRequestError && error.status === 401) {
+          onAccessInvalid();
+        } else if (
+          error instanceof PlayerRequestError &&
+          (error.code === 'PLAYER_RENAME_REQUIRED' || error.status === 409)
+        ) {
+          // Treat rename enforcement as blocking if the API surfaces it on load.
+          try {
+            const entry = await loadPlayerEntry(apiUrl);
+            if (!active) return;
+            setProfile(entry.profile);
+            setEntryState(entry.entryState);
+          } catch {
+            setBackgroundWarning(true);
+          }
+        } else {
+          setBackgroundWarning(true);
+        }
+      }
+    }
+    function reconcileWhenVisible() {
+      if (document.visibilityState === 'visible') void reconcileProfile();
+    }
+    const interval = window.setInterval(
+      () => void reconcileProfile(),
+      PROFILE_RECONCILIATION_INTERVAL_MS,
+    );
+    window.addEventListener('focus', reconcileWhenVisible);
+    document.addEventListener('visibilitychange', reconcileWhenVisible);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', reconcileWhenVisible);
+      document.removeEventListener('visibilitychange', reconcileWhenVisible);
+    };
+  }, [apiUrl, entryState, onAccessInvalid, profile]);
 
   const createCharacter = useCallback(
     async (input: {
@@ -67,6 +133,7 @@ export function PlayerExperience({
       try {
         const created = await createPlayerProfile(apiUrl, input);
         setProfile(created);
+        setBackgroundWarning(false);
         return created;
       } catch (error) {
         if (error instanceof PlayerRequestError && error.status === 401) onAccessInvalid();
@@ -96,6 +163,7 @@ export function PlayerExperience({
     );
   }
 
+  // Initial blocking load only — never after a valid profile is known.
   if (profile === undefined) {
     return (
       <main className="gate-shell">
@@ -119,11 +187,11 @@ export function PlayerExperience({
           <div className="gate-mark" aria-hidden="true">
             ◇
           </div>
-          <p className="game-kicker">Village access unavailable</p>
-          <h1 id="player-suspended-title">This player profile is suspended.</h1>
+          <p className="game-kicker">Village access blocked</p>
+          <h1 id="player-suspended-title">Account suspended</h1>
           <p>
-            The Starville map was not started. This is an application restriction only and does not
-            affect the connected wallet or any blockchain assets.
+            Your Starville account has been temporarily suspended. Please contact support if you
+            believe this was a mistake. Your connected wallet and blockchain assets are unchanged.
           </p>
           <div className="gate-actions">
             <a className="gate-primary" href={landingUrl}>
@@ -156,15 +224,31 @@ export function PlayerExperience({
   }
 
   return (
-    <GameWorld
-      access={access}
-      apiUrl={apiUrl}
-      landingUrl={landingUrl}
-      onAccessInvalid={onAccessInvalid}
-      onLeaveVillage={onLeaveVillage}
-      onRecheck={onRecheck}
-      profile={profile}
-      rechecking={rechecking}
-    />
+    <>
+      {backgroundWarning ? (
+        <div
+          className="game-soft-status game-soft-status--warning"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="game-soft-status__dot" aria-hidden="true" />
+          <span>
+            Connection interrupted. Your current village view is still available while Starville
+            reconnects.
+          </span>
+        </div>
+      ) : null}
+      <GameWorld
+        access={access}
+        apiUrl={apiUrl}
+        landingUrl={landingUrl}
+        onAccessInvalid={onAccessInvalid}
+        onLeaveVillage={onLeaveVillage}
+        {...(onRegisterMaintenanceFlush === undefined ? {} : { onRegisterMaintenanceFlush })}
+        onRecheck={onRecheck}
+        profile={profile}
+        rechecking={rechecking}
+      />
+    </>
   );
 }

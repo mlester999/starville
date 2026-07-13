@@ -23,15 +23,18 @@ export interface PlayerDirectoryQuery {
 
 export interface PlayerActivityQuery {
   readonly limit: number;
+  readonly accessPage: number;
+  readonly accessPageSize: 10 | 50 | 100;
 }
 
 export interface PlayerActionInput {
   readonly expectedVersion: number;
   readonly reason: string;
+  readonly displayName?: string;
 }
 
 export type PlayerActionKey =
-  'suspend' | 'restore' | 'reset-position' | 'require-rename' | 'revoke-sessions';
+  'suspend' | 'restore' | 'reset-position' | 'require-rename' | 'rename' | 'revoke-sessions';
 
 export type PlayerActionPersistenceResult =
   | PlayerActionResult

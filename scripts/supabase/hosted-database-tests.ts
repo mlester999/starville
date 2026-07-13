@@ -30,6 +30,9 @@ async function main(): Promise<void> {
     'player_vertical_slice.test.sql',
     'secure_player_operations.test.sql',
     'world_management.test.sql',
+    'live_operations.test.sql',
+    'cozy_gameplay.test.sql',
+    'world_asset_manager.test.sql',
   ] as const;
 
   const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });

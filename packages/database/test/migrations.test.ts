@@ -67,6 +67,22 @@ describe('Phase 2 administrator migrations', () => {
     new URL('20260712100000_world_management_schema.sql', migrationDirectory),
     'utf8',
   );
+  const consolidationSql = readFileSync(
+    new URL('20260712105000_player_rename_access_pagination.sql', migrationDirectory),
+    'utf8',
+  );
+  const liveOperationsCatalogSql = readFileSync(
+    new URL('20260712106000_live_operations.sql', migrationDirectory),
+    'utf8',
+  );
+  const cozyHousingSql = readFileSync(
+    new URL('20260713102000_cozy_gameplay_housing_admin.sql', migrationDirectory),
+    'utf8',
+  );
+  const assetManagerSchemaSql = readFileSync(
+    new URL('20260713110000_world_asset_manager_schema.sql', migrationDirectory),
+    'utf8',
+  );
   const allSql = `${schemaSql}\n${catalogSql}\n${authorizationSql}`;
 
   it('parses every migration with the hosted PostgreSQL major version grammar', async () => {
@@ -160,9 +176,42 @@ describe('Phase 2 administrator migrations', () => {
       phase6MappingStart,
       phase6Sql.indexOf('create table public.world_maps', phase6MappingStart),
     );
+    const consolidationMappingStart = consolidationSql.indexOf(
+      'with mapping(role_key, permission_key)',
+    );
+    const consolidationMappingBlock = consolidationSql.slice(
+      consolidationMappingStart,
+      consolidationSql.indexOf(
+        'alter table public.admin_player_operation_rate_limits',
+        consolidationMappingStart,
+      ),
+    );
+    const liveOperationsMappingStart = liveOperationsCatalogSql.indexOf(
+      'with mapping(role_key, permission_key)',
+    );
+    const liveOperationsMappingBlock = liveOperationsCatalogSql.slice(
+      liveOperationsMappingStart,
+      liveOperationsCatalogSql.indexOf(
+        'create table public.live_operations_maintenance',
+        liveOperationsMappingStart,
+      ),
+    );
+    const assetManagerMappingStart = assetManagerSchemaSql.indexOf(
+      'with mapping(role_key, permission_key)',
+    );
+    const assetManagerMappingBlock = assetManagerSchemaSql.slice(
+      assetManagerMappingStart,
+      assetManagerSchemaSql.indexOf(
+        'create or replace function private.valid_world_asset_collision_profile',
+        assetManagerMappingStart,
+      ),
+    );
     const mappingBlock = `${catalogSql.slice(
       catalogSql.indexOf('with mapping(role_key, permission_key)'),
-    )}\n${phase5MappingBlock}\n${phase6MappingBlock}`;
+    )}\n${phase5MappingBlock}\n${phase6MappingBlock}\n${consolidationMappingBlock}\n${liveOperationsMappingBlock}\n${cozyHousingSql.slice(
+      cozyHousingSql.indexOf('with mapping(role_key, permission_key)'),
+      cozyHousingSql.indexOf('alter table public.cozy_gameplay_idempotency'),
+    )}\n${assetManagerMappingBlock}`;
     const seeded = new Map<string, string[]>();
 
     for (const match of mappingBlock.matchAll(/\('([^']+)', '([^']+)'\)/g)) {
@@ -488,18 +537,49 @@ describe('Phase 6 world-management migrations', () => {
     new URL('20260712104000_world_management_player_admin.sql', directory),
     'utf8',
   );
+  const consolidationSql = readFileSync(
+    new URL('20260712105000_player_rename_access_pagination.sql', directory),
+    'utf8',
+  );
+  const liveOperationsSql = readFileSync(
+    new URL('20260712106000_live_operations.sql', directory),
+    'utf8',
+  );
   const adminAuthorizationTestSql = readFileSync(
     new URL('admin_authorization.test.sql', testDirectory),
     'utf8',
   );
-  const allSql = `${schemaSql}\n${functionsSql}\n${seedSql}\n${adminSql}\n${playerAdminSql}`;
+  const allSql = `${schemaSql}\n${functionsSql}\n${seedSql}\n${adminSql}\n${playerAdminSql}\n${consolidationSql}\n${liveOperationsSql}`;
 
   it('parses every forward-only Phase 6 migration with PostgreSQL 17 grammar', async () => {
     const parser = new Parser({ version: 17 });
-    for (const sql of [schemaSql, functionsSql, seedSql, adminSql, playerAdminSql]) {
+    for (const sql of [
+      schemaSql,
+      functionsSql,
+      seedSql,
+      adminSql,
+      playerAdminSql,
+      consolidationSql,
+      liveOperationsSql,
+    ]) {
       const result = await parser.parse(sql);
       expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
     }
+  });
+
+  it('default-denies live operations and exposes only narrow service-role RPCs', () => {
+    for (const table of [
+      'live_operations_maintenance',
+      'game_announcements',
+      'live_operations_audit_logs',
+    ]) {
+      expect(liveOperationsSql).toContain(`alter table public.${table} enable row level security`);
+      expect(liveOperationsSql).toContain(`alter table public.${table} force row level security`);
+      expect(liveOperationsSql).toContain(`revoke all on table public.${table}`);
+    }
+    expect(liveOperationsSql).toContain('LIVE_OPERATIONS_AUDIT_IMMUTABLE');
+    expect(liveOperationsSql).not.toMatch(/create policy/iu);
+    expect(liveOperationsSql).not.toMatch(/drop\s+schema|truncate\s+|alter\s+table\s+auth\./iu);
   });
 
   it('keeps the already-applied Phase 6 schema migration byte-for-byte immutable', () => {
@@ -693,6 +773,261 @@ describe('Phase 6 world-management migrations', () => {
     expect(allSql).not.toMatch(/transfer|mint_to|burn|set_authority|seed phrase|private key/iu);
     expect(allSql).not.toMatch(
       /create table public\.(?:inventories|crops|recipes|chat|friends|guilds|rewards|claims|stardust)/iu,
+    );
+  });
+});
+
+describe('Phase 7 cozy-gameplay migrations', () => {
+  const migrationDirectory = new URL(
+    '../../../infrastructure/supabase/migrations/',
+    import.meta.url,
+  );
+  const migrationNames = [
+    '20260713100000_cozy_gameplay_foundation.sql',
+    '20260713101000_cozy_gameplay_actions.sql',
+    '20260713101500_cozy_world_interactions.sql',
+    '20260713102000_cozy_gameplay_housing_admin.sql',
+  ] as const;
+  const migrations = migrationNames.map((name) =>
+    readFileSync(new URL(name, migrationDirectory), 'utf8'),
+  );
+  const allSql = migrations.join('\n');
+
+  it('parses every Phase 7 migration with the hosted PostgreSQL grammar', async () => {
+    const parser = new Parser({ version: 17 });
+    for (const sql of migrations) {
+      const result = await parser.parse(sql);
+      expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('keeps every cozy table default-deny behind forced RLS', () => {
+    const tables = [...allSql.matchAll(/create table public\.([a-z_]+)/giu)].map(
+      (match) => match[1],
+    );
+    expect(tables.length).toBeGreaterThanOrEqual(20);
+    for (const table of tables.filter((name): name is string => name !== undefined)) {
+      expect(allSql).toContain(`'${table}'`);
+    }
+    expect(allSql).toContain(`alter table public.%I force row level security`);
+    expect(allSql).toContain(`revoke all on table public.%I from public`);
+    expect(allSql).not.toMatch(/create policy[\s\S]{0,160}for (?:insert|update|delete)/iu);
+  });
+
+  it('grants only reviewed player RPC execution to the service role', () => {
+    for (const rpc of [
+      'bootstrap_player_cozy_gameplay',
+      'plant_player_farm_plot',
+      'water_player_farm_plot',
+      'harvest_player_farm_plot',
+      'perform_player_recipe_action',
+      'transact_player_shop',
+      'enter_player_home',
+      'exit_player_home',
+      'place_player_home_furniture',
+      'move_player_home_furniture',
+      'rotate_player_home_furniture',
+      'remove_player_home_furniture',
+    ]) {
+      expect(allSql).toMatch(new RegExp(`grant execute on function public\\.${rpc}`, 'u'));
+      expect(allSql).toMatch(new RegExp(`revoke all on function public\\.${rpc}`, 'u'));
+    }
+  });
+
+  it('contains the required authority, concurrency, and privacy safeguards', () => {
+    expect(allSql).toContain('player_dust_ledger');
+    expect(allSql).toContain('private.reject_cozy_append_only_mutation');
+    expect(allSql).toContain('cozy_gameplay_idempotency');
+    expect(allSql).toContain('for update');
+    expect(allSql).toContain('starter_grant_applied_at');
+    expect(allSql).toContain('private.cozy_furniture_placement_valid');
+    expect(allSql).toContain('home_access_denied');
+    expect(allSql).not.toMatch(
+      /create table public\.(?:player_trades|marketplace|rewards|claims)/iu,
+    );
+    expect(allSql).not.toMatch(/\$DUST|mint_to|burn|set_authority/iu);
+  });
+});
+
+describe('Phase 7.5A world-asset-manager migrations', () => {
+  const migrationDirectory = new URL(
+    '../../../infrastructure/supabase/migrations/',
+    import.meta.url,
+  );
+  const migrationNames = [
+    '20260713110000_world_asset_manager_schema.sql',
+    '20260713111000_world_asset_manager_functions.sql',
+    '20260713111500_world_asset_manager_world_integration.sql',
+    '20260713112000_world_asset_manager_storage.sql',
+  ] as const;
+  const [schemaSql = '', functionsSql = '', integrationSql = '', storageSql = ''] =
+    migrationNames.map((name) => readFileSync(new URL(name, migrationDirectory), 'utf8'));
+  const allSql = [schemaSql, functionsSql, integrationSql, storageSql].join('\n');
+
+  it('parses every forward-only migration with the hosted PostgreSQL grammar', async () => {
+    const parser = new Parser({ version: 17 });
+    for (const sql of [schemaSql, functionsSql, integrationSql, storageSql]) {
+      const result = await parser.parse(sql);
+      expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    }
+  });
+
+  it('creates only the bounded version, workflow, reference, audit, and abuse-control tables', () => {
+    expect(
+      [...schemaSql.matchAll(/create table public\.([a-z_]+)/giu)].map((match) => match[1]),
+    ).toEqual([
+      'world_asset_versions',
+      'world_asset_uploads',
+      'world_asset_processing_jobs',
+      'world_asset_tags',
+      'world_asset_version_tags',
+      'world_asset_validation_checks',
+      'world_asset_reviews',
+      'world_asset_references',
+      'world_asset_audit_events',
+      'world_asset_operation_idempotency',
+      'world_asset_operation_rate_limits',
+    ]);
+  });
+
+  it('forces RLS and removes direct browser and service-role table access', () => {
+    for (const table of [
+      'world_asset_versions',
+      'world_asset_uploads',
+      'world_asset_processing_jobs',
+      'world_asset_tags',
+      'world_asset_version_tags',
+      'world_asset_validation_checks',
+      'world_asset_reviews',
+      'world_asset_references',
+      'world_asset_audit_events',
+      'world_asset_operation_idempotency',
+      'world_asset_operation_rate_limits',
+    ]) {
+      expect(schemaSql).toContain(`'${table}'`);
+    }
+    expect(schemaSql).toContain("execute format('alter table public.%I enable row level security'");
+    expect(schemaSql).toContain("execute format('alter table public.%I force row level security'");
+    expect(schemaSql).toContain(
+      "execute format('revoke all on table public.%I from public, anon, authenticated, service_role'",
+    );
+  });
+
+  it('keeps approved versions immutable and lifecycle evidence append-only', () => {
+    expect(schemaSql).toContain('private.protect_world_asset_version_history');
+    expect(schemaSql).toContain('private.reject_world_asset_append_only_mutation');
+    expect(schemaSql).toContain('world_asset_validation_checks_append_only');
+    expect(schemaSql).toContain('world_asset_reviews_append_only');
+    expect(schemaSql).toContain('world_asset_audit_events_append_only');
+    expect(schemaSql).toContain('unique (request_id, event_key)');
+  });
+
+  it('uses upload authority for automatic processing and separate validation authority', () => {
+    const completeStart = functionsSql.indexOf(
+      'create or replace function public.complete_admin_game_asset_processing',
+    );
+    const failStart = functionsSql.indexOf(
+      'create or replace function public.fail_admin_game_asset_processing',
+    );
+    const validateStart = functionsSql.indexOf(
+      'create or replace function public.validate_admin_game_asset_version',
+    );
+    const completeBlock = functionsSql.slice(completeStart, failStart);
+    const failBlock = functionsSql.slice(
+      failStart,
+      functionsSql.indexOf(
+        'create or replace function public.get_admin_game_asset_preview_material',
+        failStart,
+      ),
+    );
+    const validateBlock = functionsSql.slice(
+      validateStart,
+      functionsSql.indexOf(
+        'create or replace function public.submit_admin_game_asset_review',
+        validateStart,
+      ),
+    );
+    expect(completeBlock).toContain("'assets.upload'");
+    expect(completeBlock).not.toContain("'assets.validate'");
+    expect(failBlock).toContain("'assets.upload'");
+    expect(failBlock).not.toContain("'assets.validate'");
+    expect(validateBlock).toContain("'assets.validate'");
+  });
+
+  it('pins immutable versions and derives map replacement audit from trusted manifests', () => {
+    expect(integrationSql).toContain('world_asset_version_id');
+    expect(integrationSql).toContain('private.clone_world_version_asset_pins');
+    expect(integrationSql).toContain('private.phase6_create_admin_world_draft');
+    expect(integrationSql).toContain('private.phase6_derive_admin_world_version');
+    expect(integrationSql).toContain('private.phase6_save_admin_world_draft');
+    expect(integrationSql).toContain(
+      'coalesce(retained.world_asset_version_id, asset.active_version_id)',
+    );
+    expect(integrationSql).toContain("'asset.world.replacement_performed'");
+    expect(integrationSql).toContain("'maps.edit'");
+    expect(integrationSql).toContain(
+      'before_object.asset_key is distinct from after_object.asset_key',
+    );
+    expect(integrationSql).toContain("'assetDeliveries'");
+    expect(integrationSql).toContain("'repository_procedural'");
+  });
+
+  it('keeps seeded categories valid and bounds detail and review aggregates', () => {
+    expect(schemaSql).toContain(
+      "when asset_key like '%cooking-hearth%' or asset_key like '%crafting-workbench%' or asset_key like '%home-entrance%' then 'structure'",
+    );
+    expect(functionsSql.match(/limit 100/gu)?.length ?? 0).toBeGreaterThanOrEqual(4);
+    expect(functionsSql).toContain('p_expected_asset_revision integer');
+    expect(functionsSql).toContain('p_expected_edit_version integer');
+    expect(functionsSql).toContain("'status', 'asset_version_conflict'");
+  });
+
+  it('binds reservation replays to their original target and binary metadata', () => {
+    expect(functionsSql).toContain('replay_asset.asset_key = p_slug');
+    expect(functionsSql).toContain('replay_asset.friendly_name = p_friendly_name');
+    expect(functionsSql).toContain('replay_upload.original_file_name = p_original_file_name');
+    expect(functionsSql).toContain('replay_upload.declared_mime_type = p_declared_mime_type');
+    expect(functionsSql).toContain('replay_upload.declared_size_bytes = p_declared_size_bytes');
+    expect(functionsSql).toContain("event.event_key = 'asset.version.created'");
+  });
+
+  it('synchronizes only concrete Phase 7 asset refs and gates compatible replacements', () => {
+    for (const source of [
+      'cozy_item_definitions',
+      'cozy_crop_definitions',
+      'cozy_furniture_definitions',
+    ]) {
+      expect(integrationSql).toContain(source);
+    }
+    expect(integrationSql).toContain('private.sync_world_asset_content_reference');
+    expect(integrationSql).toContain('private.world_manifest_assets_compatible');
+    expect(integrationSql).toContain("when 'notice' then 'sign'");
+    expect(integrationSql).toContain("return jsonb_build_object('status', 'state_conflict')");
+  });
+
+  it('keeps original preview intake paths behind one exact administrator material RPC', () => {
+    expect(functionsSql).toContain("'originalPath', original_path");
+    expect(functionsSql).toContain('upload.world_asset_id = p_asset_id');
+    expect(functionsSql).toContain('upload.world_asset_version_id = p_version_id');
+    expect(functionsSql).toContain('order by upload.created_at desc, upload.id desc');
+  });
+
+  it('protects private intake and managed writes without blocking public delivery GETs', () => {
+    expect(storageSql).toContain("'asset-intake', 'asset-intake', false");
+    expect(storageSql).toContain("'game-assets', 'game-assets', true");
+    expect(storageSql.match(/as restrictive/giu)).toHaveLength(4);
+    expect(storageSql).toContain('starville_asset_intake_read_guard');
+    expect(storageSql).toContain('starville_asset_bucket_insert_guard');
+    expect(storageSql).toContain('starville_asset_bucket_update_guard');
+    expect(storageSql).toContain('starville_asset_bucket_delete_guard');
+    expect(storageSql).not.toMatch(/for select[\s\S]{0,120}bucket_id[^;]*game-assets/iu);
+  });
+
+  it('contains no destructive reset, secret material, or client-side table grant', () => {
+    expect(allSql).not.toMatch(/drop\s+schema|truncate\s+|alter\s+table\s+auth\./iu);
+    expect(allSql).not.toMatch(/service.role.key|seed phrase|private key|database password/iu);
+    expect(allSql).not.toMatch(
+      /grant\s+(?:select|insert|update|delete|all)\s+on\s+table\s+public\./iu,
     );
   });
 });

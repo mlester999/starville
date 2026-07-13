@@ -85,6 +85,7 @@ function gateway(): AdminWorldGateway {
       total: 1,
       totalPages: 1,
     })),
+    getPublishedTopology: vi.fn(async () => ({ status: 'loaded', maps: [] })),
     getWorld: vi.fn(async () => ({ status: 'loaded', map, versions: [draftVersion] })),
     getDraft: vi.fn(async () => ({ status: 'loaded', map, version: draftVersion, manifest })),
     createDraft: vi.fn(async () => ({ status: 'created', map, version: draftVersion, manifest })),

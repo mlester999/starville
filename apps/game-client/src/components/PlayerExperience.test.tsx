@@ -37,10 +37,13 @@ const profile: PlayerProfile = {
   displayName: 'Luna Vale',
   appearancePreset: 'moonberry',
   mapId: 'lantern-square',
+  mapVersionId: null,
   x: 12,
   y: 7.5,
   facingDirection: 'south',
   gameStateVersion: 1,
+  stateVersion: 1,
+  lastTransitionAt: null,
   createdAt: '2026-07-11T04:00:00.000Z',
   updatedAt: '2026-07-11T04:00:00.000Z',
   lastEnteredAt: '2026-07-11T04:00:00.000Z',
@@ -131,5 +134,63 @@ describe('PlayerExperience moderation bootstrap boundary', () => {
     globalThis.fetch = vi.fn(async () => entryResponse('active'));
     await renderExperience();
     expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
+  });
+
+  it('refreshes an administrator-renamed display name when the window regains focus', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(entryResponse('active'))
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: { entryState: 'active', profile: { ...profile, displayName: 'Willow Vale' } },
+        }),
+      );
+    await renderExperience();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+    expect(container.querySelector('[data-testid="game-world"]')?.getAttribute('data-name')).toBe(
+      'Willow Vale',
+    );
+  });
+
+  it('keeps the game world mounted when focus reconciliation fails temporarily', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(entryResponse('active'))
+      .mockRejectedValueOnce(new TypeError('network interrupted'));
+    await renderExperience();
+    expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
+    expect(container.textContent).toContain('Connection interrupted');
+    expect(container.textContent).not.toContain('Loading your villager');
+  });
+
+  it('replaces gameplay when focus reconciliation reports suspension', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(entryResponse('active'))
+      .mockResolvedValueOnce(
+        Response.json({ success: false, error: { code: 'PLAYER_SUSPENDED' } }, { status: 403 }),
+      );
+    await renderExperience();
+    expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
+
+    await act(async () => {
+      window.dispatchEvent(new Event('focus'));
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector('[data-testid="game-world"]')).toBeNull();
+    expect(container.textContent).toContain('Account suspended');
   });
 });

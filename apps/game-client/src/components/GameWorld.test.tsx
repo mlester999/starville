@@ -106,10 +106,13 @@ describe('GameWorld controls and settings boundary', () => {
             displayName: 'Luna Vale',
             appearancePreset: 'moss',
             mapId: 'lantern-square',
+            mapVersionId: null,
             x: 12,
             y: 7.5,
             facingDirection: 'south',
             gameStateVersion: 1,
+            stateVersion: 1,
+            lastTransitionAt: null,
             createdAt: '2026-07-11T04:00:00.000Z',
             updatedAt: '2026-07-11T04:00:00.000Z',
             lastEnteredAt: '2026-07-11T04:00:00.000Z',
@@ -167,10 +170,13 @@ describe('GameWorld controls and settings boundary', () => {
             displayName: 'Luna Vale',
             appearancePreset: 'moss',
             mapId: 'lantern-square',
+            mapVersionId: null,
             x: 12,
             y: 7.5,
             facingDirection: 'south',
             gameStateVersion: 1,
+            stateVersion: 1,
+            lastTransitionAt: null,
             createdAt: '2026-07-11T04:00:00.000Z',
             updatedAt: '2026-07-11T04:00:00.000Z',
             lastEnteredAt: '2026-07-11T04:00:00.000Z',
@@ -271,5 +277,80 @@ describe('GameWorld controls and settings boundary', () => {
       expect.objectContaining({ mapId: 'moonpetal-meadow', x: 10, y: 14.5 }),
     );
     expect(container.textContent).toContain('Moonpetal Meadow');
+  });
+
+  it('routes a typed shop interaction to the React cozy panel and blocks Phaser input', async () => {
+    await act(async () => {
+      root.render(
+        <GameWorld
+          apiUrl="http://localhost:4000"
+          landingUrl="http://localhost:3000"
+          profile={{
+            id: '11111111-1111-4111-8111-111111111111',
+            displayName: 'Luna Vale',
+            appearancePreset: 'moss',
+            mapId: 'lantern-square',
+            mapVersionId: null,
+            x: 12,
+            y: 7.5,
+            facingDirection: 'south',
+            gameStateVersion: 1,
+            stateVersion: 1,
+            lastTransitionAt: null,
+            createdAt: '2026-07-11T04:00:00.000Z',
+            updatedAt: '2026-07-11T04:00:00.000Z',
+            lastEnteredAt: '2026-07-11T04:00:00.000Z',
+          }}
+          access={{
+            access: 'granted',
+            walletAddress: '11111111111111111111111111111111',
+            network: 'solana:mainnet-beta',
+            symbol: 'STAR',
+            requiredAmount: '1000',
+            observedAmount: '1000',
+            expiresAt: '2099-07-11T05:00:00.000Z',
+          }}
+          rechecking={false}
+          onRecheck={vi.fn(async () => undefined)}
+          onAccessInvalid={vi.fn()}
+          onLeaveVillage={vi.fn(async () => undefined)}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const props = canvasCapture.props as {
+      readonly onInteractionOpen: (interaction: {
+        readonly id: string;
+        readonly type: 'shop';
+        readonly title: string;
+        readonly content: string;
+        readonly x: number;
+        readonly y: number;
+        readonly range: number;
+        readonly shopSlug: string;
+      }) => void;
+    };
+    await act(async () => {
+      props.onInteractionOpen({
+        id: 'lantern-general-store',
+        type: 'shop',
+        title: 'Lantern General Store',
+        content: 'A trusted village shop.',
+        x: 10,
+        y: 8,
+        range: 1.5,
+        shopSlug: 'lantern-general-store',
+      });
+    });
+
+    expect(container.querySelector('[role="dialog"]')?.textContent).toContain(
+      'Lantern General Store',
+    );
+    expect(
+      container
+        .querySelector('[data-testid="game-canvas-boundary"]')
+        ?.getAttribute('data-input-blocked'),
+    ).toBe('true');
   });
 });

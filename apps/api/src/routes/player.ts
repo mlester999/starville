@@ -8,6 +8,7 @@ import {
   assertTrustedBrowserMutation,
   type TokenAccessCookieOptions,
 } from '../token-access/http.js';
+import type { LiveOperationsService } from '../live-operations/contracts.js';
 
 const PLAYER_API_PREFIX = '/api/v1/token-access/player';
 const BODY_LIMIT_BYTES = 4_096;
@@ -17,6 +18,7 @@ export interface RegisterPlayerRoutesOptions {
   readonly tokenAccessService: TokenAccessService;
   readonly cookie: TokenAccessCookieOptions;
   readonly allowedOrigins: ReadonlySet<string>;
+  readonly liveOperationsService?: LiveOperationsService;
 }
 
 function stateView(profile: Awaited<ReturnType<PlayerService['saveState']>>) {
@@ -37,6 +39,9 @@ export function registerPlayerRoutes(
   const { playerService, tokenAccessService, cookie, allowedOrigins } = options;
 
   app.get(`${PLAYER_API_PREFIX}/profile`, async (request, reply) => {
+    if ((await options.liveOperationsService?.getPublic(request.id))?.maintenance.active === true) {
+      throw new PublicApiError(503, 'GAME_MAINTENANCE');
+    }
     const walletAddress = await authorizePlayerRequest(request, reply, tokenAccessService, cookie);
     const entry = await requirePlayerEntry(playerService, walletAddress, request.id, true, true);
     return {

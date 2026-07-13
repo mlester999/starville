@@ -8,6 +8,28 @@ class HostedCleanupTimeoutError extends Error {
   readonly code = 'HOSTED_CLEANUP_TIMEOUT';
 }
 
+export interface HostedApiLogDiagnostic {
+  readonly errorCode: string | null;
+  readonly level: 'error' | 'fatal' | 'warn';
+  readonly message: string;
+  readonly method: string | null;
+  readonly path: string | null;
+  readonly requestId: string | null;
+  readonly statusCode: number | null;
+}
+
+function property(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
+}
+
+function safeDiagnosticCode(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Z0-9_-]{1,80}$/u.test(value) ? value : null;
+}
+
+function safeDiagnosticRequestId(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z0-9:._-]{1,160}$/u.test(value) ? value : null;
+}
+
 export function safeHostedEndpoint(url: URL): string {
   return url.pathname.replace(UUID_PATH_SEGMENT, '/:id');
 }
@@ -101,6 +123,33 @@ export function hostedResponseFailure(
     code: 'HOSTED_HTTP_STATUS',
     requestId,
     failureKind: 'http',
+  })}`;
+}
+
+export function hostedApiResponseFailure(
+  operation: string,
+  url: URL,
+  statusCode: number,
+  responseBody: string,
+  fallbackRequestId: string,
+  apiLog: HostedApiLogDiagnostic | null,
+): string {
+  let parsedBody: unknown;
+  try {
+    parsedBody = JSON.parse(responseBody) as unknown;
+  } catch {
+    parsedBody = null;
+  }
+  const responseCode = safeDiagnosticCode(property(property(parsedBody, 'error'), 'code'));
+  const responseRequestId = safeDiagnosticRequestId(property(parsedBody, 'requestId'));
+
+  return `Hosted API assertion failed: ${JSON.stringify({
+    operation,
+    endpoint: safeHostedEndpoint(url),
+    status: statusCode,
+    code: responseCode ?? (statusCode >= 400 ? 'HOSTED_API_ERROR' : 'HOSTED_RESPONSE_ASSERTION'),
+    requestId: responseRequestId ?? safeDiagnosticRequestId(fallbackRequestId),
+    apiLog,
   })}`;
 }
 

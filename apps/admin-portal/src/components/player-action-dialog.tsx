@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useActionState, useEffect, useRef, type KeyboardEvent } from 'react';
+import { useActionState, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 import {
   playerOperationAction,
@@ -23,17 +23,28 @@ export function PlayerActionDialog(props: {
   readonly walletAddress: string | null;
   readonly expectedVersion: number;
   readonly dangerous?: boolean;
+  readonly severity?: 'neutral' | 'caution' | 'critical';
+  readonly typedConfirmation?: string;
+  readonly newNameInput?: boolean;
 }) {
   const router = useRouter();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const dialogRef = useRef<HTMLDialogElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const severity = props.severity ?? (props.dangerous ? 'critical' : 'caution');
   const [state, formAction, pending] = useActionState(playerOperationAction, INITIAL_STATE);
+  const [reason, setReason] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [typedConfirmation, setTypedConfirmation] = useState('');
   const walletLabel =
     props.walletAddress === null
       ? 'restricted for this role'
       : `${props.walletAddress.slice(0, 5)}…${props.walletAddress.slice(-5)}`;
+  const valid =
+    reason.trim().length >= 12 &&
+    (props.newNameInput !== true || displayName.trim().length >= 3) &&
+    (props.typedConfirmation === undefined || typedConfirmation === props.typedConfirmation);
 
   useEffect(() => {
     if (state.outcome === 'success') closeRef.current?.focus();
@@ -70,7 +81,7 @@ export function PlayerActionDialog(props: {
   return (
     <>
       <button
-        className={props.dangerous ? 'button button--danger' : 'button button--secondary'}
+        className={severity === 'critical' ? 'button button--danger' : 'button button--secondary'}
         onClick={open}
         ref={triggerRef}
         type="button"
@@ -80,7 +91,7 @@ export function PlayerActionDialog(props: {
       <dialog
         aria-describedby={`${props.action}-description`}
         aria-labelledby={`${props.action}-title`}
-        className="operation-dialog"
+        className={`operation-dialog operation-dialog--${severity}`}
         onCancel={(event) => {
           if (pending) event.preventDefault();
         }}
@@ -120,6 +131,7 @@ export function PlayerActionDialog(props: {
                 maxLength={500}
                 minLength={12}
                 name="reason"
+                onChange={(event) => setReason(event.currentTarget.value)}
                 placeholder="Provide operational context (12–500 characters)."
                 ref={reasonRef}
                 required
@@ -129,6 +141,36 @@ export function PlayerActionDialog(props: {
                 The reason is retained in the append-only audit trail. Do not include credentials or
                 secrets.
               </p>
+              {props.newNameInput === true ? (
+                <label htmlFor={`${props.action}-display-name`}>
+                  New display name
+                  <input
+                    autoComplete="off"
+                    disabled={pending}
+                    id={`${props.action}-display-name`}
+                    maxLength={20}
+                    minLength={3}
+                    name="displayName"
+                    onChange={(event) => setDisplayName(event.currentTarget.value)}
+                    pattern="[A-Za-z0-9 _-]{3,20}"
+                    required
+                  />
+                </label>
+              ) : null}
+              {props.typedConfirmation === undefined ? null : (
+                <label htmlFor={`${props.action}-typed-confirmation`}>
+                  Type {props.typedConfirmation} to confirm
+                  <input
+                    autoComplete="off"
+                    disabled={pending}
+                    id={`${props.action}-typed-confirmation`}
+                    name="typedConfirmation"
+                    onChange={(event) => setTypedConfirmation(event.currentTarget.value)}
+                    pattern={props.typedConfirmation}
+                    required
+                  />
+                </label>
+              )}
               {state.outcome === 'error' ? <p role="alert">{state.message}</p> : null}
             </>
           )}
@@ -145,11 +187,13 @@ export function PlayerActionDialog(props: {
             </button>
             {state.outcome === 'success' ? null : (
               <button
-                className={props.dangerous ? 'button button--danger' : 'button button--primary'}
-                disabled={pending}
+                className={
+                  severity === 'critical' ? 'button button--danger' : 'button button--primary'
+                }
+                disabled={pending || !valid}
                 type="submit"
               >
-                {pending ? 'Applying…' : `Confirm ${props.buttonLabel.toLowerCase()}`}
+                {pending ? 'Applying…' : props.buttonLabel}
               </button>
             )}
           </footer>

@@ -1,4 +1,33 @@
 import type { MapId, MapManifest, PlayerStateUpdate } from '@starville/game-core';
+import type {
+  AssetCollisionProfile,
+  AssetRotation,
+  WorldAssetDelivery,
+} from '@starville/asset-management';
+
+export interface PinnedWorldAssetMaterial {
+  readonly assetKey: string;
+  readonly versionId: string;
+  readonly checksumSha256: string;
+  readonly mediaType: 'image/webp' | null;
+  readonly width: number | null;
+  readonly height: number | null;
+  readonly renderWidth: number | null;
+  readonly renderHeight: number | null;
+  readonly scale: number;
+  readonly anchorX: number;
+  readonly anchorY: number;
+  readonly footAnchorX: number;
+  readonly footAnchorY: number;
+  readonly depthAnchorX: number;
+  readonly depthAnchorY: number;
+  readonly collisionProfile: AssetCollisionProfile;
+  readonly supportedRotations: readonly AssetRotation[];
+  readonly defaultRotation: AssetRotation;
+  readonly developmentMarker: boolean;
+  readonly delivery: Readonly<{ bucket: 'game-assets'; objectPath: string }> | null;
+  readonly fallback: 'repository_procedural' | null;
+}
 
 export interface PublishedWorldMap {
   readonly id: string;
@@ -26,12 +55,14 @@ export interface PublishedWorldView {
   readonly version: PublishedWorldVersion;
   readonly manifest: MapManifest;
   readonly playerState: PublishedWorldPlayerState;
+  readonly assetDeliveries: readonly WorldAssetDelivery[];
 }
 
 export interface PublishedManifestView {
   readonly map: PublishedWorldMap;
   readonly version: PublishedWorldVersion;
   readonly manifest: MapManifest;
+  readonly assetDeliveries: readonly WorldAssetDelivery[];
 }
 
 export interface WorldTransitionView extends PublishedWorldView {
@@ -55,18 +86,28 @@ export type PlayerWorldFailure =
   | 'invalid_exit'
   | 'destination_unavailable';
 
+export type PinnedPublishedManifestView = Omit<PublishedManifestView, 'assetDeliveries'> & {
+  readonly assetDeliveries: readonly PinnedWorldAssetMaterial[];
+};
+export type PinnedPublishedWorldView = Omit<PublishedWorldView, 'assetDeliveries'> & {
+  readonly assetDeliveries: readonly PinnedWorldAssetMaterial[];
+};
+export type PinnedWorldTransitionView = Omit<WorldTransitionView, 'assetDeliveries'> & {
+  readonly assetDeliveries: readonly PinnedWorldAssetMaterial[];
+};
+
 export interface PlayerWorldGateway {
   loadCurrent(
     walletAddress: string,
     requestId: string,
     rateLimit: number,
-  ): Promise<PublishedWorldView | PlayerWorldFailure>;
+  ): Promise<PinnedPublishedWorldView | PlayerWorldFailure>;
   loadPublishedManifest(
     walletAddress: string,
     mapId: MapId,
     requestId: string,
     rateLimit: number,
-  ): Promise<PublishedManifestView | PlayerWorldFailure>;
+  ): Promise<PinnedPublishedManifestView | PlayerWorldFailure>;
   transition(
     walletAddress: string,
     input: {
@@ -76,7 +117,7 @@ export interface PlayerWorldGateway {
     },
     requestId: string,
     rateLimit: number,
-  ): Promise<WorldTransitionView | PlayerWorldFailure>;
+  ): Promise<PinnedWorldTransitionView | PlayerWorldFailure>;
 }
 
 export interface PlayerWorldService {

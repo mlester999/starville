@@ -2,6 +2,11 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 
 import {
+  assetCollisionProfileSchema,
+  assetIdentifierSchema,
+  assetRotationSchema,
+} from '@starville/asset-management';
+import {
   facingDirectionSchema,
   mapIdSchema,
   mapManifestSchema,
@@ -11,12 +16,13 @@ import {
 import type {
   PlayerWorldFailure,
   PlayerWorldGateway,
-  PublishedManifestView,
+  PinnedPublishedManifestView,
+  PinnedWorldAssetMaterial,
   PublishedWorldMap,
   PublishedWorldPlayerState,
   PublishedWorldVersion,
-  PublishedWorldView,
-  WorldTransitionView,
+  PinnedPublishedWorldView,
+  PinnedWorldTransitionView,
 } from './player-contracts.js';
 
 const timestampSchema = z.iso.datetime({ offset: true });
@@ -76,11 +82,64 @@ const playerStateSchema = z.object({
   lastTransitionAt: timestampSchema.nullable(),
   updatedAt: timestampSchema,
 });
+const pinnedAssetMaterialSchema = z
+  .object({
+    assetKey: assetIdentifierSchema,
+    versionId: z.uuid(),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    mediaType: z.literal('image/webp').nullable(),
+    width: z.number().int().positive().max(4096).nullable(),
+    height: z.number().int().positive().max(4096).nullable(),
+    renderWidth: z.number().int().positive().max(4096).nullable(),
+    renderHeight: z.number().int().positive().max(4096).nullable(),
+    scale: z.coerce.number().min(0.05).max(8),
+    anchorX: z.coerce.number().min(0).max(1),
+    anchorY: z.coerce.number().min(0).max(1),
+    footAnchorX: z.coerce.number().min(0).max(1),
+    footAnchorY: z.coerce.number().min(0).max(1),
+    depthAnchorX: z.coerce.number().min(0).max(1),
+    depthAnchorY: z.coerce.number().min(0).max(1),
+    collisionProfile: assetCollisionProfileSchema,
+    supportedRotations: z.array(assetRotationSchema).min(1).max(4),
+    defaultRotation: assetRotationSchema,
+    developmentMarker: z.boolean(),
+    delivery: z
+      .object({
+        bucket: z.literal('game-assets'),
+        objectPath: z.string().min(1).max(320),
+      })
+      .strict()
+      .nullable(),
+    fallback: z.literal('repository_procedural').nullable(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.developmentMarker) {
+      if (
+        value.delivery !== null ||
+        value.fallback !== 'repository_procedural' ||
+        [value.mediaType, value.width, value.height, value.renderWidth, value.renderHeight].some(
+          (field) => field !== null,
+        )
+      ) {
+        context.addIssue({ code: 'custom', message: 'Invalid development asset material' });
+      }
+    } else if (
+      value.delivery === null ||
+      value.fallback !== null ||
+      [value.mediaType, value.width, value.height, value.renderWidth, value.renderHeight].some(
+        (field) => field === null,
+      )
+    ) {
+      context.addIssue({ code: 'custom', message: 'Invalid production asset material' });
+    }
+  });
 const loadedManifestSchema = z.object({
   status: z.literal('loaded'),
   map: mapRecordSchema,
   version: versionRecordSchema,
   manifest: mapManifestSchema,
+  assetDeliveries: z.array(pinnedAssetMaterialSchema).max(128),
 });
 const loadedWorldSchema = loadedManifestSchema.extend({ playerState: playerStateSchema });
 const transitionedWorldSchema = loadedWorldSchema.omit({ status: true }).extend({
@@ -150,7 +209,7 @@ function parseFailure(value: unknown): PlayerWorldFailure | undefined {
   return worldFailureSchema.safeParse(value).data?.status;
 }
 
-function parseManifest(value: unknown): PublishedManifestView | PlayerWorldFailure {
+function parseManifest(value: unknown): PinnedPublishedManifestView | PlayerWorldFailure {
   const failure = parseFailure(value);
   if (failure !== undefined) return failure;
   const parsed = loadedManifestSchema.safeParse(value);
@@ -159,10 +218,11 @@ function parseManifest(value: unknown): PublishedManifestView | PlayerWorldFailu
     map: publicMap(parsed.data.map),
     version: publicVersion(parsed.data.version),
     manifest: parsed.data.manifest as MapManifest,
+    assetDeliveries: parsed.data.assetDeliveries as PinnedWorldAssetMaterial[],
   };
 }
 
-function parseWorld(value: unknown): PublishedWorldView | PlayerWorldFailure {
+function parseWorld(value: unknown): PinnedPublishedWorldView | PlayerWorldFailure {
   const failure = parseFailure(value);
   if (failure !== undefined) return failure;
   const parsed = loadedWorldSchema.safeParse(value);
@@ -172,10 +232,11 @@ function parseWorld(value: unknown): PublishedWorldView | PlayerWorldFailure {
     version: publicVersion(parsed.data.version),
     manifest: parsed.data.manifest as MapManifest,
     playerState: publicState(parsed.data.playerState),
+    assetDeliveries: parsed.data.assetDeliveries as PinnedWorldAssetMaterial[],
   };
 }
 
-function parseTransition(value: unknown): WorldTransitionView | PlayerWorldFailure {
+function parseTransition(value: unknown): PinnedWorldTransitionView | PlayerWorldFailure {
   const failure = parseFailure(value);
   if (failure !== undefined) return failure;
   const parsed = transitionedWorldSchema.safeParse(value);
@@ -186,6 +247,7 @@ function parseTransition(value: unknown): WorldTransitionView | PlayerWorldFailu
     manifest: parsed.data.manifest as MapManifest,
     playerState: publicState(parsed.data.playerState),
     transition: parsed.data.transition,
+    assetDeliveries: parsed.data.assetDeliveries as PinnedWorldAssetMaterial[],
   };
 }
 

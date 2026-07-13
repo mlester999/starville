@@ -7,7 +7,8 @@ import { z } from 'zod';
 import { WorldEditor } from '../../../../../components/world-editor';
 import { AdminApiError } from '../../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../../lib/auth/authorization';
-import { loadWorldAssets, loadWorldDraft } from '../../../../../lib/worlds/api';
+import { loadWorldEditorAssetCandidates } from '../../../../../lib/world-assets/api';
+import { loadWorldDraft } from '../../../../../lib/worlds/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -26,7 +27,14 @@ export default async function WorldEditorPage(props: {
   try {
     const [draft, assets] = await Promise.all([
       loadWorldDraft(mapId, version.data),
-      loadWorldAssets({ page: 1, pageSize: 100, search: '' }),
+      loadWorldEditorAssetCandidates({
+        page: 1,
+        pageSize: 100,
+        search: '',
+        assetType: 'all',
+        category: '',
+        interaction: 'all',
+      }),
     ]);
     if (!['draft', 'validated'].includes(draft.version.lifecycleStatus)) notFound();
 

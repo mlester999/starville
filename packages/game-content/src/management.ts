@@ -109,6 +109,27 @@ export const worldDetailSchema = z
   })
   .strict();
 
+export const publishedWorldTopologySchema = z
+  .object({
+    status: z.literal('loaded'),
+    maps: z
+      .array(
+        z
+          .object({
+            id: z.uuid(),
+            slug: z.string().min(1).max(80),
+            displayName: z.string().min(1).max(100),
+            mapStatus: z.literal('active'),
+            versionId: z.uuid(),
+            versionNumber: positiveVersionSchema,
+            manifest: mapManifestSchema,
+          })
+          .strict(),
+      )
+      .max(100),
+  })
+  .strict();
+
 export const worldDraftSchema = z
   .object({
     status: z.enum(['created', 'updated']),
@@ -216,6 +237,7 @@ export type WorldMapRecord = z.infer<typeof worldMapSchema>;
 export type WorldVersionSummary = z.infer<typeof worldVersionSummarySchema>;
 export type WorldDirectory = z.infer<typeof worldDirectorySchema>;
 export type WorldDetail = z.infer<typeof worldDetailSchema>;
+export type PublishedWorldTopology = z.infer<typeof publishedWorldTopologySchema>;
 export type WorldDraft = z.infer<typeof worldDraftSchema>;
 export type WorldDraftLoad = z.infer<typeof worldDraftLoadSchema>;
 export type WorldPreview = z.infer<typeof worldPreviewSchema>;

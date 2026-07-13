@@ -11,6 +11,7 @@ import {
   type Point,
 } from './contracts';
 import { isPositionWalkable, PLAYER_FOOT_RADIUS, type CollisionShape } from './collision';
+import { worldInteractionSchema } from './interactions';
 
 export const MAP_MANIFEST_SCHEMA_VERSION = 1 as const;
 export const MAX_MAP_MANIFEST_BYTES = 256 * 1024;
@@ -95,6 +96,11 @@ export const mapObjectKinds = [
   'sign',
   'flowers',
   'bush',
+  'farm_plot',
+  'shop',
+  'cooking_station',
+  'crafting_station',
+  'home_entrance',
 ] as const;
 const mapObjectSchema = z
   .object({
@@ -117,18 +123,6 @@ const terrainAreaSchema = z
     order: z.number().int(),
   })
   .strict();
-const interactionSchema = z
-  .object({
-    id: identifierSchema,
-    type: z.literal('notice'),
-    x: z.number().finite(),
-    y: z.number().finite(),
-    range: z.number().positive().max(4),
-    title: safeTextSchema(80),
-    content: safeTextSchema(280),
-  })
-  .strict();
-
 export const spawnPurposeSchema = z.enum(['default', 'transition-entry']);
 export type SpawnPurpose = z.infer<typeof spawnPurposeSchema>;
 
@@ -210,7 +204,7 @@ export const mapManifestSchema = z
       .array(z.discriminatedUnion('shape', [rectangleSchema, circleSchema, capsuleSchema]))
       .max(512),
     objects: z.array(mapObjectSchema).max(512),
-    interactions: z.array(interactionSchema).max(64),
+    interactions: z.array(worldInteractionSchema).max(64),
     exits: z.array(mapExitSchema).length(MAP_DIRECTIONS.length),
   })
   .strict();
@@ -454,6 +448,18 @@ export function validateMapManifest(
   for (const object of [...manifest.objects, ...manifest.interactions]) {
     if (!pointInsideBounds(object, manifest.safeSaveBounds)) {
       throw new Error(`Map object '${object.id}' lies outside safe bounds`);
+    }
+  }
+  for (const interaction of manifest.interactions) {
+    if (
+      !isPositionWalkable(
+        interaction,
+        PLAYER_FOOT_RADIUS,
+        manifest.safeSaveBounds,
+        manifest.collisions,
+      )
+    ) {
+      throw new Error(`Map interaction '${interaction.id}' is not safely reachable`);
     }
   }
 

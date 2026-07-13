@@ -1,5 +1,6 @@
 import { AuthFrame } from '../../components/auth-frame';
 import { Notice } from '../../components/notice';
+import { PremiumSelect } from '../../components/premium-select';
 import { SubmitButton } from '../../components/submit-button';
 import { loadVerifiedTotpFactors } from '../../lib/auth/mfa';
 import { AUTH_MESSAGES } from '../../lib/auth/messages';
@@ -46,13 +47,16 @@ export default async function MfaRequiredPage({ searchParams }: MfaRequiredPageP
           ) : (
             <div className="field">
               <label htmlFor="factor-id">Authenticator</label>
-              <select id="factor-id" name="factorId" required>
-                {factors.map((factor) => (
-                  <option key={factor.id} value={factor.id}>
-                    {factor.label}
-                  </option>
-                ))}
-              </select>
+              <PremiumSelect
+                defaultValue={factors[0]?.id ?? factors.map((factor) => factor.id)[0] ?? ''}
+                id="factor-id"
+                name="factorId"
+                options={factors.map((factor) => ({
+                  value: factor.id,
+                  label: factor.label,
+                }))}
+                required
+              />
             </div>
           )}
 

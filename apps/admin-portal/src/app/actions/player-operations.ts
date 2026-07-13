@@ -37,6 +37,10 @@ function containsUnsafeReasonCharacters(value: string): boolean {
 
 function apiMessage(error: AdminApiError): string {
   if (error.status === 403) return 'Your current administrator role cannot perform this action.';
+  if (error.code === 'PLAYER_NAME_UNAVAILABLE')
+    return 'That display name is already in use or reserved.';
+  if (error.code === 'PLAYER_NAME_UNCHANGED')
+    return 'Choose a display name different from the current name.';
   if (error.status === 409) return 'The player state changed. Close this dialog and reload.';
   if (error.status === 429) return 'Too many player actions were attempted. Wait briefly.';
   if (error.status === 404) return 'The player record no longer exists.';
@@ -55,6 +59,10 @@ export async function playerOperationAction(
   const requestId = readString(formData, 'requestId', 64);
   const expectedVersion = Number(readString(formData, 'expectedVersion', 16));
   const reason = readString(formData, 'reason', 500);
+  const displayName = readString(formData, 'displayName', 64);
+  const typedConfirmation = readString(formData, 'typedConfirmation', 32);
+  const requiredConfirmation =
+    action === 'suspend' ? 'SUSPEND' : action === 'revoke-sessions' ? 'REVOKE' : undefined;
   if (
     playerId === undefined ||
     !PLAYER_ID_PATTERN.test(playerId) ||
@@ -65,7 +73,9 @@ export async function playerOperationAction(
     reason === undefined ||
     reason.length < 12 ||
     containsUnsafeReasonCharacters(reason) ||
-    formData.get('confirmed') !== 'yes'
+    formData.get('confirmed') !== 'yes' ||
+    (action === 'rename' && displayName === undefined) ||
+    (requiredConfirmation !== undefined && typedConfirmation !== requiredConfirmation)
   ) {
     return {
       outcome: 'error',
@@ -74,12 +84,11 @@ export async function playerOperationAction(
   }
 
   try {
-    const result = await performAdminPlayerAction(
-      playerId,
-      action,
-      { expectedVersion, reason },
-      requestId,
-    );
+    const input =
+      action === 'rename' && displayName !== undefined
+        ? { expectedVersion, reason, displayName }
+        : { expectedVersion, reason };
+    const result = await performAdminPlayerAction(playerId, action, input, requestId);
     revalidatePath(`/players/${playerId}`);
     revalidatePath('/players');
     revalidatePath('/operations');

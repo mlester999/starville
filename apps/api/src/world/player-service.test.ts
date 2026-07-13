@@ -1,10 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { getWorldManifest } from '@starville/game-content';
+import type { MapManifest } from '@starville/game-core';
 
 import type { LogContext, ServiceLogger } from '../contracts.js';
 import type {
   PlayerWorldGateway,
+  PinnedPublishedWorldView,
+  PinnedWorldAssetMaterial,
+  PinnedWorldTransitionView,
   PublishedWorldView,
   WorldTransitionView,
 } from './player-contracts.js';
@@ -26,7 +30,60 @@ const lanternVersionId = '11111111-1111-4111-8111-111111111111';
 const meadowVersionId = '22222222-2222-4222-8222-222222222222';
 const checkedAt = '2026-07-12T04:00:00.000Z';
 
-const lanternWorld: PublishedWorldView = {
+function pinnedAssets(manifest: MapManifest): readonly PinnedWorldAssetMaterial[] {
+  return manifest.assets.map((assetKey, index) => ({
+    assetKey,
+    versionId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
+    checksumSha256: 'c'.repeat(64),
+    mediaType: null,
+    width: null,
+    height: null,
+    renderWidth: null,
+    renderHeight: null,
+    scale: 1,
+    anchorX: 0.5,
+    anchorY: 1,
+    footAnchorX: 0.5,
+    footAnchorY: 1,
+    depthAnchorX: 0.5,
+    depthAnchorY: 1,
+    collisionProfile: { shape: 'none', blocking: false },
+    supportedRotations: [0],
+    defaultRotation: 0,
+    developmentMarker: true,
+    delivery: null,
+    fallback: 'repository_procedural',
+  }));
+}
+
+function publicAssets(materials: readonly PinnedWorldAssetMaterial[]) {
+  return materials.map((material) => ({
+    assetKey: material.assetKey,
+    versionId: material.versionId,
+    checksum: material.checksumSha256,
+    url: null,
+    mediaType: null,
+    width: null,
+    height: null,
+    renderWidth: null,
+    renderHeight: null,
+    scale: material.scale,
+    anchorX: material.anchorX,
+    anchorY: material.anchorY,
+    footAnchorX: material.footAnchorX,
+    footAnchorY: material.footAnchorY,
+    depthAnchorX: material.depthAnchorX,
+    depthAnchorY: material.depthAnchorY,
+    collision: material.collisionProfile,
+    supportedRotations: [...material.supportedRotations],
+    defaultRotation: material.defaultRotation,
+    developmentMarker: true,
+  }));
+}
+
+const lanternManifest = getWorldManifest('lantern-square');
+const lanternMaterials = pinnedAssets(lanternManifest);
+const lanternWorld: PinnedPublishedWorldView = {
   map: {
     id: '33333333-3333-4333-8333-333333333333',
     slug: 'lantern-square',
@@ -39,7 +96,7 @@ const lanternWorld: PublishedWorldView = {
     checksum: 'a'.repeat(64),
     publishedAt: checkedAt,
   },
-  manifest: getWorldManifest('lantern-square'),
+  manifest: lanternManifest,
   playerState: {
     mapId: 'lantern-square',
     mapVersionId: lanternVersionId,
@@ -50,9 +107,17 @@ const lanternWorld: PublishedWorldView = {
     updatedAt: checkedAt,
     lastTransitionAt: null,
   },
+  assetDeliveries: lanternMaterials,
 };
 
-const meadowTransition: WorldTransitionView = {
+const lanternPublicWorld: PublishedWorldView = {
+  ...lanternWorld,
+  assetDeliveries: publicAssets(lanternMaterials),
+};
+
+const meadowManifest = getWorldManifest('moonpetal-meadow');
+const meadowMaterials = pinnedAssets(meadowManifest);
+const meadowTransition: PinnedWorldTransitionView = {
   map: {
     id: '44444444-4444-4444-8444-444444444444',
     slug: 'moonpetal-meadow',
@@ -65,7 +130,7 @@ const meadowTransition: WorldTransitionView = {
     checksum: 'b'.repeat(64),
     publishedAt: checkedAt,
   },
-  manifest: getWorldManifest('moonpetal-meadow'),
+  manifest: meadowManifest,
   playerState: {
     mapId: 'moonpetal-meadow',
     mapVersionId: meadowVersionId,
@@ -83,6 +148,12 @@ const meadowTransition: WorldTransitionView = {
     destinationSpawnId: 'from-south',
     completedAt: checkedAt,
   },
+  assetDeliveries: meadowMaterials,
+};
+
+const meadowPublicTransition: WorldTransitionView = {
+  ...meadowTransition,
+  assetDeliveries: publicAssets(meadowMaterials),
 };
 
 function gateway(): PlayerWorldGateway {
@@ -92,6 +163,7 @@ function gateway(): PlayerWorldGateway {
       map: lanternWorld.map,
       version: lanternWorld.version,
       manifest: lanternWorld.manifest,
+      assetDeliveries: lanternWorld.assetDeliveries,
     })),
     transition: vi.fn(async () => meadowTransition),
   };
@@ -105,6 +177,7 @@ function service(target = gateway()) {
       logger: new SilentLogger(),
       manifestReadRateLimit: 180,
       transitionRateLimit: 30,
+      publicAssetUrl: (path) => `https://assets.example.test/${path}`,
     }),
   };
 }
@@ -113,7 +186,7 @@ describe('player world service', () => {
   it('loads only a structurally valid publication matching authoritative player state', async () => {
     const { target, value } = service();
     await expect(value.loadCurrent('server-derived-wallet', 'world-current')).resolves.toEqual(
-      lanternWorld,
+      lanternPublicWorld,
     );
     expect(target.loadCurrent).toHaveBeenCalledWith('server-derived-wallet', 'world-current', 180);
   });
@@ -127,6 +200,76 @@ describe('player world service', () => {
     const { value } = service(target);
     await expect(value.loadCurrent('wallet', 'invalid-publication')).rejects.toEqual(
       expect.objectContaining({ code: 'WORLD_CONTENT_INVALID', statusCode: 503 }),
+    );
+  });
+
+  it('maps only pinned immutable public object keys to safe delivery URLs', async () => {
+    const production = {
+      ...lanternMaterials[0]!,
+      mediaType: 'image/webp' as const,
+      width: 1024,
+      height: 1024,
+      renderWidth: 512,
+      renderHeight: 512,
+      developmentMarker: false,
+      delivery: {
+        bucket: 'game-assets' as const,
+        objectPath: `starville/${lanternMaterials[0]!.assetKey}/v2/source.webp`,
+      },
+      fallback: null,
+    };
+    const target = gateway();
+    vi.mocked(target.loadCurrent).mockResolvedValueOnce({
+      ...lanternWorld,
+      assetDeliveries: [production, ...lanternMaterials.slice(1)],
+    });
+    const { value } = service(target);
+
+    const loaded = await value.loadCurrent('wallet', 'production-delivery');
+    expect(loaded.assetDeliveries[0]).toEqual(
+      expect.objectContaining({
+        assetKey: production.assetKey,
+        url: `https://assets.example.test/starville/${production.assetKey}/v2/source.webp`,
+        developmentMarker: false,
+      }),
+    );
+    expect(loaded.assetDeliveries[0]).not.toHaveProperty('delivery');
+    expect(loaded.assetDeliveries[0]).not.toHaveProperty('objectPath');
+  });
+
+  it('rejects missing pins and cross-key public object paths', async () => {
+    const missing = gateway();
+    vi.mocked(missing.loadCurrent).mockResolvedValueOnce({
+      ...lanternWorld,
+      assetDeliveries: lanternMaterials.slice(1),
+    });
+    await expect(service(missing).value.loadCurrent('wallet', 'missing-pin')).rejects.toEqual(
+      expect.objectContaining({ code: 'WORLD_CONTENT_INVALID' }),
+    );
+
+    const crossKey = gateway();
+    vi.mocked(crossKey.loadCurrent).mockResolvedValueOnce({
+      ...lanternWorld,
+      assetDeliveries: [
+        {
+          ...lanternMaterials[0]!,
+          mediaType: 'image/webp',
+          width: 1024,
+          height: 1024,
+          renderWidth: 512,
+          renderHeight: 512,
+          developmentMarker: false,
+          delivery: {
+            bucket: 'game-assets',
+            objectPath: 'starville/different-asset/v1/source.webp',
+          },
+          fallback: null,
+        },
+        ...lanternMaterials.slice(1),
+      ],
+    });
+    await expect(service(crossKey).value.loadCurrent('wallet', 'cross-key')).rejects.toEqual(
+      expect.objectContaining({ code: 'WORLD_CONTENT_INVALID' }),
     );
   });
 
@@ -178,7 +321,7 @@ describe('player world service', () => {
         },
         'travel-north',
       ),
-    ).resolves.toEqual(meadowTransition);
+    ).resolves.toEqual(meadowPublicTransition);
     expect(target.transition).toHaveBeenCalledWith(
       'wallet',
       {

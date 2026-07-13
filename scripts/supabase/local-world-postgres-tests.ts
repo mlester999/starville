@@ -23,6 +23,16 @@ const migrationFiles = [
   '20260712102000_world_management_seed.sql',
   '20260712103000_world_management_admin.sql',
   '20260712104000_world_management_player_admin.sql',
+  '20260712105000_player_rename_access_pagination.sql',
+  '20260712106000_live_operations.sql',
+  '20260713100000_cozy_gameplay_foundation.sql',
+  '20260713101000_cozy_gameplay_actions.sql',
+  '20260713101500_cozy_world_interactions.sql',
+  '20260713102000_cozy_gameplay_housing_admin.sql',
+  '20260713110000_world_asset_manager_schema.sql',
+  '20260713111000_world_asset_manager_functions.sql',
+  '20260713111500_world_asset_manager_world_integration.sql',
+  '20260713112000_world_asset_manager_storage.sql',
 ] as const;
 
 interface CommandResult {
@@ -217,6 +227,20 @@ async function main(): Promise<void> {
     const seedMigration = join(migrationDirectory, '20260712102000_world_management_seed.sql');
     await runCommand(psql, [...psqlBaseArguments, '--single-transaction', '--file', seedMigration]);
     console.log('[world-postgres] verified idempotent Phase 6 seed replay');
+
+    const cozyAssertions = join(fixtureDirectory, 'cozy-gameplay-postgres-execution.sql');
+    const cozyResult = await runCommand(psql, [...psqlBaseArguments, '--file', cozyAssertions]);
+    if (cozyResult.stdout.trim()) {
+      console.log(cozyResult.stdout.trim());
+    }
+    console.log('[world-postgres] cozy-gameplay execution assertions passed');
+
+    const assetAssertions = join(fixtureDirectory, 'world-asset-manager-postgres-execution.sql');
+    const assetResult = await runCommand(psql, [...psqlBaseArguments, '--file', assetAssertions]);
+    if (assetResult.stdout.trim()) {
+      console.log(assetResult.stdout.trim());
+    }
+    console.log('[world-postgres] world-asset-manager execution assertions passed');
 
     const assertions = join(fixtureDirectory, 'world-postgres-execution.sql');
     const result = await runCommand(psql, [...psqlBaseArguments, '--file', assertions]);

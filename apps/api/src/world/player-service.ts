@@ -1,14 +1,20 @@
 import { z } from 'zod';
 
+import { worldAssetDeliveriesSchema, type WorldAssetDelivery } from '@starville/asset-management';
 import { mapIdSchema, validateMapManifest } from '@starville/game-core';
 import { WORLD_ASSET_CATALOG } from '@starville/game-content';
 
+import { assertInternalStoragePath } from '../asset-management/storage.js';
 import type { ServiceLogger } from '../contracts.js';
 import { PublicApiError } from '../errors.js';
 import type {
   PlayerWorldFailure,
   PlayerWorldGateway,
   PlayerWorldService,
+  PinnedPublishedManifestView,
+  PinnedPublishedWorldView,
+  PinnedWorldAssetMaterial,
+  PinnedWorldTransitionView,
   PublishedManifestView,
   PublishedWorldView,
   WorldTransitionView,
@@ -37,35 +43,114 @@ function mapFailure(status: PlayerWorldFailure): never {
   throw new PublicApiError(503, 'WORLD_UNAVAILABLE');
 }
 
-function validatePublishedManifest<View extends PublishedManifestView>(view: View): View {
+function exactPublicSourcePath(assetKey: string, value: string): string {
+  const safe = assertInternalStoragePath(value);
+  const escapedKey = assetKey.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+  if (!new RegExp(`^starville/${escapedKey}/v[1-9][0-9]*/source\\.webp$`, 'u').test(safe)) {
+    throw new Error('Asset delivery path does not match its stable key');
+  }
+  return safe;
+}
+
+function projectDeliveries(
+  manifestAssets: readonly string[],
+  materials: readonly PinnedWorldAssetMaterial[],
+  publicAssetUrl: (path: string) => string,
+): readonly WorldAssetDelivery[] {
+  const byKey = new Map<string, WorldAssetDelivery>();
+  for (const material of materials) {
+    if (byKey.has(material.assetKey)) throw new Error('Duplicate pinned asset material');
+    if (material.developmentMarker) {
+      if (WORLD_ASSET_CATALOG.get(material.assetKey)?.status !== 'approved') {
+        throw new Error('Unknown repository development marker');
+      }
+    }
+    const url =
+      material.delivery === null
+        ? null
+        : publicAssetUrl(exactPublicSourcePath(material.assetKey, material.delivery.objectPath));
+    const delivery = worldAssetDeliveriesSchema.element.parse({
+      assetKey: material.assetKey,
+      versionId: material.versionId,
+      checksum: material.checksumSha256,
+      url,
+      mediaType: material.mediaType,
+      width: material.width,
+      height: material.height,
+      renderWidth: material.renderWidth,
+      renderHeight: material.renderHeight,
+      scale: material.scale,
+      anchorX: material.anchorX,
+      anchorY: material.anchorY,
+      footAnchorX: material.footAnchorX,
+      footAnchorY: material.footAnchorY,
+      depthAnchorX: material.depthAnchorX,
+      depthAnchorY: material.depthAnchorY,
+      collision: material.collisionProfile,
+      supportedRotations: material.supportedRotations,
+      defaultRotation: material.defaultRotation,
+      developmentMarker: material.developmentMarker,
+    });
+    byKey.set(delivery.assetKey, delivery);
+  }
+  if (
+    byKey.size !== manifestAssets.length ||
+    manifestAssets.some((assetKey) => !byKey.has(assetKey))
+  ) {
+    throw new Error('Published manifest and pinned asset delivery set differ');
+  }
+  return worldAssetDeliveriesSchema.parse(manifestAssets.map((assetKey) => byKey.get(assetKey)));
+}
+
+function validatePublishedManifest(
+  view: PinnedPublishedManifestView,
+  publicAssetUrl: (path: string) => string,
+): PublishedManifestView {
   try {
-    const manifest = validateMapManifest(view.manifest, WORLD_ASSET_CATALOG);
+    const assetDeliveries = projectDeliveries(
+      view.manifest.assets,
+      view.assetDeliveries,
+      publicAssetUrl,
+    );
+    const deliveryCatalog = new Map(
+      assetDeliveries.map(({ assetKey }) => [
+        assetKey,
+        { key: assetKey, status: 'approved' as const },
+      ]),
+    );
+    const manifest = validateMapManifest(view.manifest, deliveryCatalog);
     if (manifest.id !== view.map.slug || manifest.version !== view.version.versionNumber) {
       throw new Error('Published manifest identity mismatch');
     }
-    return { ...view, manifest };
+    return { map: view.map, version: view.version, manifest, assetDeliveries };
   } catch {
     throw new PublicApiError(503, 'WORLD_CONTENT_INVALID');
   }
 }
 
-function validateWorld(view: PublishedWorldView): PublishedWorldView {
-  const validated = validatePublishedManifest(view);
+function validateWorld(
+  view: PinnedPublishedWorldView,
+  publicAssetUrl: (path: string) => string,
+): PublishedWorldView {
+  const validated = validatePublishedManifest(view, publicAssetUrl);
   if (
-    validated.playerState.mapId !== validated.map.slug ||
-    validated.playerState.mapVersionId !== validated.version.id
+    view.playerState.mapId !== validated.map.slug ||
+    view.playerState.mapVersionId !== validated.version.id
   ) {
     throw new PublicApiError(503, 'WORLD_CONTENT_INVALID');
   }
-  return validated;
+  return { ...validated, playerState: view.playerState };
 }
 
-function validateTransition(view: WorldTransitionView): WorldTransitionView {
-  const validated = validateWorld(view) as WorldTransitionView;
-  if (validated.transition.toMapId !== validated.map.slug) {
+function validateTransition(
+  view: PinnedWorldTransitionView,
+  publicAssetUrl: (path: string) => string,
+): WorldTransitionView {
+  const validated = validateWorld(view, publicAssetUrl);
+  if (view.transition.toMapId !== validated.map.slug) {
     throw new PublicApiError(503, 'WORLD_CONTENT_INVALID');
   }
-  return validated;
+  return { ...validated, transition: view.transition };
 }
 
 export function createPlayerWorldService(options: {
@@ -73,15 +158,16 @@ export function createPlayerWorldService(options: {
   readonly logger: ServiceLogger;
   readonly manifestReadRateLimit: number;
   readonly transitionRateLimit: number;
+  readonly publicAssetUrl: (path: string) => string;
 }): PlayerWorldService {
-  const { gateway, logger, manifestReadRateLimit, transitionRateLimit } = options;
+  const { gateway, logger, manifestReadRateLimit, transitionRateLimit, publicAssetUrl } = options;
 
   return {
     async loadCurrent(walletAddress, requestId) {
       try {
         const result = await gateway.loadCurrent(walletAddress, requestId, manifestReadRateLimit);
         if (typeof result === 'string') return mapFailure(result);
-        return validateWorld(result);
+        return validateWorld(result, publicAssetUrl);
       } catch (error) {
         if (error instanceof PublicApiError) throw error;
         logger.child({ requestId }).error('world.current.failed', { error });
@@ -99,7 +185,7 @@ export function createPlayerWorldService(options: {
           manifestReadRateLimit,
         );
         if (typeof result === 'string') return mapFailure(result);
-        return validatePublishedManifest(result);
+        return validatePublishedManifest(result, publicAssetUrl);
       } catch (error) {
         if (error instanceof PublicApiError) throw error;
         logger.child({ requestId }).error('world.manifest.failed', { error });
@@ -117,7 +203,7 @@ export function createPlayerWorldService(options: {
           transitionRateLimit,
         );
         if (typeof result === 'string') return mapFailure(result);
-        const validated = validateTransition(result);
+        const validated = validateTransition(result, publicAssetUrl);
         logger.child({ requestId }).info('world.transition.completed', {
           exitId: validated.transition.exitId,
           fromMapId: validated.transition.fromMapId,

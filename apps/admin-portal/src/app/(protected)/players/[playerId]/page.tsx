@@ -6,9 +6,15 @@ import { notFound } from 'next/navigation';
 
 import { CopyWalletButton } from '../../../../components/copy-wallet-button';
 import { PlayerActionDialog } from '../../../../components/player-action-dialog';
+import { PremiumSelect } from '../../../../components/premium-select';
 import { AdminApiError } from '../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../lib/auth/authorization';
 import { loadAdminPlayer, loadAdminPlayerActivity } from '../../../../lib/player-operations/api';
+import {
+  loadAdminPlayerCozy,
+  loadAdminPlayerEconomy,
+  loadAdminPlayerInventory,
+} from '../../../../lib/cozy-gameplay/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -32,15 +38,37 @@ function eventLabel(value: string): string {
 
 export default async function PlayerDetailPage(props: {
   readonly params: Promise<{ readonly playerId: string }>;
+  readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
   const context = await requireAuthorizedAdmin('players.read');
   const { playerId } = await props.params;
+  const searchParams = await props.searchParams;
+  const rawAccessPage = Number(searchParams['accessPage']);
+  const rawAccessPageSize = Number(searchParams['accessPageSize']);
+  const accessPage = Number.isInteger(rawAccessPage) && rawAccessPage > 0 ? rawAccessPage : 1;
+  const accessPageSize = ([10, 50, 100] as const).find((size) => size === rawAccessPageSize) ?? 10;
+  const rawCozyPageSize = Number(searchParams['cozyPageSize']);
+  const cozyPageSize = ([10, 50, 100] as const).find((size) => size === rawCozyPageSize) ?? 10;
+  const rawEconomyPage = Number(searchParams['economyPage']);
+  const rawInventoryPage = Number(searchParams['inventoryPage']);
+  const economyPage = Number.isInteger(rawEconomyPage) && rawEconomyPage > 0 ? rawEconomyPage : 1;
+  const inventoryPage =
+    Number.isInteger(rawInventoryPage) && rawInventoryPage > 0 ? rawInventoryPage : 1;
 
   try {
-    const [player, activity] = await Promise.all([
+    const [player, activity, economy, inventory, cozy] = await Promise.all([
       loadAdminPlayer(playerId),
       hasAdminPermission(context, 'player_audit.read')
-        ? loadAdminPlayerActivity(playerId)
+        ? loadAdminPlayerActivity(playerId, { accessPage, accessPageSize })
+        : Promise.resolve(undefined),
+      hasAdminPermission(context, 'economy.read')
+        ? loadAdminPlayerEconomy(playerId, { page: economyPage, pageSize: cozyPageSize })
+        : Promise.resolve(undefined),
+      hasAdminPermission(context, 'inventories.read')
+        ? loadAdminPlayerInventory(playerId, { page: inventoryPage, pageSize: cozyPageSize })
+        : Promise.resolve(undefined),
+      hasAdminPermission(context, 'cozy_gameplay.read')
+        ? loadAdminPlayerCozy(playerId)
         : Promise.resolve(undefined),
     ]);
     const canReadWallet = hasAdminPermission(context, 'wallets.read');
@@ -111,7 +139,7 @@ export default async function PlayerDetailPage(props: {
             <dl className="detail-list">
               <div>
                 <dt>Map</dt>
-                <dd>Lantern Square</dd>
+                <dd>{player.profile.mapId}</dd>
               </div>
               <div>
                 <dt>Safe position</dt>
@@ -200,6 +228,194 @@ export default async function PlayerDetailPage(props: {
           </section>
         </div>
 
+        {economy !== undefined || inventory !== undefined || cozy !== undefined ? (
+          <section className="cozy-admin-section" aria-labelledby="cozy-state-title">
+            <div className="cozy-admin-section__heading">
+              <div>
+                <p className="eyebrow">Read-only cozy systems</p>
+                <h2 id="cozy-state-title">Gameplay state</h2>
+              </div>
+              <div>
+                <p>Operational visibility only. No DUST or inventory adjustment is available.</p>
+                <form className="cozy-page-size" method="get">
+                  <input name="economyPage" type="hidden" value="1" />
+                  <input name="inventoryPage" type="hidden" value="1" />
+                  <PremiumSelect
+                    aria-label="Cozy history entries per page"
+                    defaultValue={String(cozyPageSize)}
+                    name="cozyPageSize"
+                    options={[
+                      { value: '10', label: '10 entries' },
+                      { value: '50', label: '50 entries' },
+                      { value: '100', label: '100 entries' },
+                    ]}
+                    size="compact"
+                  />
+                  <button className="button button--secondary" type="submit">
+                    Apply
+                  </button>
+                </form>
+              </div>
+            </div>
+            <div className="detail-grid">
+              {economy !== undefined ? (
+                <section className="detail-card" aria-labelledby="dust-title">
+                  <h3 id="dust-title">DUST</h3>
+                  {economy.initialized && economy.account !== null ? (
+                    <>
+                      <p className="cozy-balance">
+                        {economy.account.balance.toLocaleString()} DUST
+                      </p>
+                      <p className="card-note">
+                        Off-chain soft currency. Not $STAR and not transferable.
+                      </p>
+                      <ol className="cozy-compact-list">
+                        {economy.items.map((entry) => (
+                          <li key={entry.id}>
+                            <span>{entry.reason.replaceAll('_', ' ')}</span>
+                            <strong>
+                              {entry.delta > 0 ? '+' : ''}
+                              {entry.delta} DUST
+                            </strong>
+                            <small>{formatDate(entry.createdAt)}</small>
+                          </li>
+                        ))}
+                      </ol>
+                      <div className="cozy-pagination">
+                        {economyPage > 1 ? (
+                          <Link
+                            href={`?economyPage=${economyPage - 1}&inventoryPage=${inventoryPage}&cozyPageSize=${cozyPageSize}`}
+                          >
+                            Previous
+                          </Link>
+                        ) : (
+                          <span />
+                        )}
+                        <span>
+                          Page {economy.pagination.page} of{' '}
+                          {Math.max(1, economy.pagination.totalPages)}
+                        </span>
+                        {economyPage < economy.pagination.totalPages ? (
+                          <Link
+                            href={`?economyPage=${economyPage + 1}&inventoryPage=${inventoryPage}&cozyPageSize=${cozyPageSize}`}
+                          >
+                            Next
+                          </Link>
+                        ) : (
+                          <span />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p>Cozy gameplay has not been initialized for this player.</p>
+                  )}
+                </section>
+              ) : null}
+
+              {inventory !== undefined ? (
+                <section className="detail-card" aria-labelledby="inventory-title">
+                  <h3 id="inventory-title">Inventory</h3>
+                  {inventory.initialized && inventory.inventory !== null ? (
+                    <>
+                      <p className="cozy-balance">
+                        {inventory.inventory.capacity.usedSlots} /{' '}
+                        {inventory.inventory.capacity.capacity} slots
+                      </p>
+                      <ul className="cozy-definition-list">
+                        {inventory.inventory.stacks.map((stack) => (
+                          <li key={stack.id}>
+                            <strong>{stack.item.name}</strong>
+                            <span>
+                              × {stack.quantity} · {stack.item.category.replaceAll('_', ' ')}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="card-note">Recent movements: {inventory.pagination.total}</p>
+                      <ol className="cozy-compact-list">
+                        {inventory.items.map((entry) => (
+                          <li key={entry.id}>
+                            <span>
+                              {entry.itemSlug} · {entry.reason.replaceAll('_', ' ')}
+                            </span>
+                            <strong>
+                              {entry.delta > 0 ? '+' : ''}
+                              {entry.delta}
+                            </strong>
+                            <small>{formatDate(entry.createdAt)}</small>
+                          </li>
+                        ))}
+                      </ol>
+                      <div className="cozy-pagination">
+                        {inventoryPage > 1 ? (
+                          <Link
+                            href={`?economyPage=${economyPage}&inventoryPage=${inventoryPage - 1}&cozyPageSize=${cozyPageSize}`}
+                          >
+                            Previous
+                          </Link>
+                        ) : (
+                          <span />
+                        )}
+                        <span>
+                          Page {inventory.pagination.page} of{' '}
+                          {Math.max(1, inventory.pagination.totalPages)}
+                        </span>
+                        {inventoryPage < inventory.pagination.totalPages ? (
+                          <Link
+                            href={`?economyPage=${economyPage}&inventoryPage=${inventoryPage + 1}&cozyPageSize=${cozyPageSize}`}
+                          >
+                            Next
+                          </Link>
+                        ) : (
+                          <span />
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <p>Cozy gameplay has not been initialized for this player.</p>
+                  )}
+                </section>
+              ) : null}
+
+              {cozy !== undefined ? (
+                <section className="detail-card" aria-labelledby="farm-home-title">
+                  <h3 id="farm-home-title">Farm and home</h3>
+                  <dl className="detail-list">
+                    <div>
+                      <dt>Farm plots</dt>
+                      <dd>{cozy.farm.total}</dd>
+                    </div>
+                    <div>
+                      <dt>Occupied</dt>
+                      <dd>{cozy.farm.occupied}</dd>
+                    </div>
+                    <div>
+                      <dt>Ready</dt>
+                      <dd>{cozy.farm.ready}</dd>
+                    </div>
+                    <div>
+                      <dt>Home</dt>
+                      <dd>{cozy.home?.templateName ?? 'Not initialized'}</dd>
+                    </div>
+                    <div>
+                      <dt>Placed furniture</dt>
+                      <dd>{cozy.home?.placedFurnitureCount ?? 0}</dd>
+                    </div>
+                    <div>
+                      <dt>Location</dt>
+                      <dd>{cozy.home?.insideHome ? 'Private home' : 'Public world'}</dd>
+                    </div>
+                    <div>
+                      <dt>Last update</dt>
+                      <dd>{formatDate(cozy.lastGameplayUpdate)}</dd>
+                    </div>
+                  </dl>
+                </section>
+              ) : null}
+            </div>
+          </section>
+        ) : null}
+
         <section className="player-actions" aria-labelledby="actions-title">
           <div>
             <p className="eyebrow">Permission-aware controls</p>
@@ -215,6 +431,8 @@ export default async function PlayerDetailPage(props: {
                 action="suspend"
                 buttonLabel="Suspend player"
                 dangerous
+                severity="critical"
+                typedConfirmation="SUSPEND"
                 description="Game entry will be blocked and active Starville access sessions will be revoked. Wallet assets remain untouched."
                 expectedVersion={moderation.version}
                 idempotencyKey={randomUUID()}
@@ -230,6 +448,7 @@ export default async function PlayerDetailPage(props: {
                 action="restore"
                 buttonLabel="Restore player"
                 description="Application access will be restored, but no wallet session will be created. The player must authenticate again."
+                severity="caution"
                 expectedVersion={moderation.version}
                 idempotencyKey={randomUUID()}
                 key={`restore-${moderation.version}`}
@@ -244,6 +463,7 @@ export default async function PlayerDetailPage(props: {
                 action="reset-position"
                 buttonLabel="Reset to spawn"
                 description="The stored resume point will be reset only to Lantern Square’s reviewed default spawn and current access sessions will be revoked so stale state cannot overwrite it. No coordinates are accepted from this browser, and no economy or inventory data changes."
+                severity="caution"
                 expectedVersion={moderation.version}
                 idempotencyKey={randomUUID()}
                 key={`reset-position-${moderation.version}`}
@@ -258,6 +478,7 @@ export default async function PlayerDetailPage(props: {
                 action="require-rename"
                 buttonLabel="Require rename"
                 dangerous
+                severity="caution"
                 description="Normal map entry will stop and active sessions will be revoked until the player chooses a valid replacement name. Staff cannot assign the name."
                 expectedVersion={moderation.version}
                 idempotencyKey={randomUUID()}
@@ -268,12 +489,30 @@ export default async function PlayerDetailPage(props: {
                 walletAddress={player.profile.walletAddress}
               />
             ) : null}
+            {hasAdminPermission(context, 'players.rename') ? (
+              <PlayerActionDialog
+                action="rename"
+                buttonLabel="Rename Player"
+                description="The canonical display name will change immediately and any rename-required state will clear. Wallet identity, access eligibility, position, progress, and moderation status are preserved."
+                expectedVersion={moderation.version}
+                idempotencyKey={randomUUID()}
+                key={`rename-${moderation.version}`}
+                newNameInput
+                playerId={player.profile.id}
+                playerName={player.profile.displayName}
+                severity="caution"
+                title="Rename this player?"
+                walletAddress={player.profile.walletAddress}
+              />
+            ) : null}
             {hasAdminPermission(context, 'players.manage_sessions') &&
             player.access.activeSessions > 0 ? (
               <PlayerActionDialog
                 action="revoke-sessions"
                 buttonLabel="Revoke sessions"
                 dangerous
+                severity="critical"
+                typedConfirmation="REVOKE"
                 description="Current Starville access sessions will stop, and the player must reconnect and sign again. The wallet and its token balance are not changed."
                 expectedVersion={moderation.version}
                 idempotencyKey={randomUUID()}
@@ -329,18 +568,75 @@ export default async function PlayerDetailPage(props: {
           ) : activity.accessEvents.length === 0 ? (
             <p>No recent access events have been recorded for this player.</p>
           ) : (
-            <ol className="audit-list">
-              {activity.accessEvents.map((event) => (
-                <li key={event.id}>
-                  <div>
-                    <strong>{eventLabel(event.event)}</strong>
-                    <span className={`state-chip state-chip--${event.result}`}>{event.result}</span>
-                  </div>
-                  <p>{event.reasonCode ?? 'No denial or error reason recorded.'}</p>
-                  <small>{formatDate(event.createdAt)}</small>
-                </li>
-              ))}
-            </ol>
+            <>
+              <form className="access-pagination-size" method="get">
+                <input name="accessPage" type="hidden" value="1" />
+                <label>
+                  Events per page
+                  <PremiumSelect
+                    aria-label="Events per page"
+                    defaultValue={String(activity.accessPageSize)}
+                    name="accessPageSize"
+                    options={[
+                      { value: '10', label: '10 per page' },
+                      { value: '50', label: '50 per page' },
+                      { value: '100', label: '100 per page' },
+                    ]}
+                    size="compact"
+                  />
+                </label>
+                <button className="button button--secondary" type="submit">
+                  Apply
+                </button>
+              </form>
+              <p className="pagination-summary">
+                Showing {(activity.accessPage - 1) * activity.accessPageSize + 1}–
+                {Math.min(activity.accessPage * activity.accessPageSize, activity.accessTotal)} of{' '}
+                {activity.accessTotal} events · Page {activity.accessPage} of{' '}
+                {Math.max(1, activity.accessTotalPages)}
+              </p>
+              <ol className="audit-list audit-list--compact">
+                {activity.accessEvents.map((event) => (
+                  <li key={event.id}>
+                    <div>
+                      <strong>{eventLabel(event.event)}</strong>
+                      <span className={`state-chip state-chip--${event.result}`}>
+                        {event.result}
+                      </span>
+                    </div>
+                    <p>{event.reasonCode ?? 'No denial or error reason recorded.'}</p>
+                    <small>{formatDate(event.createdAt)}</small>
+                  </li>
+                ))}
+              </ol>
+              <nav className="pagination" aria-label="Safe access history pages">
+                {activity.accessPage <= 1 ? (
+                  <span aria-disabled="true" className="is-disabled">
+                    Previous
+                  </span>
+                ) : (
+                  <Link
+                    href={`?accessPage=${activity.accessPage - 1}&accessPageSize=${activity.accessPageSize}`}
+                  >
+                    Previous
+                  </Link>
+                )}
+                <span>
+                  Page {activity.accessPage} of {Math.max(1, activity.accessTotalPages)}
+                </span>
+                {activity.accessPage >= activity.accessTotalPages ? (
+                  <span aria-disabled="true" className="is-disabled">
+                    Next
+                  </span>
+                ) : (
+                  <Link
+                    href={`?accessPage=${activity.accessPage + 1}&accessPageSize=${activity.accessPageSize}`}
+                  >
+                    Next
+                  </Link>
+                )}
+              </nav>
+            </>
           )}
         </section>
       </main>

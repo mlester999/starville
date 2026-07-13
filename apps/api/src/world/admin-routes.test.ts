@@ -55,6 +55,7 @@ function authGateway(permissionKeys: readonly AdminPermissionKey[]): AdminAuthGa
 function worldService(): AdminWorldService {
   return {
     listWorlds: vi.fn(async () => ({ items: [] })),
+    getPublishedTopology: vi.fn(async () => ({ status: 'loaded', maps: [] })),
     getWorld: vi.fn(async () => ({ map: {} })),
     getDraft: vi.fn(async () => ({ manifest: {} })),
     createDraft: vi.fn(async () => ({ version: {} })),
@@ -119,6 +120,24 @@ describe('administrator world routes', () => {
       { limit: '25', offset: '0' },
       expect.any(String),
     );
+  });
+
+  it('keeps the stored published topology behind maps.read', async () => {
+    const service = worldService();
+    const denied = await app([], service).inject({
+      method: 'GET',
+      url: '/api/v1/admin/world-topology',
+      headers: { authorization: 'Bearer verified' },
+    });
+    const allowed = await app(['maps.read'], service).inject({
+      method: 'GET',
+      url: '/api/v1/admin/world-topology',
+      headers: { authorization: 'Bearer verified' },
+    });
+
+    expect(denied.statusCode).toBe(403);
+    expect(allowed.statusCode).toBe(200);
+    expect(service.getPublishedTopology).toHaveBeenCalledWith(identity, expect.any(String));
   });
 
   it('keeps draft preview behind its independent permission', async () => {

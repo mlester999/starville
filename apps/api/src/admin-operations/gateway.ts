@@ -37,6 +37,7 @@ const RPC_BY_ACTION = {
   restore: 'admin_restore_player',
   'reset-position': 'admin_reset_player_position',
   'require-rename': 'admin_require_player_rename',
+  rename: 'admin_rename_player',
   'revoke-sessions': 'admin_revoke_player_sessions',
 } as const satisfies Readonly<Record<PlayerActionKey, string>>;
 
@@ -124,12 +125,14 @@ export function createSupabaseAdminOperationsGateway(
     },
 
     async getPlayerActivity(identity, playerId, query) {
-      const value = await executeRpc(client, 'get_admin_player_activity', {
+      const value = await executeRpc(client, 'get_admin_player_activity_page', {
         ...identityParameters(identity),
         p_environment_key: options.environmentKey,
         p_network: options.network,
         p_player_profile_id: playerId,
-        p_limit: query.limit,
+        p_audit_limit: query.limit,
+        p_access_page: query.accessPage,
+        p_access_page_size: query.accessPageSize,
       });
       const status = statusSchema.safeParse(value);
       if (status.success && status.data.status === 'not_found') return 'not_found';
@@ -156,6 +159,7 @@ export function createSupabaseAdminOperationsGateway(
           p_player_profile_id: playerId,
           p_expected_version: input.expectedVersion,
           p_reason: input.reason,
+          ...(action === 'rename' ? { p_display_name: input.displayName } : {}),
           p_request_id: requestId,
           p_rate_limit: rateLimit,
         }),

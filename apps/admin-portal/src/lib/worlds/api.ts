@@ -10,6 +10,7 @@ import {
   worldDraftSchema,
   worldPreviewSchema,
   worldPublishResponseSchema,
+  publishedWorldTopologySchema,
   worldValidationResponseSchema,
   type WorldAssetDirectory,
   type WorldAuditDirectory,
@@ -19,6 +20,7 @@ import {
   type WorldDraftLoad,
   type WorldPreview,
   type AdminWorldManifest,
+  type PublishedWorldTopology,
 } from './contracts';
 import type { WorldCatalogQuery, WorldDirectoryQuery } from './query';
 
@@ -50,6 +52,14 @@ export function loadWorldDirectory(query: WorldDirectoryQuery): Promise<WorldDir
     method: 'GET',
     pathname: `/api/v1/admin/worlds?${directoryParameters(query)}`,
     parser: (value) => worldDirectorySchema.parse(value),
+  });
+}
+
+export function loadPublishedWorldTopology(): Promise<PublishedWorldTopology> {
+  return callTrustedAdminApi({
+    method: 'GET',
+    pathname: '/api/v1/admin/world-topology',
+    parser: (value) => publishedWorldTopologySchema.parse(value),
   });
 }
 

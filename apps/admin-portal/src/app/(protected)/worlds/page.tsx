@@ -1,8 +1,11 @@
 import Link from 'next/link';
+import { deriveWorldTopology } from '@starville/game-content';
 
+import { PremiumSelect } from '../../../components/premium-select';
+import { WorldTopology } from '../../../components/world-topology';
 import { AdminApiError } from '../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../lib/auth/authorization';
-import { loadWorldDirectory } from '../../../lib/worlds/api';
+import { loadPublishedWorldTopology, loadWorldDirectory } from '../../../lib/worlds/api';
 import { parseWorldDirectoryQuery, worldDirectoryHref } from '../../../lib/worlds/query';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +26,12 @@ export default async function WorldsPage(props: {
   const query = parseWorldDirectoryQuery(await props.searchParams);
 
   try {
-    const directory = await loadWorldDirectory(query);
+    const [directory, topology] = await Promise.all([
+      loadWorldDirectory(query),
+      loadPublishedWorldTopology(),
+    ]);
+    const derivedTopology = deriveWorldTopology(topology);
+    const topologyBySlug = new Map(derivedTopology.nodes.map((node) => [node.map.slug, node]));
     return (
       <main className="operations-page" aria-labelledby="worlds-title">
         <header className="operations-intro">
@@ -38,6 +46,8 @@ export default async function WorldsPage(props: {
           <span className="permission-badge">{directory.total} map(s)</span>
         </header>
 
+        <WorldTopology topology={topology} />
+
         <form className="player-filters" method="get" role="search">
           <label>
             Name or slug
@@ -45,27 +55,45 @@ export default async function WorldsPage(props: {
           </label>
           <label>
             Map status
-            <select defaultValue={query.status} name="status">
-              <option value="all">All states</option>
-              <option value="active">Active</option>
-              <option value="archived">Archived</option>
-            </select>
+            <PremiumSelect
+              aria-label="Map status"
+              defaultValue={query.status}
+              name="status"
+              options={[
+                { value: 'all', label: 'All states' },
+                { value: 'active', label: 'Active' },
+                { value: 'archived', label: 'Archived' },
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Sort
-            <select defaultValue={query.sort} name="sort">
-              <option value="updated_at">Last updated</option>
-              <option value="display_name">Display name</option>
-              <option value="slug">Slug</option>
-              <option value="status">Status</option>
-            </select>
+            <PremiumSelect
+              aria-label="Sort"
+              defaultValue={query.sort}
+              name="sort"
+              options={[
+                { value: 'updated_at', label: 'Last updated' },
+                { value: 'display_name', label: 'Display name' },
+                { value: 'slug', label: 'Slug' },
+                { value: 'status', label: 'Status' },
+              ]}
+              size="compact"
+            />
           </label>
           <label>
             Direction
-            <select defaultValue={query.direction} name="direction">
-              <option value="desc">Descending</option>
-              <option value="asc">Ascending</option>
-            </select>
+            <PremiumSelect
+              aria-label="Direction"
+              defaultValue={query.direction}
+              name="direction"
+              options={[
+                { value: 'desc', label: 'Descending' },
+                { value: 'asc', label: 'Ascending' },
+              ]}
+              size="compact"
+            />
           </label>
           <input name="pageSize" type="hidden" value={query.pageSize} />
           <button className="button button--primary" type="submit">
@@ -93,6 +121,8 @@ export default async function WorldsPage(props: {
                 <tr>
                   <th scope="col">World</th>
                   <th scope="col">Map status</th>
+                  <th scope="col">Role</th>
+                  <th scope="col">Connections</th>
                   <th scope="col">Published</th>
                   <th scope="col">Draft</th>
                   <th scope="col">Validation</th>
@@ -113,6 +143,26 @@ export default async function WorldsPage(props: {
                       <span className={`state-chip state-chip--${world.status}`}>
                         {world.status}
                       </span>
+                    </td>
+                    <td data-label="Role">
+                      {topologyBySlug.get(world.slug)?.role ?? 'No published role'}
+                    </td>
+                    <td data-label="Connections">
+                      <div className="connection-chips">
+                        {topologyBySlug.get(world.slug)?.map.manifest.exits.map((exit) => (
+                          <span
+                            className={
+                              exit.enabled ? 'connection-chip' : 'connection-chip is-disabled'
+                            }
+                            key={exit.direction}
+                          >
+                            {exit.direction.slice(0, 1).toUpperCase()}:{' '}
+                            {exit.enabled
+                              ? (exit.transitionLabel ?? exit.destinationMapId)
+                              : 'Disabled'}
+                          </span>
+                        )) ?? 'Unavailable'}
+                      </div>
                     </td>
                     <td data-label="Published">
                       {world.activeVersionNumber === null

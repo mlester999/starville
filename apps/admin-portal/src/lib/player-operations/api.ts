@@ -29,7 +29,7 @@ export interface AdminPlayerDirectoryQuery {
 }
 
 export type AdminPlayerAction =
-  'suspend' | 'restore' | 'reset-position' | 'require-rename' | 'revoke-sessions';
+  'suspend' | 'restore' | 'reset-position' | 'require-rename' | 'rename' | 'revoke-sessions';
 
 function pathnameForDirectory(query: AdminPlayerDirectoryQuery): string {
   const parameters = new URLSearchParams({
@@ -62,10 +62,22 @@ export function loadAdminPlayer(playerId: string): Promise<PlayerDetail> {
   });
 }
 
-export function loadAdminPlayerActivity(playerId: string, limit = 25): Promise<PlayerActivity> {
+export function loadAdminPlayerActivity(
+  playerId: string,
+  query: {
+    readonly limit?: number;
+    readonly accessPage: number;
+    readonly accessPageSize: 10 | 50 | 100;
+  },
+): Promise<PlayerActivity> {
+  const parameters = new URLSearchParams({
+    limit: String(query.limit ?? 25),
+    accessPage: String(query.accessPage),
+    accessPageSize: String(query.accessPageSize),
+  });
   return callTrustedAdminApi({
     method: 'GET',
-    pathname: `/api/v1/admin/players/${encodeURIComponent(playerId)}/activity?limit=${limit}`,
+    pathname: `/api/v1/admin/players/${encodeURIComponent(playerId)}/activity?${parameters.toString()}`,
     parser: (value) => playerActivitySchema.parse(value),
   });
 }
@@ -81,7 +93,11 @@ export function loadOperationsSummary(): Promise<OperationsSummary> {
 export function performAdminPlayerAction(
   playerId: string,
   action: AdminPlayerAction,
-  input: { readonly expectedVersion: number; readonly reason: string },
+  input: {
+    readonly expectedVersion: number;
+    readonly reason: string;
+    readonly displayName?: string;
+  },
   requestId: string,
 ): Promise<PlayerActionResult> {
   return callTrustedAdminApi({

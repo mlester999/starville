@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 
+import type { WorldAssetDelivery } from '@starville/asset-management';
 import {
   depthForFootPosition,
   projectWorld,
@@ -8,6 +9,11 @@ import {
 } from '@starville/game-core';
 
 import { WORLD_COLORS } from './palette';
+import {
+  isProductionWorldAssetDelivery,
+  worldAssetRenderPlacement,
+  worldAssetTextureKey,
+} from './world-asset-textures';
 
 export interface RenderedWorldObject {
   readonly id: string;
@@ -140,6 +146,7 @@ function drawObject(graphics: Phaser.GameObjects.Graphics, object: MapObject): v
 export function renderWorldObjects(
   scene: Phaser.Scene,
   manifest: MapManifest,
+  deliveries: readonly WorldAssetDelivery[] = [],
 ): readonly RenderedWorldObject[] {
   const projection = {
     tileWidth: manifest.tileWidth,
@@ -148,13 +155,38 @@ export function renderWorldObjects(
     originY: manifest.projectionOrigin.y,
   };
 
+  const deliveriesByKey = new Map(deliveries.map((delivery) => [delivery.assetKey, delivery]));
+
   return manifest.objects.map((object) => {
     const screen = projectWorld(object, projection);
-    const graphics = scene.add.graphics();
-    drawObject(graphics, object);
-    const container = scene.add.container(screen.x, screen.y, [graphics]);
+    const delivery = deliveriesByKey.get(object.assetId);
+    let visual: Phaser.GameObjects.GameObject;
+    let depthOffset = 0;
+
+    if (
+      delivery !== undefined &&
+      isProductionWorldAssetDelivery(delivery) &&
+      scene.textures.exists(worldAssetTextureKey(delivery))
+    ) {
+      const placement = worldAssetRenderPlacement(delivery);
+      const image = scene.add.image(0, 0, worldAssetTextureKey(delivery));
+      image.setOrigin(placement.originX, placement.originY);
+      image.setDisplaySize(
+        delivery.renderWidth * delivery.scale,
+        delivery.renderHeight * delivery.scale,
+      );
+      image.setAngle(delivery.defaultRotation);
+      visual = image;
+      depthOffset = placement.depthOffset;
+    } else {
+      const graphics = scene.add.graphics();
+      drawObject(graphics, object);
+      visual = graphics;
+    }
+
+    const container = scene.add.container(screen.x, screen.y, [visual]);
     container.setScale(object.scale);
-    container.setDepth(depthForFootPosition(object.x, object.y, object.id));
+    container.setDepth(depthForFootPosition(object.x, object.y, object.id) + depthOffset);
     return { id: object.id, container };
   });
 }

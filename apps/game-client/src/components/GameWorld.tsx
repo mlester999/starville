@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { PlayerProfile, PlayerStateUpdate } from '@starville/game-core';
+import type { PlayerProfile, PlayerStateUpdate, WorldInteraction } from '@starville/game-core';
 
 import { loadGameSettings, saveGameSettings, type GameSettings } from '../app/game-settings';
 import { PlayerRequestError } from '../app/player-client';
@@ -19,6 +19,7 @@ import type {
   InteractionPrompt,
   RuntimeWorld,
 } from '../game/contracts';
+import { CozyGameplay } from './CozyGameplay';
 import { GameCanvas } from './GameCanvas';
 import { GameSettingsDialog } from './GameSettingsDialog';
 
@@ -31,6 +32,7 @@ interface GameWorldProps {
   readonly onRecheck: () => Promise<void>;
   readonly onAccessInvalid: () => void;
   readonly onLeaveVillage: () => Promise<void>;
+  readonly onRegisterMaintenanceFlush?: (handler: (() => Promise<void>) | undefined) => void;
 }
 
 interface LoadedGameWorldProps extends GameWorldProps {
@@ -55,6 +57,7 @@ function runtimeWorld(world: PublishedWorld): RuntimeWorld {
     manifest: world.manifest,
     versionId: world.version.id,
     checksum: world.version.checksum,
+    assetDeliveries: world.assetDeliveries,
   };
 }
 
@@ -86,6 +89,7 @@ function LoadedGameWorld({
   onRecheck,
   onAccessInvalid,
   onLeaveVillage,
+  onRegisterMaintenanceFlush,
   initialWorld,
 }: LoadedGameWorldProps) {
   const runtime = useRef<GameRuntimeHandle | null>(null);
@@ -101,6 +105,11 @@ function LoadedGameWorld({
   const [leaving, setLeaving] = useState(false);
   const [interaction, setInteraction] = useState<InteractionPrompt | null>(null);
   const [dialogue, setDialogue] = useState<InteractionDialogue | null>(null);
+  const [cozyInteraction, setCozyInteraction] = useState<Exclude<
+    WorldInteraction,
+    { readonly type: 'notice' }
+  > | null>(null);
+  const [cozyOpen, setCozyOpen] = useState(false);
   const [transition, setTransition] = useState<TransitionState | null>(null);
   const initialState = stateFromWorld(initialWorld);
   const persistence = usePlayerPersistence({
@@ -109,8 +118,12 @@ function LoadedGameWorld({
     initialGameStateVersion: initialWorld.playerState.gameStateVersion,
     onAccessInvalid,
   });
+  useEffect(() => {
+    onRegisterMaintenanceFlush?.(persistence.flushBeforeLeave);
+    return () => onRegisterMaintenanceFlush?.(undefined);
+  }, [onRegisterMaintenanceFlush, persistence.flushBeforeLeave]);
   const traveling = transition?.phase === 'traveling';
-  const inputBlocked = settingsOpen || dialogue !== null || leaving || traveling;
+  const inputBlocked = settingsOpen || dialogue !== null || cozyOpen || leaving || traveling;
 
   useEffect(
     () => () => {
@@ -128,6 +141,18 @@ function LoadedGameWorld({
   }, [dialogue, leaving, traveling]);
 
   const closeDialogue = useCallback(() => setDialogue(null), []);
+
+  const openInteraction = useCallback((nextInteraction: WorldInteraction) => {
+    if (nextInteraction.type === 'notice') {
+      setDialogue({
+        id: nextInteraction.id,
+        title: nextInteraction.title,
+        content: nextInteraction.content,
+      });
+    } else {
+      setCozyInteraction(nextInteraction);
+    }
+  }, []);
 
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
@@ -198,12 +223,14 @@ function LoadedGameWorld({
           map: destination.map,
           version: destination.version,
           manifest: destination.manifest,
+          assetDeliveries: destination.assetDeliveries,
           playerState: destination.playerState,
         };
         runtime.current?.loadWorld(runtimeWorld(nextWorld), stateFromWorld(nextWorld));
         setWorld(nextWorld);
         setInteraction(null);
         setDialogue(null);
+        setCozyInteraction(null);
         setTransition(null);
       } catch (error) {
         persistence.cancelTransition();
@@ -320,7 +347,7 @@ function LoadedGameWorld({
             onError={setRuntimeError}
             onExitRequested={(request) => void handleExit(request)}
             onFinalState={persistence.checkpoint}
-            onInteractionOpen={setDialogue}
+            onInteractionOpen={openInteraction}
             onInteractionTarget={setInteraction}
             onMapChanged={() => undefined}
             onSettingsRequested={toggleSettings}
@@ -375,6 +402,14 @@ function LoadedGameWorld({
             </section>
           </div>
         )}
+
+        <CozyGameplay
+          apiUrl={apiUrl}
+          interaction={cozyInteraction}
+          onAccessInvalid={onAccessInvalid}
+          onInteractionClose={() => setCozyInteraction(null)}
+          onOpenChange={setCozyOpen}
+        />
 
         {transition === null ? null : (
           <div

@@ -15,6 +15,7 @@ export {
   worldMapSchema,
   worldPreviewSchema,
   worldPublishResponseSchema,
+  publishedWorldTopologySchema,
   worldValidationIssueSchema,
   worldValidationResponseSchema,
   worldValidationResultSchema,
@@ -31,6 +32,7 @@ export {
   type WorldDraftLoad,
   type WorldMapRecord,
   type WorldPreview,
+  type PublishedWorldTopology,
   type WorldValidationResult,
   type WorldVersionSummary,
 } from '@starville/game-content';

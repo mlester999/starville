@@ -7,9 +7,14 @@ import { notFound } from 'next/navigation';
 import { createWorldDraftAction } from '../../../actions/worlds';
 import { WorldAuditList } from '../../../../components/world-audit-list';
 import { WorldVersionDialog } from '../../../../components/world-version-dialog';
+import { WorldTopology } from '../../../../components/world-topology';
 import { AdminApiError } from '../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../lib/auth/authorization';
-import { loadWorldDetail, loadWorldMapAudit } from '../../../../lib/worlds/api';
+import {
+  loadPublishedWorldTopology,
+  loadWorldDetail,
+  loadWorldMapAudit,
+} from '../../../../lib/worlds/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -39,11 +44,12 @@ export default async function WorldDetailPage(props: {
   const notice = noticeMessage((await props.searchParams)['notice']);
 
   try {
-    const [detail, audit] = await Promise.all([
+    const [detail, audit, topology] = await Promise.all([
       loadWorldDetail(mapId),
       hasAdminPermission(context, 'maps.audit_read')
         ? loadWorldMapAudit(mapId, { page: 1, pageSize: 10, search: '' })
         : Promise.resolve(undefined),
+      loadPublishedWorldTopology(),
     ]);
     const activeVersionId = detail.map.activePublishedVersionId;
     const openDraft = detail.versions.find((version) =>
@@ -69,6 +75,32 @@ export default async function WorldDetailPage(props: {
             {notice}
           </p>
         )}
+
+        <WorldTopology selectedMapId={detail.map.id} topology={topology} />
+
+        <section
+          className="detail-card world-connections"
+          aria-labelledby="world-connections-title"
+        >
+          <h2 id="world-connections-title">Published directional connections</h2>
+          {topology.maps
+            .find((map) => map.id === detail.map.id)
+            ?.manifest.exits.map((exit) => (
+              <div className="world-connection" key={exit.direction}>
+                <strong>
+                  {exit.direction.slice(0, 1).toUpperCase() + exit.direction.slice(1)}
+                </strong>
+                <span>
+                  {exit.enabled ? (exit.transitionLabel ?? exit.destinationMapId) : 'Disabled'}
+                </span>
+                <small>
+                  {exit.enabled
+                    ? `Destination spawn: ${exit.destinationSpawnId ?? 'Missing'}`
+                    : 'No published travel link'}
+                </small>
+              </div>
+            )) ?? <p>No active published manifest is available for this map.</p>}
+        </section>
 
         <div className="detail-grid">
           <section className="detail-card" aria-labelledby="map-record-title">

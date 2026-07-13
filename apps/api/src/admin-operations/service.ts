@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { operationsSummarySchema, playerDirectorySortSchema } from '@starville/player-operations';
-import { MAP_IDS } from '@starville/game-core';
+import { displayNameSchema, MAP_IDS } from '@starville/game-core';
 
 import type { ServiceLogger } from '../contracts.js';
 import { PublicApiError } from '../errors.js';
@@ -49,6 +49,11 @@ const directoryQuerySchema = z
 const activityQuerySchema = z
   .object({
     limit: integerQuery(1, 100, 25),
+    accessPage: integerQuery(1, 10_000, 1),
+    accessPageSize: z.preprocess(
+      (value) => (value === undefined ? 10 : Number(value)),
+      z.union([z.literal(10), z.literal(50), z.literal(100)]),
+    ),
   })
   .strict();
 
@@ -61,6 +66,7 @@ const actionInputSchema = z
       .min(12)
       .max(500)
       .refine((value) => !containsUnsafeReasonCharacters(value)),
+    displayName: displayNameSchema.optional(),
   })
   .strict();
 
@@ -130,13 +136,23 @@ export function createAdminOperationsService(options: {
       const parsedId = playerIdSchema.safeParse(playerId);
       const parsedBody = actionInputSchema.safeParse(body);
       if (!parsedId.success || !parsedBody.success) return invalidRequest();
+      if (action === 'rename' && parsedBody.data.displayName === undefined) return invalidRequest();
+      if (action !== 'rename' && parsedBody.data.displayName !== undefined) return invalidRequest();
+      const operationInput =
+        parsedBody.data.displayName === undefined
+          ? { expectedVersion: parsedBody.data.expectedVersion, reason: parsedBody.data.reason }
+          : {
+              expectedVersion: parsedBody.data.expectedVersion,
+              reason: parsedBody.data.reason,
+              displayName: parsedBody.data.displayName,
+            };
 
       const result = await trustedOperation(() =>
         gateway.performPlayerAction(
           identity,
           parsedId.data,
           action,
-          parsedBody.data,
+          operationInput,
           requestId,
           actionRateLimit,
         ),
@@ -148,6 +164,10 @@ export function createAdminOperationsService(options: {
         throw new PublicApiError(409, 'PLAYER_VERSION_CONFLICT');
       }
       if ('stateConflictCode' in result) {
+        if (result.stateConflictCode === 'PLAYER_NAME_UNAVAILABLE')
+          throw new PublicApiError(409, 'PLAYER_NAME_UNAVAILABLE');
+        if (result.stateConflictCode === 'PLAYER_NAME_UNCHANGED')
+          throw new PublicApiError(409, 'PLAYER_NAME_UNCHANGED');
         throw new PublicApiError(409, 'PLAYER_OPERATION_CONFLICT');
       }
 

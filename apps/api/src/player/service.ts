@@ -15,6 +15,7 @@ import { z } from 'zod';
 import type { ServiceLogger } from '../contracts.js';
 import { PublicApiError } from '../errors.js';
 import type { PlayerGateway, PlayerService } from './contracts.js';
+import { PlayerPersistenceError } from './gateway.js';
 
 const PROFILE_WRITE_RATE_LIMIT = 6;
 const STATE_WRITE_RATE_LIMIT = 30;
@@ -67,7 +68,30 @@ async function safeResumeProfile(
   };
 }
 
-function persistenceFailure(): never {
+function persistenceFailure(
+  logger: ServiceLogger,
+  requestId: string,
+  operation: string,
+  error: unknown,
+): never {
+  const details =
+    error instanceof PlayerPersistenceError
+      ? {
+          operation,
+          stage: error.stage,
+          rpcName: error.details.rpcName,
+          postgresCode: error.details.postgresCode,
+          parseIssues: error.details.parseIssues,
+          status: error.details.status,
+          failureName: error.name,
+        }
+      : {
+          operation,
+          stage: 'unknown',
+          failureName: error instanceof Error ? error.name : 'unknown',
+        };
+
+  logger.child({ requestId }).error('player.persistence.unavailable', details);
   throw new PublicApiError(503, 'PLAYER_PERSISTENCE_UNAVAILABLE');
 }
 
@@ -125,8 +149,8 @@ export function createPlayerService({
                 worldManifestLoader,
               ),
             };
-      } catch {
-        return persistenceFailure();
+      } catch (error) {
+        return persistenceFailure(logger, requestId, 'loadEntry', error);
       }
     },
 
@@ -150,7 +174,7 @@ export function createPlayerService({
         return safeResumeProfile(profile, walletAddress, logger, requestId, worldManifestLoader);
       } catch (error) {
         if (error instanceof PublicApiError) throw error;
-        return persistenceFailure();
+        return persistenceFailure(logger, requestId, 'createProfile', error);
       }
     },
 
@@ -172,7 +196,7 @@ export function createPlayerService({
         );
       } catch (error) {
         if (error instanceof PublicApiError) throw error;
-        return persistenceFailure();
+        return persistenceFailure(logger, requestId, 'updateProfile', error);
       }
     },
 
@@ -195,7 +219,7 @@ export function createPlayerService({
         );
       } catch (error) {
         if (error instanceof PublicApiError) throw error;
-        return persistenceFailure();
+        return persistenceFailure(logger, requestId, 'completeRename', error);
       }
     },
 
@@ -226,7 +250,7 @@ export function createPlayerService({
         );
       } catch (error) {
         if (error instanceof PublicApiError) throw error;
-        return persistenceFailure();
+        return persistenceFailure(logger, requestId, 'saveState', error);
       }
     },
   };

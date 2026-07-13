@@ -60,8 +60,8 @@ begin
     'the seed creates one published version per map'
   );
   perform pg_temp.assert_true(
-    (select count(*) = 15 from public.world_assets where approval_status = 'approved'),
-    'the seed creates exactly fifteen approved assets'
+    (select count(*) = 20 from public.world_assets where approval_status = 'approved'),
+    'the world and Phase 7 draft seeds create exactly twenty approved assets'
   );
   perform pg_temp.assert_true(
     (select count(*) = 5 and bool_and(record_version = 2) from public.world_maps),
@@ -69,7 +69,7 @@ begin
   );
   perform pg_temp.assert_true(
     (select count(*) = 5 from public.world_audit_events where event_key = 'world.version_published')
-      and (select count(*) = 15 from public.world_audit_events where event_key = 'world.asset_registered'),
+      and (select count(*) = 20 from public.world_audit_events where event_key = 'world.asset_registered'),
     'replaying the idempotent seed does not duplicate initial audit events'
   );
   perform pg_temp.assert_true(
@@ -77,11 +77,90 @@ begin
       select count(*) = (
         select sum(jsonb_array_length(version.manifest -> 'assets'))
         from public.world_map_versions as version
-        where version.version_number = 1
       )
       from public.world_map_version_assets
     ),
-    'replaying the idempotent seed preserves one asset mapping per manifest reference'
+    'all published and draft manifests retain one asset mapping per manifest reference'
+  );
+  perform pg_temp.assert_true(
+    (
+      select count(*) = 2
+        and count(*) filter (
+          where version.id in (
+            '79000000-0000-4000-8000-000000000001'::uuid,
+            '79000000-0000-4000-8000-000000000002'::uuid
+          )
+        ) = 2
+        and bool_and(version.lifecycle_status = 'draft')
+        and bool_and(version.validation_status = 'valid')
+        and bool_and(version.version_number = 2)
+      from public.world_map_versions as version
+      join public.world_maps as map on map.id = version.world_map_id
+      where map.slug in ('lantern-square', 'moonpetal-meadow')
+        and version.version_number = 2
+    ),
+    'Phase 7 derives exactly two deterministic, valid version-two drafts'
+  );
+  perform pg_temp.assert_true(
+    (
+      select count(*) = 5
+        and bool_and(version.version_number = 1)
+        and bool_and(version.lifecycle_status = 'published')
+      from public.world_maps as map
+      join public.world_map_versions as version on version.id = map.active_published_version_id
+    ),
+    'Phase 7 draft derivation does not change any active published-version pointer'
+  );
+  perform pg_temp.assert_true(
+    (
+      select count(*) = 5
+      from public.world_assets
+      where asset_key in (
+        'phase7-farm-plot-marker',
+        'phase7-general-store-marker',
+        'phase7-cooking-hearth-marker',
+        'phase7-crafting-workbench-marker',
+        'phase7-home-entrance-marker'
+      )
+        and approval_status = 'approved'
+        and repository_owned
+        and source_type = 'repository_procedural'
+    ),
+    'all five Phase 7 procedural marker assets are approved and repository-owned'
+  );
+  perform pg_temp.assert_true(
+    (
+      select count(*) = 4
+      from public.world_map_versions as version,
+        lateral jsonb_array_elements(version.manifest -> 'interactions') as interaction
+      where version.id = '79000000-0000-4000-8000-000000000001'
+        and interaction ->> 'id' in (
+          'phase7-general-store',
+          'phase7-cooking-hearth',
+          'phase7-crafting-workbench',
+          'phase7-home-entrance'
+        )
+        and interaction ->> 'type' in (
+          'shop', 'cooking_station', 'crafting_station', 'home_entrance'
+        )
+    ) and (
+      select count(*) = 6
+      from public.world_map_versions as version,
+        lateral jsonb_array_elements(version.manifest -> 'interactions') as interaction
+      where version.id = '79000000-0000-4000-8000-000000000002'
+        and interaction ->> 'id' like 'phase7-farm-plot-%'
+        and interaction ->> 'type' = 'farm_plot'
+    ),
+    'the Phase 7 drafts expose the exact trusted shop, station, home, and farm anchors'
+  );
+  perform pg_temp.assert_true(
+    (select count(*) = 6 from public.cozy_farm_plot_anchors
+      where map_version_id = '79000000-0000-4000-8000-000000000002')
+      and (select count(*) = 2 from public.cozy_gameplay_stations
+        where map_version_id = '79000000-0000-4000-8000-000000000001')
+      and (select count(*) = 1 from public.cozy_shop_interactions
+        where map_version_id = '79000000-0000-4000-8000-000000000001'),
+    'trusted Phase 7 gameplay bindings target only the deterministic draft versions'
   );
   perform pg_temp.assert_true(
     (
@@ -167,8 +246,8 @@ begin
     'destination spawns are outside every enabled exit trigger'
   );
   perform pg_temp.assert_true(
-    (select count(*) = 46 and count(distinct key) = 46 from public.admin_permissions where is_system),
-    'the current system permission catalog has forty-six unique keys'
+    (select count(*) = 59 and count(distinct key) = 59 from public.admin_permissions where is_system),
+    'the current system permission catalog has fifty-nine unique keys'
   );
   perform pg_temp.assert_true(
     not has_function_privilege(
@@ -321,11 +400,72 @@ $$;
 
 do $$
 declare
+  lantern_map_id uuid;
+  trusted_manifest jsonb;
+  rejected_manifest jsonb;
+  validation jsonb;
+begin
+  select version.world_map_id, version.manifest
+  into strict lantern_map_id, trusted_manifest
+  from public.world_map_versions as version
+  where version.id = '79000000-0000-4000-8000-000000000001';
+
+  select jsonb_set(
+    trusted_manifest,
+    '{interactions}',
+    jsonb_agg(
+      case
+        when interaction.value ->> 'id' = 'phase7-general-store'
+          then interaction.value || jsonb_build_object('price', 100)
+        else interaction.value
+      end
+      order by interaction.ordinal
+    )
+  )
+  into strict rejected_manifest
+  from jsonb_array_elements(trusted_manifest -> 'interactions') with ordinality
+    as interaction(value, ordinal);
+  validation := private.validate_world_manifest(lantern_map_id, rejected_manifest);
+  perform pg_temp.assert_true(
+    not coalesce((validation ->> 'valid')::boolean, true)
+      and validation -> 'errors' @> '[{"code":"INVALID_PHASE7_INTERACTION_SHAPE"}]'::jsonb,
+    'the Phase 7 validator rejects client-authored economy fields on world interactions'
+  );
+
+  select jsonb_set(
+    trusted_manifest,
+    '{interactions}',
+    jsonb_agg(
+      case
+        when interaction.value ->> 'id' = 'phase7-home-entrance'
+          then interaction.value || jsonb_build_object('ownerId', gen_random_uuid())
+        else interaction.value
+      end
+      order by interaction.ordinal
+    )
+  )
+  into strict rejected_manifest
+  from jsonb_array_elements(trusted_manifest -> 'interactions') with ordinality
+    as interaction(value, ordinal);
+  validation := private.validate_world_manifest(lantern_map_id, rejected_manifest);
+  perform pg_temp.assert_true(
+    not coalesce((validation ->> 'valid')::boolean, true)
+      and validation -> 'errors' @> '[{"code":"INVALID_PHASE7_INTERACTION_SHAPE"}]'::jsonb,
+    'the Phase 7 validator rejects ownership fields on shared world interactions'
+  );
+end;
+$$;
+
+do $$
+declare
   wallet constant text := '77777777777777777777777777777777';
   suspended_wallet constant text := '88888888888888888888888888888888';
   rename_wallet constant text := '99999999999999999999999999999999';
   admin_user_id uuid := (
     select value::uuid from starville_world_test_context where key = 'admin_user_id'
+  );
+  auth_session_id uuid := (
+    select value::uuid from starville_world_test_context where key = 'auth_session_id'
   );
   result jsonb;
   invalid_wallet_rejected boolean := false;
@@ -343,6 +483,44 @@ begin
       and result -> 'version' ->> 'lifecycleStatus' = 'published'
       and result -> 'playerState' ->> 'mapVersionId' is not null,
     'the loader resolves only the active Lantern Square publication and reconciles the version'
+  );
+
+  result := public.get_admin_player_detail(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    'development',
+    'solana:mainnet-beta',
+    (select id from public.player_profiles where wallet_address = wallet)
+  );
+  perform pg_temp.assert_status(
+    result, 'loaded', 'Phase 5 administrator detail remains callable after Phase 6 migrations'
+  );
+  perform pg_temp.assert_true(
+    result -> 'profile' ->> 'walletAddress' = wallet
+      and result -> 'profile' ->> 'mapId' = 'lantern-square'
+      and result -> 'profile' ->> 'mapVersionId' is not null
+      and result -> 'profile' ->> 'stateVersion' = result -> 'profile' ->> 'gameStateVersion'
+      and result -> 'moderation' ->> 'status' = 'active',
+    'administrator detail returns safe identity, game state, moderation, map, and version fields'
+  );
+
+  result := public.get_admin_player_activity(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    'development',
+    'solana:mainnet-beta',
+    (select id from public.player_profiles where wallet_address = wallet),
+    25
+  );
+  perform pg_temp.assert_status(
+    result, 'loaded', 'bounded Phase 5 player audit history remains callable after Phase 6'
+  );
+  perform pg_temp.assert_true(
+    jsonb_array_length(result -> 'items') <= 25
+      and jsonb_array_length(result -> 'accessEvents') <= 25,
+    'administrator activity history remains bounded'
   );
 
   update public.player_profiles
@@ -518,7 +696,11 @@ begin
     supersedes_version_id
   ) values (
     destination_map.id,
-    destination_version.version_number + 1,
+    (
+      select max(version_number) + 1
+      from public.world_map_versions
+      where world_map_id = destination_map.id
+    ),
     'published',
     invalid_manifest,
     private.world_manifest_checksum(invalid_manifest),
@@ -718,7 +900,7 @@ begin
   );
   perform pg_temp.assert_status(result, 'loaded', 'the trusted asset catalog executes');
   perform pg_temp.assert_true(
-    (result ->> 'total')::integer = 15 and jsonb_array_length(result -> 'items') = 15,
+    (result ->> 'total')::integer = 20 and jsonb_array_length(result -> 'items') = 20,
     'the administrator asset catalog returns all reviewed assets'
   );
 
@@ -755,6 +937,46 @@ begin
     'position reset resolves the reviewed Lantern Square publication instead of hardcoded state'
   );
 
+  select version into strict moderation_version
+  from public.player_moderation_states where player_profile_id = player_id;
+  result := public.admin_rename_player(
+    admin_user_id, auth_session_id, 'aal2', player_id, moderation_version,
+    'Willow Postgres', 'PostgreSQL execution direct rename',
+    'postgres:admin-rename', 60
+  );
+  perform pg_temp.assert_status(result, 'updated', 'the narrowly authorized direct rename executes');
+  perform pg_temp.assert_true(
+    (select display_name = 'Willow Postgres' from public.player_profiles where id = player_id),
+    'direct rename changes only the canonical display name'
+  );
+  perform pg_temp.assert_true(
+    exists (
+      select 1 from public.player_operation_audit_logs
+      where player_profile_id = player_id and event_key = 'player.rename_completed'
+        and before_state ->> 'displayName' <> after_state ->> 'displayName'
+    ),
+    'direct rename records old and new names in append-only audit history'
+  );
+
+  result := public.get_admin_player_activity_page(
+    admin_user_id, auth_session_id, 'aal2', 'development', 'solana:mainnet-beta',
+    player_id, 25, 1, 10
+  );
+  perform pg_temp.assert_status(result, 'loaded', 'server-paginated player access history executes');
+  perform pg_temp.assert_true(
+    (result ->> 'accessPage')::integer = 1
+      and (result ->> 'accessPageSize')::integer = 10
+      and jsonb_array_length(result -> 'accessEvents') <= 10,
+    'safe access history enforces the reviewed server page size'
+  );
+
+  result := public.get_admin_published_world_topology(admin_user_id, auth_session_id, 'aal2');
+  perform pg_temp.assert_status(result, 'loaded', 'published topology executes for maps.read');
+  perform pg_temp.assert_true(
+    jsonb_array_length(result -> 'maps') = 5,
+    'published topology derives all five active maps from stored published manifests'
+  );
+
   select * into strict map_record
   from public.world_maps where slug = 'whisperpine-gate';
   select * into strict active_version
@@ -786,6 +1008,25 @@ begin
   draft_edit_version := (result -> 'version' ->> 'editVersion')::integer;
   draft_checksum := result -> 'version' ->> 'checksum';
   draft_manifest := result -> 'manifest';
+  perform pg_temp.assert_true(
+    exists (
+      select 1 from public.world_map_version_assets
+      where world_map_version_id = draft_id
+    ) and not exists (
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = active_version.id)
+      except
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = draft_id)
+    ) and not exists (
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = draft_id)
+      except
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = active_version.id)
+    ),
+    'derived drafts clone every exact immutable asset-version pin from their source'
+  );
 
   result := public.save_admin_world_draft(
     admin_user_id,
@@ -802,6 +1043,22 @@ begin
   perform pg_temp.assert_status(result, 'updated', 'the trusted draft save executes');
   draft_edit_version := (result -> 'version' ->> 'editVersion')::integer;
   draft_checksum := result -> 'version' ->> 'checksum';
+  perform pg_temp.assert_true(
+    not exists (
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = active_version.id)
+      except
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = draft_id)
+    ) and not exists (
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = draft_id)
+      except
+      (select world_asset_id, world_asset_version_id
+       from public.world_map_version_assets where world_map_version_id = active_version.id)
+    ),
+    'an unchanged draft save preserves its inherited pins instead of rebinding active versions'
+  );
 
   result := public.get_admin_world_draft(
     admin_user_id,
@@ -879,6 +1136,57 @@ begin
     (result ->> 'total')::integer >= 6
       and result -> 'items' @> '[{"eventKey":"world.version_published"}]'::jsonb,
     'the lifecycle appends a bounded publication audit trail'
+  );
+end;
+$$;
+
+do $$
+declare
+  snapshot jsonb;
+begin
+  snapshot := public.get_public_live_operations();
+  perform pg_temp.assert_true(
+    snapshot -> 'maintenance' ->> 'state' = 'disabled'
+      and not (snapshot -> 'maintenance' ->> 'active')::boolean
+      and snapshot -> 'maintenance' ? 'expectedEndAt'
+      and snapshot -> 'maintenance' ? 'ctaUrl',
+    'the public live-operations RPC returns a strict disabled snapshot with explicit nullable fields'
+  );
+  perform pg_temp.assert_true(
+    not has_table_privilege('service_role', 'public.live_operations_maintenance', 'SELECT')
+      and has_function_privilege('service_role', 'public.get_public_live_operations()', 'EXECUTE'),
+    'service role reaches live operations only through the narrow public RPC'
+  );
+  perform pg_temp.assert_true(
+    exists (
+      select 1 from public.admin_role_permissions mapping
+      join public.admin_roles role on role.id=mapping.role_id
+      join public.admin_permissions permission on permission.id=mapping.permission_id
+      where role.key='live_operations_manager' and permission.key='live_operations.manage'
+    ) and not exists (
+      select 1 from public.admin_role_permissions mapping
+      join public.admin_roles role on role.id=mapping.role_id
+      join public.admin_permissions permission on permission.id=mapping.permission_id
+      where role.key='read_only_analyst' and permission.key in ('live_operations.manage','announcements.manage')
+    ),
+    'live-operations mutations remain limited to the intended operator role'
+  );
+
+  update public.live_operations_maintenance set enabled=true,
+    scheduled_start_at=now()+interval '1 hour', expected_end_at=now()+interval '2 hours', revision=revision+1;
+  snapshot := public.get_public_live_operations();
+  perform pg_temp.assert_true(
+    snapshot -> 'maintenance' ->> 'state'='scheduled'
+      and not (snapshot -> 'maintenance' ->> 'active')::boolean,
+    'a future database timestamp derives scheduled state without a browser or worker'
+  );
+
+  update public.live_operations_maintenance set scheduled_start_at=now()-interval '1 hour';
+  snapshot := public.get_public_live_operations();
+  perform pg_temp.assert_true(
+    snapshot -> 'maintenance' ->> 'state'='active'
+      and (snapshot -> 'maintenance' ->> 'active')::boolean,
+    'a passed schedule start derives active maintenance from the database clock'
   );
 end;
 $$;

@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   decodeHostedJson,
+  hostedApiResponseFailure,
   hostedFetch,
   hostedResponseFailure,
   safeHostedEndpoint,
@@ -109,6 +110,44 @@ describe('hosted RLS HTTP diagnostics', () => {
     expect(failure).not.toContain('private response body');
     expect(failure).not.toContain('token=secret');
     expect(failure).not.toContain('10000000-0000-4000-8000-000000000001');
+  });
+
+  it('correlates a safe API failure with its matching structured log', () => {
+    const url = new URL(
+      'http://localhost:4000/api/v1/admin/players/10000000-0000-4000-8000-000000000001?token=secret',
+    );
+    const diagnostic = hostedApiResponseFailure(
+      'authorized-player-detail',
+      url,
+      503,
+      JSON.stringify({
+        success: false,
+        error: { code: 'OPERATIONS_UNAVAILABLE', message: 'private response text' },
+        requestId: 'phase5-test:run:detail',
+        secret: 'must-not-appear',
+      }),
+      'fallback-request',
+      {
+        level: 'error',
+        message: 'api.request.failed',
+        requestId: 'phase5-test:run:detail',
+        method: 'GET',
+        path: '/api/v1/admin/players/:id',
+        statusCode: 503,
+        errorCode: 'OPERATIONS_UNAVAILABLE',
+      },
+    );
+
+    expect(diagnostic).toContain('"endpoint":"/api/v1/admin/players/:id"');
+    expect(diagnostic).toContain('"status":503');
+    expect(diagnostic).toContain('"code":"OPERATIONS_UNAVAILABLE"');
+    expect(diagnostic).toContain('"requestId":"phase5-test:run:detail"');
+    expect(diagnostic).toContain('"message":"api.request.failed"');
+    expect(diagnostic).not.toContain('localhost');
+    expect(diagnostic).not.toContain('token=secret');
+    expect(diagnostic).not.toContain('10000000-0000-4000-8000-000000000001');
+    expect(diagnostic).not.toContain('private response text');
+    expect(diagnostic).not.toContain('must-not-appear');
   });
 
   it('bounds cleanup steps and allows later exact cleanup to continue', async () => {

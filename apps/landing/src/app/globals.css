@@ -21,7 +21,9 @@ html {
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
+  overflow-x: clip;
   color: var(--landing-ink);
   background: var(--landing-moss-deep);
   font-family: var(--starville-font-sans, Inter, ui-sans-serif, system-ui, sans-serif);
@@ -50,6 +52,7 @@ a {
 .landing-shell,
 .village-hero {
   min-height: 100vh;
+  min-height: 100dvh;
   min-height: 100svh;
 }
 
@@ -1325,6 +1328,7 @@ a {
   position: relative;
   display: grid;
   min-height: 100vh;
+  min-height: 100dvh;
   min-height: 100svh;
   isolation: isolate;
   grid-template-rows: auto 1fr;

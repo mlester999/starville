@@ -55,6 +55,27 @@ describe('administrator interface components', () => {
     expect(source).toContain('triggerRef.current?.focus()');
   });
 
+  it('keeps announcement create flow non-redundant with clear draft guidance', () => {
+    const editor = readFileSync(new URL('./announcement-editor.tsx', import.meta.url), 'utf8');
+    expect(editor).toContain("variant = 'inline'");
+    expect(editor).toContain("variant === 'panel'");
+    expect(editor).toContain('How to create this draft');
+    expect(editor).toContain('How to update this draft');
+    expect(editor).toContain('Click to expand step-by-step instructions');
+    expect(editor).toContain('announcement-guide');
+    expect(editor).toContain('Internal title');
+    expect(editor).toContain('Player message');
+    expect(editor).toContain('Administrator reason');
+    expect(editor).toContain('Publish');
+    expect(editor).toContain('Update draft');
+    expect(editor).toContain('Save draft');
+    expect(editor).toContain('Click to expand step-by-step form');
+    expect(editor).toContain('maintenance-howto');
+    expect(editor).toContain('maintenance-howto__chevron');
+    expect(editor).toContain('maintenance-howto__icon');
+    expect(editor).toContain('PremiumSelect');
+  });
+
   it('keeps the world editor structured, guarded, and free of raw-manifest editing', () => {
     const editor = readFileSync(new URL('./world-editor.tsx', import.meta.url), 'utf8');
     const preview = readFileSync(new URL('./world-draft-preview.tsx', import.meta.url), 'utf8');
@@ -64,7 +85,10 @@ describe('administrator interface components', () => {
     expect(editor).toContain('Redo');
     expect(editor).toContain('World Y / depth base');
     expect(editor).toContain("addCollision('capsule')");
-    expect(editor).toContain('Validate saved draft');
+    expect(editor).toContain('Validate draft');
+    expect(editor).toContain('world-editor-toolbar');
+    expect(editor).toContain('asset-palette');
+    expect(editor).toContain('data-canvas-host');
     expect(editor).not.toMatch(/<textarea[^>]+name=["'](?:json|manifest)/u);
     expect(preview).toContain('DRAFT PREVIEW');
     expect(preview).toContain('no player persistence');

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { worldAssetDeliveriesSchema, type WorldAssetDelivery } from '@starville/asset-management';
 import {
   facingDirectionSchema,
   mapIdSchema,
@@ -51,6 +52,7 @@ export const publishedWorldSchema = z
     map: publishedMapSchema,
     version: publishedVersionSchema,
     manifest: mapManifestSchema,
+    assetDeliveries: worldAssetDeliveriesSchema.optional().default([]),
     playerState: publishedPlayerStateSchema,
   })
   .strict()
@@ -72,6 +74,7 @@ const publishedManifestSchema = z
     map: publishedMapSchema,
     version: publishedVersionSchema,
     manifest: mapManifestSchema,
+    assetDeliveries: worldAssetDeliveriesSchema.optional().default([]),
   })
   .strict();
 
@@ -98,9 +101,20 @@ export type WorldTransition = Omit<z.infer<typeof transitionWorldSchema>, 'manif
   readonly manifest: MapManifest;
 };
 
-function validatedManifest(value: z.infer<typeof mapManifestSchema>): MapManifest {
+function validatedManifest(
+  value: z.infer<typeof mapManifestSchema>,
+  deliveries: readonly WorldAssetDelivery[],
+): MapManifest {
   try {
-    return validateMapManifest(value, WORLD_ASSET_CATALOG);
+    const declaredAssets = new Set(value.assets);
+    if (deliveries.some(({ assetKey }) => !declaredAssets.has(assetKey))) {
+      throw new Error('Published world contains an undeclared asset delivery');
+    }
+    const availableAssets = new Set([
+      ...WORLD_ASSET_CATALOG.keys(),
+      ...deliveries.map(({ assetKey }) => assetKey),
+    ]);
+    return validateMapManifest(value, availableAssets);
   } catch {
     throw new PlayerRequestError(502, 'INVALID_WORLD_RESPONSE');
   }
@@ -111,7 +125,7 @@ function parseWorld(value: unknown): PublishedWorld {
   if (!result.success) throw new PlayerRequestError(502, 'INVALID_WORLD_RESPONSE');
   return {
     ...result.data,
-    manifest: validatedManifest(result.data.manifest),
+    manifest: validatedManifest(result.data.manifest, result.data.assetDeliveries),
   } as PublishedWorld;
 }
 
@@ -144,7 +158,7 @@ export async function loadPublishedWorldManifest(
   if (!result.success) throw new PlayerRequestError(502, 'INVALID_WORLD_RESPONSE');
   return {
     ...result.data,
-    manifest: validatedManifest(result.data.manifest),
+    manifest: validatedManifest(result.data.manifest, result.data.assetDeliveries),
   } as PublishedManifest;
 }
 
@@ -166,6 +180,6 @@ export async function transitionPublishedWorld(
   if (!result.success) throw new PlayerRequestError(502, 'INVALID_WORLD_RESPONSE');
   return {
     ...result.data,
-    manifest: validatedManifest(result.data.manifest),
+    manifest: validatedManifest(result.data.manifest, result.data.assetDeliveries),
   } as WorldTransition;
 }

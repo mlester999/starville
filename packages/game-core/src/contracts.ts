@@ -43,6 +43,13 @@ export const displayNameSchema = z
       .regex(
         /^[\p{L}\p{N} _-]+$/u,
         'Display name may contain letters, numbers, spaces, hyphens, and underscores only',
+      )
+      .refine(
+        (value) =>
+          !['admin', 'administrator', 'moderator', 'starville', 'support', 'system'].includes(
+            value.toLocaleLowerCase('en-US'),
+          ),
+        'Display name is reserved',
       ),
   );
 
@@ -81,21 +88,51 @@ export const persistedPlayerStateSchema = playerStateUpdateSchema.extend({
 });
 export type PersistedPlayerState = z.infer<typeof persistedPlayerStateSchema>;
 
-export const playerProfileSchema = z
+/**
+ * Wallet-owned player profile returned by trusted load/create/update RPCs.
+ * Phase 6 multi-map fields are part of the public profile contract so the
+ * strict entry parser accepts `private.player_profile_json` without 503.
+ *
+ * Keep the base object free of refinements so consumers can still `.extend()`
+ * it (Zod 4 rejects `.extend()` after `.superRefine()`).
+ */
+export const playerProfileObjectSchema = z
   .object({
     id: z.uuid(),
     displayName: displayNameSchema,
     appearancePreset: appearancePresetSchema,
     mapId: mapIdSchema,
+    mapVersionId: z.uuid().nullable(),
     x: finiteCoordinateSchema,
     y: finiteCoordinateSchema,
     facingDirection: facingDirectionSchema,
     gameStateVersion: z.number().int().positive(),
+    stateVersion: z.number().int().positive(),
+    lastTransitionAt: z.iso.datetime({ offset: true }).nullable(),
     createdAt: z.iso.datetime({ offset: true }),
     updatedAt: z.iso.datetime({ offset: true }),
     lastEnteredAt: z.iso.datetime({ offset: true }),
   })
   .strict();
+
+export function refineMatchingPlayerStateVersions<
+  Schema extends z.ZodType<{
+    readonly gameStateVersion: number;
+    readonly stateVersion: number;
+  }>,
+>(schema: Schema) {
+  return schema.superRefine((profile, context) => {
+    if (profile.stateVersion !== profile.gameStateVersion) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Player state versions must match',
+        path: ['stateVersion'],
+      });
+    }
+  });
+}
+
+export const playerProfileSchema = refineMatchingPlayerStateVersions(playerProfileObjectSchema);
 export type PlayerProfile = z.infer<typeof playerProfileSchema>;
 
 export interface Point {

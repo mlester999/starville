@@ -1,4 +1,8 @@
-import { playerProfileSchema } from '@starville/game-core';
+import {
+  playerProfileObjectSchema,
+  playerProfileSchema,
+  refineMatchingPlayerStateVersions,
+} from '@starville/game-core';
 import { walletAddressSchema, walletNetworkSchema } from '@starville/wallet-access';
 import { z } from 'zod';
 
@@ -83,12 +87,15 @@ export const playerModerationStateSchema = z
   })
   .strict();
 
+const playerDetailProfileSchema = refineMatchingPlayerStateVersions(
+  playerProfileObjectSchema.extend({
+    walletAddress: walletAddressSchema.nullable(),
+  }),
+);
+
 export const playerDetailSchema = z
   .object({
-    profile: playerProfileSchema.extend({
-      walletAddress: walletAddressSchema.nullable(),
-      gameStateVersion: versionSchema,
-    }),
+    profile: playerDetailProfileSchema,
     moderation: playerModerationStateSchema,
     access: z
       .object({
@@ -135,7 +142,11 @@ export const playerAccessActivityItemSchema = z
 export const playerActivitySchema = z
   .object({
     items: z.array(playerActivityItemSchema).max(100),
-    accessEvents: z.array(playerAccessActivityItemSchema).max(25),
+    accessEvents: z.array(playerAccessActivityItemSchema).max(100),
+    accessPage: z.number().int().positive(),
+    accessPageSize: z.union([z.literal(10), z.literal(50), z.literal(100)]),
+    accessTotal: countSchema,
+    accessTotalPages: countSchema,
     nextCursor: dateTimeSchema.nullable(),
   })
   .strict();

@@ -23,10 +23,13 @@ import { createAdminWorldService } from '../../apps/api/src/world/admin-service'
 import {
   createHostedFetch,
   decodeHostedJson,
+  hostedApiResponseFailure,
   hostedFetch,
   hostedResponseFailure,
+  safeHostedEndpoint,
   safeHostedTransportCode,
   withHostedCleanupTimeout,
+  type HostedApiLogDiagnostic,
 } from './hosted-rls-diagnostics';
 import { safeHostedTargetSummary, verifyCanonicalHostedTarget } from './safety';
 
@@ -54,16 +57,77 @@ interface HostedTokenGateResponse {
 class RollbackHostedFixture extends Error {}
 
 class HostedTestLogger implements ServiceLogger {
-  child(_bindings: LogContext): ServiceLogger {
-    return this;
+  constructor(
+    private readonly events: HostedApiLogDiagnostic[] = [],
+    private readonly bindings: LogContext = {},
+  ) {}
+
+  child(bindings: LogContext): ServiceLogger {
+    return new HostedTestLogger(this.events, { ...this.bindings, ...bindings });
   }
 
   trace(_message: string, _context?: LogContext): void {}
   debug(_message: string, _context?: LogContext): void {}
   info(_message: string, _context?: LogContext): void {}
-  warn(_message: string, _context?: LogContext): void {}
-  error(_message: string, _context?: LogContext): void {}
-  fatal(_message: string, _context?: LogContext): void {}
+  warn(message: string, context?: LogContext): void {
+    this.record('warn', message, context);
+  }
+  error(message: string, context?: LogContext): void {
+    this.record('error', message, context);
+  }
+  fatal(message: string, context?: LogContext): void {
+    this.record('fatal', message, context);
+  }
+
+  findApiFailure(requestId: string, url: URL): HostedApiLogDiagnostic | null {
+    const endpoint = safeHostedEndpoint(url);
+    return (
+      [...this.events]
+        .reverse()
+        .find((event) => event.requestId === requestId && event.path === endpoint) ?? null
+    );
+  }
+
+  private record(
+    level: HostedApiLogDiagnostic['level'],
+    message: string,
+    context?: LogContext,
+  ): void {
+    const combined = { ...this.bindings, ...context };
+    const rawRequestId = Reflect.get(combined, 'requestId');
+    const rawMethod = Reflect.get(combined, 'method');
+    const rawPath = Reflect.get(combined, 'path');
+    const rawStatusCode = Reflect.get(combined, 'statusCode');
+    const rawError = Reflect.get(combined, 'error');
+    const rawErrorCode =
+      typeof rawError === 'object' && rawError !== null ? Reflect.get(rawError, 'code') : null;
+    const safePath =
+      typeof rawPath === 'string' && rawPath.startsWith('/')
+        ? safeHostedEndpoint(new URL(rawPath, 'http://starville.test'))
+        : null;
+
+    this.events.push({
+      level,
+      message: /^[a-z0-9._-]{1,120}$/u.test(message) ? message : 'api.log',
+      requestId:
+        typeof rawRequestId === 'string' && /^[A-Za-z0-9:._-]{1,160}$/u.test(rawRequestId)
+          ? rawRequestId
+          : null,
+      method:
+        typeof rawMethod === 'string' && /^(?:DELETE|GET|PATCH|POST|PUT)$/u.test(rawMethod)
+          ? rawMethod
+          : null,
+      path: safePath,
+      statusCode:
+        typeof rawStatusCode === 'number' && rawStatusCode >= 100 && rawStatusCode <= 599
+          ? rawStatusCode
+          : null,
+      errorCode:
+        typeof rawErrorCode === 'string' && /^[A-Z0-9_-]{1,80}$/u.test(rawErrorCode)
+          ? rawErrorCode
+          : null,
+    });
+  }
 }
 
 const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
@@ -78,6 +142,10 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);
   }
+}
+
+function property(value: unknown, key: string): unknown {
+  return typeof value === 'object' && value !== null ? Reflect.get(value, key) : undefined;
 }
 
 function authorizationOutcome(value: unknown): string | undefined {
@@ -396,6 +464,17 @@ async function main(): Promise<void> {
       'world_map_version_assets',
       'world_audit_events',
       'world_operation_rate_limits',
+      'world_asset_versions',
+      'world_asset_uploads',
+      'world_asset_processing_jobs',
+      'world_asset_tags',
+      'world_asset_version_tags',
+      'world_asset_validation_checks',
+      'world_asset_reviews',
+      'world_asset_references',
+      'world_asset_audit_events',
+      'world_asset_operation_idempotency',
+      'world_asset_operation_rate_limits',
     ]) {
       const tokenAccessRead = await anonymousClient.from(table).select('*').limit(1);
       assert(
@@ -448,6 +527,26 @@ async function main(): Promise<void> {
     assert(
       anonymousWorldDirectory.error !== null,
       'Anonymous caller unexpectedly executed the administrator world directory',
+    );
+    const anonymousAssetDirectory = await anonymousClient.rpc('list_admin_game_assets', {
+      p_user_id: randomUUID(),
+      p_auth_session_id: randomUUID(),
+      p_assurance_level: 'aal1',
+      p_page: 1,
+      p_page_size: 1,
+      p_search: '',
+      p_asset_type: 'all',
+      p_category: 'all',
+      p_lifecycle_status: 'all',
+      p_production_status: 'all',
+      p_sort: 'updated_at',
+      p_direction: 'desc',
+      p_request_id: `phase75-test:${runId}:anonymous-assets`,
+      p_rate_limit: 10,
+    });
+    assert(
+      anonymousAssetDirectory.error !== null,
+      'Anonymous caller unexpectedly executed the administrator asset directory',
     );
 
     const normalClient = createSupabaseServerClient(
@@ -1312,6 +1411,20 @@ async function main(): Promise<void> {
       adminUserId: administrator.id,
     };
 
+    const phase6WorldLoad = await serviceClient.rpc('get_current_published_world', {
+      p_wallet_address: phase5WalletAddress,
+      p_request_id: `phase6-test:${runId}:player-detail-world-load`,
+      p_rate_limit: 120,
+    });
+    const phase6WorldLoadStatus = property(phase6WorldLoad.data, 'status');
+    const phase5MapVersionId = property(property(phase6WorldLoad.data, 'version'), 'id');
+    assert(
+      !phase6WorldLoad.error &&
+        phase6WorldLoadStatus === 'loaded' &&
+        typeof phase5MapVersionId === 'string',
+      'Temporary Phase 5 player could not reconcile to the current Phase 6 publication',
+    );
+
     const forbiddenPhase5Action = await api.inject({
       method: 'POST',
       url: `/api/v1/admin/players/${phase5PlayerId}/suspend`,
@@ -1325,6 +1438,30 @@ async function main(): Promise<void> {
     assert(
       forbiddenPhase5Action.statusCode === 403,
       'Blockchain Operator unexpectedly performed player moderation',
+    );
+    const forbiddenDetailRequestId = `phase5-test:${runId}:blockchain-detail-denied`;
+    const forbiddenDetailUrl = new URL(
+      `/api/v1/admin/players/${phase5PlayerId}`,
+      'http://starville.test',
+    );
+    const forbiddenDetailResponse = await api.inject({
+      method: 'GET',
+      url: forbiddenDetailUrl.pathname,
+      headers: {
+        authorization: `Bearer ${tokenGateFixture.accessToken}`,
+        'x-request-id': forbiddenDetailRequestId,
+      },
+    });
+    assert(
+      forbiddenDetailResponse.statusCode === 403,
+      `Blockchain Operator unexpectedly read Phase 5 player detail. ${hostedApiResponseFailure(
+        'unauthorized-player-detail',
+        forbiddenDetailUrl,
+        forbiddenDetailResponse.statusCode,
+        forbiddenDetailResponse.body,
+        forbiddenDetailRequestId,
+        logger.findApiFailure(forbiddenDetailRequestId, forbiddenDetailUrl),
+      )}`,
     );
     const forbiddenWorldDirectory = await api.inject({
       method: 'GET',
@@ -1383,14 +1520,45 @@ async function main(): Promise<void> {
       'Authorized Phase 6 world directory did not return the five published maps',
     );
 
+    const detailRequestId = `phase5-test:${runId}:detail`;
+    const detailUrl = new URL(`/api/v1/admin/players/${phase5PlayerId}`, 'http://starville.test');
     const detailResponse = await api.inject({
       method: 'GET',
-      url: `/api/v1/admin/players/${phase5PlayerId}`,
-      headers: phase5ReadHeaders,
+      url: detailUrl.pathname,
+      headers: {
+        authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
+        'x-request-id': detailRequestId,
+      },
     });
+    let detailBody: unknown;
+    try {
+      detailBody = JSON.parse(detailResponse.body) as unknown;
+    } catch {
+      detailBody = null;
+    }
+    const detailData = property(detailBody, 'data');
+    const detailProfile = property(detailData, 'profile');
+    const detailModeration = property(detailData, 'moderation');
+    const detailAccess = property(detailData, 'access');
     assert(
-      detailResponse.statusCode === 200 && detailResponse.body.includes(phase5DisplayName),
-      'Authorized Phase 5 player detail failed',
+      detailResponse.statusCode === 200 &&
+        property(detailProfile, 'id') === phase5PlayerId &&
+        property(detailProfile, 'displayName') === phase5DisplayName &&
+        property(detailProfile, 'walletAddress') === phase5WalletAddress &&
+        property(detailProfile, 'mapId') === 'lantern-square' &&
+        property(detailProfile, 'mapVersionId') === phase5MapVersionId &&
+        typeof property(detailProfile, 'gameStateVersion') === 'number' &&
+        property(detailProfile, 'stateVersion') === property(detailProfile, 'gameStateVersion') &&
+        property(detailModeration, 'status') === 'active' &&
+        typeof property(detailAccess, 'activeSessions') === 'number',
+      `Authorized Phase 5 player detail failed. ${hostedApiResponseFailure(
+        'authorized-player-detail',
+        detailUrl,
+        detailResponse.statusCode,
+        detailResponse.body,
+        detailRequestId,
+        logger.findApiFailure(detailRequestId, detailUrl),
+      )}`,
     );
 
     const operationsResponse = await api.inject({

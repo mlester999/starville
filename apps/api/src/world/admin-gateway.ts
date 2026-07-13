@@ -29,6 +29,8 @@ async function execute(
 export function createSupabaseAdminWorldGateway(client: SupabaseClient): AdminWorldGateway {
   return {
     listWorlds: (identity, input) => execute(client, 'list_admin_world_maps', identity, input),
+    getPublishedTopology: (identity) =>
+      execute(client, 'get_admin_published_world_topology', identity, {}),
     getWorld: (identity, input) => execute(client, 'get_admin_world_map', identity, input),
     getDraft: (identity, input) => execute(client, 'get_admin_world_draft', identity, input),
     createDraft: (identity, input) => execute(client, 'create_admin_world_draft', identity, input),

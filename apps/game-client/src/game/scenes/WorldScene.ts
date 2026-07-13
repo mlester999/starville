@@ -17,13 +17,13 @@ import {
 } from '@starville/game-core';
 
 import type { GameRuntimeOptions, RuntimeWorld } from '../contracts';
-import { interactionDialogue } from '../contracts';
 import { isGameplayInputAllowed } from '../input/focus';
 import { createGameplayKeys, type GameplayKeys } from '../input/keyboard';
 import { isJogging, readMovementInput } from '../input/movement-key-state';
 import { renderCollisionDebug, type CollisionDebugOverlay } from '../rendering/collision-debug';
 import { PlayerRenderer } from '../rendering/player';
 import { renderTerrain } from '../rendering/terrain';
+import { queueWorldAssetTextures } from '../rendering/world-asset-textures';
 import { renderWorldObjects, type RenderedWorldObject } from '../rendering/world-objects';
 
 const CHECKPOINT_INTERVAL_MS = 5_000;
@@ -68,6 +68,12 @@ export class WorldScene extends Phaser.Scene {
     this.projection = this.projectionFor(this.manifest);
     this.state = { ...options.initialState };
     this.lastOutsideExitState = { ...options.initialState };
+  }
+
+  public preload(): void {
+    queueWorldAssetTextures(this, this.world.assetDeliveries, (event) =>
+      this.options.callbacks.onWorldAssetFallback(event),
+    );
   }
 
   public create(): void {
@@ -154,13 +160,11 @@ export class WorldScene extends Phaser.Scene {
     if (this.inputBlocked || this.transitionPending || this.currentInteraction === undefined)
       return;
     this.inputBlocked = true;
-    this.options.callbacks.onInteractionOpen(
-      interactionDialogue({
-        ...this.currentInteraction,
-        title: sanitizeInteractionText(this.currentInteraction.title),
-        content: sanitizeInteractionText(this.currentInteraction.content),
-      }),
-    );
+    this.options.callbacks.onInteractionOpen({
+      ...this.currentInteraction,
+      title: sanitizeInteractionText(this.currentInteraction.title),
+      content: sanitizeInteractionText(this.currentInteraction.content),
+    });
   }
 
   public getState(): PlayerStateUpdate {
@@ -185,7 +189,18 @@ export class WorldScene extends Phaser.Scene {
     this.dirty = false;
     this.currentInteraction = undefined;
 
+    const queuedTextures = queueWorldAssetTextures(this, world.assetDeliveries, (event) =>
+      this.options.callbacks.onWorldAssetFallback(event),
+    );
     this.renderMap();
+    if (queuedTextures > 0) {
+      const expectedVersionId = world.versionId;
+      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
+        if (this.world.versionId !== expectedVersionId) return;
+        this.refreshWorldObjects();
+      });
+      if (!this.load.isLoading()) this.load.start();
+    }
     this.player?.setProjection(this.projection);
     this.updatePlayer(false, this.time.now, false);
     this.configureCamera();
@@ -216,7 +231,7 @@ export class WorldScene extends Phaser.Scene {
 
   private renderMap(): void {
     this.terrain = renderTerrain(this, this.manifest);
-    this.worldObjects = renderWorldObjects(this, this.manifest);
+    this.worldObjects = renderWorldObjects(this, this.manifest, this.world.assetDeliveries);
     if (this.options.collisionDebug) {
       this.collisionDebug = renderCollisionDebug(
         this,
@@ -237,6 +252,11 @@ export class WorldScene extends Phaser.Scene {
     this.interactionMarkers = [];
     this.collisionDebug?.destroy();
     this.collisionDebug = undefined;
+  }
+
+  private refreshWorldObjects(): void {
+    for (const object of this.worldObjects) object.container.destroy(true);
+    this.worldObjects = renderWorldObjects(this, this.manifest, this.world.assetDeliveries);
   }
 
   private configureCamera(): void {

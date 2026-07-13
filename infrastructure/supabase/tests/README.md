@@ -11,6 +11,9 @@ The reviewed suite also includes token access, the Phase 4 player slice,
 `secure_player_operations.test.sql` for Phase 5 moderation, and `world_management.test.sql` for the
 Phase 6 five-map graph, published-version loading, authoritative transitions, immutable history,
 append-only world audit, role mappings, dynamic approved-spawn reset, and default-deny world tables.
+`cozy_gameplay.test.sql` statically verifies the Phase 7A item catalog, DUST ledger, inventory,
+quickbar, forced-RLS defaults, immutable histories, and narrow trusted RPC grants. Real bootstrap
+and replay behavior runs in the isolated local PostgreSQL execution fixture before hosted review.
 
 The separate `pnpm rls:test:hosted` suite uses real temporary Auth sessions for RLS, API, and
 revocation behavior. Both commands verify the exact development target and require

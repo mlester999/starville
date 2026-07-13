@@ -23,6 +23,7 @@ export function registerAdminWorldRoutes(
     readonly logger: ServiceLogger;
     readonly allowedOrigins: ReadonlySet<string>;
     readonly manifestMaximumBytes: number;
+    readonly includeLegacyAssetDirectory?: boolean;
   },
 ): void {
   const authorize = (
@@ -37,6 +38,21 @@ export function registerAdminWorldRoutes(
       await options.service.listWorlds(identity, request.query, request.id),
       request.id,
     );
+  });
+
+  app.get('/api/v1/admin/world-topology', async (request, reply) => {
+    disableResponseCaching(reply);
+    const identity = await authorizeAdminRequest(
+      request,
+      options.adminGateway,
+      options.logger,
+      'maps.read',
+    );
+    return {
+      success: true,
+      data: await options.service.getPublishedTopology(identity, request.id),
+      requestId: request.id,
+    };
   });
 
   app.get('/api/v1/admin/worlds/:mapId', async (request, reply) => {
@@ -185,14 +201,16 @@ export function registerAdminWorldRoutes(
     );
   });
 
-  app.get('/api/v1/admin/world-assets', async (request, reply) => {
-    disableResponseCaching(reply);
-    const identity = await authorize(request, 'assets.read');
-    return response(
-      await options.service.listAssets(identity, request.query, request.id),
-      request.id,
-    );
-  });
+  if (options.includeLegacyAssetDirectory !== false) {
+    app.get('/api/v1/admin/world-assets', async (request, reply) => {
+      disableResponseCaching(reply);
+      const identity = await authorize(request, 'assets.read');
+      return response(
+        await options.service.listAssets(identity, request.query, request.id),
+        request.id,
+      );
+    });
+  }
 
   app.get('/api/v1/admin/world-audit', async (request, reply) => {
     disableResponseCaching(reply);

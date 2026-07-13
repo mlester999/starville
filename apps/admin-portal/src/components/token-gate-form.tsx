@@ -4,6 +4,10 @@ import { useActionState } from 'react';
 
 import { updateTokenGateAction, validateTokenGateAction } from '../app/actions/token-gate';
 import type { AdminTokenGateConfig, TokenGateActionState } from '../lib/token-access/contracts';
+import { LockedConfigField } from './locked-config-field';
+
+/** Administrator UI is locked to Solana Mainnet. Devnet remains environment tooling only. */
+const ADMIN_UI_NETWORK = 'solana:mainnet-beta' as const;
 
 interface TokenGateFormProps {
   readonly canConfigure: boolean;
@@ -66,20 +70,23 @@ export function TokenGateForm({ canConfigure, config }: TokenGateFormProps) {
             </div>
 
             <div className="token-form-columns">
-              <div className="field">
-                <label htmlFor="token-network">Network</label>
-                <select id="token-network" name="network" defaultValue={config.network}>
-                  <option value="solana:devnet">Solana Devnet</option>
-                  <option value="solana:mainnet-beta">Solana Mainnet</option>
-                </select>
-              </div>
-              <div className="field">
-                <label htmlFor="token-commitment">RPC commitment</label>
-                <select id="token-commitment" name="commitment" defaultValue={config.commitment}>
-                  <option value="confirmed">Confirmed</option>
-                  <option value="finalized">Finalized</option>
-                </select>
-              </div>
+              <LockedConfigField
+                badge="MAINNET"
+                description="Locked production network"
+                hiddenValue={ADMIN_UI_NETWORK}
+                id="token-network"
+                label="Network"
+                name="network"
+                value="Solana Mainnet"
+              />
+              <LockedConfigField
+                description="Managed by system configuration"
+                hiddenValue={config.commitment}
+                id="token-commitment"
+                label="RPC commitment"
+                name="commitment"
+                value={config.commitment === 'finalized' ? 'Finalized' : 'Confirmed'}
+              />
             </div>
 
             <div className="field">

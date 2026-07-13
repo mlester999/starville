@@ -16,6 +16,9 @@ export interface CreateApiServiceOptions {
   readonly tokenAccess?: ApiTokenAccessOptions;
   readonly adminOperations?: BuildApiAppOptions['adminOperations'];
   readonly adminWorld?: BuildApiAppOptions['adminWorld'];
+  readonly liveOperations?: BuildApiAppOptions['liveOperations'];
+  readonly adminCozy?: BuildApiAppOptions['adminCozy'];
+  readonly adminAssets?: BuildApiAppOptions['adminAssets'];
 }
 
 export function createApiService({
@@ -26,6 +29,9 @@ export function createApiService({
   tokenAccess,
   adminOperations,
   adminWorld,
+  liveOperations,
+  adminCozy,
+  adminAssets,
 }: CreateApiServiceOptions): ApiService {
   const app = buildApiApp({
     config,
@@ -35,6 +41,9 @@ export function createApiService({
     ...(tokenAccess === undefined ? {} : { tokenAccess }),
     ...(adminOperations === undefined ? {} : { adminOperations }),
     ...(adminWorld === undefined ? {} : { adminWorld }),
+    ...(liveOperations === undefined ? {} : { liveOperations }),
+    ...(adminCozy === undefined ? {} : { adminCozy }),
+    ...(adminAssets === undefined ? {} : { adminAssets }),
   });
 
   return {
