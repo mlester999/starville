@@ -10,7 +10,7 @@ values
   ('assets.approve', 'Approve assets', 'Approve validated managed asset versions.', 'assets', true, true),
   ('assets.activate', 'Activate assets', 'Activate an approved immutable asset version for controlled use.', 'assets', true, true),
   ('assets.deprecate', 'Deprecate assets', 'Deprecate or safely archive managed assets.', 'assets', true, true),
-  ('assets.audit_read', 'Read asset audit', 'Read bounded append-only asset lifecycle history.', 'assets', true, true)
+  ('assets.audit.read', 'Read asset audit', 'Read bounded append-only asset lifecycle history.', 'assets', true, true)
 on conflict (key) do update
 set name = excluded.name,
     description = excluded.description,
@@ -34,7 +34,7 @@ with mapping(role_key, permission_key) as (
     ('game_administrator', 'assets.approve'),
     ('game_administrator', 'assets.activate'),
     ('game_administrator', 'assets.deprecate'),
-    ('game_administrator', 'assets.audit_read'),
+    ('game_administrator', 'assets.audit.read'),
     ('game_administrator', 'assets.publish'),
     ('content_manager', 'assets.edit'),
     ('content_manager', 'assets.validate'),
@@ -42,18 +42,18 @@ with mapping(role_key, permission_key) as (
     ('content_manager', 'assets.approve'),
     ('content_manager', 'assets.activate'),
     ('content_manager', 'assets.deprecate'),
-    ('content_manager', 'assets.audit_read'),
+    ('content_manager', 'assets.audit.read'),
     ('world_designer', 'assets.edit'),
     ('world_designer', 'assets.validate'),
-    ('world_designer', 'assets.audit_read'),
+    ('world_designer', 'assets.audit.read'),
     ('asset_manager', 'assets.edit'),
     ('asset_manager', 'assets.validate'),
     ('asset_manager', 'assets.review'),
     ('asset_manager', 'assets.approve'),
     ('asset_manager', 'assets.activate'),
     ('asset_manager', 'assets.deprecate'),
-    ('asset_manager', 'assets.audit_read'),
-    ('read_only_analyst', 'assets.audit_read')
+    ('asset_manager', 'assets.audit.read'),
+    ('read_only_analyst', 'assets.audit.read')
 )
 insert into public.admin_role_permissions (role_id, permission_id)
 select role.id, permission.id
@@ -672,7 +672,8 @@ create table public.world_asset_audit_events (
   event_key text not null check (event_key ~ '^asset\.[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$'),
   action text not null check (char_length(action) between 3 and 80 and action ~ '^[a-z][a-z0-9_]*$'),
   permission_key text not null check (
-    permission_key ~ '^assets\.[a-z_]+$' or permission_key = 'maps.edit'
+    permission_key ~ '^assets\.[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$'
+    or permission_key = 'maps.edit'
   ),
   actor_admin_user_id uuid not null references public.admin_users(user_id) on delete restrict,
   admin_session_id uuid not null references public.admin_sessions(id) on delete restrict,

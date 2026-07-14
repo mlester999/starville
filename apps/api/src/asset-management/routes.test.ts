@@ -149,6 +149,52 @@ describe('administrator asset routes', () => {
     );
   });
 
+  it('uses the corrected read-only permission for asset audit access only', async () => {
+    const deniedService = assetService();
+    const denied = await app(['assets.read'], deniedService).inject({
+      method: 'GET',
+      url: '/api/v1/admin/world-assets/audit',
+      headers: { authorization: 'Bearer verified' },
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(deniedService.listAudit).not.toHaveBeenCalled();
+
+    const allowedService = assetService();
+    const allowed = await app(['assets.audit.read'], allowedService).inject({
+      method: 'GET',
+      url: '/api/v1/admin/world-assets/audit?limit=10&offset=0',
+      headers: { authorization: 'Bearer verified' },
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowedService.listAudit).toHaveBeenCalledWith(
+      identity,
+      { limit: '10', offset: '0' },
+      expect.any(String),
+    );
+
+    const uploadService = assetService();
+    const body = multipartBody({
+      friendlyName: 'Willow Tree',
+      slug: 'willow-tree',
+      assetType: 'tree',
+      category: 'nature',
+      developmentMarkerReplacementKey: null,
+      idempotencyKey: requestId,
+    });
+    const upload = await app(['assets.audit.read'], uploadService).inject({
+      method: 'POST',
+      url: '/api/v1/admin/world-assets',
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'content-type': `multipart/form-data; boundary=${body.boundary}`,
+      },
+      payload: body.payload,
+    });
+    expect(upload.statusCode).toBe(403);
+    expect(uploadService.upload).not.toHaveBeenCalled();
+  });
+
   it('proxies private variants only through an authenticated no-store byte response', async () => {
     const denied = await app([]).inject({
       method: 'GET',

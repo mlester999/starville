@@ -16,6 +16,23 @@ describe('administrator interface components', () => {
     expect(markup).toContain('ADMINISTRATION');
   });
 
+  it('supports white-label names, logo, and mark-only collapsed brand presentation', () => {
+    const markup = renderToStaticMarkup(
+      createElement(AdminBrand, {
+        compact: true,
+        markOnly: true,
+        gameName: 'LANTERN COVE',
+        administrationName: 'Lantern Cove Ops',
+        logoUrl: 'https://cdn.example/logo.svg',
+      }),
+    );
+
+    expect(markup).toContain('aria-label="Lantern Cove Ops"');
+    expect(markup).toContain('brand--mark-only');
+    expect(markup).toContain('https://cdn.example/logo.svg');
+    expect(markup).toContain('LANTERN COVE');
+  });
+
   it('connects an authentication page heading to its main panel', () => {
     const markup = renderToStaticMarkup(
       createElement(AuthFrame, {

@@ -1,8 +1,10 @@
 import { parseLandingPublicConfig } from '../lib/public-config';
 import { LandingExperience } from '../components/landing-experience';
+import { loadPublishedPlatformConfiguration } from '../lib/platform-configuration';
 
-export default function LandingPage() {
+export default async function LandingPage() {
   const config = parseLandingPublicConfig(process.env);
+  const platform = await loadPublishedPlatformConfiguration();
 
   return (
     <LandingExperience
@@ -13,6 +15,8 @@ export default function LandingPage() {
       network={config.network}
       xUrl={config.social.xUrl}
       discordUrl={config.social.discordUrl}
+      platformConfiguration={platform.configuration}
+      assetUrls={platform.assetUrls}
     />
   );
 }

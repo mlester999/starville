@@ -2,9 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useId, useRef, useState, type MouseEvent } from 'react';
+import { useEffect, useId, useRef, useState, type CSSProperties, type MouseEvent } from 'react';
 
 import type { WalletNetwork } from '@starville/wallet-access';
+import {
+  PLATFORM_FONT_REGISTRY,
+  type PlatformAssetUrls,
+  type PlatformConfiguration,
+} from '@starville/platform-configuration';
 
 import { initializeStarvilleAppKit } from '../lib/reown';
 import {
@@ -26,6 +31,8 @@ interface LandingExperienceProps {
   readonly network: WalletNetwork;
   readonly xUrl: string | undefined;
   readonly discordUrl: string | undefined;
+  readonly platformConfiguration: PlatformConfiguration;
+  readonly assetUrls: PlatformAssetUrls;
 }
 
 interface SocialLinkProps {
@@ -88,6 +95,8 @@ export function LandingExperience({
   network,
   xUrl,
   discordUrl,
+  platformConfiguration,
+  assetUrls,
 }: LandingExperienceProps) {
   const pathname = usePathname();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -139,9 +148,39 @@ export function LandingExperience({
       ? `${formatTokenAmount(accessConfig.requiredAmount)} ${accessConfig.symbol} required`
       : 'Access requirement unavailable';
   const mintAddress = accessConfig?.mintAddress;
+  const hero = platformConfiguration.landing.sections.find(({ key }) => key === 'hero');
+  const effectiveXUrl = platformConfiguration.branding.xUrl ?? xUrl;
+  const effectiveDiscordUrl = platformConfiguration.branding.discordUrl ?? discordUrl;
+  const gameName = platformConfiguration.branding.shortGameName;
+  const heroAssetUrl = assetUrls.landing.hero ?? assetUrls.branding.landing_hero_background;
+  const xSocialLabel =
+    gameName === 'Starville' ? 'Follow Starville on X' : `Follow ${gameName} on X`;
+  const discordSocialLabel =
+    gameName === 'Starville' ? 'Join the Starville Discord' : `Join the ${gameName} Discord`;
 
   return (
-    <main className="landing-shell">
+    <main
+      className="landing-shell"
+      style={
+        {
+          '--landing-runtime-background': platformConfiguration.theme.tokens.background,
+          '--landing-runtime-text': platformConfiguration.theme.tokens.textPrimary,
+          '--landing-runtime-primary': platformConfiguration.theme.tokens.primaryAction,
+          '--landing-runtime-primary-text': platformConfiguration.theme.tokens.primaryActionText,
+          '--landing-runtime-focus': platformConfiguration.theme.tokens.focusRing,
+          '--landing-runtime-hero-overlay': platformConfiguration.theme.tokens.landingHeroOverlay,
+          '--landing-display':
+            PLATFORM_FONT_REGISTRY[platformConfiguration.typography.display].stack,
+          '--starville-font-sans':
+            PLATFORM_FONT_REGISTRY[platformConfiguration.typography.body].stack,
+          ...(heroAssetUrl === undefined || heroAssetUrl === null
+            ? {}
+            : {
+                '--landing-runtime-hero-image': `url("${heroAssetUrl}")`,
+              }),
+        } as CSSProperties
+      }
+    >
       <section
         className="village-hero"
         aria-labelledby="hero-title"
@@ -159,8 +198,13 @@ export function LandingExperience({
         </div>
 
         <header className="hero-header">
-          <a className="brand-link" href={landingUrl} aria-label="Starville home">
-            <StarvilleMark compact />
+          <a className="brand-link" href={landingUrl} aria-label={`${gameName} home`}>
+            <StarvilleMark
+              compact
+              gameName={gameName.toUpperCase()}
+              tagline={platformConfiguration.branding.tagline}
+              logoUrl={assetUrls.branding.brand_logo}
+            />
           </a>
 
           <nav className="hero-navigation" aria-label="Primary navigation">
@@ -183,18 +227,18 @@ export function LandingExperience({
           <div className="hero-header__actions">
             <SocialLink
               assetSrc="/images/x-official.png"
-              href={xUrl}
-              label="Follow Starville on X"
+              href={effectiveXUrl}
+              label={xSocialLabel}
               mobileLabel="X"
             />
             <SocialLink
               assetSrc="/images/discord-official.png"
-              href={discordUrl}
-              label="Join the Starville Discord"
+              href={effectiveDiscordUrl}
+              label={discordSocialLabel}
               mobileLabel="Discord"
             />
             <button className="header-play" type="button" onClick={openAccessDialog}>
-              Play now
+              {hero?.ctaLabel ?? 'Play now'}
               <span aria-hidden="true">✦</span>
             </button>
           </div>
@@ -225,18 +269,18 @@ export function LandingExperience({
             <div className="mobile-navigation__actions">
               <SocialLink
                 assetSrc="/images/x-official.png"
-                href={xUrl}
-                label="Follow Starville on X"
+                href={effectiveXUrl}
+                label={xSocialLabel}
                 mobileLabel="X"
               />
               <SocialLink
                 assetSrc="/images/discord-official.png"
-                href={discordUrl}
-                label="Join the Starville Discord"
+                href={effectiveDiscordUrl}
+                label={discordSocialLabel}
                 mobileLabel="Discord"
               />
               <button className="header-play" type="button" onClick={openAccessDialog}>
-                Play now
+                {hero?.ctaLabel ?? 'Play now'}
                 <span aria-hidden="true">✦</span>
               </button>
             </div>
@@ -246,14 +290,15 @@ export function LandingExperience({
         <div className="hero-copy">
           <p className="hero-kicker">
             <span aria-hidden="true" />
-            Your cozy life beneath the stars
+            {hero?.items[0]?.heading ?? platformConfiguration.branding.tagline}
             <span aria-hidden="true" />
           </p>
-          <h1 id="hero-title">STARVILLE</h1>
-          <p className="hero-subtitle">A cozy world to farm, cook, build, and belong.</p>
+          <h1 id="hero-title">{hero?.heading ?? gameName.toUpperCase()}</h1>
+          <p className="hero-subtitle">
+            {hero?.description ?? platformConfiguration.branding.tagline}
+          </p>
           <p className="hero-description">
-            Build your home, grow your farm, cook with friends, and help a lantern-lit village bloom
-            again.
+            {hero?.items[0]?.description ?? platformConfiguration.branding.shortDescription}
           </p>
           <div className="hero-actions">
             <button
@@ -261,7 +306,7 @@ export function LandingExperience({
               type="button"
               onClick={openAccessDialog}
             >
-              Play now
+              {hero?.ctaLabel ?? 'Play now'}
               <span aria-hidden="true">→</span>
             </button>
             <Link className="hero-button hero-button--ghost" href="/spectate">
@@ -271,7 +316,7 @@ export function LandingExperience({
           </div>
         </div>
 
-        <footer className="world-status" aria-label="Starville world status">
+        <footer className="world-status" aria-label={`${gameName} world status`}>
           <div className="world-status__item world-status__network">
             <span className="world-status__light" aria-hidden="true" />
             <span>
@@ -322,6 +367,55 @@ export function LandingExperience({
           </div>
         </footer>
       </section>
+
+      {[...platformConfiguration.landing.sections]
+        .filter(
+          (landingSection) =>
+            landingSection.enabled &&
+            !['hero', 'wallet_access', 'footer'].includes(landingSection.key),
+        )
+        .sort((first, second) => first.order - second.order)
+        .map((landingSection) => {
+          const sectionAsset = assetUrls.landing[landingSection.key];
+          return (
+            <section
+              className={`configured-landing-section configured-landing-section--${landingSection.key}`}
+              key={landingSection.key}
+              style={
+                sectionAsset === undefined
+                  ? undefined
+                  : { backgroundImage: `url("${sectionAsset}")` }
+              }
+            >
+              <div>
+                <p className="hero-kicker">{landingSection.key.replaceAll('_', ' ')}</p>
+                {landingSection.heading === null ? null : <h2>{landingSection.heading}</h2>}
+                {landingSection.description === null ? null : <p>{landingSection.description}</p>}
+                {landingSection.key === 'token_contract' && mintAddress ? (
+                  <code>{shortenWalletAddress(mintAddress)}</code>
+                ) : null}
+                {landingSection.items.length === 0 ? null : (
+                  <div className="configured-landing-section__items">
+                    {landingSection.items.map((item) => (
+                      <article key={item.heading}>
+                        <h3>{item.heading}</h3>
+                        <p>{item.description}</p>
+                      </article>
+                    ))}
+                  </div>
+                )}
+                {landingSection.ctaLabel !== null && landingSection.ctaDestination !== null ? (
+                  <a
+                    className="hero-button hero-button--primary"
+                    href={landingSection.ctaDestination}
+                  >
+                    {landingSection.ctaLabel}
+                  </a>
+                ) : null}
+              </div>
+            </section>
+          );
+        })}
 
       <AccessDialog
         labelledBy="access-dialog-title"

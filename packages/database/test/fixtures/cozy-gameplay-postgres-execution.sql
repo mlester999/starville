@@ -96,6 +96,29 @@ select pg_temp.assert_true(
   ),
   'private helpers and player bootstrap are not browser callable'
 );
+select pg_temp.assert_true(
+  position(
+    'state public.player_inventory_state'
+    in pg_get_functiondef('private.cozy_remove_item(uuid,uuid,integer,text,text,text,text)'::regprocedure)
+  ) = 0
+    and position(
+      'into state'
+      in pg_get_functiondef('private.cozy_remove_item(uuid,uuid,integer,text,text,text,text)'::regprocedure)
+    ) = 0
+    and position(
+      'stack public.player_inventory_stacks'
+      in pg_get_functiondef(
+        'private.cozy_furniture_mutation(text,text,uuid,uuid,uuid,text,integer,integer,integer,integer,integer,text,text)'::regprocedure
+      )
+    ) = 0
+    and position(
+      'into stack'
+      in pg_get_functiondef(
+        'private.cozy_furniture_mutation(text,text,uuid,uuid,uuid,text,integer,integer,integer,integer,integer,text,text)'::regprocedure
+      )
+    ) = 0,
+  'lint-unused state and stack row variables are absent from repaired functions'
+);
 
 insert into public.player_profiles (
   wallet_address, display_name, appearance_preset,
@@ -449,6 +472,16 @@ begin
   join public.cozy_item_definitions item on item.id=stack.item_definition_id
   where stack.player_profile_id=player_id and item.slug='willow-chair'
   order by stack.slot_index limit 1;
+  result:=public.place_player_home_furniture(
+    wallet,home_id,'ffffffff-ffff-4fff-8fff-ffffffffffff','willow-chair',1,1,0,home_version,
+    'phase7-fixture-furniture-missing-0001','phase7-fixture:furniture:missing-stack'
+  );
+  perform pg_temp.assert_true(
+    result->>'status'='item_unavailable'
+      and (select count(*)=0 from public.player_home_furniture where player_home_id=home_id)
+      and (select state_version=home_version from public.player_homes where id=home_id),
+    'a missing inventory stack is rejected without mutating home or furniture state'
+  );
   result:=public.place_player_home_furniture(
     wallet,home_id,chair_stack_id,'willow-chair',1,1,0,home_version,
     'phase7-fixture-furniture-place-0001','phase7-fixture:furniture:place'

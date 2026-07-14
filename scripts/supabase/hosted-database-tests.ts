@@ -33,6 +33,7 @@ async function main(): Promise<void> {
     'live_operations.test.sql',
     'cozy_gameplay.test.sql',
     'world_asset_manager.test.sql',
+    'platform_configuration.test.sql',
   ] as const;
 
   const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });

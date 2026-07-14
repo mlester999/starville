@@ -2,8 +2,9 @@ import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import multipart from '@fastify/multipart';
 import Fastify, { type FastifyInstance } from 'fastify';
+import { isModuleEnabled, type PlatformModuleKey } from '@starville/platform-configuration';
 import type { AdminAuthGateway, ApiRuntimeConfig, ServiceLogger } from './contracts.js';
-import { formatApiError, formatNotFoundError } from './errors.js';
+import { formatApiError, formatNotFoundError, PublicApiError } from './errors.js';
 import { resolveRequestId } from './request-id.js';
 import { registerHealthRoutes } from './routes/health.js';
 import { registerAdminRoutes } from './routes/admin.js';
@@ -30,6 +31,8 @@ import type { AdminCozyService } from './cozy-gameplay/admin.js';
 import { registerAdminCozyGameplayRoutes } from './routes/admin-cozy-gameplay.js';
 import type { AdminAssetService } from './asset-management/contracts.js';
 import { registerAdminAssetRoutes } from './routes/admin-assets.js';
+import type { PlatformConfigurationService } from './platform-configuration/contracts.js';
+import { registerPlatformConfigurationRoutes } from './routes/platform-configuration.js';
 
 export interface ApiTokenAccessOptions {
   readonly service: TokenAccessService;
@@ -58,11 +61,22 @@ export interface BuildApiAppOptions {
   readonly liveOperations?: { readonly service: LiveOperationsService };
   readonly adminCozy?: { readonly service: AdminCozyService };
   readonly adminAssets?: { readonly service: AdminAssetService };
+  readonly platformConfiguration?: { readonly service: PlatformConfigurationService };
 }
 
 function requestPath(url: string): string {
   return url.split('?', 1)[0] ?? '/';
 }
+
+const ADMIN_MODULE_PATHS: readonly [string, PlatformModuleKey][] = [
+  ['/api/v1/admin/live-operations', 'operations'],
+  ['/api/v1/admin/players', 'players'],
+  ['/api/v1/admin/token-gate', 'blockchain'],
+  ['/api/v1/admin/worlds', 'world_management'],
+  ['/api/v1/admin/world-assets', 'world_assets'],
+  ['/api/v1/admin/game-content', 'content_management'],
+  ['/api/v1/admin/platform-configuration', 'platform_configuration'],
+];
 
 export function buildApiApp({
   config,
@@ -75,6 +89,7 @@ export function buildApiApp({
   liveOperations,
   adminCozy,
   adminAssets,
+  platformConfiguration,
 }: BuildApiAppOptions): FastifyInstance {
   const allowedOrigins = new Set(config.corsAllowedOrigins);
   const app = Fastify({
@@ -104,6 +119,18 @@ export function buildApiApp({
   app.addHook('onRequest', async (request, reply) => {
     void reply.header('x-request-id', request.id);
   });
+
+  if (platformConfiguration !== undefined) {
+    app.addHook('preHandler', async (request) => {
+      const path = requestPath(request.url);
+      const module = ADMIN_MODULE_PATHS.find(([prefix]) => path.startsWith(prefix))?.[1];
+      if (module === undefined) return;
+      const active = await platformConfiguration.service.getActive('starville', request.id);
+      if (!isModuleEnabled(active.configuration, module)) {
+        throw new PublicApiError(404, 'MODULE_DISABLED');
+      }
+    });
+  }
 
   app.addHook('onResponse', async (request, reply) => {
     logger.child({ requestId: request.id }).info('api.request.completed', {
@@ -137,6 +164,14 @@ export function buildApiApp({
 
   registerHealthRoutes(app, config);
   registerStatusRoutes(app);
+  if (platformConfiguration !== undefined) {
+    registerPlatformConfigurationRoutes(app, {
+      service: platformConfiguration.service,
+      adminGateway: adminAuthGateway,
+      logger,
+      allowedOrigins,
+    });
+  }
   if (liveOperations !== undefined) {
     registerLiveOperationsRoutes(app, {
       service: liveOperations.service,

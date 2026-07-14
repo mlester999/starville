@@ -87,6 +87,13 @@ const SAFE_ERROR_MESSAGES = {
   ASSET_STORAGE_UNAVAILABLE: 'Asset storage is temporarily unavailable.',
   ASSET_PROCESSING_UNAVAILABLE: 'Asset processing is temporarily unavailable.',
   ASSET_MANAGEMENT_UNAVAILABLE: 'Asset management is temporarily unavailable.',
+  INVALID_PLATFORM_CONFIGURATION_REQUEST: 'The platform-configuration request is invalid.',
+  PLATFORM_CONFIGURATION_VERSION_CONFLICT:
+    'The platform configuration changed. Reload and try again.',
+  PLATFORM_CONFIGURATION_UNAVAILABLE: 'Platform configuration is temporarily unavailable.',
+  PLATFORM_CONFIGURATION_PREVIEW_UNAVAILABLE:
+    'The platform-configuration preview is temporarily unavailable.',
+  MODULE_DISABLED: 'The requested module is not enabled.',
 } as const;
 
 export type SafeApiErrorCode = keyof typeof SAFE_ERROR_MESSAGES;

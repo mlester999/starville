@@ -30,6 +30,7 @@
     "@starville/logger": "workspace:*",
     "@starville/live-operations": "workspace:*",
     "@starville/player-operations": "workspace:*",
+    "@starville/platform-configuration": "workspace:*",
     "@starville/solana": "workspace:*",
     "@starville/shared-types": "workspace:*",
     "@starville/supabase": "workspace:*",

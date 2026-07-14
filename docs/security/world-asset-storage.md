@@ -81,7 +81,7 @@ by a map or other registered content.
 | `assets.approve`    | Approve an immutable candidate when `assets.review` is also present |
 | `assets.activate`   | Publish sanitized delivery and select the active version            |
 | `assets.deprecate`  | Deprecate/archive subject to references                             |
-| `assets.audit_read` | Read bounded asset audit history                                    |
+| `assets.audit.read` | Read bounded asset audit history                                    |
 
 Super administrators, game administrators, and asset managers receive the full asset capability set.
 Live-operations managers receive read only. Read-only analysts receive read plus audit read. Other

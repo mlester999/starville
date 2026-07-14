@@ -29,6 +29,12 @@ export const ASSET_TYPES = [
   'recipe_icon',
   'furniture_icon',
   'shop_icon',
+  'brand_logo',
+  'brand_mark',
+  'favicon',
+  'admin_login_background',
+  'landing_hero_background',
+  'social_share_image',
 ] as const;
 export const assetTypeSchema = z.enum(ASSET_TYPES);
 export type AssetType = z.infer<typeof assetTypeSchema>;
@@ -48,6 +54,7 @@ export const ASSET_CATEGORIES = [
   'inventory',
   'recipe',
   'shop',
+  'branding',
 ] as const;
 export const assetCategorySchema = z.enum(ASSET_CATEGORIES);
 export type AssetCategory = z.infer<typeof assetCategorySchema>;
@@ -423,6 +430,37 @@ const profileEntries: readonly AssetTypeProfile[] = [
       anchorRequired: false,
       collisionSupport: 'none',
       helperText: iconHelper,
+    }),
+  ),
+  ...(
+    [
+      ['brand_logo', 'Brand logo', 1200, 600, true],
+      ['brand_mark', 'Brand mark', 1024, 1024, true],
+      ['favicon', 'Favicon source', 512, 512, true],
+      ['admin_login_background', 'Admin login background', 1920, 1080, false],
+      ['landing_hero_background', 'Landing hero background', 1920, 1080, false],
+      ['social_share_image', 'Social share image', 1200, 630, false],
+    ] as const
+  ).map(([type, label, recommendedWidth, recommendedHeight, requiredTransparency]) =>
+    profile({
+      type,
+      label,
+      description:
+        'Approved presentation asset pinned by an immutable platform configuration version.',
+      maximumSourceBytes: WORLD_MAX_BYTES,
+      recommendedWidth,
+      recommendedHeight,
+      requiredTransparency,
+      allowedCategories: ['branding'],
+      allowedInteractions: ['decorative'],
+      previewMode: 'icon',
+      anchorRequired: false,
+      collisionSupport: 'none',
+      helperText: [
+        'PNG or WebP only; SVG and arbitrary external URLs are not accepted.',
+        'Complete validation, review, approval, and activation before selecting this version.',
+        `Recommended dimensions: ${recommendedWidth} × ${recommendedHeight} px.`,
+      ],
     }),
   ),
 ];

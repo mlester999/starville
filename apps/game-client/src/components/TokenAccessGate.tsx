@@ -15,6 +15,7 @@ import { LiveOperationsBoundary } from './LiveOperationsBoundary';
 interface TokenAccessGateProps {
   readonly apiUrl: string;
   readonly landingUrl: string;
+  readonly gameName?: string;
 }
 
 const SESSION_RECONCILE_INTERVAL_MS = 30_000;
@@ -23,7 +24,11 @@ function isConfirmedAccessDenial(error: unknown): boolean {
   return error instanceof GameAccessRequestError && error.status === 401;
 }
 
-export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
+export function TokenAccessGate({
+  apiUrl,
+  landingUrl,
+  gameName = 'Starville',
+}: TokenAccessGateProps) {
   const [screen, setScreen] = useState<GateScreen>('checking');
   const [access, setAccess] = useState<TrustedTokenAccess>();
   const [rechecking, setRechecking] = useState(false);
@@ -179,19 +184,18 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
   const stateCopy = {
     checking: {
       kicker: 'Checking the village gate',
-      title: 'Verifying your Starville access…',
-      description: 'The game is asking the Starville server for the current trusted session.',
+      title: `Verifying your ${gameName} access…`,
+      description: `The game is asking the ${gameName} server for the current trusted session.`,
     },
     required: {
       kicker: 'Wallet access required',
       title: 'Begin your journey at the village gate.',
-      description:
-        'Connect and verify your Solana wallet on the Starville landing page before entering the game.',
+      description: `Connect and verify your Solana wallet on the ${gameName} landing page before entering the game.`,
     },
     expired: {
       kicker: 'Session expired',
       title: 'The gate needs a fresh signature.',
-      description: 'Return to Starville and verify the current wallet again to continue.',
+      description: `Return to ${gameName} and verify the current wallet again to continue.`,
     },
     revoked: {
       kicker: 'Access changed',
@@ -202,12 +206,11 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
     unavailable: {
       kicker: 'Verification unavailable',
       title: 'The village gate could not be checked.',
-      description:
-        'Starville has not granted access. The verification service may be temporarily unavailable.',
+      description: `${gameName} has not granted access. The verification service may be temporarily unavailable.`,
     },
     granted: {
       kicker: 'Access verified',
-      title: 'Welcome to Starville.',
+      title: `Welcome to ${gameName}.`,
       description: '',
     },
   }[screen];
@@ -252,7 +255,7 @@ export function TokenAccessGate({ apiUrl, landingUrl }: TokenAccessGateProps) {
             ) : (
               <div className="gate-actions">
                 <a className="gate-primary" href={landingUrl}>
-                  Go to Starville
+                  Go to {gameName}
                   <span aria-hidden="true">→</span>
                 </a>
                 {screen === 'unavailable' ? (

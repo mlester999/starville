@@ -18,6 +18,7 @@
     "@reown/appkit-adapter-solana": "1.8.22",
     "@starville/config": "workspace:*",
     "@starville/design-tokens": "workspace:*",
+    "@starville/platform-configuration": "workspace:*",
     "@starville/wallet-access": "workspace:*",
     "next": "16.2.10",
     "react": "19.2.7",

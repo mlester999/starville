@@ -89,6 +89,9 @@ importers:
       '@starville/live-operations':
         specifier: workspace:*
         version: link:../../packages/live-operations
+      '@starville/platform-configuration':
+        specifier: workspace:*
+        version: link:../../packages/platform-configuration
       '@starville/player-operations':
         specifier: workspace:*
         version: link:../../packages/player-operations
@@ -180,6 +183,9 @@ importers:
       '@starville/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@starville/platform-configuration':
+        specifier: workspace:*
+        version: link:../../packages/platform-configuration
       '@starville/player-operations':
         specifier: workspace:*
         version: link:../../packages/player-operations
@@ -268,6 +274,9 @@ importers:
       '@starville/live-operations':
         specifier: workspace:*
         version: link:../../packages/live-operations
+      '@starville/platform-configuration':
+        specifier: workspace:*
+        version: link:../../packages/platform-configuration
       '@starville/player-operations':
         specifier: workspace:*
         version: link:../../packages/player-operations
@@ -344,6 +353,9 @@ importers:
       '@starville/design-tokens':
         specifier: workspace:*
         version: link:../../packages/design-tokens
+      '@starville/platform-configuration':
+        specifier: workspace:*
+        version: link:../../packages/platform-configuration
       '@starville/wallet-access':
         specifier: workspace:*
         version: link:../../packages/wallet-access
@@ -733,6 +745,37 @@ importers:
       '@starville/shared-validation':
         specifier: workspace:*
         version: link:../shared-validation
+
+  packages/platform-configuration:
+    dependencies:
+      '@starville/admin-auth':
+        specifier: workspace:*
+        version: link:../admin-auth
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@starville/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@starville/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 22.20.1
+        version: 22.20.1
+      eslint:
+        specifier: 9.39.4
+        version: 9.39.4
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.1.4(@types/node@22.20.1)(esbuild@0.28.1)(tsx@4.23.0))
 
   packages/player-operations:
     dependencies:

@@ -66,7 +66,7 @@ currently requiring a review decision.
 
 ### `GET /api/v1/admin/world-assets/audit`
 
-Requires `assets.audit_read`. Filters are bounded by asset, search text, outcome, limit, and offset.
+Requires `assets.audit.read`. Filters are bounded by asset, search text, outcome, limit, and offset.
 Metadata is projected to a safe closed shape.
 
 ### `GET /api/v1/admin/world-assets/:assetId/references`

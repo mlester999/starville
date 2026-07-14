@@ -14,6 +14,9 @@ append-only world audit, role mappings, dynamic approved-spawn reset, and defaul
 `cozy_gameplay.test.sql` statically verifies the Phase 7A item catalog, DUST ledger, inventory,
 quickbar, forced-RLS defaults, immutable histories, and narrow trusted RPC grants. Real bootstrap
 and replay behavior runs in the isolated local PostgreSQL execution fixture before hosted review.
+`platform_configuration.test.sql` covers the Phase 7.5B presentation authority, permission matrix,
+forced RLS, immutable publication, approved branding profiles, and public-versus-preview execution
+boundaries.
 
 The separate `pnpm rls:test:hosted` suite uses real temporary Auth sessions for RLS, API, and
 revocation behavior. Both commands verify the exact development target and require

@@ -15,7 +15,601 @@
   --admin-danger: #9e493f;
   --admin-success: #287356;
   --admin-focus: #c08a2b;
+  --admin-action-text: #fff;
   --admin-shadow: 0 1.5rem 5rem rgb(26 47 39 / 12%);
+}
+
+/* Phase 7.5B platform presentation editor */
+.platform-settings-shell {
+  width: min(100% - 2rem, 92rem);
+  margin: 0 auto;
+  padding: clamp(1rem, 3vw, 2.5rem) 0 6rem;
+}
+
+.platform-settings-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.platform-settings-heading h1 {
+  margin: 0;
+  font-family: var(--starville-font-display, serif);
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  letter-spacing: -0.04em;
+}
+
+.platform-settings-heading p:last-child {
+  max-width: 48rem;
+  color: var(--admin-text-muted);
+}
+
+.platform-settings-tabs {
+  display: flex;
+  gap: 0.45rem;
+  margin: 1.5rem 0;
+  padding: 0.45rem;
+  overflow-x: auto;
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  background: var(--admin-surface);
+}
+
+.platform-settings-tabs a {
+  flex: 0 0 auto;
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.7rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.platform-settings-tabs a:hover {
+  background: var(--admin-canvas-soft);
+}
+
+.platform-settings-tabs a.is-active {
+  color: var(--admin-action-text);
+  background: var(--admin-forest);
+}
+
+.platform-editor-status,
+.platform-preview-sizes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  color: var(--admin-text-muted);
+  font-size: 0.85rem;
+}
+
+.platform-badge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 0.3rem 0.55rem;
+  border-radius: 999px;
+  color: var(--admin-forest);
+  background: rgb(74 166 135 / 16%);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.platform-badge--published {
+  color: #62450e;
+  background: rgb(183 134 47 / 18%);
+}
+
+.platform-editor-card,
+.platform-summary-card,
+.platform-empty,
+.platform-table-card {
+  min-width: 0;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--admin-line);
+  border-radius: 1.25rem;
+  background: var(--admin-surface);
+  box-shadow: 0 1rem 3rem rgb(25 56 46 / 7%);
+}
+
+.platform-editor-card legend {
+  padding: 0 0.5rem;
+  font-family: var(--starville-font-display, serif);
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.platform-field-grid,
+.platform-color-grid,
+.platform-module-grid,
+.platform-overview-grid,
+.platform-preview-comparison {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.platform-color-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.platform-field,
+.platform-sticky-actions label,
+.platform-create-draft label,
+.platform-lifecycle-form label {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--admin-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.platform-field input,
+.platform-field textarea,
+.platform-sticky-actions input,
+.platform-create-draft input,
+.platform-lifecycle-form input,
+.platform-inline-action input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--admin-line-strong);
+  border-radius: 0.7rem;
+  color: var(--admin-text);
+  background: var(--admin-surface-solid);
+}
+
+.platform-field textarea {
+  min-height: 7rem;
+  resize: vertical;
+}
+
+.platform-field--wide {
+  margin-top: 1rem;
+}
+
+.platform-assets-heading,
+.platform-table-card > header,
+.platform-preview-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 2rem 0 1rem;
+}
+
+.platform-assets-heading h2,
+.platform-table-card h2,
+.platform-summary-card h2,
+.platform-empty h2 {
+  margin: 0;
+  font-family: var(--starville-font-display, serif);
+}
+
+.platform-assets-heading p,
+.platform-table-card header p,
+.platform-summary-card p,
+.platform-empty p {
+  color: var(--admin-text-muted);
+}
+
+.platform-color {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.4rem 0.75rem;
+  padding: 0.8rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.8rem;
+}
+
+.platform-color input {
+  width: 2.5rem;
+  height: 2.5rem;
+  padding: 0;
+  border: 0;
+}
+
+.platform-color code {
+  grid-column: 1 / -1;
+  color: var(--admin-text-muted);
+}
+
+.platform-type-preview,
+.platform-module-card,
+.platform-navigation-row {
+  padding: 1rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.9rem;
+  background: var(--admin-surface-solid);
+}
+
+.platform-type-preview h2 {
+  font-family: var(--starville-font-display, serif);
+}
+
+.platform-toggle,
+.platform-module-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.platform-toggle input,
+.platform-module-toggle > input {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--admin-forest);
+}
+
+.platform-module-toggle span,
+.platform-navigation-row > div:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.platform-module-card small,
+.platform-navigation-row small {
+  color: var(--admin-text-muted);
+}
+
+.platform-navigation-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.platform-module-card {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.platform-landing-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.platform-landing-card {
+  padding: 1rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  background: var(--admin-surface-solid);
+}
+
+.platform-landing-card > header,
+.platform-preset-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.platform-landing-card > header > div {
+  display: grid;
+  gap: 0.2rem;
+  text-transform: capitalize;
+}
+
+.platform-landing-card small,
+.platform-change-summary small {
+  color: var(--admin-text-muted);
+}
+
+.platform-preset-actions {
+  justify-content: flex-start;
+}
+
+.platform-preset-actions button {
+  min-height: 2.5rem;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid var(--admin-line-strong);
+  border-radius: 0.7rem;
+  color: var(--admin-forest);
+  background: var(--admin-canvas-soft);
+  font-weight: 750;
+}
+
+.platform-navigation-row {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) minmax(12rem, 1.5fr) 7rem;
+  align-items: end;
+  gap: 1rem;
+}
+
+.platform-help {
+  grid-column: 1 / -1;
+  color: var(--admin-text-muted);
+  font-size: 0.85rem;
+}
+
+.platform-sticky-actions {
+  position: sticky;
+  z-index: 5;
+  bottom: 1rem;
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) auto auto;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--admin-line-strong);
+  border-radius: 1rem;
+  background: rgb(255 254 249 / 96%);
+  box-shadow: var(--admin-shadow);
+  backdrop-filter: blur(1rem);
+}
+
+.platform-sticky-actions a,
+.platform-sticky-actions button,
+.platform-create-draft button,
+.platform-lifecycle-form button,
+.platform-inline-action button,
+.platform-type-preview button {
+  min-height: 2.75rem;
+  padding: 0.65rem 1rem;
+  border: 0;
+  border-radius: 0.7rem;
+  color: var(--admin-action-text);
+  background: var(--admin-forest);
+  font-weight: 750;
+  text-decoration: none;
+}
+
+.platform-sticky-actions a {
+  display: grid;
+  place-items: center;
+  color: var(--admin-forest);
+  background: var(--admin-canvas-soft);
+}
+
+.platform-unsaved {
+  position: fixed;
+  z-index: 10;
+  right: 1rem;
+  bottom: 6.5rem;
+  padding: 0.55rem 0.8rem;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--admin-danger);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.platform-overview-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.platform-summary-card--wide {
+  grid-column: 1 / -1;
+}
+
+.platform-create-draft,
+.platform-lifecycle-actions,
+.platform-lifecycle-form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.platform-lifecycle-actions {
+  margin-top: 1rem;
+}
+
+.platform-change-summary {
+  display: grid;
+  gap: 0.3rem;
+  margin-top: 1rem;
+  padding: 0.8rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.8rem;
+  background: var(--admin-canvas-soft);
+}
+
+.platform-lifecycle-form {
+  grid-template-columns: 1fr auto;
+  align-items: end;
+}
+
+.platform-preview-banner {
+  margin-top: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.8rem;
+  color: #fff;
+  background: var(--admin-forest);
+}
+
+.platform-preview-banner a {
+  color: #fff;
+}
+
+.platform-preview-comparison > div {
+  min-width: 0;
+}
+
+.platform-preview-comparison__wide {
+  grid-column: 1 / -1;
+}
+
+.platform-preview-frame {
+  display: grid;
+  min-height: 30rem;
+  overflow: hidden;
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  color: var(--preview-text);
+  background: var(--preview-background);
+}
+
+.platform-preview-frame header,
+.platform-preview-frame footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: var(--preview-surface);
+}
+
+.platform-preview-frame__hero {
+  display: grid;
+  max-width: 34rem;
+  place-items: center;
+  align-content: center;
+  margin: auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.platform-preview-frame__hero h2 {
+  margin: 0;
+  font-size: clamp(2rem, 6vw, 4rem);
+}
+
+.platform-preview-frame__hero button {
+  padding: 0.7rem 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--preview-primary-text);
+  background: var(--preview-primary);
+  font-weight: 800;
+}
+
+.platform-preview-admin,
+.platform-preview-login {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.35fr) 1fr;
+  min-height: 24rem;
+  overflow: hidden;
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  color: var(--preview-text);
+  background: var(--preview-background);
+}
+
+.platform-preview-admin aside,
+.platform-preview-login > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 1.25rem;
+  background: var(--preview-surface);
+}
+
+.platform-preview-admin nav {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 1rem;
+}
+
+.platform-preview-admin nav span,
+.platform-preview-login label {
+  padding: 0.45rem 0.55rem;
+  border-radius: 0.4rem;
+  background: color-mix(in srgb, var(--preview-background) 70%, transparent);
+}
+
+.platform-preview-admin > div,
+.platform-preview-login > div:last-child {
+  display: grid;
+  max-width: 38rem;
+  align-content: center;
+  gap: 0.75rem;
+  padding: 2rem;
+}
+
+.platform-preview-admin button,
+.platform-preview-login button {
+  width: fit-content;
+  padding: 0.7rem 1rem;
+  border: 0;
+  border-radius: 0.6rem;
+  color: var(--preview-primary-text);
+  background: var(--preview-primary);
+}
+
+.platform-preview-login label {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.platform-table-scroll {
+  overflow-x: auto;
+}
+
+.platform-table-card table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.platform-table-card th,
+.platform-table-card td {
+  padding: 0.75rem;
+  border-bottom: 1px solid var(--admin-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.platform-inline-action {
+  display: grid;
+  grid-template-columns: minmax(10rem, 1fr) auto;
+  gap: 0.5rem;
+}
+
+@media (max-width: 64rem) {
+  .platform-color-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .platform-preview-comparison,
+  .platform-overview-grid {
+    grid-template-columns: 1fr;
+  }
+  .platform-summary-card--wide {
+    grid-column: auto;
+  }
+  .platform-preview-comparison__wide {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 48rem) {
+  .platform-field-grid,
+  .platform-color-grid,
+  .platform-module-grid {
+    grid-template-columns: 1fr;
+  }
+  .platform-navigation-row,
+  .platform-sticky-actions,
+  .platform-lifecycle-form,
+  .platform-inline-action {
+    grid-template-columns: 1fr;
+  }
+  .platform-assets-heading,
+  .platform-table-card > header,
+  .platform-preview-banner,
+  .platform-landing-card > header,
+  .platform-preset-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .platform-preview-admin,
+  .platform-preview-login {
+    grid-template-columns: 1fr;
+  }
+  .platform-settings-shell {
+    width: min(100% - 1rem, 92rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .platform-settings-shell *,
+  .platform-settings-shell *::before,
+  .platform-settings-shell *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 * {
@@ -86,6 +680,18 @@ a {
   border-radius: 0.85rem;
   background: rgb(107 180 148 / 10%);
   transform: rotate(45deg);
+}
+
+.brand-logo {
+  width: auto;
+  max-width: 8rem;
+  height: 2.75rem;
+  object-fit: contain;
+}
+
+.brand--compact .brand-logo {
+  max-width: 6rem;
+  height: 2.15rem;
 }
 
 .brand-mark::before,
@@ -161,6 +767,44 @@ a {
   font-size: 0.5rem;
 }
 
+.brand--mark-only {
+  justify-content: center;
+  gap: 0;
+}
+
+.brand--mark-only .brand-copy {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.brand--mark-only .brand-logo,
+.brand--mark-only .brand-mark {
+  max-width: 2.5rem;
+  width: 2.35rem;
+  height: 2.35rem;
+}
+
+.brand--mark-only .brand-logo {
+  object-fit: contain;
+}
+
+a.brand {
+  text-decoration: none;
+  color: inherit;
+}
+
+a.brand:focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 3px;
+  border-radius: 0.65rem;
+}
+
 .auth-shell {
   display: grid;
   min-height: 100vh;
@@ -178,7 +822,13 @@ a {
   color: #f7f4e9;
   background:
     radial-gradient(circle at 15% 20%, rgb(116 195 159 / 22%), transparent 21rem),
-    linear-gradient(150deg, #163d31 0%, #102b24 62%, #0c211c 100%);
+    linear-gradient(
+      var(--auth-overlay-color, rgb(16 43 36 / 86%)),
+      var(--auth-overlay-color, rgb(12 33 28 / 92%))
+    ),
+    var(--auth-background-image, linear-gradient(150deg, #163d31 0%, #102b24 62%, #0c211c 100%));
+  background-position: center, center, var(--auth-background-position, center);
+  background-size: cover;
 }
 
 .auth-context::after {
@@ -467,28 +1117,557 @@ a {
   margin-top: 0.75rem;
 }
 
+/*
+ * Admin application shell breakpoints (single source of truth):
+ * - mobile: below 48rem (768px) → drawer only
+ * - tablet: 48rem–74.9875rem (768–1199px) → drawer (portrait) / compact rail (landscape)
+ * - desktop: 75rem (1200px) and above → persistent full-height sidebar
+ */
+.portal-theme {
+  --admin-shell-bp-mobile: 47.9875rem;
+  --admin-shell-bp-desktop: 75rem;
+  --admin-shell-header-height: 5.25rem;
+  --portal-sidebar-width-expanded: 16.5rem;
+  --portal-sidebar-width-collapsed: 4.85rem;
+  /*
+   * Lock the protected admin chrome to the viewport. Document scroll is replaced
+   * by independent main-content and sidebar-nav scroll regions so the sidebar
+   * always spans top-to-bottom regardless of page length.
+   */
+  height: 100vh;
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow: hidden;
+  color: var(--admin-text);
+  background: var(--admin-canvas);
+}
+
 .portal-shell {
-  min-height: 100vh;
-  min-height: 100dvh;
+  /*
+   * Shared desktop shell chrome height. Sidebar brand row and main app header
+   * must share this exact box so their bottom borders form one continuous line.
+   * 5.25rem (84px) fits brand + collapse, breadcrumb + title, without excess air.
+   */
+  --admin-shell-header-height: 5.25rem;
+  --portal-sidebar-width: var(--portal-sidebar-width-expanded);
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: var(--portal-sidebar-width) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.portal-shell--collapsed {
+  --portal-sidebar-width: var(--portal-sidebar-width-collapsed);
+}
+
+.portal-shell--hydrated {
+  transition: grid-template-columns 180ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-shell--hydrated {
+    transition: none;
+  }
+
+  .portal-sidebar,
+  .portal-sidebar__link,
+  .portal-nav-drawer,
+  .portal-nav-backdrop {
+    transition: none !important;
+  }
+}
+
+.portal-sidebar {
+  position: relative;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  width: var(--portal-sidebar-width);
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  border-right: 1px solid var(--admin-line);
+  background: var(--admin-nav-bg, var(--admin-surface-solid));
+  color: var(--admin-text);
+  box-shadow: inset -1px 0 0 rgb(255 255 255 / 3%);
+}
+
+.portal-sidebar__brand {
+  box-sizing: border-box;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  height: var(--admin-shell-header-height);
+  min-height: var(--admin-shell-header-height);
+  max-height: var(--admin-shell-header-height);
+  padding: 0 0.85rem;
+  border-bottom: 1px solid var(--admin-line);
+}
+
+.portal-shell--collapsed .portal-sidebar__brand {
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  /* Keep the same shared height — do not grow when stacking mark + collapse. */
+  height: var(--admin-shell-header-height);
+  min-height: var(--admin-shell-header-height);
+  max-height: var(--admin-shell-header-height);
+  padding: 0 0.45rem;
+}
+
+.portal-shell--collapsed .portal-sidebar__collapse {
+  width: 2.1rem;
+  min-width: 2.1rem;
+  height: 2.1rem;
+}
+
+.portal-shell--collapsed .portal-sidebar__brand .brand-mark,
+.portal-shell--collapsed .portal-sidebar__brand .brand-logo,
+.portal-shell--collapsed .portal-sidebar__brand .brand-logo--mark {
+  width: 2.1rem;
+  max-width: 2.1rem;
+  height: 2.1rem;
+}
+
+.portal-sidebar__collapse {
+  display: inline-grid;
+  width: 2.35rem;
+  min-width: 2.35rem;
+  height: 2.35rem;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--admin-line) 90%, transparent);
+  border-radius: 0.7rem;
+  color: var(--admin-text-muted);
+  background: color-mix(in srgb, var(--admin-surface) 35%, transparent);
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.portal-sidebar__collapse:hover {
+  color: var(--admin-text);
+  background: color-mix(in srgb, var(--admin-surface) 55%, transparent);
+}
+
+.portal-sidebar__collapse:focus-visible,
+.portal-sidebar__link:focus-visible,
+.portal-sidebar__avatar:focus-visible,
+.portal-nav-trigger:focus-visible,
+.portal-nav-drawer__close:focus-visible,
+.portal-nav-drawer a:focus-visible {
+  outline: 2px solid var(--admin-focus);
+  outline-offset: 2px;
+}
+
+.portal-sidebar__nav {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 1.15rem;
+  min-height: 0;
+  padding: 1rem 0.75rem 1.25rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--admin-line) 70%, transparent) transparent;
+}
+
+.portal-sidebar__nav::-webkit-scrollbar {
+  width: 0.4rem;
+}
+
+.portal-sidebar__nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--admin-line) 75%, transparent);
+}
+
+.portal-sidebar__group {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.portal-sidebar__group-label {
+  margin: 0 0 0.2rem;
+  padding: 0 0.65rem;
+  color: var(--admin-text-muted);
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.portal-sidebar__group-separator {
+  width: 1.6rem;
+  height: 1px;
+  margin: 0.35rem auto 0.45rem;
+  background: color-mix(in srgb, var(--admin-line) 85%, transparent);
+}
+
+.portal-sidebar__group-links {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.portal-sidebar__link {
+  position: relative;
+  display: flex;
+  min-height: 2.65rem;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid transparent;
+  border-radius: 0.75rem;
+  color: var(--admin-text-muted);
+  font-size: 0.84rem;
+  font-weight: 650;
+  text-decoration: none;
+  transition:
+    color 140ms ease,
+    background 140ms ease,
+    border-color 140ms ease;
+}
+
+.portal-shell--collapsed .portal-sidebar__link {
+  justify-content: center;
+  width: 2.85rem;
+  min-height: 2.85rem;
+  margin-inline: auto;
+  padding: 0.55rem;
+  gap: 0;
+}
+
+.portal-sidebar__icon {
+  display: inline-grid;
+  width: 1.15rem;
+  flex: 0 0 auto;
+  place-items: center;
+  font-size: 0.95rem;
+  line-height: 1;
+  opacity: 0.92;
+}
+
+.portal-sidebar__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-sidebar__badge {
+  margin-left: auto;
+  padding: 0.12rem 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--admin-canvas-soft, var(--admin-surface)) 80%, transparent);
+  color: var(--admin-text-muted);
+  font-size: 0.58rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.portal-shell--collapsed .portal-sidebar__label,
+.portal-shell--collapsed .portal-sidebar__badge {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.portal-sidebar__link:hover {
+  color: var(--admin-text);
+  background: color-mix(in srgb, var(--admin-surface) 42%, transparent);
+}
+
+.portal-sidebar__link.is-active {
+  color: var(--admin-text);
+  border-color: color-mix(in srgb, var(--admin-nav-active, var(--admin-gold)) 28%, transparent);
+  background: color-mix(in srgb, var(--admin-nav-active, var(--admin-mint)) 16%, transparent);
+  box-shadow: inset 3px 0 0 var(--admin-nav-active, var(--admin-gold));
+}
+
+.portal-shell--collapsed .portal-sidebar__link.is-active {
+  box-shadow: none;
+  background: color-mix(in srgb, var(--admin-nav-active, var(--admin-mint)) 22%, transparent);
+}
+
+.portal-sidebar__footer {
+  flex: 0 0 auto;
+  margin-top: auto;
+  padding: 0.85rem;
+  padding-bottom: max(0.85rem, env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--admin-line);
+  background: var(--admin-nav-bg, var(--admin-surface-solid));
+}
+
+.portal-sidebar__profile {
+  position: relative;
+}
+
+.portal-sidebar__profile-expanded {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.35rem 0.7rem;
+  align-items: center;
+}
+
+.portal-sidebar__profile-copy {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.portal-sidebar__profile-name {
+  overflow: hidden;
+  color: var(--admin-text);
+  font-size: 0.82rem;
+  font-weight: 720;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-sidebar__profile-role {
+  overflow: hidden;
+  color: var(--admin-text-muted);
+  font-size: 0.68rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-sidebar__profile-actions {
+  grid-column: 1 / -1;
+  margin-top: 0.35rem;
+}
+
+.portal-sidebar__profile-actions .button,
+.portal-nav-drawer__actions .button,
+.portal-header__account .button {
+  width: 100%;
+}
+
+.portal-sidebar__avatar {
+  display: inline-grid;
+  width: 2.55rem;
+  min-width: 2.55rem;
+  height: 2.55rem;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--admin-line) 90%, transparent);
+  border-radius: 0.8rem;
+  color: var(--admin-text);
+  background: color-mix(in srgb, var(--admin-surface) 48%, transparent);
+  cursor: pointer;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.portal-sidebar__avatar--static {
+  cursor: default;
+}
+
+/* Expanded desktop: show inline profile; hide compact avatar menu trigger. */
+.portal-sidebar__avatar--menu {
+  display: none;
+}
+
+.portal-shell--collapsed .portal-sidebar__avatar--menu {
+  display: inline-grid;
+}
+
+.portal-shell--collapsed .portal-sidebar__profile-expanded {
+  display: none;
+}
+
+.portal-shell--collapsed .portal-sidebar__footer {
+  display: grid;
+  place-items: center;
+  padding: 0.75rem 0.5rem max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
+.portal-sidebar__profile-menu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 0.5rem);
+  left: 0;
+  z-index: 50;
+  min-width: 11rem;
+  padding: 0.75rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.85rem;
+  background: var(--admin-surface-solid);
+  box-shadow: var(--admin-shadow);
+}
+
+.portal-shell--collapsed .portal-sidebar__profile-menu {
+  right: auto;
+  left: calc(100% + 0.55rem);
+  bottom: 0;
+  width: 13rem;
+}
+
+.portal-sidebar__profile-menu-meta {
+  display: grid;
+  gap: 0.15rem;
+  margin-bottom: 0.65rem;
+}
+
+.portal-sidebar__profile-menu-meta strong {
+  font-size: 0.84rem;
+}
+
+.portal-sidebar__profile-menu-meta span {
+  color: var(--admin-text-muted);
+  font-size: 0.7rem;
+}
+
+.portal-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  max-height: 100%;
+  overflow: hidden;
+  background: var(--admin-canvas);
 }
 
 .portal-header {
+  box-sizing: border-box;
+  position: relative;
+  z-index: 30;
   display: flex;
-  min-height: 5.1rem;
+  flex: 0 0 auto;
+  height: var(--admin-shell-header-height);
+  min-height: var(--admin-shell-header-height);
+  max-height: var(--admin-shell-header-height);
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
-  padding: 0.9rem clamp(1.25rem, 5vw, 4rem);
+  gap: 1rem;
+  /* Horizontal padding only — vertical centering comes from flex + shared height. */
+  padding: 0 clamp(1rem, 3vw, 2rem);
   border-bottom: 1px solid var(--admin-line);
-  background: rgb(255 255 252 / 76%);
-  backdrop-filter: blur(1rem);
+  background: color-mix(in srgb, var(--admin-surface-solid) 88%, transparent);
+  backdrop-filter: blur(0.9rem);
+}
+
+.portal-header__start {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.portal-header__titles {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+  align-content: center;
+}
+
+.portal-header__title {
+  margin: 0;
+  overflow: hidden;
+  font-family: var(--starville-font-display, Inter, ui-sans-serif, system-ui, sans-serif);
+  font-size: clamp(1.1rem, 1.8vw, 1.35rem);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-breadcrumb {
+  min-width: 0;
+}
+
+.portal-breadcrumb ol {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--admin-text-muted);
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  list-style: none;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.portal-breadcrumb li {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.portal-breadcrumb li:not(:last-child)::after {
+  content: '/';
+  opacity: 0.55;
+}
+
+.portal-breadcrumb a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.portal-breadcrumb a:hover {
+  color: var(--admin-text);
+}
+
+.portal-breadcrumb span[aria-current='page'] {
+  overflow: hidden;
+  color: var(--admin-text);
+  text-overflow: ellipsis;
+}
+
+.portal-header__end {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.portal-env-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.75rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--admin-gold) 35%, var(--admin-line));
+  border-radius: 999px;
+  color: var(--admin-gold);
+  background: color-mix(in srgb, var(--admin-gold) 12%, transparent);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .portal-header__account {
-  display: grid;
+  display: none;
   grid-template-columns: auto auto auto;
   align-items: center;
-  gap: 0.25rem 1rem;
+  gap: 0.25rem 0.85rem;
 }
 
 .account-name {
@@ -511,68 +1690,47 @@ a {
   grid-column: 3;
 }
 
-.portal-nav {
-  display: flex;
-  min-height: 3.25rem;
-  align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem clamp(1.25rem, 5vw, 4rem);
-  border-bottom: 1px solid var(--admin-line);
-  background: rgb(255 255 252 / 48%);
-  overflow-x: auto;
-  scrollbar-width: none;
+.portal-content {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
-.portal-nav::-webkit-scrollbar {
+.portal-nav-trigger {
   display: none;
-}
-
-.portal-nav a {
-  flex: 0 0 auto;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid transparent;
-  border-radius: 0.55rem;
-  color: var(--admin-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
-  text-decoration: none;
-  transition:
-    color 160ms ease,
-    background 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease;
-}
-
-.portal-nav a:hover {
+  align-items: center;
+  gap: 0.45rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.75rem;
   color: var(--admin-text);
-  background: rgb(75 128 103 / 8%);
+  background: var(--admin-surface);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 720;
 }
 
-.portal-nav a:focus-visible,
-.portal-nav-drawer a:focus-visible,
-.portal-nav-trigger:focus-visible {
-  outline: 2px solid var(--admin-accent);
-  outline-offset: 2px;
+.portal-nav-trigger__bars {
+  font-size: 1rem;
+  line-height: 1;
 }
 
-.portal-nav a.is-active {
-  border-color: rgb(40 115 86 / 34%);
-  color: var(--admin-text);
-  background: rgb(129 215 173 / 18%);
-  box-shadow:
-    inset 0 1px rgb(255 255 255 / 58%),
-    0 0 1rem rgb(79 163 121 / 8%);
-}
-
-.portal-nav-trigger,
+/* Drawer primitives stay hidden until a drawer-mode breakpoint activates them. */
 .portal-nav-backdrop {
   display: none;
 }
 
 .overview {
-  width: min(100% - 2.5rem, 68rem);
+  width: min(100% - 2rem, 58rem);
   margin: 0 auto;
-  padding: clamp(3rem, 8vw, 7rem) 0 5rem;
+  padding: clamp(1.25rem, 3vw, 2rem) 0 4rem;
 }
 
 .overview__intro {
@@ -1209,22 +2367,6 @@ a {
     padding: clamp(2.5rem, 9vw, 5rem) 1.5rem;
   }
 
-  .portal-header {
-    align-items: flex-start;
-  }
-
-  .portal-header__account {
-    grid-template-columns: auto;
-    justify-items: end;
-  }
-
-  .account-name,
-  .account-role,
-  .portal-header__account form {
-    grid-row: auto;
-    grid-column: 1;
-  }
-
   .token-access-grid {
     grid-template-columns: 1fr;
   }
@@ -1235,9 +2377,30 @@ a {
 }
 
 @media (max-width: 560px) {
-  .brand--compact .brand-copy span,
-  .portal-header .account-role {
+  .brand--compact .brand-copy span {
     display: none;
+  }
+
+  .portal-header {
+    align-items: flex-start;
+    padding-block: 0.7rem;
+  }
+
+  .portal-header__title {
+    white-space: normal;
+  }
+
+  .portal-breadcrumb ol {
+    max-width: min(70vw, 16rem);
+    text-overflow: ellipsis;
+  }
+
+  .portal-nav-trigger__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
   }
 
   .account-name {
@@ -1305,10 +2468,6 @@ a {
 
   .portal-header {
     background: rgb(17 29 25 / 78%);
-  }
-
-  .portal-nav {
-    background: rgb(17 29 25 / 52%);
   }
 
   .notice {
@@ -2182,31 +3341,144 @@ select {
   }
 }
 
-@media (max-width: 760px) {
-  .portal-nav {
+/*
+ * Tablet landscape (768–1199px landscape): compact icon rail remains full-height.
+ * Forces collapsed presentation so labels never squeeze the main column.
+ */
+@media (min-width: 48rem) and (max-width: 74.9875rem) and (orientation: landscape) {
+  .portal-shell,
+  .portal-shell--collapsed {
+    --portal-sidebar-width: var(--portal-sidebar-width-collapsed);
+  }
+
+  .portal-sidebar {
+    display: flex;
+  }
+
+  .portal-sidebar__brand {
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0 0.45rem;
+  }
+
+  .portal-sidebar__brand .brand-copy {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .portal-sidebar__brand .brand-mark,
+  .portal-sidebar__brand .brand-logo,
+  .portal-sidebar__brand .brand-logo--mark {
+    width: 2.1rem;
+    max-width: 2.1rem;
+    height: 2.1rem;
+  }
+
+  .portal-sidebar__collapse {
+    width: 2.1rem;
+    min-width: 2.1rem;
+    height: 2.1rem;
+  }
+
+  .portal-sidebar__link {
+    justify-content: center;
+    width: 2.85rem;
+    min-height: 2.85rem;
+    margin-inline: auto;
+    padding: 0.55rem;
+    gap: 0;
+  }
+
+  .portal-sidebar__label,
+  .portal-sidebar__badge,
+  .portal-sidebar__group-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .portal-sidebar__group-separator {
+    display: block;
+  }
+
+  .portal-sidebar__footer {
+    display: grid;
+    place-items: center;
+    padding: 0.75rem 0.5rem max(1rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .portal-sidebar__profile-expanded {
     display: none;
   }
 
-  .portal-nav-trigger {
-    display: flex;
-    width: calc(100% - 1.5rem);
-    min-height: 3rem;
-    align-items: center;
-    justify-content: space-between;
-    margin: 0.75rem;
-    padding: 0.65rem 0.9rem;
-    border: 1px solid var(--admin-line-strong);
-    border-radius: 0.8rem;
-    color: var(--admin-text);
-    background: var(--admin-surface);
-    font: inherit;
-    font-weight: 720;
+  .portal-sidebar__avatar--menu {
+    display: inline-grid;
   }
 
-  .portal-nav-trigger span:last-child {
-    color: var(--admin-text-muted);
-    font-size: 0.68rem;
-    text-transform: uppercase;
+  .portal-sidebar__profile-menu {
+    right: auto;
+    left: calc(100% + 0.55rem);
+    bottom: 0;
+    width: 13rem;
+  }
+
+  .portal-nav-trigger {
+    display: none;
+  }
+}
+
+/*
+ * Drawer mode: mobile (<768) and tablet portrait (≤1199 portrait).
+ * Persistent desktop sidebar is hidden; full-height overlay drawer is used.
+ */
+@media (max-width: 47.9875rem), (max-width: 74.9875rem) and (orientation: portrait) {
+  .portal-shell,
+  .portal-shell--collapsed {
+    --portal-sidebar-width: 0rem;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .portal-sidebar {
+    display: none;
+  }
+
+  .portal-main {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+  }
+
+  /* Compact mobile/tablet chrome — do not force the desktop shell header height. */
+  .portal-header {
+    height: auto;
+    min-height: 3.5rem;
+    max-height: none;
+    padding: 0.75rem max(1rem, env(safe-area-inset-right, 0px)) 0.75rem
+      max(1rem, env(safe-area-inset-left, 0px));
+  }
+
+  .portal-nav-trigger {
+    display: inline-flex;
+  }
+
+  .portal-header__account--mobile {
+    display: none;
+  }
+
+  .portal-breadcrumb {
+    display: none;
   }
 
   .portal-nav-backdrop {
@@ -2215,60 +3487,90 @@ select {
     inset: 0;
     display: flex;
     align-items: stretch;
-    justify-content: flex-end;
+    justify-content: flex-start;
+    padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px)
+      env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     background: rgb(9 18 15 / 72%);
   }
 
   .portal-nav-drawer {
-    width: min(88vw, 23rem);
+    display: flex;
+    flex-direction: column;
+    width: min(88vw, 21.25rem);
+    height: 100%;
     max-height: 100dvh;
-    padding: 1rem;
-    overflow-y: auto;
-    border-left: 1px solid var(--admin-line-strong);
-    background: var(--admin-surface-solid);
+    max-height: 100svh;
+    padding: 0;
+    overflow: hidden;
+    border-right: 1px solid var(--admin-line-strong);
+    background: var(--admin-nav-bg, var(--admin-surface-solid));
     box-shadow: var(--admin-shadow);
   }
 
-  .portal-nav-drawer header {
+  .portal-nav-drawer__header {
     display: flex;
+    flex: 0 0 auto;
     align-items: start;
     justify-content: space-between;
     gap: 1rem;
-    margin-bottom: 1rem;
+    padding: 1rem;
+    border-bottom: 1px solid var(--admin-line);
   }
 
-  .portal-nav-drawer h2 {
-    margin: 0.15rem 0 0;
+  .portal-nav-drawer__current {
+    margin: 0.55rem 0 0;
+    color: var(--admin-text-muted);
+    font-size: 0.72rem;
   }
 
-  .portal-nav-drawer header button {
+  .portal-nav-drawer__close {
     width: 2.75rem;
+    min-width: 2.75rem;
     min-height: 2.75rem;
     border: 1px solid var(--admin-line);
     border-radius: 0.7rem;
     color: var(--admin-text);
     background: transparent;
+    cursor: pointer;
     font-size: 1.5rem;
+    line-height: 1;
   }
 
-  .portal-nav-drawer nav {
+  .portal-nav-drawer__nav {
     display: grid;
-    gap: 0.45rem;
+    flex: 1 1 auto;
+    gap: 1rem;
+    min-height: 0;
+    padding: 1rem 0.85rem;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
-  .portal-nav-drawer a {
-    min-height: 2.8rem;
-    padding: 0.75rem;
-    border: 1px solid transparent;
-    border-radius: 0.75rem;
-    color: var(--admin-text-muted);
-    text-decoration: none;
+  .portal-nav-drawer .portal-sidebar__group {
+    display: grid;
+    gap: 0.35rem;
   }
 
-  .portal-nav-drawer a.is-active {
-    border-color: rgb(40 115 86 / 34%);
-    color: var(--admin-text);
-    background: rgb(129 215 173 / 18%);
+  .portal-nav-drawer .portal-sidebar__group + .portal-sidebar__group {
+    padding-top: 0.85rem;
+    border-top: 1px solid color-mix(in srgb, var(--admin-line) 80%, transparent);
+  }
+
+  .portal-nav-drawer .portal-sidebar__link {
+    min-height: 2.75rem;
+  }
+
+  .portal-nav-drawer__profile {
+    flex: 0 0 auto;
+    margin-top: auto;
+    padding: 0.9rem 1rem max(1.1rem, env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--admin-line);
+    background: var(--admin-nav-bg, var(--admin-surface-solid));
+  }
+
+  .portal-nav-drawer__actions {
+    margin-top: 0.75rem;
   }
 
   .operations-page {

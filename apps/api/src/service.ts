@@ -19,6 +19,7 @@ export interface CreateApiServiceOptions {
   readonly liveOperations?: BuildApiAppOptions['liveOperations'];
   readonly adminCozy?: BuildApiAppOptions['adminCozy'];
   readonly adminAssets?: BuildApiAppOptions['adminAssets'];
+  readonly platformConfiguration?: BuildApiAppOptions['platformConfiguration'];
 }
 
 export function createApiService({
@@ -32,6 +33,7 @@ export function createApiService({
   liveOperations,
   adminCozy,
   adminAssets,
+  platformConfiguration,
 }: CreateApiServiceOptions): ApiService {
   const app = buildApiApp({
     config,
@@ -44,6 +46,7 @@ export function createApiService({
     ...(liveOperations === undefined ? {} : { liveOperations }),
     ...(adminCozy === undefined ? {} : { adminCozy }),
     ...(adminAssets === undefined ? {} : { adminAssets }),
+    ...(platformConfiguration === undefined ? {} : { platformConfiguration }),
   });
 
   return {

@@ -33,6 +33,11 @@ const migrationFiles = [
   '20260713111000_world_asset_manager_functions.sql',
   '20260713111500_world_asset_manager_world_integration.sql',
   '20260713112000_world_asset_manager_storage.sql',
+  '20260713113000_fix_asset_audit_read_permission.sql',
+  '20260713114000_fix_database_lint_warnings.sql',
+  '20260713115000_fix_final_hosted_validation.sql',
+  '20260714100000_platform_configuration_schema.sql',
+  '20260714101000_platform_configuration_functions.sql',
 ] as const;
 
 interface CommandResult {
@@ -241,6 +246,20 @@ async function main(): Promise<void> {
       console.log(assetResult.stdout.trim());
     }
     console.log('[world-postgres] world-asset-manager execution assertions passed');
+
+    const platformAssertions = join(
+      fixtureDirectory,
+      'platform-configuration-postgres-execution.sql',
+    );
+    const platformResult = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--file',
+      platformAssertions,
+    ]);
+    if (platformResult.stdout.trim()) {
+      console.log(platformResult.stdout.trim());
+    }
+    console.log('[world-postgres] platform-configuration execution assertions passed');
 
     const assertions = join(fixtureDirectory, 'world-postgres-execution.sql');
     const result = await runCommand(psql, [...psqlBaseArguments, '--file', assertions]);

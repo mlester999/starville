@@ -42,6 +42,22 @@ begin
 end;
 $$;
 
+select pg_temp.assert_true(
+  position(
+    'profile public.player_profiles'
+    in pg_get_functiondef(
+      'private.phase6_get_published_world_manifest(text,text,text,integer)'::regprocedure
+    )
+  ) = 0
+    and position(
+      'profile :='
+      in pg_get_functiondef(
+        'private.phase6_get_published_world_manifest(text,text,text,integer)'::regprocedure
+      )
+    ) = 0,
+  'published-world manifest helper has no lint-unused profile row variable'
+);
+
 do $$
 declare
   admin_user_id constant uuid := '10000000-0000-4000-8000-000000000001';
@@ -60,8 +76,43 @@ begin
     'the seed creates one published version per map'
   );
   perform pg_temp.assert_true(
-    (select count(*) = 20 from public.world_assets where approval_status = 'approved'),
-    'the world and Phase 7 draft seeds create exactly twenty approved assets'
+    (
+      select count(*) = 20
+        and count(*) = count(distinct asset.asset_key)
+        and array_agg(asset.asset_key order by asset.asset_key) = array[
+          'brooklight-sign',
+          'bush-round',
+          'closed-route-marker',
+          'cottage-amber',
+          'cottage-sage',
+          'fence-willow',
+          'flowers-moon',
+          'lamp-star',
+          'moonstone-marker',
+          'notice-board',
+          'orchard-road-sign',
+          'phase7-cooking-hearth-marker',
+          'phase7-crafting-workbench-marker',
+          'phase7-farm-plot-marker',
+          'phase7-general-store-marker',
+          'phase7-home-entrance-marker',
+          'rock-moss',
+          'tree-maple',
+          'tree-pine',
+          'whisperpine-gate'
+        ]::text[]
+        and bool_and(
+          asset.approval_status = 'approved'
+          and asset.repository_owned
+          and asset.source_type = 'repository_procedural'
+          and asset.lifecycle_status = 'active'
+          and asset.production_status = 'development_marker'
+          and asset.development_marker_replacement_key is null
+          and asset.active_version_id is not null
+        )
+      from public.world_assets as asset
+    ),
+    'the world and Phase 7 seeds create the exact reviewed development-marker catalog'
   );
   perform pg_temp.assert_true(
     (select count(*) = 5 and bool_and(record_version = 2) from public.world_maps),
@@ -246,8 +297,8 @@ begin
     'destination spawns are outside every enabled exit trigger'
   );
   perform pg_temp.assert_true(
-    (select count(*) = 59 and count(distinct key) = 59 from public.admin_permissions where is_system),
-    'the current system permission catalog has fifty-nine unique keys'
+    (select count(*) = 67 and count(distinct key) = 67 from public.admin_permissions where is_system),
+    'the current system permission catalog has sixty-seven unique keys'
   );
   perform pg_temp.assert_true(
     not has_function_privilege(
@@ -541,6 +592,18 @@ begin
     result -> 'map' ->> 'slug' = 'moonpetal-meadow'
       and result -> 'version' ->> 'lifecycleStatus' = 'published',
     'published-manifest resolution returns the requested active publication'
+  );
+
+  result := public.get_published_world_manifest(
+    '66666666666666666666666666666666',
+    'moonpetal-meadow',
+    'postgres:manifest-missing-profile',
+    600
+  );
+  perform pg_temp.assert_status(
+    result,
+    'not_found',
+    'a valid wallet without a player profile retains the safe not-found behavior'
   );
 
   begin

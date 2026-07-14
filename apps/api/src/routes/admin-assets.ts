@@ -137,7 +137,7 @@ export function registerAdminAssetRoutes(
 
   app.get('/api/v1/admin/world-assets/audit', async (request, reply) => {
     disableResponseCaching(reply);
-    const identity = await authorize(request, 'assets.audit_read');
+    const identity = await authorize(request, 'assets.audit.read');
     return response(
       await options.service.listAudit(identity, request.query, request.id),
       request.id,

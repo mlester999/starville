@@ -19,7 +19,7 @@ export const revalidate = 0;
 export default async function WorldAssetAuditPage(props: {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
-  await requireAssetManagerPermission('assets.audit_read');
+  await requireAssetManagerPermission('assets.audit.read');
   const query = parseAssetAuditQuery(await props.searchParams);
   try {
     const audit = await loadAssetAudit(query);

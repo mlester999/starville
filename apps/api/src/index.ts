@@ -30,6 +30,8 @@ import { createCozyGameplayService } from './cozy-gameplay/service.js';
 import { createSupabaseAdminAssetGateway } from './asset-management/gateway.js';
 import { createAdminAssetService } from './asset-management/service.js';
 import { createSupabaseAssetStorage } from './asset-management/storage.js';
+import { createSupabasePlatformConfigurationGateway } from './platform-configuration/gateway.js';
+import { createPlatformConfigurationService } from './platform-configuration/service.js';
 
 const config = loadApiConfig(process.env);
 const adminSecurity = loadAdminSecurityConfig(process.env);
@@ -112,6 +114,11 @@ const adminAssetService = createAdminAssetService({
   readRateLimit: worldConfig.adminReadRateLimit,
   mutationRateLimit: worldConfig.adminDraftWriteRateLimit,
 });
+const platformConfigurationService = createPlatformConfigurationService({
+  gateway: createSupabasePlatformConfigurationGateway(privilegedSupabase),
+  logger,
+  publicAssetUrl: (path) => assetStorage.publicUrl(path),
+});
 const service = createApiService({
   config,
   logger,
@@ -137,6 +144,7 @@ const service = createApiService({
   liveOperations: { service: liveOperationsService },
   adminCozy: { service: adminCozyService },
   adminAssets: { service: adminAssetService },
+  platformConfiguration: { service: platformConfigurationService },
 });
 
 let isShuttingDown = false;

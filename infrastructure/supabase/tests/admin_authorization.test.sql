@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(38);
+select plan(42);
 
 create temporary table expected_phase6_admin_permissions (
   key text primary key
@@ -38,7 +38,7 @@ values
   ('assets.approve'),
   ('assets.activate'),
   ('assets.deprecate'),
-  ('assets.audit_read'),
+  ('assets.audit.read'),
   ('assets.publish'),
   ('economy.read'),
   ('economy.adjust_stardust'),
@@ -69,7 +69,15 @@ values
   ('players.reset_position'),
   ('players.require_rename'),
   ('players.rename'),
-  ('player_audit.read');
+  ('player_audit.read'),
+  ('platform_configuration.read'),
+  ('platform_configuration.edit'),
+  ('platform_configuration.validate'),
+  ('platform_configuration.review'),
+  ('platform_configuration.publish'),
+  ('platform_configuration.rollback'),
+  ('platform_configuration.audit.read'),
+  ('platform_configuration.preview');
 
 select has_table('public', 'admin_roles', 'admin_roles exists');
 select has_table('public', 'admin_permissions', 'admin_permissions exists');
@@ -151,6 +159,53 @@ select is(
   ),
   0,
   'Read-only Analyst has no write permission'
+);
+
+select ok(
+  exists (
+    select 1
+    from public.admin_role_permissions as mapping
+    join public.admin_roles as role on role.id = mapping.role_id
+    join public.admin_permissions as permission on permission.id = mapping.permission_id
+    where role.key = 'read_only_analyst' and permission.key = 'assets.audit.read'
+  ),
+  'Read-only Analyst retains bounded asset-audit read access'
+);
+
+select ok(
+  not exists (
+    select 1 from public.admin_permissions where key = 'assets.audit_read'
+  ),
+  'legacy asset-audit permission is absent from the active catalog'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from public.admin_role_permissions as mapping
+    join public.admin_roles as role on role.id = mapping.role_id
+    join public.admin_permissions as permission on permission.id = mapping.permission_id
+    where role.key = 'read_only_analyst'
+      and permission.key in (
+        'assets.upload', 'assets.edit', 'assets.validate', 'assets.review',
+        'assets.approve', 'assets.activate', 'assets.deprecate', 'assets.publish'
+      )
+  ),
+  0,
+  'Read-only Analyst receives no asset mutation authority'
+);
+
+select is(
+  (
+    select array_agg(role.key order by role.key)
+    from public.admin_role_permissions as mapping
+    join public.admin_roles as role on role.id = mapping.role_id
+    join public.admin_permissions as permission on permission.id = mapping.permission_id
+    where role.key in ('super_admin', 'game_administrator')
+      and permission.key = 'assets.audit.read'
+  ),
+  array['game_administrator', 'super_admin']::text[],
+  'Super Admin and Game Administrator retain asset-audit read access'
 );
 
 select ok(

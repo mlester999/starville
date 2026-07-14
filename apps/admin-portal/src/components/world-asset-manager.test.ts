@@ -33,6 +33,10 @@ const authorization = readFileSync(
   new URL('../lib/world-assets/authorization.ts', import.meta.url),
   'utf8',
 );
+const auditPage = readFileSync(
+  new URL('../app/(protected)/world-assets/audit/page.tsx', import.meta.url),
+  'utf8',
+);
 const styles = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
 describe('world asset manager interface boundaries', () => {
@@ -110,6 +114,12 @@ describe('world asset manager interface boundaries', () => {
     );
     expect(actions).toContain("operation.data === 'approve'");
     expect(actions).toContain("requireAssetManagerPermission('assets.review')");
+  });
+
+  it('uses the corrected read-only permission for asset audit navigation and access', () => {
+    expect(authorization).toContain("hasAdminPermission(context, 'assets.audit.read')");
+    expect(auditPage).toContain("requireAssetManagerPermission('assets.audit.read')");
+    expect(`${authorization}\n${auditPage}`).not.toContain('assets.audit_read');
   });
 
   it('has bounded responsive layouts and reduced-motion treatment', () => {

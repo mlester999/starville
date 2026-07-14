@@ -38,27 +38,152 @@ $$;
 
 do $$
 declare
+  null_request_rejected boolean := false;
+  malformed_request_rejected boolean := false;
+begin
+  perform pg_temp.assert_asset_true(
+    (
+      select count(*) = 11
+        and bool_and(
+          position(
+            'private.assert_valid_request_id(p_request_id)'
+            in pg_get_functiondef(routine.oid)
+          ) > 0
+        )
+      from pg_proc as routine
+      join pg_namespace as namespace on namespace.oid = routine.pronamespace
+      where namespace.nspname = 'public'
+        and routine.proname = any (array[
+          'get_admin_game_asset_version',
+          'list_admin_game_asset_review_queue',
+          'get_admin_world_draft',
+          'list_admin_world_audit',
+          'list_admin_world_assets',
+          'list_admin_game_assets',
+          'get_admin_game_asset',
+          'list_admin_game_asset_audit',
+          'list_admin_game_asset_references',
+          'get_admin_game_asset_preview_material',
+          'list_admin_world_editor_asset_candidates'
+        ])
+    ),
+    'all eleven retained administrator RPC signatures validate request IDs exactly once'
+  );
+  perform pg_temp.assert_asset_true(
+    (
+      select routine.provolatile = 'i'
+      from pg_proc as routine
+      join pg_namespace as namespace on namespace.oid = routine.pronamespace
+      where namespace.nspname = 'private'
+        and routine.proname = 'valid_world_asset_validation_results'
+    ) and position(
+      'pg_column_size'
+      in pg_get_functiondef(
+        'private.valid_world_asset_validation_results(jsonb)'::regprocedure
+      )
+    ) = 0 and position(
+      'octet_length(p_value::text)'
+      in pg_get_functiondef(
+        'private.valid_world_asset_validation_results(jsonb)'::regprocedure
+      )
+    ) > 0,
+    'validation-result checking remains truly immutable for its CHECK constraints'
+  );
+  perform pg_temp.assert_asset_true(
+    private.valid_world_asset_validation_results(
+      '{"valid":true,"checkedAt":"2026-07-14T01:02:03.123Z","issues":[]}'::jsonb
+    )
+      and private.valid_world_asset_validation_results(
+        '{"valid":false,"checkedAt":"2026-07-14T09:02:03+08:00","issues":[{"code":"IMAGE_WARNING","level":"warning","path":"sprite.webp","message":"Review dimensions"}]}'::jsonb
+      )
+      and private.valid_world_asset_validation_results(
+        '{"valid":true,"checkedAt":"2024-02-29T23:59:59-14:00","issues":[]}'::jsonb
+      ),
+    'bounded UTC, offset, and leap-year validation results remain valid'
+  );
+  perform pg_temp.assert_asset_true(
+    not private.valid_world_asset_validation_results(
+      '{"valid":true,"checkedAt":"2026-02-30T01:02:03Z","issues":[]}'::jsonb
+    )
+      and not private.valid_world_asset_validation_results(
+        '{"valid":true,"checkedAt":"2025-02-29T01:02:03Z","issues":[]}'::jsonb
+      )
+      and not private.valid_world_asset_validation_results(
+        '{"valid":true,"checkedAt":"2026-07-14T01:02:03+14:01","issues":[]}'::jsonb
+      )
+      and not private.valid_world_asset_validation_results(
+        '{"valid":true,"checkedAt":"2026-07-14T01:02:03+15:00","issues":[]}'::jsonb
+      )
+      and not private.valid_world_asset_validation_results(
+        '{"valid":"yes","checkedAt":"2026-07-14T01:02:03Z","issues":[]}'::jsonb
+      )
+      and not private.valid_world_asset_validation_results('{}'::jsonb)
+      and not private.valid_world_asset_validation_results(
+        '{"valid":true,"checkedAt":"2026-07-14T01:02:03Z","issues":{}}'::jsonb
+      )
+      and not private.valid_world_asset_validation_results(
+        jsonb_build_object(
+          'valid', true,
+          'checkedAt', '2026-07-14T01:02:03Z',
+          'issues', '[]'::jsonb,
+          'oversized', repeat('x', 70000)
+        )
+      ),
+    'invalid dates, malformed offsets and fields, and oversized results remain rejected'
+  );
+
+  perform private.assert_valid_request_id('asset:valid-request_1.2');
+  begin
+    perform private.assert_valid_request_id(null);
+  exception when sqlstate '22023' then
+    null_request_rejected := true;
+  end;
+  begin
+    perform private.assert_valid_request_id('asset request with spaces');
+  exception when sqlstate '22023' then
+    malformed_request_rejected := true;
+  end;
+  perform pg_temp.assert_asset_true(
+    null_request_rejected and malformed_request_rejected,
+    'missing and malformed request IDs are rejected with invalid_parameter_value'
+  );
+end;
+$$;
+
+do $$
+declare
   super_user_id constant uuid := 'a5000000-0000-4000-8000-000000000001';
   super_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000002';
   super_admin_session_id constant uuid := 'a5000000-0000-4000-8000-000000000003';
   designer_user_id constant uuid := 'a5000000-0000-4000-8000-000000000011';
   designer_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000012';
   designer_admin_session_id constant uuid := 'a5000000-0000-4000-8000-000000000013';
+  analyst_user_id constant uuid := 'a5000000-0000-4000-8000-000000000021';
+  analyst_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000022';
+  analyst_admin_session_id constant uuid := 'a5000000-0000-4000-8000-000000000023';
   super_role_id uuid;
   designer_role_id uuid;
+  analyst_role_id uuid;
+  audit_result jsonb;
+  null_rpc_request_rejected boolean := false;
+  malformed_rpc_request_rejected boolean := false;
 begin
   select id into strict super_role_id from public.admin_roles where key = 'super_admin';
   select id into strict designer_role_id from public.admin_roles where key = 'world_designer';
+  select id into strict analyst_role_id from public.admin_roles where key = 'read_only_analyst';
 
   insert into auth.users (id, email) values
     (super_user_id, 'asset-super@example.invalid'),
-    (designer_user_id, 'asset-designer@example.invalid');
+    (designer_user_id, 'asset-designer@example.invalid'),
+    (analyst_user_id, 'asset-analyst@example.invalid');
   insert into auth.sessions (id, user_id) values
     (super_auth_session_id, super_user_id),
-    (designer_auth_session_id, designer_user_id);
+    (designer_auth_session_id, designer_user_id),
+    (analyst_auth_session_id, analyst_user_id);
   insert into public.admin_users (user_id, role_id, status, display_name, mfa_required) values
     (super_user_id, super_role_id, 'active', 'Asset Super Admin', false),
-    (designer_user_id, designer_role_id, 'active', 'Asset Designer', false);
+    (designer_user_id, designer_role_id, 'active', 'Asset Designer', false),
+    (analyst_user_id, analyst_role_id, 'active', 'Asset Read-only Analyst', false);
   insert into public.admin_sessions (
     id, user_id, auth_session_id, status, expires_at,
     permission_version_snapshot, session_version_snapshot
@@ -73,6 +198,63 @@ begin
   select designer_admin_session_id, designer_user_id, designer_auth_session_id, 'active',
     now() + interval '1 hour', permission_version, session_version
   from public.admin_users where user_id = designer_user_id;
+  insert into public.admin_sessions (
+    id, user_id, auth_session_id, status, expires_at,
+    permission_version_snapshot, session_version_snapshot
+  )
+  select analyst_admin_session_id, analyst_user_id, analyst_auth_session_id, 'active',
+    now() + interval '1 hour', permission_version, session_version
+  from public.admin_users where user_id = analyst_user_id;
+
+  begin
+    perform public.list_admin_game_asset_audit(
+      analyst_user_id, analyst_auth_session_id, 'aal1', null,
+      1, 10, '', 'all', null, 60
+    );
+  exception when sqlstate '22023' then
+    null_rpc_request_rejected := true;
+  end;
+  begin
+    perform public.list_admin_game_asset_audit(
+      analyst_user_id, analyst_auth_session_id, 'aal1', null,
+      1, 10, '', 'all', 'asset audit with spaces', 60
+    );
+  exception when sqlstate '22023' then
+    malformed_rpc_request_rejected := true;
+  end;
+  perform pg_temp.assert_asset_true(
+    null_rpc_request_rejected and malformed_rpc_request_rejected,
+    'retained administrator RPC rejects missing and malformed request IDs'
+  );
+
+  perform pg_temp.assert_asset_true(
+    exists (
+      select 1
+      from public.admin_role_permissions mapping
+      join public.admin_roles role on role.id = mapping.role_id
+      join public.admin_permissions permission on permission.id = mapping.permission_id
+      where role.key = 'read_only_analyst' and permission.key = 'assets.audit.read'
+    ) and not exists (
+      select 1
+      from public.admin_role_permissions mapping
+      join public.admin_roles role on role.id = mapping.role_id
+      join public.admin_permissions permission on permission.id = mapping.permission_id
+      where role.key = 'read_only_analyst' and permission.key not like '%.read'
+    ) and not exists (
+      select 1 from public.admin_permissions where key = 'assets.audit_read'
+    ),
+    'read-only analyst has corrected audit access and zero non-read permissions'
+  );
+
+  audit_result := public.list_admin_game_asset_audit(
+    analyst_user_id, analyst_auth_session_id, 'aal1', null,
+    1, 10, '', 'all', 'asset-analyst-audit-read', 60
+  );
+  perform pg_temp.assert_asset_status(
+    audit_result,
+    'loaded',
+    'read-only analyst may read bounded asset audit information'
+  );
 
   -- Exercise the supported custom-role boundary: trusted upload processing is
   -- a continuation of assets.upload, while explicit revalidation is separate.

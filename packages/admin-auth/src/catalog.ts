@@ -52,7 +52,7 @@ export const ADMIN_PERMISSION_KEYS = [
   'assets.approve',
   'assets.activate',
   'assets.deprecate',
-  'assets.audit_read',
+  'assets.audit.read',
   'assets.publish',
   'economy.read',
   'economy.adjust_stardust',
@@ -75,6 +75,14 @@ export const ADMIN_PERMISSION_KEYS = [
   'audit_logs.read',
   'system_settings.read',
   'system_settings.manage',
+  'platform_configuration.read',
+  'platform_configuration.edit',
+  'platform_configuration.validate',
+  'platform_configuration.review',
+  'platform_configuration.publish',
+  'platform_configuration.rollback',
+  'platform_configuration.audit.read',
+  'platform_configuration.preview',
 ] as const;
 
 export type AdminPermissionKey = (typeof ADMIN_PERMISSION_KEYS)[number];
@@ -96,7 +104,8 @@ const readOnlyPermissions = ADMIN_PERMISSION_KEYS.filter((permission) =>
   (permission) =>
     permission !== 'roles.read' &&
     permission !== 'audit_logs.read' &&
-    permission !== 'player_audit.read',
+    permission !== 'player_audit.read' &&
+    permission !== 'platform_configuration.audit.read',
 );
 
 export const INITIAL_ROLE_PERMISSIONS = {
@@ -133,7 +142,7 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'assets.approve',
     'assets.activate',
     'assets.deprecate',
-    'assets.audit_read',
+    'assets.audit.read',
     'assets.publish',
     'economy.read',
     'rewards.read',
@@ -141,6 +150,14 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'moderation.read',
     'moderation.act',
     'system_settings.read',
+    'platform_configuration.read',
+    'platform_configuration.edit',
+    'platform_configuration.validate',
+    'platform_configuration.review',
+    'platform_configuration.publish',
+    'platform_configuration.rollback',
+    'platform_configuration.audit.read',
+    'platform_configuration.preview',
   ],
   economy_manager: [
     'overview.read',
@@ -178,6 +195,8 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'claims.pause',
     'moderation.read',
     'system_settings.read',
+    'platform_configuration.read',
+    'platform_configuration.preview',
   ],
   content_manager: [
     'overview.read',
@@ -194,8 +213,12 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'assets.approve',
     'assets.activate',
     'assets.deprecate',
-    'assets.audit_read',
+    'assets.audit.read',
     'assets.publish',
+    'platform_configuration.read',
+    'platform_configuration.edit',
+    'platform_configuration.validate',
+    'platform_configuration.preview',
   ],
   world_designer: [
     'overview.read',
@@ -209,7 +232,8 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'assets.upload',
     'assets.edit',
     'assets.validate',
-    'assets.audit_read',
+    'assets.audit.read',
+    'platform_configuration.read',
   ],
   asset_manager: [
     'overview.read',
@@ -223,7 +247,7 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'assets.approve',
     'assets.activate',
     'assets.deprecate',
-    'assets.audit_read',
+    'assets.audit.read',
     'assets.publish',
   ],
   moderator: [
@@ -248,6 +272,7 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'rewards.read',
     'claims.read',
     'moderation.read',
+    'platform_configuration.read',
   ],
   financial_reviewer: [
     'overview.read',
@@ -274,5 +299,5 @@ export const INITIAL_ROLE_PERMISSIONS = {
     'token_gate.read',
     'token_gate.configure',
   ],
-  read_only_analyst: [...readOnlyPermissions, 'assets.audit_read'],
+  read_only_analyst: readOnlyPermissions,
 } as const satisfies Readonly<Record<AdminRoleKey, readonly AdminPermissionKey[]>>;

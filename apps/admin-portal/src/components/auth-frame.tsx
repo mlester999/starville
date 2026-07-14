@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 
 import { AdminBrand } from './admin-brand';
 
@@ -8,22 +8,44 @@ interface AuthFrameProps {
   readonly description: string;
   readonly children: ReactNode;
   readonly footer?: ReactNode;
+  readonly gameName?: string;
+  readonly administrationName?: string;
+  readonly contextTitle?: string;
+  readonly contextFootnote?: string;
+  readonly style?: CSSProperties;
+  readonly logoUrl?: string | null;
 }
 
-export function AuthFrame({ eyebrow, title, description, children, footer }: AuthFrameProps) {
+export function AuthFrame({
+  eyebrow,
+  title,
+  description,
+  children,
+  footer,
+  gameName,
+  administrationName,
+  contextTitle = 'Steward the world with care.',
+  contextFootnote = 'Restricted to authorized Starville staff.',
+  style,
+  logoUrl,
+}: AuthFrameProps) {
   return (
-    <main className="auth-shell">
+    <main className="auth-shell" style={style}>
       <section className="auth-context" aria-label="Starville administration">
-        <AdminBrand />
+        <AdminBrand
+          {...(gameName === undefined ? {} : { gameName })}
+          {...(administrationName === undefined ? {} : { administrationName })}
+          {...(logoUrl === undefined ? {} : { logoUrl })}
+        />
         <div className="auth-context__message">
           <p className="eyebrow">Protected operations</p>
-          <h2>Steward the world with care.</h2>
+          <h2>{contextTitle}</h2>
           <p>
             Administrator access is verified against trusted server and database records on every
             protected request.
           </p>
         </div>
-        <p className="auth-context__footnote">Restricted to authorized Starville staff.</p>
+        <p className="auth-context__footnote">{contextFootnote}</p>
       </section>
 
       <section className="auth-panel" aria-labelledby="auth-title">

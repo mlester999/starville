@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(53);
+select plan(60);
 
 select has_table('public', 'world_asset_versions', 'asset versions exist');
 select has_table('public', 'world_asset_uploads', 'private upload reservations exist');
@@ -118,10 +118,19 @@ select is(
   (select count(*)::integer from public.admin_permissions
    where key in (
      'assets.edit', 'assets.validate', 'assets.review', 'assets.approve',
-     'assets.activate', 'assets.deprecate', 'assets.audit_read'
+     'assets.activate', 'assets.deprecate', 'assets.audit.read'
    ) and is_system),
   7,
   'the full asset lifecycle permission catalog is seeded'
+);
+
+select ok(
+  (select pg_get_functiondef(function.oid) like '%assets.audit.read%'
+     and pg_get_functiondef(function.oid) not like '%assets.audit_read%'
+   from pg_proc as function
+   where function.pronamespace = 'public'::regnamespace
+     and function.proname = 'list_admin_game_asset_audit'),
+  'asset audit RPC checks only the corrected read permission'
 );
 
 select is(
@@ -492,6 +501,120 @@ select ok(
       and pg_get_functiondef(function.oid) like '%order by upload.created_at desc, upload.id desc%'
   ),
   'administrator original previews resolve only the latest upload bound to the exact asset version'
+);
+
+select ok(
+  (select count(*) = 11
+     and bool_and(
+       position(
+         'private.assert_valid_request_id(p_request_id)'
+         in pg_get_functiondef(function.oid)
+       ) > 0
+     )
+   from pg_proc as function
+   where function.pronamespace = 'public'::regnamespace
+     and function.proname = any (array[
+       'get_admin_game_asset_version',
+       'list_admin_game_asset_review_queue',
+       'get_admin_world_draft',
+       'list_admin_world_audit',
+       'list_admin_world_assets',
+       'list_admin_game_assets',
+       'get_admin_game_asset',
+       'list_admin_game_asset_audit',
+       'list_admin_game_asset_references',
+       'get_admin_game_asset_preview_material',
+       'list_admin_world_editor_asset_candidates'
+     ])),
+  'all eleven retained administrator read RPCs validate their request ID without overloads'
+);
+
+select ok(
+  (select prosecdef and provolatile = 'i'
+   from pg_proc
+   where oid = 'private.assert_valid_request_id(text)'::regprocedure)
+  and not has_function_privilege(
+    'anon', 'private.assert_valid_request_id(text)', 'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated', 'private.assert_valid_request_id(text)', 'EXECUTE'
+  )
+  and not has_function_privilege(
+    'service_role', 'private.assert_valid_request_id(text)', 'EXECUTE'
+  ),
+  'request-ID validation remains private, immutable, and unavailable to client roles'
+);
+
+select lives_ok(
+  $$ select private.assert_valid_request_id('asset:valid-request_1.2') $$,
+  'the canonical request-ID alphabet and bound accept a valid correlation ID'
+);
+
+select throws_ok(
+  $$ select private.assert_valid_request_id(null) $$,
+  '22023',
+  'INVALID_REQUEST_ID',
+  'a missing request ID is rejected consistently'
+);
+
+select ok(
+  (select provolatile = 'i'
+   from pg_proc
+   where oid = 'private.valid_world_asset_validation_results(jsonb)'::regprocedure)
+  and private.valid_world_asset_validation_results(
+    '{"valid":true,"checkedAt":"2026-07-14T01:02:03Z","issues":[]}'::jsonb
+  )
+  and private.valid_world_asset_validation_results(
+    '{"valid":true,"checkedAt":"2024-02-29T23:59:59+14:00","issues":[]}'::jsonb
+  )
+  and not private.valid_world_asset_validation_results(
+    '{"valid":true,"checkedAt":"2026-02-30T01:02:03Z","issues":[]}'::jsonb
+  )
+  and not private.valid_world_asset_validation_results(
+    '{"valid":true,"checkedAt":"2025-02-29T01:02:03Z","issues":[]}'::jsonb
+  )
+  and not private.valid_world_asset_validation_results(
+    '{"valid":true,"checkedAt":"2026-07-14T01:02:03+14:01","issues":[]}'::jsonb
+  )
+  and not private.valid_world_asset_validation_results('{}'::jsonb)
+  and not private.valid_world_asset_validation_results(
+    '{"valid":true,"checkedAt":"2026-07-14T01:02:03Z","issues":{}}'::jsonb
+  )
+  and position(
+    'pg_column_size'
+    in pg_get_functiondef(
+      'private.valid_world_asset_validation_results(jsonb)'::regprocedure
+    )
+  ) = 0
+  and position(
+    'octet_length(p_value::text)'
+    in pg_get_functiondef(
+      'private.valid_world_asset_validation_results(jsonb)'::regprocedure
+    )
+  ) > 0,
+  'validation-result checks use immutable sizing and enforce dates and bounded offsets'
+);
+
+select ok(
+  position(
+    'state public.player_inventory_state'
+    in pg_get_functiondef(
+      'private.cozy_remove_item(uuid,uuid,integer,text,text,text,text)'::regprocedure
+    )
+  ) = 0
+  and position(
+    'stack public.player_inventory_stacks'
+    in pg_get_functiondef(
+      'private.cozy_furniture_mutation(text,text,uuid,uuid,uuid,text,integer,integer,integer,integer,integer,text,text)'::regprocedure
+    )
+  ) = 0
+  and position(
+    'profile public.player_profiles'
+    in pg_get_functiondef(
+      'private.phase6_get_published_world_manifest(text,text,text,integer)'::regprocedure
+    )
+  ) = 0,
+  'the three obsolete row variables are absent from deployed routine definitions'
 );
 
 select * from finish();

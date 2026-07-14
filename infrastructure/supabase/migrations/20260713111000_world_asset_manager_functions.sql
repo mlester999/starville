@@ -618,7 +618,7 @@ declare
   items jsonb;
 begin
   perform private.assert_verified_admin_permission(
-    p_user_id, p_auth_session_id, p_assurance_level, 'assets.audit_read'
+    p_user_id, p_auth_session_id, p_assurance_level, 'assets.audit.read'
   );
   if p_page not between 1 and 10000 or p_page_size not in (10, 50, 100)
      or char_length(normalized_search) > 100

@@ -41,6 +41,6 @@ export function assetManagerCapabilities(
     canApprove: canReview && hasAdminPermission(context, 'assets.approve'),
     canActivate: hasAdminPermission(context, 'assets.activate'),
     canDeprecate: hasAdminPermission(context, 'assets.deprecate'),
-    canReadAudit: hasAdminPermission(context, 'assets.audit_read'),
+    canReadAudit: hasAdminPermission(context, 'assets.audit.read'),
   };
 }

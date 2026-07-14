@@ -84,7 +84,45 @@ select is(
   array['brooklight-crossing', 'hearthfield-road', 'lantern-square', 'moonpetal-meadow', 'whisperpine-gate']::text[],
   'only the approved Phase 6 world graph is seeded'
 );
-select is((select count(*)::integer from public.world_assets), 15, 'the reviewed procedural catalog contains fifteen stable assets');
+select ok(
+  (
+    select count(*) = 20
+      and count(*) = count(distinct asset.asset_key)
+      and array_agg(asset.asset_key order by asset.asset_key) = array[
+        'brooklight-sign',
+        'bush-round',
+        'closed-route-marker',
+        'cottage-amber',
+        'cottage-sage',
+        'fence-willow',
+        'flowers-moon',
+        'lamp-star',
+        'moonstone-marker',
+        'notice-board',
+        'orchard-road-sign',
+        'phase7-cooking-hearth-marker',
+        'phase7-crafting-workbench-marker',
+        'phase7-farm-plot-marker',
+        'phase7-general-store-marker',
+        'phase7-home-entrance-marker',
+        'rock-moss',
+        'tree-maple',
+        'tree-pine',
+        'whisperpine-gate'
+      ]::text[]
+      and bool_and(
+        asset.approval_status = 'approved'
+        and asset.repository_owned
+        and asset.source_type = 'repository_procedural'
+        and asset.lifecycle_status = 'active'
+        and asset.production_status = 'development_marker'
+        and asset.development_marker_replacement_key is null
+        and asset.active_version_id is not null
+      )
+    from public.world_assets as asset
+  ),
+  'the reviewed procedural catalog is the exact twenty-key development-marker set'
+);
 select ok(
   not exists (
     select 1 from public.world_assets

@@ -1,10 +1,14 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
+
+import { PLATFORM_FONT_REGISTRY } from '@starville/platform-configuration';
 
 import { AuthFrame } from '../../components/auth-frame';
 import { Notice } from '../../components/notice';
 import { SubmitButton } from '../../components/submit-button';
 import { loginNoticeMessage } from '../../lib/auth/messages';
 import { loginAction } from '../actions/auth';
+import { loadPublicPlatformConfiguration } from '../../lib/platform-configuration/runtime';
 
 interface LoginPageProps {
   readonly searchParams: Promise<{ readonly notice?: string }>;
@@ -12,17 +16,58 @@ interface LoginPageProps {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const notice = loginNoticeMessage((await searchParams).notice);
+  const runtime = await loadPublicPlatformConfiguration();
+  const configuration = runtime.configuration;
+  const overlayAlpha = Math.round(configuration.adminLogin.overlayStrength * 255)
+    .toString(16)
+    .padStart(2, '0');
 
   return (
     <AuthFrame
-      eyebrow="Authorized staff"
-      title="Sign in to Admin"
-      description="Use your assigned Starville staff identity. Player accounts and wallets do not grant access."
+      eyebrow={configuration.adminLogin.eyebrow}
+      title={configuration.adminLogin.title}
+      description={configuration.adminLogin.supportingDescription}
+      gameName={configuration.branding.shortGameName.toUpperCase()}
+      administrationName={configuration.branding.administrationName.toUpperCase()}
+      contextTitle={configuration.adminLogin.subtitle}
+      contextFootnote={configuration.adminLogin.footerCopy}
+      logoUrl={runtime.assetUrls.branding.brand_logo}
+      style={
+        {
+          '--admin-canvas': configuration.theme.tokens.background,
+          '--admin-surface': configuration.theme.tokens.surface,
+          '--admin-surface-solid': configuration.theme.tokens.elevatedSurface,
+          '--admin-text': configuration.theme.tokens.textPrimary,
+          '--admin-text-muted': configuration.theme.tokens.textSecondary,
+          '--admin-forest': configuration.theme.tokens.primaryAction,
+          '--admin-action-text': configuration.theme.tokens.primaryActionText,
+          '--admin-line': configuration.theme.tokens.border,
+          '--admin-focus': configuration.theme.tokens.focusRing,
+          '--starville-font-display':
+            PLATFORM_FONT_REGISTRY[configuration.typography.display].stack,
+          '--starville-font-sans': PLATFORM_FONT_REGISTRY[configuration.typography.body].stack,
+          '--auth-overlay-color': `${configuration.theme.tokens.loginPageOverlay}${overlayAlpha}`,
+          '--auth-background-position': `${String(configuration.adminLogin.backgroundFocalPointX)}% ${String(configuration.adminLogin.backgroundFocalPointY)}%`,
+          ...(runtime.assetUrls.branding.admin_login_background === null
+            ? {}
+            : {
+                '--auth-background-image': `url("${runtime.assetUrls.branding.admin_login_background}")`,
+              }),
+        } as CSSProperties
+      }
       footer={
-        <p>
-          Need help? Contact your Starville security administrator through your approved internal
-          channel.
-        </p>
+        <div>
+          <p>
+            Need help? Contact your {configuration.branding.shortGameName} security administrator
+            through your approved internal channel.
+          </p>
+          {configuration.adminLogin.supportLink !== null ? (
+            <a href={configuration.adminLogin.supportLink}>Support</a>
+          ) : null}
+          {configuration.adminLogin.documentationLink !== null ? (
+            <a href={configuration.adminLogin.documentationLink}>Administrator documentation</a>
+          ) : null}
+        </div>
       }
     >
       {notice ? (
@@ -63,7 +108,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
       <p className="security-note">
         <span aria-hidden="true">◆</span>
-        Access is checked server-side and recorded for security review.
+        {configuration.adminLogin.securityNotice}
       </p>
     </AuthFrame>
   );

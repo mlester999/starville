@@ -21,7 +21,7 @@ comment on table public.admin_roles is
 
 create table public.admin_permissions (
   id uuid primary key default gen_random_uuid(),
-  key text not null unique check (key ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$'),
+  key text not null unique check (key ~ '^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$'),
   name text not null check (char_length(name) between 1 and 120),
   description text not null check (char_length(description) between 1 and 500),
   category text not null check (category ~ '^[a-z][a-z0-9_]{1,62}$'),

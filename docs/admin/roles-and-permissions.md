@@ -46,7 +46,7 @@ renamed accidentally. Phase 2 does not provide role-management UI.
 | Inventories     | `inventories.read`, `inventories.adjust`                                                                                                                                          |
 | Items           | `items.read`, `items.create`, `items.update`, `items.publish`                                                                                                                     |
 | Maps            | `maps.read`, `maps.edit`, `maps.preview`, `maps.publish`, `maps.audit_read`                                                                                                       |
-| Assets          | `assets.read`, `assets.upload`, `assets.edit`, `assets.validate`, `assets.review`, `assets.approve`, `assets.activate`, `assets.deprecate`, `assets.audit_read`, `assets.publish` |
+| Assets          | `assets.read`, `assets.upload`, `assets.edit`, `assets.validate`, `assets.review`, `assets.approve`, `assets.activate`, `assets.deprecate`, `assets.audit.read`, `assets.publish` |
 | Economy         | `economy.read`, `economy.adjust_stardust`, `economy.configure_rewards`                                                                                                            |
 | Rewards         | `rewards.read`, `rewards.simulate`, `rewards.approve`                                                                                                                             |
 | Claims          | `claims.read`, `claims.open`, `claims.pause`, `claims.reconcile`                                                                                                                  |
@@ -70,7 +70,7 @@ between this document, the TypeScript catalog, migrations, and tests visible dur
 `cozy_gameplay.read`, `inventories.adjust`, `items.read`, `items.create`, `items.update`,
 `items.publish`, `maps.read`, `maps.edit`, `maps.preview`, `maps.publish`, `maps.audit_read`,
 `assets.read`, `assets.upload`, `assets.edit`, `assets.validate`, `assets.review`, `assets.approve`,
-`assets.activate`, `assets.deprecate`, `assets.audit_read`, `assets.publish`, `economy.read`,
+`assets.activate`, `assets.deprecate`, `assets.audit.read`, `assets.publish`, `economy.read`,
 `economy.adjust_stardust`, `economy.configure_rewards`, `rewards.read`, `rewards.simulate`,
 `rewards.approve`, `claims.read`, `claims.open`, `claims.pause`, `claims.reconcile`,
 `blockchain.read`, `blockchain.configure`, `token_gate.read`, `token_gate.configure`,
@@ -85,7 +85,7 @@ between this document, the TypeScript catalog, migrations, and tests visible dur
 `cozy_gameplay.read`, `inventories.adjust`, `items.read`, `items.create`, `items.update`,
 `items.publish`, `maps.read`, `maps.edit`, `maps.preview`, `maps.audit_read`, `assets.read`,
 `assets.upload`, `assets.edit`, `assets.validate`, `assets.review`, `assets.approve`,
-`assets.activate`, `assets.deprecate`, `assets.audit_read`, `assets.publish`, `economy.read`,
+`assets.activate`, `assets.deprecate`, `assets.audit.read`, `assets.publish`, `economy.read`,
 `rewards.read`, `claims.read`, `moderation.read`, `moderation.act`, `system_settings.read`.
 
 ### `economy_manager` — 10 permissions
@@ -106,19 +106,19 @@ between this document, the TypeScript catalog, migrations, and tests visible dur
 
 `overview.read`, `items.read`, `items.create`, `items.update`, `items.publish`, `maps.read`,
 `assets.read`, `assets.upload`, `assets.edit`, `assets.validate`, `assets.review`, `assets.approve`,
-`assets.activate`, `assets.deprecate`, `assets.audit_read`, `assets.publish`.
+`assets.activate`, `assets.deprecate`, `assets.audit.read`, `assets.publish`.
 
 ### `world_designer` — 12 permissions
 
 `overview.read`, `items.read`, `maps.read`, `maps.edit`, `maps.preview`, `maps.publish`,
 `maps.audit_read`, `assets.read`, `assets.upload`, `assets.edit`, `assets.validate`,
-`assets.audit_read`.
+`assets.audit.read`.
 
 ### `asset_manager` — 13 permissions
 
 `overview.read`, `items.read`, `maps.read`, `assets.read`, `assets.upload`, `assets.edit`,
 `assets.validate`, `assets.review`, `assets.approve`, `assets.activate`, `assets.deprecate`,
-`assets.audit_read`, `assets.publish`.
+`assets.audit.read`, `assets.publish`.
 
 ### `moderator` — 10 permissions
 
@@ -145,7 +145,7 @@ between this document, the TypeScript catalog, migrations, and tests visible dur
 
 `overview.read`, `operations.read`, `live_operations.read`, `announcements.read`, `players.read`,
 `wallets.read`, `inventories.read`, `cozy_gameplay.read`, `items.read`, `maps.read`, `assets.read`,
-`assets.audit_read`, `economy.read`, `rewards.read`, `claims.read`, `blockchain.read`,
+`assets.audit.read`, `economy.read`, `rewards.read`, `claims.read`, `blockchain.read`,
 `token_gate.read`, `moderation.read`, `system_settings.read`.
 
 ## Sensitive assignments
@@ -186,3 +186,11 @@ document or a frontend navigation map has no authorization effect.
 The stable internal key `economy.adjust_stardust` remains temporarily unchanged for migration and
 authorization compatibility. Its product-facing currency is DUST; the legacy identifier must not be
 displayed as currency copy and will require a separately versioned permission migration if renamed.
+
+# Phase 7.5B platform configuration
+
+The narrow catalog is `platform_configuration.read`, `.edit`, `.validate`, `.review`, `.publish`,
+`.rollback`, `.audit.read`, and `.preview`. Game Administrator receives the full lifecycle. Content
+Manager receives read, edit, validate, and preview. World Designer and Customer Support receive
+read. Live Operations Manager receives read and preview. Read-only Analyst receives only
+`platform_configuration.read`. Navigation and module settings never change permission mappings.

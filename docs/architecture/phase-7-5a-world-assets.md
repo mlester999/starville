@@ -109,7 +109,7 @@ Permissions are narrow:
 - `assets.approve`
 - `assets.activate`
 - `assets.deprecate`
-- `assets.audit_read`
+- `assets.audit.read`
 
 List responses use allowlisted filters, sorts, and exact page sizes of 10, 50, or 100. DTOs expose
 friendly metadata, lifecycle state, safe reference counts, and trusted public derivative URLs only.

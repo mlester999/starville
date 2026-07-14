@@ -23,6 +23,7 @@
     "@starville/game-content": "workspace:*",
     "@starville/live-operations": "workspace:*",
     "@starville/player-operations": "workspace:*",
+    "@starville/platform-configuration": "workspace:*",
     "@starville/wallet-access": "workspace:*",
     "phaser": "3.90.0",
     "react": "19.2.7",

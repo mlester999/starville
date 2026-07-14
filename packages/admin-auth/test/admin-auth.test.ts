@@ -36,7 +36,7 @@ const authorized = {
 describe('admin authorization catalog', () => {
   it('contains the required stable roles and permission catalog', () => {
     expect(ADMIN_ROLE_KEYS).toHaveLength(12);
-    expect(ADMIN_PERMISSION_KEYS).toHaveLength(59);
+    expect(ADMIN_PERMISSION_KEYS).toHaveLength(67);
     expect(INITIAL_ROLE_PERMISSIONS.super_admin).toEqual(ADMIN_PERMISSION_KEYS);
   });
 
@@ -56,6 +56,42 @@ describe('admin authorization catalog', () => {
     expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('announcements.manage');
   });
 
+  it('keeps platform configuration lifecycle authority narrow', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'platform_configuration.read',
+        'platform_configuration.edit',
+        'platform_configuration.validate',
+        'platform_configuration.review',
+        'platform_configuration.publish',
+        'platform_configuration.rollback',
+        'platform_configuration.audit.read',
+        'platform_configuration.preview',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).toEqual(
+      expect.arrayContaining([
+        'platform_configuration.read',
+        'platform_configuration.edit',
+        'platform_configuration.validate',
+        'platform_configuration.preview',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).not.toContain(
+      'platform_configuration.publish',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining(['platform_configuration.read', 'platform_configuration.preview']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain(
+      'platform_configuration.edit',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('platform_configuration.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain(
+      'platform_configuration.preview',
+    );
+  });
+
   it('keeps sensitive permissions out of the read-only role', () => {
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('players.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('roles.read');
@@ -66,7 +102,27 @@ describe('admin authorization catalog', () => {
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('maps.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.preview');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.audit_read');
-    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('assets.audit_read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('assets.audit.read');
+    expect(
+      INITIAL_ROLE_PERMISSIONS.read_only_analyst.every((permission) =>
+        permission.endsWith('.read'),
+      ),
+    ).toBe(true);
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst as readonly string[]).not.toContain(
+      'assets.audit_read',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toEqual(
+      expect.arrayContaining([
+        'assets.upload',
+        'assets.edit',
+        'assets.validate',
+        'assets.review',
+        'assets.approve',
+        'assets.activate',
+        'assets.deprecate',
+        'assets.publish',
+      ]),
+    );
   });
 
   it('separates asset upload, review, approval, and activation authority', () => {
@@ -79,7 +135,7 @@ describe('admin authorization catalog', () => {
         'assets.approve',
         'assets.activate',
         'assets.deprecate',
-        'assets.audit_read',
+        'assets.audit.read',
       ]),
     );
     expect(INITIAL_ROLE_PERMISSIONS.asset_manager).toEqual(
@@ -89,6 +145,9 @@ describe('admin authorization catalog', () => {
     expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('assets.upload');
     expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('assets.approve');
     expect(INITIAL_ROLE_PERMISSIONS.customer_support).not.toContain('assets.edit');
+    expect(ADMIN_PERMISSION_KEYS as readonly string[]).not.toContain('assets.audit_read');
+    expect(INITIAL_ROLE_PERMISSIONS.super_admin).toContain('assets.audit.read');
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toContain('assets.audit.read');
   });
 
   it('keeps Phase 6 world permissions narrow and role-specific', () => {
