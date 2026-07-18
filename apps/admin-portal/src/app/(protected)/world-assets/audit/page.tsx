@@ -24,7 +24,10 @@ export default async function WorldAssetAuditPage(props: {
   try {
     const audit = await loadAssetAudit(query);
     return (
-      <main className="operations-page world-assets-page" aria-labelledby="asset-audit-title">
+      <main
+        className="operations-page world-assets-page admin-content-shell"
+        aria-labelledby="asset-audit-title"
+      >
         <header className="operations-intro">
           <div>
             <p className="eyebrow">Append-only production history</p>
@@ -112,7 +115,10 @@ export default async function WorldAssetAuditPage(props: {
     );
   } catch (error) {
     return (
-      <main className="operations-page world-assets-page" aria-labelledby="asset-audit-title">
+      <main
+        className="operations-page world-assets-page admin-content-shell"
+        aria-labelledby="asset-audit-title"
+      >
         <h1 id="asset-audit-title">Asset Audit</h1>
         <WorldAssetEmptyState
           action={

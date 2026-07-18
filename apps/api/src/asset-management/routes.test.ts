@@ -72,6 +72,7 @@ function assetService(): AdminAssetService {
     deprecateAsset: vi.fn(async () => ({ status: 'deprecated' })),
     archiveAsset: vi.fn(async () => ({ status: 'archived' })),
     createVersion: vi.fn(async () => ({ status: 'validated' })),
+    createVersionFromExisting: vi.fn(async () => ({ status: 'created' })),
     listReviewQueue: vi.fn(async () => ({ status: 'loaded', items: [] })),
     listAudit: vi.fn(async () => ({ status: 'loaded', items: [] })),
     listReferences: vi.fn(async () => ({ status: 'loaded', items: [] })),
@@ -81,7 +82,11 @@ function assetService(): AdminAssetService {
 
 const apps: ReturnType<typeof buildApiApp>[] = [];
 
-function app(permissions: readonly AdminPermissionKey[], service = assetService()) {
+function app(
+  permissions: readonly AdminPermissionKey[],
+  service = assetService(),
+  remoteWritesApproved = true,
+) {
   const value = buildApiApp({
     config: {
       environment: 'test',
@@ -93,7 +98,7 @@ function app(permissions: readonly AdminPermissionKey[], service = assetService(
     logger: new SilentLogger(),
     adminAuthGateway: authGateway(permissions),
     adminSessionTtlMinutes: 60,
-    adminAssets: { service },
+    adminAssets: { service, remoteWritesApproved },
   });
   apps.push(value);
   return value;
@@ -121,6 +126,23 @@ afterEach(async () => {
 });
 
 describe('administrator asset routes', () => {
+  it('routes a canonical asset/version UUID pair through the plural version-detail endpoint', async () => {
+    const service = assetService();
+    const result = await app(['assets.read'], service).inject({
+      method: 'GET',
+      url: `/api/v1/admin/world-assets/${assetId}/versions/${versionId}`,
+      headers: { authorization: 'Bearer verified' },
+    });
+
+    expect(result.statusCode).toBe(200);
+    expect(service.getVersion).toHaveBeenCalledWith(
+      identity,
+      assetId,
+      versionId,
+      expect.any(String),
+    );
+  });
+
   it('requires authentication and the exact asset-read permission', async () => {
     const service = assetService();
     const missing = await app(['assets.read'], service).inject({
@@ -283,6 +305,153 @@ describe('administrator asset routes', () => {
       }),
       requestId,
     );
+  });
+
+  it('creates a new draft-version candidate through the bounded multipart route', async () => {
+    const service = assetService();
+    const metadata = {
+      sourceVersionId: versionId,
+      configurationMode: 'copy' as const,
+      expectedAssetRevision: 3,
+      reason: 'Replace the procedural pine tree with reviewed transparent artwork.',
+      idempotencyKey: requestId,
+    };
+    const body = multipartBody(metadata);
+    const result = await app(['assets.upload'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+        'content-type': `multipart/form-data; boundary=${body.boundary}`,
+      },
+      payload: body.payload,
+    });
+
+    expect(result.statusCode, result.body).toBe(200);
+    expect(service.createVersion).toHaveBeenCalledWith(
+      identity,
+      assetId,
+      expect.objectContaining({
+        metadata,
+        originalFileName: 'willow-tree.png',
+        declaredMediaType: 'image/png',
+      }),
+      requestId,
+    );
+    expect(service.activateVersion).not.toHaveBeenCalled();
+  });
+
+  it('creates an explicit successor draft without uploading or activating artwork', async () => {
+    const service = assetService();
+    const body = {
+      sourceVersionId: versionId,
+      configurationMode: 'copy',
+      expectedAssetRevision: 3,
+      reason: 'Create an editable successor for corrected anchor configuration.',
+      idempotencyKey: requestId,
+      confirmed: true,
+    };
+    const result = await app(['assets.upload'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions/from-existing`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+      },
+      payload: body,
+    });
+
+    expect(result.statusCode, result.body).toBe(200);
+    expect(service.createVersionFromExisting).toHaveBeenCalledWith(
+      identity,
+      assetId,
+      body,
+      requestId,
+    );
+    expect(service.createVersion).not.toHaveBeenCalled();
+    expect(service.activateVersion).not.toHaveBeenCalled();
+  });
+
+  it('denies successor creation without upload authority and before persistence', async () => {
+    const service = assetService();
+    const result = await app([], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions/from-existing`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+      },
+      payload: {
+        sourceVersionId: versionId,
+        configurationMode: 'copy',
+        expectedAssetRevision: 3,
+        reason: 'Create an editable successor for corrected anchor configuration.',
+        idempotencyKey: requestId,
+        confirmed: true,
+      },
+    });
+
+    expect(result.statusCode).toBe(403);
+    expect(service.createVersionFromExisting).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with a friendly safe error before parsing bytes when remote writes are disabled', async () => {
+    const service = assetService();
+    const body = multipartBody({
+      expectedAssetRevision: 3,
+      reason: 'Replace the procedural pine tree with reviewed transparent artwork.',
+      idempotencyKey: requestId,
+    });
+    const result = await app(['assets.upload'], service, false).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+        'content-type': `multipart/form-data; boundary=${body.boundary}`,
+      },
+      payload: body.payload,
+    });
+
+    expect(result.statusCode).toBe(503);
+    expect(result.json()).toMatchObject({
+      success: false,
+      error: {
+        code: 'ASSET_REMOTE_WRITES_DISABLED',
+        message:
+          'Remote asset uploads are currently disabled because hosted writes have not been approved for this session.',
+      },
+      requestId,
+    });
+    expect(service.createVersion).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed version multipart without invoking persistence', async () => {
+    const service = assetService();
+    const body = multipartBody({
+      expectedAssetRevision: 3,
+      reason: 'A valid reason but no valid request identifier.',
+      idempotencyKey: 'not-a-uuid',
+    });
+    const result = await app(['assets.upload'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+        'content-type': `multipart/form-data; boundary=${body.boundary}`,
+      },
+      payload: body.payload,
+    });
+
+    expect(result.statusCode).toBe(400);
+    expect(service.createVersion).not.toHaveBeenCalled();
   });
 
   it('rejects a valid upload from staff lacking assets.upload before invoking upload processing', async () => {

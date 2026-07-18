@@ -20,6 +20,9 @@ import { buildApiApp } from '../../apps/api/src/app';
 import type { LogContext, ServiceLogger } from '../../apps/api/src/contracts';
 import { createSupabaseAdminWorldGateway } from '../../apps/api/src/world/admin-gateway';
 import { createAdminWorldService } from '../../apps/api/src/world/admin-service';
+import { createSupabaseAdminChatGateway } from '../../apps/api/src/realtime/chat-admin-gateway';
+import { createSupabaseAdminSocialGateway } from '../../apps/api/src/realtime/social-admin-gateway';
+import { createSupabaseAdminSocialGraphGateway } from '../../apps/api/src/realtime/social-graph-admin-gateway';
 import {
   createHostedFetch,
   decodeHostedJson,
@@ -369,6 +372,9 @@ async function main(): Promise<void> {
     adminSessionTtlMinutes: 60,
     adminOperations: { service: adminOperationsService, readRateLimit: 120 },
     adminWorld: { service: adminWorldService, manifestMaximumBytes: 262_144 },
+    adminChat: { gateway: createSupabaseAdminChatGateway(serviceClient) },
+    adminSocial: { gateway: createSupabaseAdminSocialGateway(serviceClient) },
+    adminSocialGraph: { gateway: createSupabaseAdminSocialGraphGateway(serviceClient) },
   });
 
   try {
@@ -475,6 +481,26 @@ async function main(): Promise<void> {
       'world_asset_audit_events',
       'world_asset_operation_idempotency',
       'world_asset_operation_rate_limits',
+      'social_interaction_settings',
+      'social_interaction_requests',
+      'player_gift_items',
+      'player_trade_offer_items',
+      'player_inventory_reservations',
+      'social_interaction_receipts',
+      'social_interaction_receipt_items',
+      'social_interaction_audit',
+      'social_interaction_idempotency',
+      'social_graph_settings',
+      'player_friend_requests',
+      'player_friendships',
+      'player_parties',
+      'player_party_members',
+      'player_party_invitations',
+      'player_party_ready_checks',
+      'player_party_ready_responses',
+      'player_social_notifications',
+      'player_social_audit',
+      'player_social_idempotency',
     ]) {
       const tokenAccessRead = await anonymousClient.from(table).select('*').limit(1);
       assert(
@@ -994,6 +1020,67 @@ async function main(): Promise<void> {
     });
     assert(apiAuthorization.statusCode === 200, 'Real bearer session was denied by the admin API');
 
+    const socialList = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/social-interactions?page=1&pageSize=10&type=all&status=all&search=',
+      headers: {
+        authorization: `Bearer ${activeSession.accessToken}`,
+        'x-request-id': `phase8c-test:${runId}:social-list`,
+      },
+    });
+    assert(
+      socialList.statusCode === 200,
+      `Read-only Analyst social list failed: status=${String(socialList.statusCode)} code=${String(property(property(socialList.json(), 'error'), 'code'))} requestId=${String(property(socialList.json(), 'requestId'))}`,
+    );
+    const socialAuditDenied = await api.inject({
+      method: 'GET',
+      url: `/api/v1/admin/social-interactions/${randomUUID()}`,
+      headers: {
+        authorization: `Bearer ${activeSession.accessToken}`,
+        'x-request-id': `phase8c-test:${runId}:social-audit-denied`,
+      },
+    });
+    assert(
+      socialAuditDenied.statusCode === 403,
+      'Read-only Analyst unexpectedly received protected social receipt audit access',
+    );
+    const socialGraphList = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/social-graph?page=1&pageSize=10&status=all&search=',
+      headers: {
+        authorization: `Bearer ${activeSession.accessToken}`,
+        'x-request-id': `phase8d-test:${runId}:social-graph-list`,
+      },
+    });
+    assert(
+      socialGraphList.statusCode === 200,
+      `Read-only Analyst social graph list failed: status=${String(socialGraphList.statusCode)} code=${String(property(property(socialGraphList.json(), 'error'), 'code'))} requestId=${String(property(socialGraphList.json(), 'requestId'))}`,
+    );
+    const socialGraphAuditDenied = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/social-graph/audit?page=1&pageSize=10&search=',
+      headers: {
+        authorization: `Bearer ${activeSession.accessToken}`,
+        'x-request-id': `phase8d-test:${runId}:social-graph-audit-denied`,
+      },
+    });
+    assert(
+      socialGraphAuditDenied.statusCode === 403,
+      'Read-only Analyst unexpectedly received protected friends and parties audit access',
+    );
+    const socialGraphSettingsDenied = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/social-graph/settings',
+      headers: {
+        authorization: `Bearer ${activeSession.accessToken}`,
+        'x-request-id': `phase8d-test:${runId}:social-graph-settings-denied`,
+      },
+    });
+    assert(
+      socialGraphSettingsDenied.statusCode === 403,
+      'Read-only Analyst unexpectedly received social graph settings access',
+    );
+
     const overviewUrl = new URL('/overview', adminPortalUrl);
     const overviewResponse = await hostedFetch('admin-overview', overviewUrl, requestId, {
       headers: { cookie: activeSession.cookieHeader(), 'x-request-id': requestId },
@@ -1475,6 +1562,18 @@ async function main(): Promise<void> {
       forbiddenWorldDirectory.statusCode === 403,
       'Blockchain Operator unexpectedly accessed world management',
     );
+    const forbiddenChatReports = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/multiplayer-chat/reports',
+      headers: {
+        authorization: `Bearer ${tokenGateFixture.accessToken}`,
+        'x-request-id': `phase8b-test:${runId}:blockchain-chat-denied`,
+      },
+    });
+    assert(
+      forbiddenChatReports.statusCode === 403,
+      'Blockchain Operator unexpectedly accessed protected chat reports',
+    );
 
     const [gameAdministratorRole] = await sql<{ id: string }[]>`
       select id from public.admin_roles where key = 'game_administrator'
@@ -1489,6 +1588,21 @@ async function main(): Promise<void> {
       authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
       'x-request-id': `phase5-test:${runId}:read`,
     };
+
+    const authorizedChatReports = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/multiplayer-chat/reports?page=1&pageSize=10',
+      headers: {
+        authorization: `Bearer ${gameAdministratorFixture.accessToken}`,
+        'x-request-id': `phase8b-test:${runId}:game-admin-chat-read`,
+      },
+    });
+    assert(
+      authorizedChatReports.statusCode === 200 &&
+        !authorizedChatReports.body.includes('walletAddress') &&
+        !authorizedChatReports.body.includes('evidenceText'),
+      'Game Administrator could not safely read the bounded chat report queue',
+    );
 
     const directoryResponse = await api.inject({
       method: 'GET',
@@ -1881,6 +1995,18 @@ async function main(): Promise<void> {
       where user_id = ${administrator.id}
     `;
     const readOnlyPhase5Fixture = await createActiveAdministratorSession();
+    const forbiddenReadOnlyChatReports = await api.inject({
+      method: 'GET',
+      url: '/api/v1/admin/multiplayer-chat/reports',
+      headers: {
+        authorization: `Bearer ${readOnlyPhase5Fixture.accessToken}`,
+        'x-request-id': `phase8b-test:${runId}:analyst-chat-denied`,
+      },
+    });
+    assert(
+      forbiddenReadOnlyChatReports.statusCode === 403,
+      'Read-only Analyst unexpectedly accessed protected chat report evidence',
+    );
     const readOnlyDetailUrl = new URL(`/players/${phase5PlayerId}`, adminPortalUrl);
     const readOnlyDetailPage = await hostedFetch(
       'read-only-player-detail',

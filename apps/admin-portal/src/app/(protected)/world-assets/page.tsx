@@ -31,7 +31,10 @@ export default async function WorldAssetsPage(props: {
       query.lifecycle !== 'all' ||
       query.production !== 'all';
     return (
-      <main className="operations-page world-assets-page" aria-labelledby="assets-title">
+      <main
+        className="operations-page world-assets-page admin-content-shell"
+        aria-labelledby="assets-title"
+      >
         <header className="operations-intro world-assets-intro">
           <div>
             <p className="eyebrow">Versioned production-art pipeline</p>
@@ -48,6 +51,9 @@ export default async function WorldAssetsPage(props: {
                 Upload asset
               </Link>
             ) : null}
+            <Link className="button button--secondary" href="/world-assets/guide">
+              Guide &amp; templates
+            </Link>
             {capabilities.canReview ? (
               <Link className="button button--secondary" href="/world-assets/review">
                 Review queue
@@ -119,7 +125,10 @@ export default async function WorldAssetsPage(props: {
   } catch (error) {
     const forbidden = error instanceof AdminApiError && error.status === 403;
     return (
-      <main className="operations-page world-assets-page" aria-labelledby="assets-title">
+      <main
+        className="operations-page world-assets-page admin-content-shell"
+        aria-labelledby="assets-title"
+      >
         <h1 id="assets-title">World Assets</h1>
         <WorldAssetEmptyState
           action={

@@ -5,6 +5,12 @@ import type {
   WorldInteraction,
 } from '@starville/game-core';
 import type { WorldAssetDelivery } from '@starville/asset-management';
+import type { PublicPresence } from '@starville/realtime';
+import type {
+  CooperativeActivityInstanceSnapshot,
+  CooperativeActivityObject,
+} from '@starville/cooperative-activities';
+import type { ResolvedAvatarProfile } from '../app/avatar-client';
 
 export interface InteractionPrompt {
   readonly id: string;
@@ -44,10 +50,12 @@ export interface WorldAssetFallbackEvent {
 
 export const WORLD_ASSET_FALLBACK_EVENT_NAME = 'starville:world-asset-fallback';
 
+export type LocalMovementPhase = 'moving' | 'stopped';
+
 export interface GameRuntimeCallbacks {
   readonly onReady: () => void;
   readonly onError: (message: string) => void;
-  readonly onStateChanged: (state: PlayerStateUpdate) => void;
+  readonly onStateChanged: (state: PlayerStateUpdate, phase: LocalMovementPhase) => void;
   readonly onCheckpoint: (state: PlayerStateUpdate) => void;
   readonly onInteractionTarget: (prompt: InteractionPrompt | null) => void;
   readonly onInteractionOpen: (interaction: WorldInteraction) => void;
@@ -55,6 +63,13 @@ export interface GameRuntimeCallbacks {
   readonly onExitRequested: (request: ExitTransitionRequest) => void;
   readonly onMapChanged: (world: RuntimeWorld) => void;
   readonly onWorldAssetFallback: (event: WorldAssetFallbackEvent) => void;
+  readonly onRemotePlayerSelected: (presenceId: string | null) => void;
+  readonly onActivityInteraction: (interaction: {
+    readonly instanceId: string;
+    readonly expectedRevision: number;
+    readonly objectiveKey: string;
+    readonly objectKey: string;
+  }) => void;
 }
 
 export interface MasterAudioSettings {
@@ -66,6 +81,7 @@ export interface GameRuntimeOptions {
   readonly initialState: PlayerStateUpdate;
   readonly initialWorld: RuntimeWorld;
   readonly appearancePreset: AppearancePreset;
+  readonly avatarProfile?: ResolvedAvatarProfile;
   readonly reducedMotion: boolean;
   readonly collisionDebug: boolean;
   readonly audioSettings: MasterAudioSettings;
@@ -75,11 +91,23 @@ export interface GameRuntimeOptions {
 export interface GameRuntimeHandle {
   setInputBlocked(blocked: boolean): void;
   setAudioSettings(settings: MasterAudioSettings): void;
+  setRemotePresences(presences: readonly PublicPresence[]): void;
+  setLocalAvatarProfile(profile: ResolvedAvatarProfile): void;
+  setRemoteAvatarProfiles(profiles: Readonly<Record<string, ResolvedAvatarProfile>>): void;
+  setRemotePlayerNamesVisible(visible: boolean): void;
+  setSelectedRemotePresence(presenceId: string | null): void;
+  setActivityInstance(instance: CooperativeActivityInstanceSnapshot | null): void;
   interact(): void;
   getState(): PlayerStateUpdate;
   loadWorld(world: RuntimeWorld, state: PlayerStateUpdate): void;
   cancelTransition(): void;
   destroy(): void;
+}
+
+export interface ActivityInteractionTarget extends CooperativeActivityObject {
+  readonly instanceId: string;
+  readonly expectedRevision: number;
+  readonly objectiveKey: string;
 }
 
 export function interactionDialogue(interaction: WorldInteraction): InteractionDialogue {

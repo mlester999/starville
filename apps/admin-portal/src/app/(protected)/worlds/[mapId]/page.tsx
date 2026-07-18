@@ -52,9 +52,7 @@ export default async function WorldDetailPage(props: {
       loadPublishedWorldTopology(),
     ]);
     const activeVersionId = detail.map.activePublishedVersionId;
-    const openDraft = detail.versions.find((version) =>
-      ['draft', 'validated'].includes(version.lifecycleStatus),
-    );
+    const openDraft = detail.versions.find((version) => version.id === detail.draftHeadVersionId);
 
     return (
       <main className="operations-page world-detail" aria-labelledby="world-title">
@@ -231,7 +229,13 @@ export default async function WorldDetailPage(props: {
                       <td data-label="Updated">{formatDate(version.updatedAt)}</td>
                       <td data-label="Actions">
                         <div className="table-actions">
-                          {['draft', 'validated'].includes(version.lifecycleStatus) &&
+                          <Link
+                            className="table-link"
+                            href={`/worlds/${detail.map.id}/revisions/${version.id}`}
+                          >
+                            Inspect
+                          </Link>
+                          {version.id === detail.draftHeadVersionId &&
                           hasAdminPermission(context, 'maps.edit') ? (
                             <Link
                               className="table-link"
@@ -240,8 +244,9 @@ export default async function WorldDetailPage(props: {
                               Edit
                             </Link>
                           ) : null}
-                          {version.lifecycleStatus === 'validated' &&
-                          hasAdminPermission(context, 'maps.preview') ? (
+                          {['validated', 'published', 'superseded'].includes(
+                            version.lifecycleStatus,
+                          ) && hasAdminPermission(context, 'maps.preview') ? (
                             <Link
                               className="table-link"
                               href={`/worlds/${detail.map.id}/preview?version=${version.id}`}
@@ -250,6 +255,7 @@ export default async function WorldDetailPage(props: {
                             </Link>
                           ) : null}
                           {version.lifecycleStatus === 'validated' &&
+                          version.id === detail.draftHeadVersionId &&
                           hasAdminPermission(context, 'maps.publish') ? (
                             <WorldVersionDialog
                               expectedActiveVersionId={activeVersionId}
@@ -260,6 +266,7 @@ export default async function WorldDetailPage(props: {
                               mapName={detail.map.displayName}
                               operation="publish"
                               requestId={randomUUID()}
+                              reviewRequestId={randomUUID()}
                               versionId={version.id}
                               versionNumber={version.versionNumber}
                             />
@@ -275,6 +282,24 @@ export default async function WorldDetailPage(props: {
                               mapName={detail.map.displayName}
                               operation="derive"
                               requestId={randomUUID()}
+                              reviewRequestId={randomUUID()}
+                              versionId={version.id}
+                              versionNumber={version.versionNumber}
+                            />
+                          ) : null}
+                          {version.lifecycleStatus === 'superseded' &&
+                          activeVersionId !== null &&
+                          hasAdminPermission(context, 'maps.rollback') ? (
+                            <WorldVersionDialog
+                              expectedActiveVersionId={activeVersionId}
+                              expectedChecksum={version.checksum}
+                              expectedEditVersion={version.editVersion}
+                              expectedRecordVersion={detail.map.recordVersion}
+                              mapId={detail.map.id}
+                              mapName={detail.map.displayName}
+                              operation="rollback"
+                              requestId={randomUUID()}
+                              reviewRequestId={randomUUID()}
                               versionId={version.id}
                               versionNumber={version.versionNumber}
                             />

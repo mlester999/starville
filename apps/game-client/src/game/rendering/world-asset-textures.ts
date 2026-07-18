@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 
 import type { WorldAssetDelivery } from '@starville/asset-management';
+import { depthOffsetForAnchors } from '@starville/game-core';
 
 import type { WorldAssetFallbackEvent } from '../contracts';
 
@@ -33,7 +34,7 @@ export function worldAssetTextureKey(delivery: WorldAssetDelivery): string {
 }
 
 export function worldAssetDepthOffset(delivery: WorldAssetDelivery): number {
-  return Math.round((delivery.depthAnchorY - delivery.footAnchorY) * 400);
+  return depthOffsetForAnchors(delivery.footAnchorY, delivery.depthAnchorY);
 }
 
 export interface WorldAssetRenderPlacement {

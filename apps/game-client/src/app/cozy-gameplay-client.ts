@@ -12,20 +12,29 @@ import {
   inventorySchema,
   itemCatalogSchema,
   paginationMetaSchema,
+  playableVerticalSliceSchema,
   phase7ABootstrapSchema,
   quickbarSchema,
   recipeActionResponseSchema,
   recipeCatalogSchema,
   shopCatalogSchema,
   shopTransactionResponseSchema,
+  verticalSliceMutationResponseSchema,
+  workstationJobMutationResponseSchema,
+  workstationTutorialMutationResponseSchema,
+  workstationWorkspaceSchema,
   type FarmPlot,
   type HomeAccessResponse,
   type HomeView,
   type Inventory,
   type ItemCatalog,
+  type PlayableVerticalSlice,
   type Quickbar,
   type RecipeDefinition,
   type ShopOffer,
+  type CraftingJob,
+  type WorkstationTutorial,
+  type WorkstationWorkspace,
 } from '@starville/cozy-gameplay';
 
 import { PlayerRequestError, requestPlayerApi } from './player-client';
@@ -60,8 +69,10 @@ export type FarmView = z.infer<typeof farmViewSchema>;
 export type RecipeCatalog = z.infer<typeof recipeCatalogSchema>;
 export type ShopCatalog = z.infer<typeof shopCatalogSchema>;
 export type { FarmPlot, HomeAccessResponse, HomeView, Inventory, ItemCatalog, Quickbar };
+export type { PlayableVerticalSlice };
 export type RecipeAvailability = RecipeCatalog['recipes'][number];
 export type { RecipeDefinition, ShopOffer };
+export type { CraftingJob, WorkstationTutorial, WorkstationWorkspace };
 
 async function cozyRequest(
   apiUrl: string,
@@ -134,6 +145,136 @@ export async function loadShopCatalog(apiUrl: string, shopSlug: string): Promise
 
 export async function loadPlayerHome(apiUrl: string): Promise<HomeView> {
   return parsed(homeViewSchema.safeParse(await cozyRequest(apiUrl, '/home', 'GET')));
+}
+
+export async function loadPlayableVerticalSlice(apiUrl: string): Promise<PlayableVerticalSlice> {
+  return parsed(
+    playableVerticalSliceSchema.safeParse(await cozyRequest(apiUrl, '/vertical-slice', 'GET')),
+  );
+}
+
+export async function acceptStarterFarmingQuest(apiUrl: string) {
+  return parsed(
+    verticalSliceMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, '/quest/accept', 'POST', {
+        idempotencyKey: createCozyIdempotencyKey(),
+      }),
+    ),
+  );
+}
+
+export async function mutateHomeFarm(
+  apiUrl: string,
+  operation: 'prepare' | 'plant' | 'water' | 'harvest',
+  tile: PlayableVerticalSlice['plot']['tiles'][number],
+  seedItemSlug?: string,
+) {
+  return parsed(
+    verticalSliceMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, `/home-plot/${operation}`, 'POST', {
+        tileId: tile.id,
+        expectedTileStateVersion: tile.stateVersion,
+        idempotencyKey: createCozyIdempotencyKey(),
+        ...(operation === 'plant' ? { seedItemSlug } : {}),
+        ...(operation === 'water' || operation === 'harvest'
+          ? {
+              cropInstanceId: tile.crop?.id,
+              expectedCropStateVersion: tile.crop?.stateVersion,
+            }
+          : {}),
+      }),
+    ),
+  );
+}
+
+export async function deliverStarterFarmingQuest(
+  apiUrl: string,
+  quest: PlayableVerticalSlice['quest'],
+) {
+  return parsed(
+    verticalSliceMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, '/quest/deliver', 'POST', {
+        expectedQuestStateVersion: quest.stateVersion,
+        idempotencyKey: createCozyIdempotencyKey(),
+      }),
+    ),
+  );
+}
+
+export async function loadWorkstationWorkspace(
+  apiUrl: string,
+  workstationInstanceId: string,
+): Promise<WorkstationWorkspace> {
+  return parsed(
+    workstationWorkspaceSchema.safeParse(
+      await cozyRequest(
+        apiUrl,
+        `/workstations/${encodeURIComponent(workstationInstanceId)}`,
+        'GET',
+      ),
+    ),
+  );
+}
+
+export async function startWorkstationJob(
+  apiUrl: string,
+  workspace: WorkstationWorkspace,
+  recipeVersionId: string,
+  quantity: number,
+) {
+  return parsed(
+    workstationJobMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, '/workstation-jobs/start', 'POST', {
+        workstationInstanceId: workspace.workstation.id,
+        recipeVersionId,
+        quantity,
+        expectedInventoryStateVersion: workspace.inventory.capacity.stateVersion,
+        expectedDustStateVersion: workspace.dust.stateVersion,
+        expectedWorkstationStateVersion: workspace.workstation.stateVersion,
+        idempotencyKey: createCozyIdempotencyKey(),
+      }),
+    ),
+  );
+}
+
+export async function collectWorkstationJob(
+  apiUrl: string,
+  workspace: WorkstationWorkspace,
+  job: CraftingJob,
+) {
+  return parsed(
+    workstationJobMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, '/workstation-jobs/collect', 'POST', {
+        workstationInstanceId: workspace.workstation.id,
+        craftingJobId: job.id,
+        expectedJobStateVersion: job.stateVersion,
+        expectedInventoryStateVersion: workspace.inventory.capacity.stateVersion,
+        expectedWorkstationStateVersion: workspace.workstation.stateVersion,
+        idempotencyKey: createCozyIdempotencyKey(),
+      }),
+    ),
+  );
+}
+
+export async function acceptWorkstationTutorial(apiUrl: string) {
+  return parsed(
+    workstationTutorialMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, '/quest/workstations/accept', 'POST', {
+        idempotencyKey: createCozyIdempotencyKey(),
+      }),
+    ),
+  );
+}
+
+export async function turnInWorkstationTutorial(apiUrl: string, tutorial: WorkstationTutorial) {
+  return parsed(
+    workstationTutorialMutationResponseSchema.safeParse(
+      await cozyRequest(apiUrl, '/quest/workstations/turn-in', 'POST', {
+        expectedQuestStateVersion: tutorial.stateVersion,
+        idempotencyKey: createCozyIdempotencyKey(),
+      }),
+    ),
+  );
 }
 
 export async function updateQuickbar(

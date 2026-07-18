@@ -3,6 +3,7 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 
 import {
   GLOBAL_ASSET_INTAKE_MAX_BYTES,
+  assetCreateVersionActionSchema,
   assetCreateVersionUploadMetadataSchema,
   assetUploadMetadataSchema,
 } from '@starville/asset-management';
@@ -110,12 +111,23 @@ export function registerAdminAssetRoutes(
     readonly service: AdminAssetService;
     readonly logger: ServiceLogger;
     readonly allowedOrigins: ReadonlySet<string>;
+    readonly remoteWritesApproved: boolean;
   },
 ): void {
   const authorize = (
     request: FastifyRequest,
     permission: Parameters<typeof authorizeAdminRequest>[3],
   ) => authorizeAdminRequest(request, options.adminGateway, options.logger, permission);
+
+  const assertRemoteWritesApproved = (request: FastifyRequest, assetId?: unknown) => {
+    if (options.remoteWritesApproved) return;
+    options.logger.child({ requestId: request.id }).warn('admin.asset.version_upload_blocked', {
+      assetId: typeof assetId === 'string' ? assetId : null,
+      processingStage: 'remote_write_gate',
+      errorCategory: 'remote_writes_not_approved',
+    });
+    throw new PublicApiError(503, 'ASSET_REMOTE_WRITES_DISABLED');
+  };
 
   app.get('/api/v1/admin/world-assets', async (request, reply) => {
     disableResponseCaching(reply);
@@ -157,6 +169,7 @@ export function registerAdminAssetRoutes(
     assertTrustedOrigin(request, options.allowedOrigins);
     disableResponseCaching(reply);
     const identity = await authorize(request, 'assets.upload');
+    assertRemoteWritesApproved(request);
     const upload = await multipartUpload(request, (value) =>
       assetUploadMetadataSchema.parse(value),
     );
@@ -217,6 +230,7 @@ export function registerAdminAssetRoutes(
     assertTrustedOrigin(request, options.allowedOrigins);
     disableResponseCaching(reply);
     const identity = await authorize(request, 'assets.upload');
+    assertRemoteWritesApproved(request, parameter(request, 'assetId'));
     const upload = await multipartUpload(request, (value) =>
       assetCreateVersionUploadMetadataSchema.parse(value),
     );
@@ -236,6 +250,26 @@ export function registerAdminAssetRoutes(
       request.id,
     );
   });
+
+  app.post(
+    '/api/v1/admin/world-assets/:assetId/versions/from-existing',
+    { bodyLimit: 8 * 1024 },
+    async (request, reply) => {
+      assertTrustedOrigin(request, options.allowedOrigins);
+      disableResponseCaching(reply);
+      const identity = await authorize(request, 'assets.upload');
+      assertRemoteWritesApproved(request, parameter(request, 'assetId'));
+      return response(
+        await options.service.createVersionFromExisting(
+          identity,
+          parameter(request, 'assetId'),
+          assetCreateVersionActionSchema.parse(request.body),
+          request.id,
+        ),
+        request.id,
+      );
+    },
+  );
 
   app.post(
     '/api/v1/admin/world-assets/:assetId/versions/:versionId/draft',

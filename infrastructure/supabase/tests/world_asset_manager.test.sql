@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(60);
+select plan(66);
 
 select has_table('public', 'world_asset_versions', 'asset versions exist');
 select has_table('public', 'world_asset_uploads', 'private upload reservations exist');
@@ -15,11 +15,68 @@ select has_table('public', 'world_asset_reviews', 'review history exists');
 select has_table('public', 'world_asset_references', 'content references exist');
 select has_table('public', 'world_asset_audit_events', 'asset audit history exists');
 select has_table('public', 'world_asset_operation_idempotency', 'idempotency records exist');
+select has_table(
+  'public', 'world_asset_operation_intents',
+  'high-impact lifecycle request intent records exist'
+);
 select has_table('public', 'world_asset_operation_rate_limits', 'durable rate limits exist');
+
+select has_function(
+  'public', 'claim_admin_game_asset_operation_intent',
+  array['uuid', 'uuid', 'text', 'uuid', 'uuid', 'text', 'text', 'text', 'text'],
+  'the API can bind a lifecycle request identifier to one intent'
+);
+
+select ok(
+  (select relrowsecurity and relforcerowsecurity
+   from pg_class where oid = 'public.world_asset_operation_intents'::regclass)
+  and not has_table_privilege('anon', 'public.world_asset_operation_intents', 'SELECT')
+  and not has_table_privilege('authenticated', 'public.world_asset_operation_intents', 'SELECT')
+  and has_function_privilege(
+    'service_role',
+    'public.claim_admin_game_asset_operation_intent(uuid,uuid,text,uuid,uuid,text,text,text,text)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.claim_admin_game_asset_operation_intent(uuid,uuid,text,uuid,uuid,text,text,text,text)',
+    'EXECUTE'
+  ),
+  'intent claims are forced-RLS and callable only through the trusted service role'
+);
 
 select has_column(
   'public', 'world_map_version_assets', 'world_asset_version_id',
   'world manifests pin immutable asset-version identifiers'
+);
+
+select has_function(
+  'private', 'world_editor_asset_pins_for_version', array['uuid'],
+  'the world editor can resolve exact immutable draft asset pins'
+);
+
+select ok(
+  (select prosecdef and provolatile = 's'
+   from pg_proc
+   where oid = 'private.world_editor_asset_pins_for_version(uuid)'::regprocedure)
+  and not has_function_privilege(
+    'anon', 'private.world_editor_asset_pins_for_version(uuid)', 'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated', 'private.world_editor_asset_pins_for_version(uuid)', 'EXECUTE'
+  )
+  and not has_function_privilege(
+    'service_role', 'private.world_editor_asset_pins_for_version(uuid)', 'EXECUTE'
+  ),
+  'draft pin resolution is stable, definer-protected, and private to trusted RPCs'
+);
+
+select ok(
+  (select position('''assetPins''' in pg_get_functiondef(function.oid)) > 0
+      and position('''assets.read''' in pg_get_functiondef(function.oid)) > 0
+   from pg_proc as function
+   where function.oid = 'public.get_admin_world_draft(uuid,uuid,text,uuid,uuid,text,integer)'::regprocedure),
+  'draft loading returns pins only after maps.edit and assets.read authorization'
 );
 
 select ok(
@@ -29,7 +86,8 @@ select ok(
       'world_asset_versions', 'world_asset_uploads', 'world_asset_processing_jobs',
       'world_asset_tags', 'world_asset_version_tags', 'world_asset_validation_checks',
       'world_asset_reviews', 'world_asset_references', 'world_asset_audit_events',
-      'world_asset_operation_idempotency', 'world_asset_operation_rate_limits'
+      'world_asset_operation_idempotency', 'world_asset_operation_intents',
+      'world_asset_operation_rate_limits'
     ]) as expected(table_name)
     left join pg_class relation
       on relation.relname = expected.table_name

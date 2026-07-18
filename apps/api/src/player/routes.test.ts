@@ -8,6 +8,7 @@ import type { AdminAuthGateway, LogContext, ServiceLogger } from '../contracts.j
 import { PublicApiError } from '../errors.js';
 import type { PlayerService } from './contracts.js';
 import type { RuntimeTokenGateConfig, TokenAccessService } from '../token-access/contracts.js';
+import type { RealtimeTicketService } from '../realtime/contracts.js';
 
 class SilentLogger implements ServiceLogger {
   child(_bindings: LogContext): ServiceLogger {
@@ -129,7 +130,11 @@ function tokenService(view: TokenAccessSessionView = grantedView): TokenAccessSe
 
 const apps: ReturnType<typeof buildApiApp>[] = [];
 
-function createApp(service = tokenService(), players = playerService()) {
+function createApp(
+  service = tokenService(),
+  players = playerService(),
+  realtimeTicketService?: RealtimeTicketService,
+) {
   const app = buildApiApp({
     config: {
       environment: 'test',
@@ -147,6 +152,7 @@ function createApp(service = tokenService(), players = playerService()) {
       cookieSecure: false,
       cookieMaxAgeSeconds: 900,
       playerService: players,
+      ...(realtimeTicketService === undefined ? {} : { realtimeTicketService }),
     },
   });
   apps.push(app);
@@ -212,6 +218,32 @@ describe('protected player routes', () => {
       data: { profile, entryState: 'active' },
     });
     expect(enumeration.statusCode).toBe(404);
+  });
+
+  it('issues a private-home realtime ticket only through the authenticated same-origin route', async () => {
+    const realtimeTicketService: RealtimeTicketService = {
+      issue: vi.fn(),
+      issuePrivateHome: vi.fn(async () => ({
+        ticket: 't'.repeat(43),
+        homeId: '10000000-0000-4000-8000-000000000001',
+        expiresAt: '2026-07-17T00:00:30.000Z',
+      })),
+    };
+    const app = createApp(tokenService(), playerService(), realtimeTicketService);
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/private-home-realtime-ticket',
+      headers: { origin: 'http://localhost:3001' },
+      payload: { homeId: '10000000-0000-4000-8000-000000000001' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(realtimeTicketService.issuePrivateHome).toHaveBeenCalledWith({
+      rawAccessToken: undefined,
+      homeId: '10000000-0000-4000-8000-000000000001',
+      requestId: expect.any(String),
+    });
+    expect(realtimeTicketService.issue).not.toHaveBeenCalled();
   });
 
   it('touches last-entered only for profile bootstrap, not profile or state writes', async () => {

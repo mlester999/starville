@@ -20,6 +20,11 @@ import {
   recipeCatalogFixture,
   shopCatalogFixture,
   shopTransactionFixture,
+  playableVerticalSliceFixture,
+  verticalSliceMutationFixture,
+  workstationJobMutationFixture,
+  workstationTutorialMutationFixture,
+  workstationWorkspaceFixture,
 } from './test-fixtures.js';
 
 class SilentLogger implements ServiceLogger {
@@ -57,6 +62,18 @@ function gateway(): CozyGameplayGateway {
     moveFurniture: vi.fn(async () => furnitureMutationFixture),
     rotateFurniture: vi.fn(async () => furnitureMutationFixture),
     removeFurniture: vi.fn(async () => furnitureMutationFixture),
+    getPlayableVerticalSlice: vi.fn(async () => playableVerticalSliceFixture),
+    acceptStarterQuest: vi.fn(async () => verticalSliceMutationFixture),
+    prepareHomeSoil: vi.fn(async () => verticalSliceMutationFixture),
+    plantHomeCrop: vi.fn(async () => verticalSliceMutationFixture),
+    waterHomeCrop: vi.fn(async () => verticalSliceMutationFixture),
+    harvestHomeCrop: vi.fn(async () => verticalSliceMutationFixture),
+    deliverStarterQuest: vi.fn(async () => verticalSliceMutationFixture),
+    getWorkstationWorkspace: vi.fn(async () => workstationWorkspaceFixture),
+    startWorkstationJob: vi.fn(async () => workstationJobMutationFixture),
+    collectWorkstationJob: vi.fn(async () => workstationJobMutationFixture),
+    acceptWorkstationTutorial: vi.fn(async () => workstationTutorialMutationFixture),
+    turnInWorkstationTutorial: vi.fn(async () => workstationTutorialMutationFixture),
   };
 }
 
@@ -355,5 +372,136 @@ describe('cozy gameplay service', () => {
         'request-home-status',
       ),
     ).rejects.toEqual(expect.objectContaining({ code }));
+  });
+
+  it('validates personal-plot farming intent without accepting owner, maturity, yield, or reward fields', async () => {
+    const persistence = gateway();
+    const service = createCozyGameplayService({ gateway: persistence, logger: new SilentLogger() });
+    const prepare = {
+      tileId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      expectedTileStateVersion: 1,
+      idempotencyKey: 'phase11-prepare-0001',
+    };
+
+    await expect(
+      service.getPlayableVerticalSlice(WALLET_ADDRESS, 'request-vertical-slice'),
+    ).resolves.toEqual(playableVerticalSliceFixture);
+    await expect(
+      service.prepareHomeSoil(WALLET_ADDRESS, prepare, 'request-prepare'),
+    ).resolves.toEqual(verticalSliceMutationFixture);
+    expect(persistence.prepareHomeSoil).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      prepare,
+      'request-prepare',
+    );
+
+    await expect(
+      service.prepareHomeSoil(
+        WALLET_ADDRESS,
+        { ...prepare, ownerPlayerId: 'attacker', yield: 999, mature: true },
+        'request-forged-prepare',
+      ),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_REQUEST', statusCode: 400 }));
+    await expect(
+      service.deliverStarterQuest(
+        WALLET_ADDRESS,
+        {
+          expectedQuestStateVersion: 9,
+          idempotencyKey: 'phase11-delivery-0001',
+          rewardDust: 1000,
+        },
+        'request-forged-reward',
+      ),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_REQUEST', statusCode: 400 }));
+  });
+
+  it.each([
+    ['tool_action_too_far', 'TOOL_ACTION_TOO_FAR', 409],
+    ['tool_not_owned', 'TOOL_NOT_OWNED', 409],
+    ['crop_not_mature', 'CROP_NOT_MATURE', 409],
+    ['farming_tile_conflict', 'FARMING_TILE_CONFLICT', 409],
+    ['inventory_full', 'INVENTORY_FULL', 409],
+    ['economy_settlement_failed', 'ECONOMY_SETTLEMENT_FAILED', 503],
+  ] as const)('maps Phase 11A status %s to a safe %s error', async (status, code, statusCode) => {
+    const persistence = gateway();
+    vi.mocked(persistence.prepareHomeSoil).mockResolvedValueOnce(status);
+    const service = createCozyGameplayService({ gateway: persistence, logger: new SilentLogger() });
+    await expect(
+      service.prepareHomeSoil(
+        WALLET_ADDRESS,
+        {
+          tileId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+          expectedTileStateVersion: 1,
+          idempotencyKey: 'phase11-status-0001',
+        },
+        'request-phase11-status',
+      ),
+    ).rejects.toEqual(expect.objectContaining({ code, statusCode }));
+  });
+
+  it('accepts only canonical workstation-job intent and rejects client-authored settlement', async () => {
+    const persistence = gateway();
+    vi.mocked(persistence.startWorkstationJob).mockResolvedValueOnce('crafting_queue_full');
+    const service = createCozyGameplayService({ gateway: persistence, logger: new SilentLogger() });
+    const input = {
+      workstationInstanceId: 'b1100000-0000-4000-8000-000000000101',
+      recipeVersionId: 'b1100000-0000-4000-8000-000000000211',
+      quantity: 1,
+      expectedInventoryStateVersion: 2,
+      expectedDustStateVersion: 1,
+      expectedWorkstationStateVersion: 1,
+      idempotencyKey: 'phase11b-start-route-0001',
+    };
+
+    await expect(
+      service.startWorkstationJob(WALLET_ADDRESS, input, 'request-workstation-start'),
+    ).rejects.toEqual(expect.objectContaining({ code: 'CRAFTING_QUEUE_FULL', statusCode: 409 }));
+    expect(persistence.startWorkstationJob).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      input,
+      'request-workstation-start',
+    );
+
+    await expect(
+      service.startWorkstationJob(
+        WALLET_ADDRESS,
+        {
+          ...input,
+          outputItemSlug: 'attacker-output',
+          outputQuantity: 999,
+          completesAt: '2099-01-01T00:00:00.000Z',
+          durationSeconds: 0,
+          dustFee: -100,
+        },
+        'request-forged-workstation-start',
+      ),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_REQUEST', statusCode: 400 }));
+    expect(persistence.startWorkstationJob).toHaveBeenCalledTimes(1);
+  });
+
+  it('validates workstation and job UUID ownership references before persistence', async () => {
+    const persistence = gateway();
+    const service = createCozyGameplayService({ gateway: persistence, logger: new SilentLogger() });
+
+    await expect(
+      service.getWorkstationWorkspace(WALLET_ADDRESS, 'not-a-uuid', 'request-invalid-station'),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_REQUEST', statusCode: 400 }));
+    await expect(
+      service.collectWorkstationJob(
+        WALLET_ADDRESS,
+        {
+          workstationInstanceId: 'b1100000-0000-4000-8000-000000000101',
+          craftingJobId: 'version-2',
+          expectedJobStateVersion: 1,
+          expectedInventoryStateVersion: 2,
+          expectedWorkstationStateVersion: 1,
+          idempotencyKey: 'phase11b-collect-route-0001',
+        },
+        'request-invalid-job',
+      ),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_REQUEST', statusCode: 400 }));
+
+    expect(persistence.getWorkstationWorkspace).not.toHaveBeenCalled();
+    expect(persistence.collectWorkstationJob).not.toHaveBeenCalled();
   });
 });

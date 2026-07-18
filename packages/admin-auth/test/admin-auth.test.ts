@@ -36,7 +36,7 @@ const authorized = {
 describe('admin authorization catalog', () => {
   it('contains the required stable roles and permission catalog', () => {
     expect(ADMIN_ROLE_KEYS).toHaveLength(12);
-    expect(ADMIN_PERMISSION_KEYS).toHaveLength(67);
+    expect(ADMIN_PERMISSION_KEYS).toHaveLength(171);
     expect(INITIAL_ROLE_PERMISSIONS.super_admin).toEqual(ADMIN_PERMISSION_KEYS);
   });
 
@@ -54,6 +54,33 @@ describe('admin authorization catalog', () => {
     );
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('live_operations.manage');
     expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('announcements.manage');
+  });
+
+  it('keeps farming inspection, content, reward, and live-operations authority narrow', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining(['farming.read', 'farming.player_read', 'farming.content_manage']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).not.toContain('farming.reward_manage');
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).toEqual(
+      expect.arrayContaining(['farming.read', 'farming.content_manage']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).not.toContain('farming.reward_manage');
+    expect(INITIAL_ROLE_PERMISSIONS.economy_manager).toEqual(
+      expect.arrayContaining(['farming.read', 'farming.liveops', 'farming.reward_manage']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.economy_manager).not.toContain('farming.content_manage');
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining(['farming.read', 'farming.liveops']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain(
+      'farming.content_manage',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('farming.reward_manage');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('farming.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('farming.liveops');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('farming.player_read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('farming.content_manage');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('farming.reward_manage');
   });
 
   it('keeps platform configuration lifecycle authority narrow', () => {
@@ -92,20 +119,73 @@ describe('admin authorization catalog', () => {
     );
   });
 
+  it('keeps avatar content review, activation, settings, and support authority narrow', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'avatar_content.read',
+        'avatar_content.audit.read',
+        'avatar_content.edit',
+        'avatar_content.review',
+        'avatar_content.approve',
+        'avatar_content.activate',
+        'avatar_content.settings.read',
+        'avatar_profile.support.read',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).not.toContain(
+      'avatar_content.settings.edit',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).toEqual(
+      expect.arrayContaining([
+        'avatar_content.read',
+        'avatar_content.edit',
+        'avatar_content.review',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).not.toContain('avatar_content.activate');
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining([
+        'avatar_content.read',
+        'avatar_content.audit.read',
+        'avatar_content.review',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.customer_support).toContain('avatar_profile.support.read');
+    expect(INITIAL_ROLE_PERMISSIONS.customer_support).not.toContain('avatar_content.edit');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toEqual(
+      expect.arrayContaining(['avatar_content.read', 'avatar_content.audit.read']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain(
+      'avatar_content.settings.read',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('avatar_content.read');
+    expect(INITIAL_ROLE_PERMISSIONS.blockchain_operator).not.toContain('avatar_content.read');
+  });
+
   it('keeps sensitive permissions out of the read-only role', () => {
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('players.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('roles.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('audit_logs.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('player_audit.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('operations.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('realtime.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('economy.adjust_stardust');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('maps.read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.preview');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('maps.audit_read');
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('assets.audit.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('multiplayer_chat.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain(
+      'multiplayer_chat.reports.read',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('multiplayer_chat.audit.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain(
+      'multiplayer_chat.settings.read',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('multiplayer_chat.moderate');
     expect(
-      INITIAL_ROLE_PERMISSIONS.read_only_analyst.every((permission) =>
-        permission.endsWith('.read'),
+      INITIAL_ROLE_PERMISSIONS.read_only_analyst.every(
+        (permission) => permission.endsWith('.read') || permission.endsWith('.inspect'),
       ),
     ).toBe(true);
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst as readonly string[]).not.toContain(
@@ -123,6 +203,50 @@ describe('admin authorization catalog', () => {
         'assets.publish',
       ]),
     );
+  });
+
+  it('keeps multiplayer chat evidence and mutation permissions narrow', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'multiplayer_chat.read',
+        'multiplayer_chat.moderate',
+        'multiplayer_chat.reports.read',
+        'multiplayer_chat.audit.read',
+        'multiplayer_chat.settings.read',
+        'multiplayer_chat.settings.edit',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).toEqual(
+      expect.arrayContaining([
+        'multiplayer_chat.read',
+        'multiplayer_chat.moderate',
+        'multiplayer_chat.reports.read',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.customer_support).not.toContain('multiplayer_chat.moderate');
+    expect(INITIAL_ROLE_PERMISSIONS.world_designer).not.toContain('multiplayer_chat.moderate');
+    expect(INITIAL_ROLE_PERMISSIONS.blockchain_operator).not.toContain('multiplayer_chat.moderate');
+  });
+
+  it('keeps social settlement visibility read-only and role-specific', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'social_interactions.read',
+        'social_interactions.audit.read',
+        'social_interactions.settings.read',
+        'social_interactions.settings.edit',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).toContain('social_interactions.read');
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('social_interactions.audit.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('social_interactions.read');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain(
+      'social_interactions.audit.read',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain(
+      'social_interactions.settings.read',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.blockchain_operator).not.toContain('social_interactions.read');
   });
 
   it('separates asset upload, review, approval, and activation authority', () => {
@@ -155,8 +279,9 @@ describe('admin authorization catalog', () => {
       expect.arrayContaining(['maps.read', 'maps.edit', 'maps.preview', 'maps.audit_read']),
     );
     expect(INITIAL_ROLE_PERMISSIONS.game_administrator).not.toContain('maps.publish');
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).not.toContain('maps.rollback');
     expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
-      expect.arrayContaining(['maps.read', 'maps.audit_read']),
+      expect.arrayContaining(['maps.read', 'maps.audit_read', 'maps.rollback']),
     );
     expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('maps.edit');
     expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain('maps.publish');
@@ -169,6 +294,7 @@ describe('admin authorization catalog', () => {
         'maps.audit_read',
       ]),
     );
+    expect(INITIAL_ROLE_PERMISSIONS.world_designer).not.toContain('maps.rollback');
   });
 
   it('maps every Phase 5 player action to one exact server permission', () => {

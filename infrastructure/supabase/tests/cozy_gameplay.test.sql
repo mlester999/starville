@@ -18,8 +18,8 @@ select has_table('public', 'cozy_gameplay_rate_limits', 'durable gameplay rate l
 
 select is(
   (select count(*)::integer from public.cozy_item_definitions),
-  21,
-  'the canonical Phase 7 item catalog is seeded exactly once'
+  23,
+  'the canonical item catalog includes the additive Phase 11A hoe and Phase 11B Garden Soup'
 );
 select ok(
   exists (

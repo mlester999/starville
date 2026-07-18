@@ -165,6 +165,16 @@ const rawLanternSquareManifest = {
   ],
   interactions: [
     {
+      id: 'phase11-willow-guide',
+      type: 'starter_npc',
+      x: 12,
+      y: 10.5,
+      range: 2.5,
+      title: 'Willow Guide',
+      content: 'Learn the first home-plot farming loop and make a small Moonbean delivery.',
+      npcSlug: 'willow-guide',
+    },
+    {
       id: 'welcome-notice',
       type: 'notice',
       x: 9.75,

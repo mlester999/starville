@@ -58,10 +58,14 @@ function worldService(): AdminWorldService {
     getPublishedTopology: vi.fn(async () => ({ status: 'loaded', maps: [] })),
     getWorld: vi.fn(async () => ({ map: {} })),
     getDraft: vi.fn(async () => ({ manifest: {} })),
+    getRevision: vi.fn(async () => ({ manifest: {} })),
+    compareRevisions: vi.fn(async () => ({ changeSummary: {} })),
     createDraft: vi.fn(async () => ({ version: {} })),
     saveDraft: vi.fn(async () => ({ version: {} })),
     validateDraft: vi.fn(async () => ({ validationResult: {} })),
     publishVersion: vi.fn(async () => ({ version: {} })),
+    reviewPublication: vi.fn(async () => ({ reviewId: versionId })),
+    rollbackVersion: vi.fn(async () => ({ version: {} })),
     deriveVersion: vi.fn(async () => ({ version: {} })),
     previewVersion: vi.fn(async () => ({ draftPreview: true })),
     listAudit: vi.fn(async () => ({ items: [] })),
@@ -208,6 +212,93 @@ describe('administrator world routes', () => {
     expect(editor.statusCode).toBe(403);
     expect(publisher.statusCode).toBe(200);
     expect(service.publishVersion).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps immutable revision inspection and comparison read-only behind maps.read', async () => {
+    const service = worldService();
+    const denied = await app([], service).inject({
+      method: 'GET',
+      url: `/api/v1/admin/worlds/${mapId}/revisions/${versionId}`,
+      headers: { authorization: 'Bearer verified' },
+    });
+    const inspected = await app(['maps.read'], service).inject({
+      method: 'GET',
+      url: `/api/v1/admin/worlds/${mapId}/revisions/${versionId}`,
+      headers: { authorization: 'Bearer verified' },
+    });
+    const compared = await app(['maps.read'], service).inject({
+      method: 'GET',
+      url: `/api/v1/admin/worlds/${mapId}/revisions/${versionId}/comparison?fromVersionId=${mapId}`,
+      headers: { authorization: 'Bearer verified' },
+    });
+
+    expect(denied.statusCode).toBe(403);
+    expect(inspected.statusCode).toBe(200);
+    expect(compared.statusCode).toBe(200);
+    expect(service.getRevision).toHaveBeenCalledWith(
+      identity,
+      mapId,
+      versionId,
+      expect.any(String),
+    );
+    expect(service.compareRevisions).toHaveBeenCalledWith(
+      identity,
+      mapId,
+      mapId,
+      versionId,
+      expect.any(String),
+    );
+  });
+
+  it('separates publish review from rollback review and rollback authority', async () => {
+    const service = worldService();
+    const origin = 'http://localhost:3002';
+    const publisher = await app(['maps.publish'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/worlds/${mapId}/versions/${versionId}/publication-review`,
+      headers: { authorization: 'Bearer verified', origin },
+      payload: { expectedActiveVersionId: mapId, operation: 'rollback', acknowledged: true },
+    });
+    const publishOnlyRollback = await app(['maps.publish'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/worlds/${mapId}/versions/${versionId}/rollback-review`,
+      headers: { authorization: 'Bearer verified', origin },
+      payload: { expectedActiveVersionId: mapId, operation: 'publish', acknowledged: true },
+    });
+    const rollbackReviewer = await app(['maps.rollback'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/worlds/${mapId}/versions/${versionId}/rollback-review`,
+      headers: { authorization: 'Bearer verified', origin },
+      payload: { expectedActiveVersionId: mapId, operation: 'publish', acknowledged: true },
+    });
+    const rollback = await app(['maps.rollback'], service).inject({
+      method: 'POST',
+      url: `/api/v1/admin/worlds/${mapId}/versions/${versionId}/rollback`,
+      headers: { authorization: 'Bearer verified', origin },
+      payload: { confirmed: true },
+    });
+
+    expect(publisher.statusCode).toBe(200);
+    expect(publishOnlyRollback.statusCode).toBe(403);
+    expect(rollbackReviewer.statusCode).toBe(200);
+    expect(rollback.statusCode).toBe(200);
+    expect(service.reviewPublication).toHaveBeenNthCalledWith(
+      1,
+      identity,
+      mapId,
+      versionId,
+      expect.objectContaining({ operation: 'publish' }),
+      expect.any(String),
+    );
+    expect(service.reviewPublication).toHaveBeenNthCalledWith(
+      2,
+      identity,
+      mapId,
+      versionId,
+      expect.objectContaining({ operation: 'rollback' }),
+      expect.any(String),
+    );
+    expect(service.rollbackVersion).toHaveBeenCalledTimes(1);
   });
 
   it('uses independent audit and asset read permissions', async () => {

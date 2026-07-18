@@ -27,6 +27,21 @@ export async function isAssetManagerRequestAuthorized(
   }
 }
 
+export async function isAssetScenePreviewRequestAuthorized(
+  worldPermission: Extract<AdminPermissionKey, 'maps.read' | 'maps.preview'>,
+): Promise<boolean> {
+  try {
+    const result = await getCurrentAdminAuthorization();
+    return (
+      isAuthorizedAdmin(result) &&
+      hasAdminPermission(result.context, 'assets.read') &&
+      hasAdminPermission(result.context, worldPermission)
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function assetManagerCapabilities(
   context: AdminAuthorizationContext,
 ): AssetManagerCapabilities {

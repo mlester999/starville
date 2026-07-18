@@ -62,9 +62,13 @@ function chainableGameObject(kind: 'graphics' | 'image') {
 describe('production world-object rendering', () => {
   it('renders every object when one production texture succeeds and another falls back', () => {
     const baseManifest = lanternSquareManifest();
-    const objects = baseManifest.objects.slice(0, 3);
+    const objects = baseManifest.objects
+      .slice(0, 3)
+      .map((object, index) => (index === 0 ? { ...object, rotation: 90 as const } : object));
     const manifest = { ...baseManifest, objects };
-    const successful = delivery(objects[0]!.assetId, '11111111-1111-4111-8111-111111111111');
+    const successful = delivery(objects[0]!.assetId, '11111111-1111-4111-8111-111111111111', {
+      supportedRotations: [0, 90],
+    });
     const failed = delivery(objects[1]!.assetId, '22222222-2222-4222-8222-222222222222');
     const successfulKey = worldAssetTextureKey(successful);
     const failedKey = worldAssetTextureKey(failed);
@@ -117,5 +121,6 @@ describe('production world-object rendering', () => {
       successful.anchorX,
       successful.anchorY,
     );
+    expect(Reflect.get(images[0]!, 'setAngle')).toHaveBeenCalledWith(90);
   });
 });

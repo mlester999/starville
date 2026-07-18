@@ -28,6 +28,8 @@ export default defineConfig(({ mode }) => {
   };
   parseGameClientPublicConfig(environment);
   const port = parseGameClientPort(environment['GAME_CLIENT_PORT']);
+  const developmentApiProxy = environment['GAME_CLIENT_DEV_API_PROXY_TARGET'];
+  const developmentRealtimeProxy = environment['GAME_CLIENT_DEV_REALTIME_PROXY_TARGET'];
 
   return {
     plugins: [react()],
@@ -38,6 +40,25 @@ export default defineConfig(({ mode }) => {
     server: {
       port,
       strictPort: true,
+      proxy: {
+        ...(developmentApiProxy === undefined
+          ? {}
+          : {
+              '/api': {
+                target: developmentApiProxy,
+                changeOrigin: false,
+              },
+            }),
+        ...(developmentRealtimeProxy === undefined
+          ? {}
+          : {
+              '/realtime': {
+                target: developmentRealtimeProxy,
+                ws: true,
+                rewrite: (path: string) => path.replace(/^\/realtime/u, ''),
+              },
+            }),
+      },
     },
     preview: {
       port,

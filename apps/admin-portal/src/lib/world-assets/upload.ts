@@ -1,6 +1,12 @@
+import { assetSlugSchema, normalizeAssetSlug } from '@starville/asset-management';
+
 import type { AssetTypeProfile } from './profiles';
 
 export type DetectedImageFormat = 'image/png' | 'image/webp' | 'unknown';
+
+export const FRIENDLY_NAME_MAX_LENGTH = 100;
+export const ASSET_SLUG_MAX_LENGTH = 96;
+export const ASSET_SLUG_MIN_LENGTH = 3;
 
 export function detectImageFormat(bytes: Uint8Array): DetectedImageFormat {
   if (
@@ -57,11 +63,83 @@ export function advisoryFileIssues(
   return issues;
 }
 
+/** @deprecated Prefer generateAssetSlug — kept for existing call sites. */
 export function uploadSlug(value: string): string {
-  return value
-    .normalize('NFKD')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/gu, '-')
-    .replace(/^-+|-+$/gu, '')
-    .slice(0, 96);
+  return generateAssetSlug(value);
+}
+
+/**
+ * Generate a stable path-safe asset slug from a friendly display name.
+ * Applies repository normalizeAssetSlug rules and enforces the current max length.
+ */
+export function generateAssetSlug(value: string): string {
+  return normalizeAssetSlug(value).slice(0, ASSET_SLUG_MAX_LENGTH);
+}
+
+export function isValidAssetSlug(value: string): boolean {
+  return assetSlugSchema.safeParse(value).success;
+}
+
+export function normalizeFriendlyName(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/gu, ' ');
+}
+
+export function friendlyNameValidationMessage(value: string): string | null {
+  const trimmed = normalizeFriendlyName(value);
+  if (value.length > 0 && value.trim().length === 0) {
+    return 'Enter a readable name — spaces alone are not allowed.';
+  }
+  if (trimmed.length === 0) {
+    return 'Friendly name is required.';
+  }
+  if (trimmed.length > FRIENDLY_NAME_MAX_LENGTH) {
+    return `Keep the friendly name to ${String(FRIENDLY_NAME_MAX_LENGTH)} characters or fewer.`;
+  }
+  if (/[<>\p{Cc}]/u.test(trimmed)) {
+    return 'This name contains characters that cannot be used.';
+  }
+  return null;
+}
+
+export function assetSlugValidationMessage(slug: string, friendlyName: string): string | null {
+  if (normalizeFriendlyName(friendlyName).length === 0) return null;
+  if (slug.length === 0) {
+    return 'Use a friendly name with letters so an asset ID can be generated.';
+  }
+  if (slug.length < ASSET_SLUG_MIN_LENGTH) {
+    return 'The generated asset ID is too short. Use a more complete friendly name.';
+  }
+  if (!isValidAssetSlug(slug)) {
+    return 'The generated asset ID must start with a letter and use only lowercase letters, numbers, and hyphens.';
+  }
+  return null;
+}
+
+/**
+ * Suggest a human-readable alternate when the preferred slug is already taken.
+ * Prefers sequential suffixes (pine-tree-02) over random characters.
+ */
+export function suggestAlternateAssetSlug(
+  preferred: string,
+  taken: ReadonlySet<string> | ReadonlyArray<string>,
+): string {
+  const occupied = taken instanceof Set ? taken : new Set(taken);
+  if (!occupied.has(preferred) && isValidAssetSlug(preferred)) return preferred;
+
+  for (let index = 2; index <= 99; index += 1) {
+    const suffix = `-${String(index).padStart(2, '0')}`;
+    const maxBase = ASSET_SLUG_MAX_LENGTH - suffix.length;
+    const candidate = `${preferred.slice(0, Math.max(1, maxBase))}${suffix}`.replace(/-+$/u, '');
+    if (isValidAssetSlug(candidate) && !occupied.has(candidate)) return candidate;
+  }
+
+  const fallback = `${preferred.slice(0, ASSET_SLUG_MAX_LENGTH - 4)}-alt`;
+  return isValidAssetSlug(fallback) ? fallback : preferred;
+}
+
+export function slugCollisionMessage(slug: string, suggestion: string): string {
+  if (suggestion !== slug && isValidAssetSlug(suggestion)) {
+    return `This asset ID already exists. Try a more specific name such as one that generates “${suggestion}”.`;
+  }
+  return 'This asset ID already exists. Try a more specific friendly name.';
 }

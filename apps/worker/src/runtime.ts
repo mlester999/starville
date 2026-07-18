@@ -20,7 +20,7 @@ export interface WorkerRuntime {
 export interface CreateWorkerRuntimeOptions {
   readonly config: WorkerRuntimeConfig;
   readonly logger: ServiceLogger;
-  readonly jobs?: readonly WorkerJob[];
+  readonly jobs?: readonly WorkerJob<unknown>[];
 }
 
 function assertRuntimeConfig(config: WorkerRuntimeConfig): void {
@@ -35,7 +35,7 @@ function sendJson(response: ServerResponse, statusCode: number, body: unknown): 
 }
 
 async function runJobs(
-  jobs: readonly WorkerJob[],
+  jobs: readonly WorkerJob<unknown>[],
   config: WorkerRuntimeConfig,
   logger: ServiceLogger,
 ): Promise<void> {

@@ -33,6 +33,36 @@ import type { AdminAssetService } from './asset-management/contracts.js';
 import { registerAdminAssetRoutes } from './routes/admin-assets.js';
 import type { PlatformConfigurationService } from './platform-configuration/contracts.js';
 import { registerPlatformConfigurationRoutes } from './routes/platform-configuration.js';
+import type { RealtimeTicketService } from './realtime/contracts.js';
+import type { AdminRealtimeGateway } from './realtime/admin-gateway.js';
+import { registerAdminRealtimeRoutes } from './routes/admin-realtime.js';
+import { registerAdminChatRoutes } from './routes/admin-chat.js';
+import type { AdminChatGateway } from './realtime/chat-admin-gateway.js';
+import type { AdminSocialGateway } from './realtime/social-admin-gateway.js';
+import { registerAdminSocialRoutes } from './routes/admin-social.js';
+import type { AdminSocialGraphGateway } from './realtime/social-graph-admin-gateway.js';
+import { registerAdminSocialGraphRoutes } from './routes/admin-social-graph.js';
+import type { AdminCooperativeActivityGateway } from './realtime/cooperative-activity-admin-gateway.js';
+import { registerAdminCooperativeActivityRoutes } from './routes/admin-cooperative-activities.js';
+import type { EconomyGateway } from './economy/gateway.js';
+import { registerEconomyRoutes } from './routes/economy.js';
+import type { AvatarService } from './avatar/contracts.js';
+import type { AdminAvatarGateway } from './avatar/admin-gateway.js';
+import { registerAvatarRoutes } from './routes/avatar.js';
+import { registerAdminAvatarRoutes } from './routes/admin-avatar.js';
+import type {
+  CosmeticGateway,
+  CosmeticService,
+  AdminCosmeticGateway,
+} from './cosmetics/contracts.js';
+import { registerCosmeticRoutes } from './routes/cosmetics.js';
+import { registerAdminCosmeticRoutes } from './routes/admin-cosmetics.js';
+import type { WorldGameTestService } from './world/game-test-contracts.js';
+import { registerWorldGameTestRoutes } from './routes/world-game-test.js';
+import type { ProgressionGateway } from './progression/gateway.js';
+import { registerProgressionRoutes } from './routes/progression.js';
+import type { HousingGateway } from './housing/gateway.js';
+import { registerHousingRoutes } from './routes/housing.js';
 
 export interface ApiTokenAccessOptions {
   readonly service: TokenAccessService;
@@ -42,6 +72,10 @@ export interface ApiTokenAccessOptions {
   readonly playerService?: PlayerService;
   readonly worldService?: PlayerWorldService;
   readonly cozyGameplayService?: CozyGameplayService;
+  readonly realtimeTicketService?: RealtimeTicketService;
+  readonly avatarService?: AvatarService;
+  readonly cosmeticService?: CosmeticService;
+  readonly cosmeticGateway?: CosmeticGateway;
 }
 
 export interface BuildApiAppOptions {
@@ -60,16 +94,50 @@ export interface BuildApiAppOptions {
   };
   readonly liveOperations?: { readonly service: LiveOperationsService };
   readonly adminCozy?: { readonly service: AdminCozyService };
-  readonly adminAssets?: { readonly service: AdminAssetService };
+  readonly adminAssets?: {
+    readonly service: AdminAssetService;
+    readonly remoteWritesApproved: boolean;
+  };
   readonly platformConfiguration?: { readonly service: PlatformConfigurationService };
+  readonly adminRealtime?: { readonly gateway: AdminRealtimeGateway };
+  readonly adminChat?: { readonly gateway: AdminChatGateway };
+  readonly adminSocial?: { readonly gateway: AdminSocialGateway };
+  readonly adminSocialGraph?: { readonly gateway: AdminSocialGraphGateway };
+  readonly adminCooperativeActivities?: { readonly gateway: AdminCooperativeActivityGateway };
+  readonly economy?: { readonly gateway: EconomyGateway };
+  readonly progression?: { readonly gateway: ProgressionGateway };
+  readonly housing?: { readonly gateway: HousingGateway };
+  readonly adminAvatar?: { readonly gateway: AdminAvatarGateway };
+  readonly adminCosmetics?: { readonly gateway: AdminCosmeticGateway };
+  readonly worldGameTest?: {
+    readonly service: WorldGameTestService;
+    readonly cookieSecure: boolean;
+    readonly cookieMaxAgeSeconds: number;
+  };
 }
 
 function requestPath(url: string): string {
   return url.split('?', 1)[0] ?? '/';
 }
 
-const ADMIN_MODULE_PATHS: readonly [string, PlatformModuleKey][] = [
+const MODULE_PATHS: readonly [string, PlatformModuleKey][] = [
+  ['/api/v1/admin/avatar-content', 'avatar_customization'],
+  ['/api/v1/token-access/player/avatar', 'avatar_customization'],
+  ['/api/v1/token-access/player/cosmetics', 'wardrobe'],
+  ['/api/v1/admin/cosmetics', 'wardrobe'],
+  ['/api/v1/token-access/player/economy', 'offchain_economy'],
+  ['/api/v1/token-access/player/progression', 'cozy_gameplay'],
+  ['/api/v1/token-access/player/housing', 'cozy_gameplay'],
   ['/api/v1/admin/live-operations', 'operations'],
+  ['/api/v1/admin/realtime', 'operations'],
+  ['/api/v1/admin/multiplayer-chat', 'operations'],
+  ['/api/v1/admin/social-interactions', 'operations'],
+  ['/api/v1/admin/social-graph', 'social_graph'],
+  ['/api/v1/admin/cooperative-activities', 'cooperative_activities'],
+  ['/api/v1/admin/economy/simulations', 'economy_simulation'],
+  ['/api/v1/admin/economy', 'offchain_economy'],
+  ['/api/v1/admin/progression', 'content_management'],
+  ['/api/v1/admin/housing', 'content_management'],
   ['/api/v1/admin/players', 'players'],
   ['/api/v1/admin/token-gate', 'blockchain'],
   ['/api/v1/admin/worlds', 'world_management'],
@@ -90,6 +158,17 @@ export function buildApiApp({
   adminCozy,
   adminAssets,
   platformConfiguration,
+  adminRealtime,
+  adminChat,
+  adminSocial,
+  adminSocialGraph,
+  adminCooperativeActivities,
+  economy,
+  progression,
+  housing,
+  adminAvatar,
+  adminCosmetics,
+  worldGameTest,
 }: BuildApiAppOptions): FastifyInstance {
   const allowedOrigins = new Set(config.corsAllowedOrigins);
   const app = Fastify({
@@ -123,7 +202,7 @@ export function buildApiApp({
   if (platformConfiguration !== undefined) {
     app.addHook('preHandler', async (request) => {
       const path = requestPath(request.url);
-      const module = ADMIN_MODULE_PATHS.find(([prefix]) => path.startsWith(prefix))?.[1];
+      const module = MODULE_PATHS.find(([prefix]) => path.startsWith(prefix))?.[1];
       if (module === undefined) return;
       const active = await platformConfiguration.service.getActive('starville', request.id);
       if (!isModuleEnabled(active.configuration, module)) {
@@ -204,14 +283,75 @@ export function buildApiApp({
       logger,
       readLimiter,
     });
+    if (adminRealtime !== undefined) {
+      registerAdminRealtimeRoutes(app, {
+        adminGateway: adminAuthGateway,
+        realtimeGateway: adminRealtime.gateway,
+        logger,
+      });
+    }
     if (adminCozy !== undefined) {
       registerAdminCozyGameplayRoutes(app, {
         adminGateway: adminAuthGateway,
         service: adminCozy.service,
         logger,
         readLimiter,
+        allowedOrigins,
       });
     }
+  }
+
+  if (adminChat !== undefined) {
+    registerAdminChatRoutes(app, {
+      adminGateway: adminAuthGateway,
+      chatGateway: adminChat.gateway,
+      logger,
+      allowedOrigins,
+    });
+  }
+
+  if (adminSocial !== undefined) {
+    registerAdminSocialRoutes(app, {
+      adminGateway: adminAuthGateway,
+      socialGateway: adminSocial.gateway,
+      logger,
+    });
+  }
+
+  if (adminSocialGraph !== undefined) {
+    registerAdminSocialGraphRoutes(app, {
+      adminGateway: adminAuthGateway,
+      socialGraphGateway: adminSocialGraph.gateway,
+      logger,
+      allowedOrigins,
+    });
+  }
+
+  if (adminCooperativeActivities !== undefined) {
+    registerAdminCooperativeActivityRoutes(app, {
+      adminGateway: adminAuthGateway,
+      activityGateway: adminCooperativeActivities.gateway,
+      logger,
+      allowedOrigins,
+    });
+  }
+
+  if (adminAvatar !== undefined) {
+    registerAdminAvatarRoutes(app, {
+      adminGateway: adminAuthGateway,
+      avatarGateway: adminAvatar.gateway,
+      logger,
+      allowedOrigins,
+    });
+  }
+
+  if (adminCosmetics !== undefined) {
+    registerAdminCosmeticRoutes(app, {
+      adminGateway: adminAuthGateway,
+      cosmeticGateway: adminCosmetics.gateway,
+      logger,
+      allowedOrigins,
+    });
   }
 
   if (adminWorld !== undefined) {
@@ -225,12 +365,29 @@ export function buildApiApp({
     });
   }
 
+  if (worldGameTest !== undefined) {
+    registerWorldGameTestRoutes(app, {
+      service: worldGameTest.service,
+      adminGateway: adminAuthGateway,
+      logger,
+      allowedOrigins,
+      cookie: {
+        secure: worldGameTest.cookieSecure,
+        maxAgeSeconds: worldGameTest.cookieMaxAgeSeconds,
+      },
+      adminMutationLimiter: new FixedWindowAdminRateLimiter(30, 60_000),
+      gameReadLimiter: new FixedWindowPlayerRateLimiter(120, 60_000),
+      gameMutationLimiter: new FixedWindowPlayerRateLimiter(30, 60_000),
+    });
+  }
+
   if (adminAssets !== undefined) {
     registerAdminAssetRoutes(app, {
       adminGateway: adminAuthGateway,
       service: adminAssets.service,
       logger,
       allowedOrigins,
+      remoteWritesApproved: adminAssets.remoteWritesApproved,
     });
   }
 
@@ -258,8 +415,38 @@ export function buildApiApp({
           maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
         },
         allowedOrigins,
+        ...(tokenAccess.realtimeTicketService === undefined
+          ? {}
+          : { realtimeTicketService: tokenAccess.realtimeTicketService }),
         ...(liveOperations === undefined ? {} : { liveOperationsService: liveOperations.service }),
       });
+      if (tokenAccess.avatarService !== undefined) {
+        registerAvatarRoutes(app, {
+          service: tokenAccess.avatarService,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          cookieHashSecret: tokenAccess.cookieHashSecret,
+          allowedOrigins,
+        });
+      }
+      if (tokenAccess.cosmeticService !== undefined && tokenAccess.cosmeticGateway !== undefined) {
+        registerCosmeticRoutes(app, {
+          service: tokenAccess.cosmeticService,
+          gateway: tokenAccess.cosmeticGateway,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          cookieHashSecret: tokenAccess.cookieHashSecret,
+          allowedOrigins,
+        });
+      }
       if (tokenAccess.worldService !== undefined) {
         registerPlayerWorldRoutes(app, {
           worldService: tokenAccess.worldService,
@@ -287,6 +474,48 @@ export function buildApiApp({
           ...(liveOperations === undefined
             ? {}
             : { liveOperationsService: liveOperations.service }),
+        });
+      }
+      if (economy !== undefined) {
+        registerEconomyRoutes(app, {
+          gateway: economy.gateway,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          adminGateway: adminAuthGateway,
+          logger,
+          allowedOrigins,
+        });
+      }
+      if (progression !== undefined) {
+        registerProgressionRoutes(app, {
+          gateway: progression.gateway,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          adminGateway: adminAuthGateway,
+          logger,
+          allowedOrigins,
+        });
+      }
+      if (housing !== undefined) {
+        registerHousingRoutes(app, {
+          gateway: housing.gateway,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          adminGateway: adminAuthGateway,
+          logger,
+          allowedOrigins,
         });
       }
     }

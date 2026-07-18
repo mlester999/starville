@@ -6,16 +6,19 @@ import {
   type PlatformRouteKey,
 } from './registries';
 
-const defaultNavigation: readonly [PlatformRouteKey, string, PlatformIconKey][] = [
-  ['overview', 'Overview', 'overview'],
-  ['operations', 'Operations', 'operations'],
-  ['players', 'Players', 'players'],
-  ['token_access', 'Token Access', 'access'],
-  ['worlds', 'Worlds', 'world'],
-  ['world_assets', 'World Assets', 'assets'],
-  ['game_content', 'Game Content', 'content'],
-  ['world_audit', 'World Audit', 'audit'],
-  ['platform_settings', 'Platform Settings', 'settings'],
+const defaultNavigation: readonly [PlatformRouteKey, string, PlatformIconKey, number][] = [
+  ['overview', 'Overview', 'overview', 0],
+  ['operations', 'Operations', 'operations', 10],
+  ['players', 'Players', 'players', 20],
+  ['token_access', 'Token Access', 'access', 30],
+  ['worlds', 'Worlds', 'world', 40],
+  ['world_assets', 'World Assets', 'assets', 50],
+  ['game_content', 'Game Content', 'content', 60],
+  ['avatar_content', 'Avatar Content', 'players', 65],
+  ['cooperative_activities', 'Activities', 'activities', 70],
+  ['economy', 'Economy', 'content', 80],
+  ['world_audit', 'World Audit', 'audit', 90],
+  ['platform_settings', 'Platform Settings', 'settings', 100],
 ];
 
 export const STARVILLE_DEFAULT_CONFIGURATION: PlatformConfiguration = {
@@ -222,18 +225,19 @@ export const STARVILLE_DEFAULT_CONFIGURATION: PlatformConfiguration = {
   },
   navigation: {
     collapsedByDefault: false,
-    items: defaultNavigation.map(([routeKey, label, icon], order) => ({
+    items: defaultNavigation.map(([routeKey, label, icon, order]) => ({
       routeKey,
       moduleKey: PLATFORM_ROUTE_REGISTRY[routeKey].module,
       label,
       icon,
-      order: order * 10,
+      order,
       group:
         routeKey === 'platform_settings'
           ? 'Platform'
           : routeKey === 'worlds' ||
               routeKey === 'world_assets' ||
               routeKey === 'game_content' ||
+              routeKey === 'avatar_content' ||
               routeKey === 'world_audit'
             ? 'World Management'
             : 'Administration',
@@ -242,7 +246,7 @@ export const STARVILLE_DEFAULT_CONFIGURATION: PlatformConfiguration = {
   },
   modules: Object.entries(PLATFORM_MODULE_REGISTRY).map(([key, definition]) => ({
     key: key as keyof typeof PLATFORM_MODULE_REGISTRY,
-    enabled: true,
+    enabled: key !== 'star_utility' && key !== 'cosmetic_shop',
     label: definition.label,
   })),
 };

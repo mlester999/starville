@@ -8,6 +8,7 @@ import {
 } from '@starville/asset-management';
 import { mapObjectKinds } from '@starville/game-core';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   useCallback,
   useEffect,
@@ -25,12 +26,22 @@ import {
 } from '../app/actions/worlds';
 import type {
   AdminWorldManifest,
+  WorldDraftAssetPin,
   WorldDraftLoad,
   WorldValidationResult,
 } from '../lib/worlds/contracts';
+import type { WorldGameTestStatus } from '../lib/worlds/game-test-api';
 import type { WorldEditorAssetCandidate } from '../lib/world-assets/contracts';
 import { availableAdminAssetMediaPath } from '../lib/world-assets/media';
-import { objectKindAssetType } from '../lib/worlds/asset-replacement';
+import {
+  resolveWorldObjectRendering,
+  WORLD_OBJECT_RENDER_MODES,
+  type WorldObjectRenderMode,
+} from '../lib/worlds/asset-rendering';
+import {
+  objectInteractionRequirements,
+  objectKindAssetType,
+} from '../lib/worlds/asset-replacement';
 import {
   browserManifestIssues,
   commitWorldEditorManifest,
@@ -52,18 +63,24 @@ import {
   clampCanvasZoom,
   computeFitCanvasView,
   draftPreviewAvailability,
-  exceedsPanDragThreshold,
   isWorldEditorGuideCompleted,
   readLocalBoolean,
   WORLD_EDITOR_STORAGE_KEYS,
   writeLocalBoolean,
   zoomPercentage,
 } from '../lib/worlds/editor-usability';
+import {
+  beginCanvasPointerGesture,
+  finishCanvasPointerGesture,
+  moveCanvasPointerGesture,
+  type CanvasPointerGesture,
+} from '../lib/worlds/pointer-gesture';
 import { EditorScrollRegion } from './editor-scroll-region';
 import { PremiumSelect } from './premium-select';
 import { WorldEditorGuide } from './world-editor-guide';
 import { WorldAssetReplacementDialog } from './world-asset-replacement-dialog';
 import { WorldManifestCanvas } from './world-manifest-canvas';
+import { WorldGameTestLauncher } from './world-game-test-launcher';
 
 const INITIAL_ACTION_STATE: WorldActionState = { outcome: 'idle' };
 const FACING_DIRECTIONS = [
@@ -89,6 +106,13 @@ type MobilePanel = 'none' | 'assets' | 'inspector';
 interface WorldEditorProps {
   readonly draft: WorldDraftLoad;
   readonly approvedAssets: readonly WorldEditorAssetCandidate[];
+  readonly initialAssetKey: string | null;
+  readonly canOpenGameTest: boolean;
+  readonly assuranceLevel: 'aal1' | 'aal2';
+  readonly gameTestEnvironment: string;
+  readonly gameTestReopenUrl: string;
+  readonly initialGameTestStatus: WorldGameTestStatus | null;
+  readonly returnedGameTestSessionId: string | null;
   readonly saveRequestId: string;
   readonly validationRequestId: string;
 }
@@ -102,6 +126,24 @@ function numeric(value: string, fallback: number): number {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function safelyCapturePointer(node: HTMLElement, pointerId: number): void {
+  if (node.hasPointerCapture(pointerId)) return;
+  try {
+    node.setPointerCapture(pointerId);
+  } catch {
+    // The pointer may already have been cancelled by the browser or operating system.
+  }
+}
+
+function safelyReleasePointer(node: HTMLElement, pointerId: number): void {
+  if (!node.hasPointerCapture(pointerId)) return;
+  try {
+    node.releasePointerCapture(pointerId);
+  } catch {
+    // Lost capture is handled by the same safe gesture reset path.
+  }
+}
+
 function humanizeKey(value: string): string {
   return value
     .replace(/^phase7[-_]/iu, '')
@@ -113,6 +155,19 @@ function humanizeKey(value: string): string {
 
 function isDevelopmentAsset(asset: WorldEditorAssetCandidate): boolean {
   return asset.asset.productionStatus === 'development_marker';
+}
+
+function assetCollisionSummary(
+  source: WorldEditorAssetCandidate | WorldDraftAssetPin | null,
+): string {
+  if (source === null) return 'No managed profile available';
+  const collision =
+    'pinnedVersion' in source ? source.pinnedVersion.collision : source.activeVersion.collision;
+  if (collision.shape === 'none') return 'No managed blocking footprint';
+  if (collision.shape === 'rectangle') {
+    return `${collision.blocking ? 'Blocking' : 'Non-blocking'} rectangle · ${collision.width.toFixed(2)} × ${collision.height.toFixed(2)}`;
+  }
+  return `${collision.blocking ? 'Blocking' : 'Non-blocking'} capsule · radius ${collision.radius.toFixed(2)}`;
 }
 
 function EditorField({
@@ -162,15 +217,21 @@ function layerLabel(layer: WorldEditorLayer): string {
   return layer.slice(0, 1).toUpperCase() + layer.slice(1);
 }
 
+function renderModeLabel(mode: WorldObjectRenderMode): string {
+  if (mode === 'collision') return 'Collision Debug';
+  return mode.slice(0, 1).toUpperCase() + mode.slice(1);
+}
+
 function appendBaseFields(
   formData: FormData,
   props: WorldEditorProps,
+  versionId: string,
   editVersion: number,
   checksum: string | null,
   id: string,
 ): void {
   formData.set('mapId', props.draft.map.id);
-  formData.set('versionId', props.draft.version.id);
+  formData.set('versionId', versionId);
   formData.set('requestId', id);
   formData.set('expectedEditVersion', String(editVersion));
   formData.set('expectedChecksum', checksum ?? '');
@@ -180,12 +241,14 @@ function ToggleChip(props: {
   readonly label: string;
   readonly pressed: boolean;
   readonly onToggle: () => void;
+  readonly disabled?: boolean;
   readonly title?: string;
 }) {
   return (
     <button
       aria-pressed={props.pressed}
       className={`world-editor-toggle ${props.pressed ? 'is-active' : ''}`}
+      disabled={props.disabled}
       onClick={props.onToggle}
       title={props.title}
       type="button"
@@ -213,6 +276,10 @@ function InspectorSection({
 }
 
 export function WorldEditor(props: WorldEditorProps) {
+  const router = useRouter();
+  const initialAssetCandidate = props.approvedAssets.find(
+    ({ assetKey }) => assetKey === props.initialAssetKey,
+  );
   const [history, setHistory] = useState(() => createWorldEditorHistory(props.draft.manifest));
   const [lastSaved, setLastSaved] = useState(props.draft.manifest);
   const [selection, setSelection] = useState<WorldEditorSelection>();
@@ -221,14 +288,30 @@ export function WorldEditor(props: WorldEditorProps) {
   const [showCollisions, setShowCollisions] = useState(true);
   const [showSpawns, setShowSpawns] = useState(true);
   const [showExits, setShowExits] = useState(true);
-  const [assetKey, setAssetKey] = useState(
-    props.approvedAssets.find(({ asset }) => asset.assetType === 'building')?.assetKey ?? '',
+  const [renderMode, setRenderMode] = useState<WorldObjectRenderMode>('mixed');
+  const [failedAssetVersionIds, setFailedAssetVersionIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
   );
-  const [objectKind, setObjectKind] = useState<MapObject['kind']>('building');
+  const [assetKey, setAssetKey] = useState(
+    initialAssetCandidate !== undefined
+      ? initialAssetCandidate.assetKey
+      : (props.approvedAssets.find(({ asset }) => asset.assetType === 'building')?.assetKey ?? ''),
+  );
+  const [objectKind, setObjectKind] = useState<MapObject['kind']>(() =>
+    initialAssetCandidate === undefined
+      ? 'building'
+      : (mapObjectKinds.find(
+          (kind) => objectKindAssetType(kind) === initialAssetCandidate.asset.assetType,
+        ) ?? 'building'),
+  );
   const [assetSearch, setAssetSearch] = useState('');
   const [assetCategory, setAssetCategory] = useState<AssetCategoryFilter>('all');
   const [assetInteraction, setAssetInteraction] = useState<AssetInteractionFilter>('all');
   const [assetProduction, setAssetProduction] = useState<AssetProductionFilter>('approved');
+  const [placementPreview, setPlacementPreview] = useState<Readonly<{
+    x: number;
+    y: number;
+  }> | null>(null);
   const showDevelopmentAssets = assetProduction !== 'approved';
   const [mobilePanel, setMobilePanel] = useState<MobilePanel>('none');
   const [layersCollapsed, setLayersCollapsed] = useState(false);
@@ -237,20 +320,13 @@ export function WorldEditor(props: WorldEditorProps) {
   const [canvasZoom, setCanvasZoom] = useState(1.45);
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
+  const [moveToolActive, setMoveToolActive] = useState(false);
   const [canvasHelpOpen, setCanvasHelpOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
   const [objectListSearch, setObjectListSearch] = useState('');
   const guideTriggerRef = useRef<HTMLButtonElement>(null);
-  const panSession = useRef<{
-    pointerId: number;
-    originX: number;
-    originY: number;
-    startPanX: number;
-    startPanY: number;
-    moved: boolean;
-    /** Left-button pan may start on an object; only pan after threshold. */
-    allowWithoutThreshold: boolean;
-  } | null>(null);
+  const panSession = useRef<CanvasPointerGesture | null>(null);
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const canvasTransformRef = useRef<HTMLDivElement>(null);
   const canvasZoomRef = useRef(canvasZoom);
@@ -259,6 +335,7 @@ export function WorldEditor(props: WorldEditorProps) {
   const panFrameRef = useRef(0);
   /** Suppress the click-select that follows a completed pan gesture. */
   const suppressNextSelectRef = useRef(false);
+  const suppressSelectTimerRef = useRef(0);
   /** When true, layout changes do not auto-refit the map. */
   const userAdjustedView = useRef(false);
   const lastSuccessfulValidation = useRef(false);
@@ -275,6 +352,11 @@ export function WorldEditor(props: WorldEditorProps) {
     }
   }, [canvasPan]);
   const [editVersion, setEditVersion] = useState(props.draft.version.editVersion);
+  const [currentVersionId, setCurrentVersionId] = useState(props.draft.version.id);
+  const [currentVersionNumber, setCurrentVersionNumber] = useState(
+    props.draft.version.versionNumber,
+  );
+  const [revisionLifecycle, setRevisionLifecycle] = useState(props.draft.version.lifecycleStatus);
   const [checksum, setChecksum] = useState(props.draft.version.checksum);
   const [saveId, setSaveId] = useState(props.saveRequestId);
   const [validationId, setValidationId] = useState(props.validationRequestId);
@@ -297,8 +379,31 @@ export function WorldEditor(props: WorldEditorProps) {
   const [operation, setOperation] = useState<'save' | 'validate'>('save');
   const [pending, startTransition] = useTransition();
   const manifest = history.present;
+  const editableDraft = revisionLifecycle === 'draft';
   const issues = useMemo(() => browserManifestIssues(manifest), [manifest]);
   const dirty = manifestHasUnsavedChanges(manifest, lastSaved);
+  const localChangeSummary = useMemo(() => {
+    const before = new Map(lastSaved.objects.map((object) => [object.id, object]));
+    const after = new Map(manifest.objects.map((object) => [object.id, object]));
+    let moved = 0;
+    let modified = 0;
+    for (const [id, object] of after) {
+      const previous = before.get(id);
+      if (previous === undefined) continue;
+      if (previous.x !== object.x || previous.y !== object.y) moved += 1;
+      if (JSON.stringify(previous) !== JSON.stringify(object)) modified += 1;
+    }
+    return {
+      added: [...after.keys()].filter((id) => !before.has(id)).length,
+      removed: [...before.keys()].filter((id) => !after.has(id)).length,
+      moved,
+      modified,
+      collisionsChanged:
+        JSON.stringify(lastSaved.collisions) !== JSON.stringify(manifest.collisions),
+      exitsChanged: JSON.stringify(lastSaved.exits) !== JSON.stringify(manifest.exits),
+      terrainChanged: JSON.stringify(lastSaved.terrain) !== JSON.stringify(manifest.terrain),
+    };
+  }, [lastSaved, manifest]);
   const preview = draftPreviewAvailability({
     dirty,
     pending,
@@ -318,6 +423,44 @@ export function WorldEditor(props: WorldEditorProps) {
       ),
     [props.approvedAssets],
   );
+
+  const placementPreviewObject = useMemo<MapObject | undefined>(() => {
+    if (placementPreview === null || !editableDraft) return undefined;
+    const candidate = approvedAssets.find(
+      (asset) =>
+        asset.assetKey === assetKey &&
+        asset.asset.assetType === objectKindAssetType(objectKind) &&
+        (!isDevelopmentAsset(asset) || showDevelopmentAssets),
+    );
+    if (candidate === undefined) return undefined;
+    return {
+      id: nextEditorIdentifier(manifest, 'placement-preview'),
+      assetId: candidate.assetKey,
+      kind: objectKind,
+      x: placementPreview.x,
+      y: placementPreview.y,
+      scale: 1,
+      rotation: candidate.activeVersion.render.defaultRotation,
+    };
+  }, [
+    approvedAssets,
+    assetKey,
+    editableDraft,
+    manifest,
+    objectKind,
+    placementPreview,
+    showDevelopmentAssets,
+  ]);
+  const canvasManifest = useMemo<AdminWorldManifest>(() => {
+    if (placementPreviewObject === undefined) return manifest;
+    return {
+      ...manifest,
+      assets: manifest.assets.includes(placementPreviewObject.assetId)
+        ? manifest.assets
+        : [...manifest.assets, placementPreviewObject.assetId],
+      objects: [...manifest.objects, placementPreviewObject],
+    };
+  }, [manifest, placementPreviewObject]);
 
   const filteredAssets = useMemo(() => {
     const query = assetSearch.trim().toLowerCase();
@@ -542,6 +685,55 @@ export function WorldEditor(props: WorldEditorProps) {
         userAdjustedView.current = false;
         scheduleFitCanvas({ force: true });
       } else if (
+        editableDraft &&
+        event.altKey &&
+        selection?.layer === 'objects' &&
+        (event.key === 'ArrowLeft' ||
+          event.key === 'ArrowRight' ||
+          event.key === 'ArrowUp' ||
+          event.key === 'ArrowDown')
+      ) {
+        event.preventDefault();
+        const step = event.shiftKey ? 0.5 : 0.125;
+        setHistory((current) => {
+          const selectedId = selection.id;
+          const bounds = current.present.safeSaveBounds;
+          const next = {
+            ...current.present,
+            objects: current.present.objects.map((object) =>
+              object.id === selectedId
+                ? {
+                    ...object,
+                    x: Math.min(
+                      bounds.maxX,
+                      Math.max(
+                        bounds.minX,
+                        object.x +
+                          (event.key === 'ArrowLeft'
+                            ? -step
+                            : event.key === 'ArrowRight'
+                              ? step
+                              : 0),
+                      ),
+                    ),
+                    y: Math.min(
+                      bounds.maxY,
+                      Math.max(
+                        bounds.minY,
+                        object.y +
+                          (event.key === 'ArrowUp' ? -step : event.key === 'ArrowDown' ? step : 0),
+                      ),
+                    ),
+                  }
+                : object,
+            ),
+          };
+          return commitWorldEditorManifest(current, next);
+        });
+        setActionState(INITIAL_ACTION_STATE);
+        setServerValidation(null);
+        setValidatedChecksum(null);
+      } else if (
         document.activeElement === canvasHostRef.current &&
         (event.key === 'ArrowLeft' ||
           event.key === 'ArrowRight' ||
@@ -579,10 +771,24 @@ export function WorldEditor(props: WorldEditorProps) {
         window.cancelAnimationFrame(panFrameRef.current);
         panFrameRef.current = 0;
       }
+      if (suppressSelectTimerRef.current !== 0) {
+        window.clearTimeout(suppressSelectTimerRef.current);
+        suppressSelectTimerRef.current = 0;
+      }
     };
-  }, [dirty, mobilePanel, canvasHelpOpen, guideOpen, scheduleFitCanvas, commitPan]);
+  }, [
+    dirty,
+    mobilePanel,
+    canvasHelpOpen,
+    guideOpen,
+    scheduleFitCanvas,
+    commitPan,
+    editableDraft,
+    selection,
+  ]);
 
   function commit(next: AdminWorldManifest): void {
+    if (!editableDraft) return;
     setHistory((current) => commitWorldEditorManifest(current, next));
     setActionState(INITIAL_ACTION_STATE);
     setServerValidation(null);
@@ -598,6 +804,18 @@ export function WorldEditor(props: WorldEditorProps) {
     userAdjustedView.current = false;
     scheduleFitCanvas({ force: true });
   }, [scheduleFitCanvas]);
+
+  function suppressGestureClick(): void {
+    suppressNextSelectRef.current = true;
+    if (suppressSelectTimerRef.current !== 0) {
+      window.clearTimeout(suppressSelectTimerRef.current);
+    }
+    // A synthesized click follows pointerup synchronously. Clear the guard if no click arrives.
+    suppressSelectTimerRef.current = window.setTimeout(() => {
+      suppressNextSelectRef.current = false;
+      suppressSelectTimerRef.current = 0;
+    }, 0);
+  }
 
   function updateObject(id: string, patch: Partial<MapObject>): void {
     commit({
@@ -628,6 +846,7 @@ export function WorldEditor(props: WorldEditorProps) {
   }
 
   function placeObject(): void {
+    if (!editableDraft) return;
     const candidate = approvedAssets.find(
       (asset) =>
         asset.assetKey === assetKey &&
@@ -640,9 +859,10 @@ export function WorldEditor(props: WorldEditorProps) {
       id,
       assetId: assetKey,
       kind: objectKind,
-      x: manifest.width / 2,
-      y: manifest.height / 2,
+      x: placementPreview?.x ?? manifest.width / 2,
+      y: placementPreview?.y ?? manifest.height / 2,
       scale: 1,
+      rotation: candidate.activeVersion.render.defaultRotation,
     };
     commit({
       ...manifest,
@@ -652,6 +872,29 @@ export function WorldEditor(props: WorldEditorProps) {
     setLayer('objects');
     setSelection({ layer: 'objects', id });
     setMobilePanel('inspector');
+    setPlacementPreview(null);
+  }
+
+  function duplicateSelected(): void {
+    if (!editableDraft || selectedObject === undefined) return;
+    const id = nextEditorIdentifier(manifest, selectedObject.kind);
+    const duplicate: MapObject = {
+      ...selectedObject,
+      id,
+      x: Math.min(manifest.safeSaveBounds.maxX, selectedObject.x + 0.5),
+      y: Math.min(manifest.safeSaveBounds.maxY, selectedObject.y + 0.5),
+    };
+    commit({ ...manifest, objects: [...manifest.objects, duplicate] });
+    setSelection({ layer: 'objects', id });
+  }
+
+  function discardChanges(): void {
+    if (!dirty || !window.confirm('Discard all unsaved changes in this Composer session?')) return;
+    setHistory(createWorldEditorHistory(lastSaved));
+    setSelection(undefined);
+    setServerValidation(null);
+    setValidatedChecksum(null);
+    setPlacementPreview(null);
   }
 
   function chooseObjectKind(next: MapObject['kind']): void {
@@ -665,6 +908,7 @@ export function WorldEditor(props: WorldEditorProps) {
   }
 
   function addCollision(shape: MapCollision['shape']): void {
+    if (!editableDraft) return;
     const id = nextEditorIdentifier(manifest, `collision-${shape}`);
     const x = manifest.width / 2;
     const y = manifest.height / 2;
@@ -690,6 +934,7 @@ export function WorldEditor(props: WorldEditorProps) {
   }
 
   function addSpawn(): void {
+    if (!editableDraft) return;
     const id = nextEditorIdentifier(manifest, 'spawn');
     const spawn: MapSpawn = {
       id,
@@ -706,7 +951,27 @@ export function WorldEditor(props: WorldEditorProps) {
   }
 
   function removeSelected(): void {
+    if (!editableDraft) return;
     if (selection === undefined) return;
+    const object =
+      selection.layer === 'objects'
+        ? manifest.objects.find(({ id }) => id === selection.id)
+        : undefined;
+    const requiresConfirmation =
+      selection.layer === 'collisions' ||
+      selection.layer === 'spawns' ||
+      (object !== undefined &&
+        ['shop', 'cooking_station', 'crafting_station', 'home_entrance', 'farm_plot'].includes(
+          object.kind,
+        ));
+    if (
+      requiresConfirmation &&
+      !window.confirm(
+        'Remove this gameplay-relevant item from the draft? Validation may also require related interactions, collisions, or spawn references to be updated.',
+      )
+    ) {
+      return;
+    }
     const next = removeWorldEditorSelection(manifest, selection);
     if (next === manifest) return;
     commit(next);
@@ -714,8 +979,9 @@ export function WorldEditor(props: WorldEditorProps) {
   }
 
   function saveDraft(): void {
+    if (!editableDraft) return;
     const formData = new FormData();
-    appendBaseFields(formData, props, editVersion, checksum, saveId);
+    appendBaseFields(formData, props, currentVersionId, editVersion, checksum, saveId);
     formData.set('manifest', JSON.stringify(manifest));
     formData.set('confirmed', 'yes');
     setOperation('save');
@@ -724,6 +990,12 @@ export function WorldEditor(props: WorldEditorProps) {
       setActionState(result);
       setSaveId(requestId());
       if (result.outcome === 'success') {
+        const nextVersionId = result.versionId ?? currentVersionId;
+        if (nextVersionId !== currentVersionId) {
+          setCurrentVersionId(nextVersionId);
+          setCurrentVersionNumber((value) => value + 1);
+          router.replace(`/worlds/${props.draft.map.id}/editor?version=${nextVersionId}`);
+        }
         setLastSaved(manifest);
         setEditVersion(result.editVersion ?? editVersion);
         const nextChecksum = result.checksum ?? checksum;
@@ -737,7 +1009,7 @@ export function WorldEditor(props: WorldEditorProps) {
 
   function validateDraft(): void {
     const formData = new FormData();
-    appendBaseFields(formData, props, editVersion, checksum, validationId);
+    appendBaseFields(formData, props, currentVersionId, editVersion, checksum, validationId);
     setOperation('validate');
     startTransition(async () => {
       const result = await validateWorldDraftAction(INITIAL_ACTION_STATE, formData);
@@ -748,6 +1020,7 @@ export function WorldEditor(props: WorldEditorProps) {
       if (result.checksum !== undefined) setChecksum(result.checksum);
       if (result.validation !== undefined) setServerValidation(result.validation);
       if (result.outcome === 'success' && result.validation?.valid === true) {
+        setRevisionLifecycle('validated');
         setValidatedChecksum(nextChecksum);
       } else {
         setValidatedChecksum(null);
@@ -759,6 +1032,64 @@ export function WorldEditor(props: WorldEditorProps) {
     selection?.layer === 'objects'
       ? manifest.objects.find(({ id }) => id === selection.id)
       : undefined;
+  const savedSelectedObject =
+    selectedObject === undefined
+      ? undefined
+      : lastSaved.objects.find(({ id }) => id === selectedObject.id);
+  const selectedObjectRendering =
+    selectedObject === undefined
+      ? undefined
+      : resolveWorldObjectRendering({
+          manifestAssetKeys: new Set(manifest.assets),
+          object: selectedObject,
+          pins: props.draft.assetPins,
+          candidates: approvedAssets,
+          mode: renderMode,
+          allowUnpinnedActive: dirty && revisionLifecycle === 'draft',
+          failedVersionIds: failedAssetVersionIds,
+        });
+  const selectedObjectCollisions =
+    selectedObject === undefined
+      ? []
+      : manifest.collisions.filter(
+          ({ id }) => id === `${selectedObject.id}-base` || id.startsWith(`${selectedObject.id}-`),
+        );
+  const selectedObjectInteractions =
+    selectedObject === undefined ? [] : objectInteractionRequirements(manifest, selectedObject);
+  const canvasEmphasisObjectIds = useMemo(
+    () =>
+      placementPreviewObject === undefined
+        ? selection?.layer === 'objects'
+          ? [selection.id]
+          : []
+        : [placementPreviewObject.id],
+    [placementPreviewObject, selection],
+  );
+  const handleCanvasAssetMediaError = useCallback((versionId: string) => {
+    setFailedAssetVersionIds((current) => {
+      if (current.has(versionId)) return current;
+      return new Set([...current, versionId]);
+    });
+  }, []);
+  const handleCanvasSelect = useCallback(
+    (target: WorldEditorSelection) => {
+      if (target.id === placementPreviewObject?.id) return;
+      setLayer(target.layer);
+      setSelection(target);
+      setMobilePanel('inspector');
+      setInspectorCollapsedPersist(false);
+    },
+    [placementPreviewObject?.id, setInspectorCollapsedPersist],
+  );
+  const selectedAssetPin = selectedObjectRendering?.pin ?? null;
+  const selectedAssetCandidate = selectedObjectRendering?.candidate ?? null;
+  const selectedAssetId = selectedAssetPin?.assetId ?? selectedAssetCandidate?.asset.id ?? null;
+  const selectedAssetName =
+    selectedAssetPin?.friendlyName ?? selectedAssetCandidate?.asset.friendlyName ?? null;
+  const selectedReferenceCount =
+    selectedAssetPin?.referenceCount ?? selectedAssetCandidate?.asset.referenceCount ?? null;
+  const selectedSupportedRotations = selectedAssetPin?.pinnedVersion.render.supportedRotations ??
+    selectedAssetCandidate?.activeVersion.render.supportedRotations ?? [0];
   const selectedCollision =
     selection?.layer === 'collisions'
       ? manifest.collisions.find(({ id }) => id === selection.id)
@@ -783,12 +1114,26 @@ export function WorldEditor(props: WorldEditorProps) {
     };
     if (layer === 'objects')
       return manifest.objects
-        .map((item) => ({
-          id: item.id,
-          label: humanizeKey(item.id),
-          detail: item.kind.replace(/_/gu, ' '),
-          title: `${item.id} · ${item.assetId}`,
-        }))
+        .map((item) => {
+          const rendering = resolveWorldObjectRendering({
+            manifestAssetKeys: new Set(manifest.assets),
+            object: item,
+            pins: props.draft.assetPins,
+            candidates: approvedAssets,
+            mode: renderMode,
+            allowUnpinnedActive: dirty && props.draft.version.lifecycleStatus === 'draft',
+            failedVersionIds: failedAssetVersionIds,
+          });
+          return {
+            id: item.id,
+            label:
+              rendering.pin?.friendlyName ??
+              rendering.candidate?.asset.friendlyName ??
+              humanizeKey(item.id),
+            detail: `${item.kind.replace(/_/gu, ' ')} · X ${item.x}, Y ${item.y} · ${rendering.status === 'asset' ? `Version ${rendering.renderedVersionNumber}` : `marker: ${rendering.reason.replaceAll('_', ' ')}`}`,
+            title: `${item.id} · ${item.assetId} · ${rendering.explanation}`,
+          };
+        })
         .filter((item) => matches(item.label, item.detail, item.title));
     if (layer === 'collisions')
       return manifest.collisions
@@ -949,20 +1294,45 @@ export function WorldEditor(props: WorldEditorProps) {
                 value={objectKind}
               />
             </EditorField>
-            <button
-              className="button button--secondary"
-              disabled={assetKey === ''}
-              onClick={placeObject}
-              type="button"
-            >
-              Place selected asset at center
-            </button>
+            {placementPreview !== null ? (
+              <div className="editor-placement-preview" role="status">
+                <strong>Preview placement only</strong>
+                <span>
+                  X {placementPreview.x.toFixed(2)}, Y {placementPreview.y.toFixed(2)} · Drag to
+                  adjust · Not saved
+                </span>
+                <div className="editor-create-buttons">
+                  <button className="button button--primary" onClick={placeObject} type="button">
+                    Confirm placement
+                  </button>
+                  <button
+                    className="button button--quiet"
+                    onClick={() => setPlacementPreview(null)}
+                    type="button"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                className="button button--secondary"
+                disabled={!editableDraft || assetKey === ''}
+                onClick={() =>
+                  setPlacementPreview({ x: manifest.width / 2, y: manifest.height / 2 })
+                }
+                type="button"
+              >
+                Preview placement at center
+              </button>
+            )}
           </div>
         ) : null}
         {layer === 'collisions' ? (
           <div className="editor-create-buttons" aria-label="Create collision footprint">
             <button
               className="button button--quiet"
+              disabled={!editableDraft}
               onClick={() => addCollision('rectangle')}
               type="button"
             >
@@ -970,6 +1340,7 @@ export function WorldEditor(props: WorldEditorProps) {
             </button>
             <button
               className="button button--quiet"
+              disabled={!editableDraft}
               onClick={() => addCollision('circle')}
               type="button"
             >
@@ -977,6 +1348,7 @@ export function WorldEditor(props: WorldEditorProps) {
             </button>
             <button
               className="button button--quiet"
+              disabled={!editableDraft}
               onClick={() => addCollision('capsule')}
               type="button"
             >
@@ -987,6 +1359,7 @@ export function WorldEditor(props: WorldEditorProps) {
         {layer === 'spawns' ? (
           <button
             className="button button--secondary editor-add-button"
+            disabled={!editableDraft}
             onClick={addSpawn}
             type="button"
           >
@@ -1003,7 +1376,11 @@ export function WorldEditor(props: WorldEditorProps) {
         {layerItems().length === 0 ? (
           <p className="asset-palette__empty">No on-map items match this filter.</p>
         ) : (
-          <ul className="editor-entity-list">
+          <ul
+            aria-label={`${layerLabel(layer)} on the map`}
+            className="editor-entity-list"
+            role="listbox"
+          >
             {layerItems().map((item) => {
               const target = selectionFor(item.id);
               const pressed =
@@ -1011,9 +1388,9 @@ export function WorldEditor(props: WorldEditorProps) {
                 selection?.layer === target.layer &&
                 selection.id === target.id;
               return (
-                <li key={item.id}>
+                <li key={item.id} role="none">
                   <button
-                    aria-pressed={pressed}
+                    aria-selected={pressed}
                     className={pressed ? 'is-selected' : ''}
                     onClick={() => {
                       setSelection(target);
@@ -1022,6 +1399,7 @@ export function WorldEditor(props: WorldEditorProps) {
                     }}
                     title={item.title}
                     type="button"
+                    role="option"
                   >
                     <strong className="editor-entity-list__label">{item.label}</strong>
                     <small className="editor-entity-list__detail">{item.detail}</small>
@@ -1129,6 +1507,7 @@ export function WorldEditor(props: WorldEditorProps) {
                     onClick={() => {
                       setAssetKey(asset.assetKey);
                       setLayer('objects');
+                      setPlacementPreview(null);
                     }}
                     title={asset.assetKey}
                     type="button"
@@ -1210,6 +1589,12 @@ export function WorldEditor(props: WorldEditorProps) {
           {dirty ? <span className="state-chip state-chip--pending">Unsaved edits</span> : null}
         </div>
       ) : null}
+      {editableDraft ? null : (
+        <p className="world-editor-read-only" role="status">
+          Read-only validated world version. Selection, inspection, rendering modes, pan, and zoom
+          remain available; create or derive an editable draft before changing world data.
+        </p>
+      )}
     </div>
   );
 
@@ -1304,6 +1689,184 @@ export function WorldEditor(props: WorldEditorProps) {
           <p className="field-hint editor-selection-ref" title={selectedObject.id}>
             {selectedObject.id}
           </p>
+          <InspectorSection title="World Object">
+            <dl className="world-object-inspector-grid">
+              <div>
+                <dt>Type</dt>
+                <dd>{selectedObject.kind.replaceAll('_', ' ')}</dd>
+              </div>
+              <div>
+                <dt>Position</dt>
+                <dd>
+                  X {selectedObject.x} · Y {selectedObject.y}
+                </dd>
+              </div>
+              <div>
+                <dt>Scale / layer</dt>
+                <dd>{selectedObject.scale} · objects</dd>
+              </div>
+              <div>
+                <dt>Map collision</dt>
+                <dd>
+                  {selectedObjectCollisions.length === 0
+                    ? 'No object-keyed collision region'
+                    : selectedObjectCollisions.map(({ id }) => id).join(', ')}
+                </dd>
+              </div>
+              <div>
+                <dt>Managed collision</dt>
+                <dd>{assetCollisionSummary(selectedAssetPin ?? selectedAssetCandidate)}</dd>
+              </div>
+              <div>
+                <dt>Interactions</dt>
+                <dd>
+                  {selectedObjectInteractions.length === 0
+                    ? 'Decorative / none required'
+                    : selectedObjectInteractions.join(', ').replaceAll('_', ' ')}
+                </dd>
+              </div>
+            </dl>
+          </InspectorSection>
+          <InspectorSection title="World Asset Binding">
+            <dl className="world-object-inspector-grid">
+              <div>
+                <dt>Manifest asset key</dt>
+                <dd>
+                  <code>{selectedObject.assetId}</code>
+                </dd>
+              </div>
+              <div>
+                <dt>Binding state</dt>
+                <dd>
+                  {manifest.assets.includes(selectedObject.assetId)
+                    ? 'Declared by this draft manifest'
+                    : 'Missing from draft asset declarations'}
+                </dd>
+              </div>
+              <div>
+                <dt>World version</dt>
+                <dd>
+                  Version {currentVersionNumber} · {props.draft.version.lifecycleStatus}
+                </dd>
+              </div>
+              {selectedAssetId === null || selectedAssetName === null ? (
+                <div>
+                  <dt>Canonical asset</dt>
+                  <dd>Not available for this exact key</dd>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <dt>Canonical asset</dt>
+                    <dd>
+                      <Link href={`/world-assets/${selectedAssetId}`}>{selectedAssetName}</Link>
+                      <code>{selectedAssetId}</code>
+                    </dd>
+                  </div>
+                  {selectedAssetPin === null ? null : (
+                    <div>
+                      <dt>Draft-pinned version</dt>
+                      <dd>
+                        <Link
+                          href={`/world-assets/${selectedAssetPin.assetId}/versions/${selectedAssetPin.pinnedVersion.id}`}
+                        >
+                          Version {selectedAssetPin.pinnedVersion.versionNumber} ·{' '}
+                          {selectedAssetPin.pinnedVersion.lifecycleStatus}
+                        </Link>
+                        <code>{selectedAssetPin.pinnedVersion.id}</code>
+                      </dd>
+                    </div>
+                  )}
+                  {selectedAssetCandidate === null ? null : (
+                    <div>
+                      <dt>Current active version</dt>
+                      <dd>
+                        <Link
+                          href={`/world-assets/${selectedAssetCandidate.asset.id}/versions/${selectedAssetCandidate.versionId}`}
+                        >
+                          Version {selectedAssetCandidate.activeVersion.versionNumber} · active
+                        </Link>
+                        <code>{selectedAssetCandidate.versionId}</code>
+                      </dd>
+                    </div>
+                  )}
+                  <div>
+                    <dt>Rendered version</dt>
+                    <dd>
+                      {selectedObjectRendering?.renderedVersionNumber === null
+                        ? 'Fallback marker; no artwork version rendered'
+                        : `Version ${selectedObjectRendering?.renderedVersionNumber}`}
+                      {selectedObjectRendering?.renderedVersionId === null ? null : (
+                        <code>{selectedObjectRendering?.renderedVersionId}</code>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Reference safety</dt>
+                    <dd>
+                      {selectedReferenceCount ?? 0} known reference(s). The stable key and retained
+                      version pin were not changed by this view.
+                    </dd>
+                  </div>
+                  {selectedAssetPin?.latestVersion === null ||
+                  selectedAssetPin?.latestVersion === undefined ||
+                  selectedAssetPin.latestVersion.id === selectedAssetPin.pinnedVersion.id ? null : (
+                    <div>
+                      <dt>Latest immutable version</dt>
+                      <dd>
+                        Version {selectedAssetPin.latestVersion.versionNumber} ·{' '}
+                        {selectedAssetPin.latestVersion.lifecycleStatus} ·{' '}
+                        {selectedAssetPin.latestVersion.validationStatus} ·{' '}
+                        {selectedAssetPin.latestVersion.sourceWidth ?? 'unknown'} ×{' '}
+                        {selectedAssetPin.latestVersion.sourceHeight ?? 'unknown'}. It is not the
+                        retained pin and is never rendered automatically.
+                        {selectedAssetPin.latestVersion.lifecycleStatus === 'validated' ? (
+                          <span className="field-hint">
+                            {selectedAssetName} Version{' '}
+                            {selectedAssetPin.latestVersion.versionNumber} is validated but is not
+                            active. The world continues to use its existing pinned or active version
+                            until an authorized administrator approves and activates a replacement
+                            and updates the world draft where required.
+                          </span>
+                        ) : null}
+                      </dd>
+                    </div>
+                  )}
+                </>
+              )}
+              {selectedObjectRendering?.replacementCandidate === null ||
+              selectedObjectRendering?.replacementCandidate === undefined ? null : (
+                <div>
+                  <dt>Replacement available</dt>
+                  <dd>
+                    {selectedObjectRendering.replacementCandidate.asset.friendlyName} is available,
+                    but requires an explicit reviewed draft replacement.
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </InspectorSection>
+          <InspectorSection title="Rendering Explanation">
+            <p
+              className={`world-object-render-status world-object-render-status--${selectedObjectRendering?.status ?? 'marker'}`}
+            >
+              {renderModeLabel(renderMode)} ·{' '}
+              {selectedObjectRendering?.status === 'asset' ? 'managed asset' : 'fallback marker'} ·{' '}
+              {selectedObjectRendering?.reason.replaceAll('_', ' ') ?? 'unresolved'}
+            </p>
+            <p>{selectedObjectRendering?.explanation}</p>
+            <p className="field-hint">
+              Only the protected processed-source route is eligible. Intake files, private storage
+              paths, and validated non-active versions are never selected by the canvas.
+            </p>
+          </InspectorSection>
+          <InspectorSection title="Next Safe Action">
+            <p>{selectedObjectRendering?.nextSafeAction}</p>
+            <p className="field-hint">
+              Rendering modes, selection, pan, and zoom are view state only and never save or
+              publish world data.
+            </p>
+          </InspectorSection>
           <InspectorSection title="Identity">
             <div className="editor-field world-editor-current-asset">
               <span className="editor-field__label">Current visual asset</span>
@@ -1312,7 +1875,7 @@ export function WorldEditor(props: WorldEditorProps) {
             </div>
             <WorldAssetReplacementDialog
               candidates={approvedAssets}
-              lifecycleStatus={props.draft.version.lifecycleStatus}
+              lifecycleStatus={revisionLifecycle}
               manifest={manifest}
               object={selectedObject}
               onReplace={commit}
@@ -1348,6 +1911,22 @@ export function WorldEditor(props: WorldEditorProps) {
             />
           </InspectorSection>
           <InspectorSection title="Visual layer">
+            <EditorField label="Rotation">
+              <PremiumSelect
+                aria-label="Selected object rotation"
+                onChange={(value) =>
+                  updateObject(selectedObject.id, {
+                    rotation: Number(value) as MapObject['rotation'],
+                  })
+                }
+                options={selectedSupportedRotations.map((rotation) => ({
+                  value: String(rotation),
+                  label: `${String(rotation)}°`,
+                }))}
+                size="compact"
+                value={String(selectedObject.rotation ?? selectedSupportedRotations[0] ?? 0)}
+              />
+            </EditorField>
             <NumberEditor
               label="Scale"
               max={4}
@@ -1355,8 +1934,80 @@ export function WorldEditor(props: WorldEditorProps) {
               onCommit={(value) => updateObject(selectedObject.id, { scale: value })}
               value={selectedObject.scale}
             />
+            <p className="field-hint">
+              Effective placement scale: {selectedObject.scale.toFixed(2)}× the pinned asset render
+              size.
+            </p>
+            <button
+              className="button button--quiet"
+              disabled={!editableDraft || selectedObject.scale === 1}
+              onClick={() => updateObject(selectedObject.id, { scale: 1 })}
+              type="button"
+            >
+              Reset scale to 1×
+            </button>
           </InspectorSection>
-          <button className="button button--danger" onClick={removeSelected} type="button">
+          <div className="editor-create-buttons" aria-label="Object placement tools">
+            <button
+              className="button button--quiet"
+              disabled={!editableDraft}
+              onClick={() =>
+                updateObject(selectedObject.id, {
+                  x: Math.round(selectedObject.x * 2) / 2,
+                  y: Math.round(selectedObject.y * 2) / 2,
+                })
+              }
+              type="button"
+            >
+              Snap to half tile
+            </button>
+            <button
+              className="button button--quiet"
+              disabled={!editableDraft}
+              onClick={() =>
+                updateObject(selectedObject.id, {
+                  x: manifest.width / 2,
+                  y: manifest.height / 2,
+                })
+              }
+              type="button"
+            >
+              Align center
+            </button>
+            <button
+              className="button button--quiet"
+              disabled={
+                !editableDraft ||
+                savedSelectedObject === undefined ||
+                (savedSelectedObject.x === selectedObject.x &&
+                  savedSelectedObject.y === selectedObject.y)
+              }
+              onClick={() => {
+                if (savedSelectedObject === undefined) return;
+                updateObject(selectedObject.id, {
+                  x: savedSelectedObject.x,
+                  y: savedSelectedObject.y,
+                });
+              }}
+              type="button"
+            >
+              Reset saved position
+            </button>
+            <button
+              className="button button--quiet"
+              disabled={!editableDraft}
+              onClick={duplicateSelected}
+              type="button"
+            >
+              Duplicate
+            </button>
+          </div>
+          <button
+            className="button button--danger"
+            disabled={!editableDraft}
+            onClick={removeSelected}
+            type="button"
+          >
             Delete object
           </button>
           <p className="field-hint">
@@ -1476,7 +2127,7 @@ export function WorldEditor(props: WorldEditorProps) {
             <p className="eyebrow">Protected draft editor</p>
             <h1 id="editor-title">{props.draft.map.displayName}</h1>
             <p className="world-editor-toolbar__meta">
-              Version {props.draft.version.versionNumber} · revision {editVersion} · {manifest.name}
+              Version {currentVersionNumber} · revision {editVersion} · {manifest.name}
             </p>
           </div>
           <button
@@ -1522,8 +2173,25 @@ export function WorldEditor(props: WorldEditorProps) {
             Redo
           </button>
           <button
+            className="button button--quiet"
+            disabled={!dirty || pending}
+            onClick={discardChanges}
+            type="button"
+          >
+            Discard changes
+          </button>
+          <button
+            aria-expanded={changesOpen}
+            className="button button--quiet"
+            disabled={!dirty}
+            onClick={() => setChangesOpen((value) => !value)}
+            type="button"
+          >
+            Review changes
+          </button>
+          <button
             className="button button--primary"
-            disabled={pending || issues.length > 0 || !dirty}
+            disabled={!editableDraft || pending || issues.length > 0 || !dirty}
             onClick={saveDraft}
             title="Save Draft stores edits without changing the live world"
             type="button"
@@ -1532,7 +2200,7 @@ export function WorldEditor(props: WorldEditorProps) {
           </button>
           <button
             className="button button--secondary"
-            disabled={pending || dirty || issues.length > 0}
+            disabled={!editableDraft || pending || dirty || issues.length > 0}
             onClick={validateDraft}
             title="Validate Draft runs trusted checks on the current saved revision"
             type="button"
@@ -1542,7 +2210,7 @@ export function WorldEditor(props: WorldEditorProps) {
           {preview.canPreview ? (
             <Link
               className="button button--secondary"
-              href={`/worlds/${props.draft.map.id}/preview?version=${props.draft.version.id}`}
+              href={`/worlds/${props.draft.map.id}/preview?version=${currentVersionId}`}
               title="Draft Preview opens an isolated staff-only view after trusted validation"
             >
               Draft preview
@@ -1562,9 +2230,55 @@ export function WorldEditor(props: WorldEditorProps) {
               ) : null}
             </span>
           )}
+          <WorldGameTestLauncher
+            assuranceLevel={props.assuranceLevel}
+            activePublishedVersionId={props.draft.map.activePublishedVersionId}
+            canPreview={props.canOpenGameTest}
+            checksum={checksum}
+            dirty={dirty}
+            editVersion={editVersion}
+            environment={props.gameTestEnvironment}
+            initialStatus={props.initialGameTestStatus}
+            mapId={props.draft.map.id}
+            mapDisplayName={props.draft.map.displayName}
+            reopenUrl={props.gameTestReopenUrl}
+            returnedSessionId={props.returnedGameTestSessionId}
+            returnPath={`/worlds/${props.draft.map.id}/editor?version=${currentVersionId}`}
+            validated={preview.canPreview}
+            versionId={currentVersionId}
+            versionNumber={currentVersionNumber}
+          />
         </div>
 
         <div className="world-editor-toolbar__toggles" aria-label="Editor view toggles">
+          <label className="world-editor-render-mode">
+            <span>Object rendering</span>
+            <PremiumSelect
+              aria-label="Object rendering mode"
+              onChange={(value) => setRenderMode(value as WorldObjectRenderMode)}
+              options={WORLD_OBJECT_RENDER_MODES.map((mode) => ({
+                value: mode,
+                label: renderModeLabel(mode),
+              }))}
+              size="compact"
+              value={renderMode}
+            />
+          </label>
+          <ToggleChip
+            disabled={!editableDraft}
+            label="Move tool"
+            pressed={moveToolActive && editableDraft}
+            title="Require an explicit mode before pointer or touch dragging changes an object"
+            onToggle={() => setMoveToolActive((value) => !value)}
+          />
+          <span className="world-editor-tool-status" role="status">
+            Selected tool:{' '}
+            {placementPreviewObject
+              ? 'Placement'
+              : moveToolActive && editableDraft
+                ? 'Move'
+                : 'Select'}
+          </span>
           <ToggleChip
             label="Grid"
             pressed={showGrid}
@@ -1624,6 +2338,26 @@ export function WorldEditor(props: WorldEditorProps) {
           </button>
         </div>
       </header>
+
+      {changesOpen && dirty ? (
+        <section className="world-editor-change-review" aria-live="polite">
+          <strong>Unsaved structured change summary</strong>
+          <span>{localChangeSummary.added} objects added</span>
+          <span>{localChangeSummary.removed} objects removed</span>
+          <span>{localChangeSummary.moved} objects moved</span>
+          <span>{localChangeSummary.modified} objects modified</span>
+          <span>
+            {localChangeSummary.collisionsChanged ? 'Collision changed' : 'Collision unchanged'}
+          </span>
+          <span>
+            {localChangeSummary.exitsChanged
+              ? 'Entrances/exits changed'
+              : 'Entrances/exits unchanged'}
+          </span>
+          <span>{localChangeSummary.terrainChanged ? 'Terrain changed' : 'Terrain unchanged'}</span>
+          <small>The trusted save computes and stores the authoritative summary.</small>
+        </section>
+      ) : null}
 
       <WorldEditorGuide
         onClose={() => setGuideOpen(false)}
@@ -1685,9 +2419,19 @@ export function WorldEditor(props: WorldEditorProps) {
             className={`world-editor-stage__canvas-wrap ${isPanning ? 'is-panning' : ''}`}
             data-canvas-host="true"
             data-pan-threshold={CANVAS_PAN_DRAG_THRESHOLD_PX}
+            onClickCapture={(event) => {
+              if (!suppressNextSelectRef.current) return;
+              event.preventDefault();
+              event.stopPropagation();
+              suppressNextSelectRef.current = false;
+              if (suppressSelectTimerRef.current !== 0) {
+                window.clearTimeout(suppressSelectTimerRef.current);
+                suppressSelectTimerRef.current = 0;
+              }
+            }}
             onLostPointerCapture={() => {
               if (panSession.current !== null) {
-                commitPan(canvasPanRef.current);
+                if (panSession.current.moved) commitPan(canvasPanRef.current);
                 panSession.current = null;
                 setIsPanning(false);
               }
@@ -1702,8 +2446,6 @@ export function WorldEditor(props: WorldEditorProps) {
               ) {
                 return;
               }
-              // Primary: left-drag empty canvas. Also middle button, Space+left, Shift/Alt modifiers.
-              const isLeft = event.button === 0;
               const isMiddle = event.button === 1;
               const forcePan =
                 isMiddle ||
@@ -1711,78 +2453,80 @@ export function WorldEditor(props: WorldEditorProps) {
                 event.shiftKey ||
                 event.altKey ||
                 event.buttons === 4;
-              if (!isLeft && !isMiddle) return;
-
-              const onObject =
+              const startedOnInteractiveTarget =
                 target instanceof Element &&
                 Boolean(
                   target.closest(
-                    '.world-canvas__object, .world-canvas__exits, .world-canvas__collisions, .world-canvas__spawns',
+                    '[data-world-canvas-interactive], .world-canvas__exits, .world-canvas__collisions, .world-canvas__spawns',
                   ),
                 );
-              // Left-drag on empty space pans immediately after threshold; Space/middle always pan.
-              if (isLeft && onObject && !forcePan) {
-                // Still track the press so a drag can convert into pan and suppress accidental selection.
-                panSession.current = {
-                  pointerId: event.pointerId,
-                  originX: event.clientX,
-                  originY: event.clientY,
-                  startPanX: canvasPanRef.current.x,
-                  startPanY: canvasPanRef.current.y,
-                  moved: false,
-                  allowWithoutThreshold: false,
-                };
-                event.currentTarget.setPointerCapture(event.pointerId);
-                return;
-              }
-
-              event.preventDefault();
-              panSession.current = {
+              const gesture = beginCanvasPointerGesture({
                 pointerId: event.pointerId,
-                originX: event.clientX,
-                originY: event.clientY,
-                startPanX: canvasPanRef.current.x,
-                startPanY: canvasPanRef.current.y,
-                moved: false,
-                allowWithoutThreshold: forcePan,
-              };
-              setIsPanning(true);
-              event.currentTarget.setPointerCapture(event.pointerId);
+                pointerType: event.pointerType,
+                isPrimary: event.isPrimary,
+                button: event.button,
+                clientX: event.clientX,
+                clientY: event.clientY,
+                panX: canvasPanRef.current.x,
+                panY: canvasPanRef.current.y,
+                startedOnInteractiveTarget,
+                forcePan,
+              });
+              if (gesture === null) return;
+              panSession.current = gesture;
+              if (forcePan) {
+                event.preventDefault();
+                setIsPanning(true);
+                safelyCapturePointer(event.currentTarget, event.pointerId);
+              }
+            }}
+            onPointerLeave={(event) => {
+              const session = panSession.current;
+              if (
+                session !== null &&
+                session.pointerId === event.pointerId &&
+                !session.moved &&
+                !event.currentTarget.hasPointerCapture(event.pointerId)
+              ) {
+                panSession.current = null;
+              }
             }}
             onPointerMove={(event) => {
               const session = panSession.current;
               if (session === null || session.pointerId !== event.pointerId) return;
-              const dx = event.clientX - session.originX;
-              const dy = event.clientY - session.originY;
-              const pastThreshold =
-                session.allowWithoutThreshold || exceedsPanDragThreshold(dx, dy);
-              if (!pastThreshold) return;
-              if (!session.moved) {
-                session.moved = true;
+              const movement = moveCanvasPointerGesture(session, event.clientX, event.clientY);
+              panSession.current = movement.gesture;
+              if (!movement.shouldPan) return;
+              if (movement.startedPan) {
                 userAdjustedView.current = true;
                 setIsPanning(true);
+                safelyCapturePointer(event.currentTarget, event.pointerId);
               }
               event.preventDefault();
               scheduleLivePan({
-                x: session.startPanX + dx,
-                y: session.startPanY + dy,
+                x: session.startPanX + movement.dx,
+                y: session.startPanY + movement.dy,
               });
             }}
             onPointerUp={(event) => {
               if (panSession.current?.pointerId !== event.pointerId) return;
               const session = panSession.current;
+              const outcome = finishCanvasPointerGesture(session);
               panSession.current = null;
               setIsPanning(false);
-              if (session.moved) {
-                suppressNextSelectRef.current = true;
+              safelyReleasePointer(event.currentTarget, event.pointerId);
+              if (outcome === 'pan') {
+                suppressGestureClick();
                 commitPan(canvasPanRef.current);
                 event.preventDefault();
               }
             }}
-            onPointerCancel={() => {
-              if (panSession.current !== null) {
-                if (panSession.current.moved) suppressNextSelectRef.current = true;
-                commitPan(canvasPanRef.current);
+            onPointerCancel={(event) => {
+              const session = panSession.current;
+              if (session !== null && session.pointerId === event.pointerId) {
+                finishCanvasPointerGesture(session, true);
+                if (session.moved) commitPan(canvasPanRef.current);
+                safelyReleasePointer(event.currentTarget, event.pointerId);
               }
               panSession.current = null;
               setIsPanning(false);
@@ -1824,21 +2568,31 @@ export function WorldEditor(props: WorldEditorProps) {
                     ? 'objects'
                     : (layer as WorldEditorSelection['layer'])
                 }
+                assetCandidates={approvedAssets}
+                assetPins={props.draft.assetPins}
+                allowUnpinnedActive={
+                  placementPreviewObject !== undefined || (dirty && revisionLifecycle === 'draft')
+                }
                 className="world-editor-stage__canvas"
-                emphasisObjectIds={selection?.layer === 'objects' ? [selection.id] : []}
-                manifest={manifest}
-                onSelect={(target) => {
-                  if (panSession.current?.moved || suppressNextSelectRef.current) {
-                    suppressNextSelectRef.current = false;
-                    return;
-                  }
-                  setLayer(target.layer);
-                  setSelection(target);
-                  setMobilePanel('inspector');
-                  setInspectorCollapsedPersist(false);
-                }}
+                emphasisObjectIds={canvasEmphasisObjectIds}
+                failedAssetVersionIds={failedAssetVersionIds}
+                manifest={canvasManifest}
+                onAssetMediaError={handleCanvasAssetMediaError}
+                onSelect={handleCanvasSelect}
+                renderMode={renderMode}
+                {...(placementPreviewObject !== undefined || (editableDraft && moveToolActive)
+                  ? {
+                      onObjectMove: (objectId: string, x: number, y: number) => {
+                        if (objectId === placementPreviewObject?.id) {
+                          setPlacementPreview({ x, y });
+                          return;
+                        }
+                        updateObject(objectId, { x, y });
+                      },
+                    }
+                  : {})}
                 {...(selection === undefined ? {} : { selection })}
-                showCollisions={showCollisions}
+                showCollisions={showCollisions || renderMode === 'collision'}
                 showExits={showExits}
                 showGrid={showGrid}
                 showSpawns={showSpawns}
@@ -1918,7 +2672,8 @@ export function WorldEditor(props: WorldEditorProps) {
             {canvasHelpOpen ? (
               <div className="world-canvas-help" role="dialog" aria-label="Canvas controls">
                 <p>
-                  <strong>Select</strong> — click a marker
+                  <strong>Select</strong> — click an object, managed image, label, or layer-list
+                  item
                 </p>
                 <p>
                   <strong>Pan</strong> — hold left mouse on empty map space and drag
@@ -1943,8 +2698,9 @@ export function WorldEditor(props: WorldEditorProps) {
             ) : null}
           </div>
           <p className="world-editor-stage__note">
-            Structured isometric data view — terrain, objects, Phase 7 markers, collisions, spawns,
-            and exits. Viewing, zooming, and panning do not mutate draft data.
+            Structured isometric data view — eligible active assets use protected processed media;
+            every other object keeps an explained marker fallback. Viewing, selection, render modes,
+            zooming, and panning do not mutate draft data.
           </p>
         </section>
 

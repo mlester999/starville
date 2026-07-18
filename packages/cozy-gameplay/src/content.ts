@@ -62,13 +62,33 @@ const itemBase = (
   slug: string,
   name: string,
   description: string,
-): Pick<ItemInput, 'id' | 'slug' | 'name' | 'description' | 'active' | 'contentVersion'> => ({
+): Pick<
+  ItemInput,
+  | 'id'
+  | 'slug'
+  | 'name'
+  | 'description'
+  | 'active'
+  | 'contentVersion'
+  | 'giftable'
+  | 'tradable'
+  | 'accountBound'
+  | 'permanentTool'
+  | 'minimumTransferQuantity'
+  | 'maximumTransferQuantity'
+> => ({
   id,
   slug,
   name,
   description,
   active: true,
   contentVersion: PHASE_7_CONTENT_VERSION,
+  giftable: true,
+  tradable: true,
+  accountBound: false,
+  permanentTool: false,
+  minimumTransferQuantity: 1,
+  maximumTransferQuantity: 99,
 });
 const stackItem = (
   input: Pick<ItemInput, 'id' | 'slug' | 'name' | 'description' | 'category' | 'metadata'> & {
@@ -266,6 +286,12 @@ export const PHASE_7_ITEM_DEFINITIONS = Object.freeze(
       sellEligible: false,
       defaultBuyPrice: null,
       defaultSellPrice: null,
+      giftable: false,
+      tradable: false,
+      accountBound: true,
+      permanentTool: true,
+      minimumTransferQuantity: 1,
+      maximumTransferQuantity: 1,
       ...developmentAsset('starter-watering-can'),
     },
   ]),

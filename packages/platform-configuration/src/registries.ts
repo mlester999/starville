@@ -72,6 +72,7 @@ export const PLATFORM_ICON_KEYS = [
   'world',
   'assets',
   'content',
+  'activities',
   'audit',
   'settings',
 ] as const;
@@ -85,6 +86,21 @@ export const PLATFORM_ROUTE_REGISTRY = {
   worlds: { href: '/worlds', permission: 'maps.read', module: 'world_management' },
   world_assets: { href: '/world-assets', permission: 'assets.read', module: 'world_assets' },
   game_content: { href: '/game-content', permission: 'items.read', module: 'content_management' },
+  avatar_content: {
+    href: '/game-content/avatars',
+    permission: 'avatar_content.read',
+    module: 'avatar_customization',
+  },
+  cooperative_activities: {
+    href: '/operations/activities',
+    permission: 'cooperative_activities.read',
+    module: 'cooperative_activities',
+  },
+  economy: {
+    href: '/economy',
+    permission: 'economy.read',
+    module: 'offchain_economy',
+  },
   world_audit: { href: '/world-audit', permission: 'maps.audit_read', module: 'audit' },
   platform_settings: {
     href: '/platform-settings',
@@ -131,12 +147,66 @@ export const PLATFORM_MODULE_REGISTRY = {
     dependencies: ['world_management'],
   },
   cozy_gameplay: { label: 'Cozy gameplay', required: false, dependencies: ['players'] },
+  social_graph: {
+    label: 'Friends and parties',
+    required: false,
+    dependencies: ['players', 'operations', 'audit'],
+  },
+  cooperative_activities: {
+    label: 'Cooperative activities',
+    required: false,
+    dependencies: ['social_graph', 'cozy_gameplay', 'world_management', 'audit'],
+  },
+  offchain_economy: {
+    label: 'Off-chain economy',
+    required: false,
+    dependencies: ['players', 'cozy_gameplay', 'audit'],
+  },
+  economy_simulation: {
+    label: 'Economy simulation',
+    required: false,
+    dependencies: ['offchain_economy', 'audit'],
+  },
+  star_utility: {
+    label: '$STAR utility',
+    required: false,
+    dependencies: ['blockchain', 'offchain_economy'],
+  },
   content_management: {
     label: 'Content management',
     required: false,
     dependencies: ['audit'],
   },
-  economy: { label: 'Economy', required: false, dependencies: ['players', 'audit'] },
+  avatar_customization: {
+    label: 'Avatar customization',
+    required: false,
+    dependencies: ['players', 'world_assets', 'content_management', 'operations', 'audit'],
+  },
+  wardrobe: {
+    label: 'Wardrobe and outfits',
+    required: false,
+    dependencies: ['avatar_customization', 'players', 'audit'],
+  },
+  emotes: {
+    label: 'Realtime emotes',
+    required: false,
+    dependencies: ['avatar_customization', 'operations', 'players', 'audit'],
+  },
+  cosmetic_collections: {
+    label: 'Cosmetic collections',
+    required: false,
+    dependencies: ['wardrobe', 'avatar_customization', 'players', 'audit'],
+  },
+  cosmetic_shop: {
+    label: 'DUST cosmetic shop',
+    required: false,
+    dependencies: ['wardrobe', 'offchain_economy', 'audit'],
+  },
+  economy: {
+    label: 'Legacy economy presentation',
+    required: false,
+    dependencies: ['players', 'audit'],
+  },
   blockchain: { label: 'Blockchain', required: false, dependencies: ['security_settings'] },
   support: { label: 'Support', required: false, dependencies: ['players'] },
   reporting: { label: 'Reporting', required: false, dependencies: ['audit'] },

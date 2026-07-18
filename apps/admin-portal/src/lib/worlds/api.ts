@@ -9,7 +9,11 @@ import {
   worldDraftLoadSchema,
   worldDraftSchema,
   worldPreviewSchema,
+  worldPublicationReviewSchema,
   worldPublishResponseSchema,
+  worldRevisionComparisonSchema,
+  worldRevisionSchema,
+  worldRollbackResponseSchema,
   publishedWorldTopologySchema,
   worldValidationResponseSchema,
   type WorldAssetDirectory,
@@ -19,6 +23,9 @@ import {
   type WorldDraft,
   type WorldDraftLoad,
   type WorldPreview,
+  type WorldPublicationReview,
+  type WorldRevision,
+  type WorldRevisionComparison,
   type AdminWorldManifest,
   type PublishedWorldTopology,
 } from './contracts';
@@ -76,6 +83,26 @@ export function loadWorldDraft(mapId: string, versionId: string): Promise<WorldD
     method: 'GET',
     pathname: `/api/v1/admin/worlds/${encodeURIComponent(mapId)}/drafts/${encodeURIComponent(versionId)}`,
     parser: (value) => worldDraftLoadSchema.parse(value),
+  });
+}
+
+export function loadWorldRevision(mapId: string, versionId: string): Promise<WorldRevision> {
+  return callTrustedAdminApi({
+    method: 'GET',
+    pathname: `/api/v1/admin/worlds/${encodeURIComponent(mapId)}/revisions/${encodeURIComponent(versionId)}`,
+    parser: (value) => worldRevisionSchema.parse(value),
+  });
+}
+
+export function compareWorldRevisions(
+  mapId: string,
+  fromVersionId: string,
+  toVersionId: string,
+): Promise<WorldRevisionComparison> {
+  return callTrustedAdminApi({
+    method: 'GET',
+    pathname: `/api/v1/admin/worlds/${encodeURIComponent(mapId)}/revisions/${encodeURIComponent(toVersionId)}/comparison?fromVersionId=${encodeURIComponent(fromVersionId)}`,
+    parser: (value) => worldRevisionComparisonSchema.parse(value),
   });
 }
 
@@ -138,6 +165,7 @@ export function publishWorldDraft(
     readonly expectedEditVersion: number;
     readonly expectedActiveVersionId: string | null;
     readonly expectedChecksum: string;
+    readonly reviewId: string;
     readonly reason: string;
     readonly requestId: string;
     readonly confirmed: true;
@@ -149,6 +177,46 @@ export function publishWorldDraft(
     body: input,
     requestId: input.requestId,
     parser: (value) => worldPublishResponseSchema.parse(value),
+  });
+}
+
+export function reviewWorldPublication(
+  mapId: string,
+  versionId: string,
+  input: {
+    readonly expectedActiveVersionId: string | null;
+    readonly operation: 'publish' | 'rollback';
+    readonly acknowledged: true;
+  },
+  requestId: string,
+): Promise<WorldPublicationReview> {
+  const reviewSegment = input.operation === 'publish' ? 'publication-review' : 'rollback-review';
+  return callTrustedAdminApi({
+    method: 'POST',
+    pathname: `/api/v1/admin/worlds/${encodeURIComponent(mapId)}/versions/${encodeURIComponent(versionId)}/${reviewSegment}`,
+    body: input,
+    requestId,
+    parser: (value) => worldPublicationReviewSchema.parse(value),
+  });
+}
+
+export function rollbackWorldRevision(
+  mapId: string,
+  versionId: string,
+  input: {
+    readonly expectedActiveVersionId: string;
+    readonly reviewId: string;
+    readonly reason: string;
+    readonly confirmed: true;
+  },
+  requestId: string,
+) {
+  return callTrustedAdminApi({
+    method: 'POST',
+    pathname: `/api/v1/admin/worlds/${encodeURIComponent(mapId)}/versions/${encodeURIComponent(versionId)}/rollback`,
+    body: input,
+    requestId,
+    parser: (value) => worldRollbackResponseSchema.parse(value),
   });
 }
 

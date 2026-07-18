@@ -27,6 +27,7 @@ const identity = {
 const mapId = '11111111-1111-4111-8111-111111111111';
 const publishedVersionId = '22222222-2222-4222-8222-222222222222';
 const draftVersionId = '33333333-3333-4333-8333-333333333333';
+const publicationReviewId = '44444444-4444-4444-8444-444444444444';
 const timestamp = '2026-07-12T04:00:00.000Z';
 const checksum = 'a'.repeat(64);
 const manifest = getWorldManifest('lantern-square');
@@ -58,6 +59,20 @@ const draftVersion = {
   publishedAt: null,
   publicationReason: null,
   supersedesVersionId: null,
+  derivedFromVersionId: publishedVersionId,
+} as const;
+
+const changeSummary = {
+  objectsAdded: 0,
+  objectsRemoved: 0,
+  objectsMoved: 0,
+  objectsModified: 0,
+  assetBindingsChanged: 0,
+  collisionsChanged: 0,
+  interactionsChanged: 0,
+  exitsChanged: 0,
+  spawnsChanged: 0,
+  terrainChanged: false,
 } as const;
 
 const validationResult = {
@@ -86,8 +101,40 @@ function gateway(): AdminWorldGateway {
       totalPages: 1,
     })),
     getPublishedTopology: vi.fn(async () => ({ status: 'loaded', maps: [] })),
-    getWorld: vi.fn(async () => ({ status: 'loaded', map, versions: [draftVersion] })),
-    getDraft: vi.fn(async () => ({ status: 'loaded', map, version: draftVersion, manifest })),
+    getWorld: vi.fn(async () => ({
+      status: 'loaded',
+      map,
+      versions: [draftVersion],
+      draftHeadVersionId: draftVersionId,
+      revisionMetadata: [],
+      publicationHistory: [],
+    })),
+    getDraft: vi.fn(async () => ({
+      status: 'loaded',
+      map,
+      version: draftVersion,
+      manifest,
+      assetPins: [],
+    })),
+    getRevision: vi.fn(async () => ({
+      status: 'loaded',
+      map,
+      version: draftVersion,
+      manifest,
+      isDraftHead: true,
+      revisionMetadata: {
+        parentRevisionId: publishedVersionId,
+        revisionKind: 'draft_created',
+        changeSummary,
+        createdAt: timestamp,
+      },
+    })),
+    compareRevisions: vi.fn(async () => ({
+      status: 'loaded',
+      fromVersion: draftVersion,
+      toVersion: draftVersion,
+      changeSummary,
+    })),
     createDraft: vi.fn(async () => ({ status: 'created', map, version: draftVersion, manifest })),
     saveDraft: vi.fn(async () => ({
       status: 'updated',
@@ -121,6 +168,28 @@ function gateway(): AdminWorldGateway {
         supersedesVersionId: publishedVersionId,
       },
       previousVersionId: publishedVersionId,
+      sourceRevisionId: draftVersionId,
+      publicationId: '55555555-5555-4555-8555-555555555555',
+      operation: 'publish',
+    })),
+    reviewPublication: vi.fn(async () => ({
+      status: 'reviewed',
+      reviewId: '66666666-6666-4666-8666-666666666666',
+      operation: 'publish',
+      targetRevisionId: draftVersionId,
+      expectedActiveVersionId: publishedVersionId,
+      changeSummary,
+      gameTestEvidenceId: '77777777-7777-4777-8777-777777777777',
+      expiresAt: timestamp,
+    })),
+    rollbackVersion: vi.fn(async () => ({
+      status: 'rolled_back',
+      map,
+      version: draftVersion,
+      sourceRevisionId: publishedVersionId,
+      previousVersionId: draftVersionId,
+      publicationId: '88888888-8888-4888-8888-888888888888',
+      operation: 'rollback',
     })),
     deriveVersion: vi.fn(async () => ({ status: 'created', map, version: draftVersion, manifest })),
     previewVersion: vi.fn(async () => ({
@@ -299,6 +368,7 @@ describe('administrator world service', () => {
           expectedEditVersion: 1,
           expectedActiveVersionId: publishedVersionId,
           expectedChecksum: checksum,
+          reviewId: publicationReviewId,
           reason: 'short',
           confirmed: true,
         },
@@ -315,6 +385,7 @@ describe('administrator world service', () => {
         expectedEditVersion: 1,
         expectedActiveVersionId: publishedVersionId,
         expectedChecksum: checksum,
+        reviewId: publicationReviewId,
         reason: 'Publish reviewed world draft.',
         confirmed: true,
       },
@@ -325,10 +396,89 @@ describe('administrator world service', () => {
       expect.objectContaining({
         p_expected_active_version_id: publishedVersionId,
         p_expected_checksum: checksum,
+        p_review_id: publicationReviewId,
         p_reason: 'Publish reviewed world draft.',
         p_rate_limit: 5,
       }),
     );
+  });
+
+  it('binds revision inspection, comparison, impact review, and rollback to exact UUIDs', async () => {
+    const { target, value } = service();
+    const reviewId = '66666666-6666-4666-8666-666666666666';
+
+    await value.getRevision(identity, mapId, draftVersionId, 'inspect-revision');
+    await value.compareRevisions(
+      identity,
+      mapId,
+      publishedVersionId,
+      draftVersionId,
+      'compare-revisions',
+    );
+    await value.reviewPublication(
+      identity,
+      mapId,
+      draftVersionId,
+      {
+        expectedActiveVersionId: publishedVersionId,
+        operation: 'publish',
+        acknowledged: true,
+      },
+      'review-publication',
+    );
+    await value.rollbackVersion(
+      identity,
+      mapId,
+      publishedVersionId,
+      {
+        expectedActiveVersionId: draftVersionId,
+        reviewId,
+        reason: 'Restore the reviewed historical publication.',
+        confirmed: true,
+      },
+      'rollback-publication',
+    );
+
+    expect(target.getRevision).toHaveBeenCalledWith(
+      identity,
+      expect.objectContaining({ p_world_map_id: mapId, p_version_id: draftVersionId }),
+    );
+    expect(target.compareRevisions).toHaveBeenCalledWith(
+      identity,
+      expect.objectContaining({
+        p_from_version_id: publishedVersionId,
+        p_to_version_id: draftVersionId,
+      }),
+    );
+    expect(target.reviewPublication).toHaveBeenCalledWith(
+      identity,
+      expect.objectContaining({
+        p_target_version_id: draftVersionId,
+        p_operation: 'publish',
+        p_acknowledged: true,
+      }),
+    );
+    expect(target.rollbackVersion).toHaveBeenCalledWith(
+      identity,
+      expect.objectContaining({
+        p_target_version_id: publishedVersionId,
+        p_review_id: reviewId,
+      }),
+    );
+
+    await expect(
+      value.reviewPublication(
+        identity,
+        mapId,
+        draftVersionId,
+        {
+          expectedActiveVersionId: publishedVersionId,
+          operation: 'publish',
+          acknowledged: false,
+        },
+        'unacknowledged-review',
+      ),
+    ).rejects.toEqual(expect.objectContaining({ code: 'INVALID_WORLD_ADMIN_REQUEST' }));
   });
 
   it('maps database lifecycle conflicts and validation failures to safe public errors', async () => {
@@ -402,6 +552,7 @@ describe('administrator world service', () => {
           expectedEditVersion: 1,
           expectedActiveVersionId: publishedVersionId,
           expectedChecksum: checksum,
+          reviewId: publicationReviewId,
           reason: 'Publish reviewed world draft.',
           confirmed: true,
         },

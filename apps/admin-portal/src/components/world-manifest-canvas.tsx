@@ -1,8 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { depthForFootPosition, depthOffsetForAnchors, type Point } from '@starville/game-core';
+import { memo, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 
-import type { AdminWorldManifest } from '../lib/worlds/contracts';
+import type { WorldEditorAssetCandidate } from '../lib/world-assets/contracts';
+import type { AssetSceneRenderOverride } from '../lib/world-assets/scene-preview-model';
+import {
+  resolveWorldObjectRendering,
+  worldAssetCanvasMetrics,
+  worldAssetCanvasMetricsForRender,
+  worldObjectFriendlyLabel,
+  type WorldObjectRenderMode,
+} from '../lib/worlds/asset-rendering';
+import type { AdminWorldManifest, WorldDraftAssetPin } from '../lib/worlds/contracts';
 import type { WorldEditorSelection } from '../lib/worlds/editor-state';
 import { shouldShowInteractionLabel, shouldShowObjectLabel } from '../lib/worlds/editor-usability';
 
@@ -16,11 +26,29 @@ interface WorldManifestCanvasProps {
   readonly showInteractions?: boolean;
   readonly playerPosition?: Readonly<{ x: number; y: number }>;
   readonly onSelect?: (selection: WorldEditorSelection) => void;
+  readonly onObjectMove?: (objectId: string, x: number, y: number) => void;
   readonly className?: string;
   /** Viewport zoom factor used only for label declutter (does not mutate draft). */
   readonly zoom?: number;
   readonly activeLayer?: WorldEditorSelection['layer'] | 'metadata' | 'bounds';
   readonly emphasisObjectIds?: readonly string[];
+  /** Authorized active-version catalog used only for non-mutating canvas presentation. */
+  readonly assetCandidates?: readonly WorldEditorAssetCandidate[];
+  readonly assetPins?: readonly WorldDraftAssetPin[];
+  readonly allowUnpinnedActive?: boolean;
+  readonly renderMode?: WorldObjectRenderMode;
+  readonly failedAssetVersionIds?: ReadonlySet<string>;
+  readonly onAssetMediaError?: (versionId: string) => void;
+  /** One ephemeral version rendered at one existing or test-pad object. Never written to manifest. */
+  readonly scenePreviewOverride?: AssetSceneRenderOverride;
+  /** Optional local-scene camera using the same projected world coordinates as the canvas. */
+  readonly sceneCamera?: Readonly<{
+    center: Point;
+    zoom: number;
+    panX: number;
+    panY: number;
+  }>;
+  readonly showSceneAnchors?: boolean;
 }
 
 export const WORLD_CANVAS_VIEW_WIDTH = 1000;
@@ -104,6 +132,33 @@ function selected(
   return current?.layer === layer && current.id === id;
 }
 
+function ReferencePlayer(props: {
+  readonly position: Point;
+  readonly view: ReturnType<typeof projection>;
+}) {
+  const player = project(props.position.x, props.position.y, props.view);
+  return (
+    <g
+      aria-label="Reference player"
+      className="world-canvas__player"
+      data-world-canvas-reference-player="true"
+      transform={`translate(${player.x} ${player.y})`}
+    >
+      <ellipse cx={0} cy={2} fill="rgba(10, 24, 20, 0.4)" rx={9} ry={5} />
+      <circle cx={0} cy={-15} fill="#f0d9a8" r={9} stroke="rgba(20, 40, 32, 0.4)" strokeWidth={1} />
+      <path
+        d="M -8 -6 L 8 -6 L 6 7 L -6 7 Z"
+        fill="#4aa687"
+        stroke="rgba(20, 40, 32, 0.35)"
+        strokeWidth={1}
+      />
+      <text fill="#f7efd9" fontSize={7} fontWeight={700} textAnchor="middle" x={0} y={17}>
+        PLAYER
+      </text>
+    </g>
+  );
+}
+
 function objectIsPhase7(object: AdminWorldManifest['objects'][number]): boolean {
   return (
     object.assetId.startsWith('phase7-') ||
@@ -116,11 +171,28 @@ function objectIsPhase7(object: AdminWorldManifest['objects'][number]): boolean 
   );
 }
 
-function friendlyObjectLabel(object: AdminWorldManifest['objects'][number]): string {
-  return OBJECT_KIND_META[object.kind].label;
+function managedDepthOffset(
+  object: AdminWorldManifest['objects'][number],
+  pins: readonly WorldDraftAssetPin[],
+  candidates: readonly WorldEditorAssetCandidate[],
+  scenePreviewOverride: AssetSceneRenderOverride | undefined,
+): number {
+  if (scenePreviewOverride?.targetObjectId === object.id) {
+    return depthOffsetForAnchors(
+      scenePreviewOverride.configuration.render.footAnchor.y,
+      scenePreviewOverride.configuration.render.depthAnchor.y,
+    );
+  }
+  const pin = pins.find((item) => item.assetKey === object.assetId);
+  const render =
+    pin?.pinnedVersion.render ??
+    candidates.find((item) => item.assetKey === object.assetId)?.activeVersion.render;
+  return render === undefined
+    ? 0
+    : depthOffsetForAnchors(render.footAnchor.y, render.depthAnchor.y);
 }
 
-export function WorldManifestCanvas({
+function WorldManifestCanvasView({
   manifest,
   selection,
   showGrid,
@@ -130,17 +202,97 @@ export function WorldManifestCanvas({
   showInteractions = true,
   playerPosition,
   onSelect,
+  onObjectMove,
   className,
   zoom = 1,
   activeLayer = 'objects',
   emphasisObjectIds = [],
+  assetCandidates = [],
+  assetPins = [],
+  allowUnpinnedActive = false,
+  renderMode = 'mixed',
+  failedAssetVersionIds,
+  onAssetMediaError,
+  scenePreviewOverride,
+  sceneCamera,
+  showSceneAnchors = false,
 }: WorldManifestCanvasProps) {
   const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [localFailedVersionIds, setLocalFailedVersionIds] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  );
+  const [loadedVersionIds, setLoadedVersionIds] = useState<ReadonlySet<string>>(() => new Set());
+  const objectDrag = useRef<{
+    readonly pointerId: number;
+    readonly objectId: string;
+    readonly startWorldX: number;
+    readonly startWorldY: number;
+    readonly startSvgX: number;
+    readonly startSvgY: number;
+  } | null>(null);
+  const [dragPreview, setDragPreview] = useState<{
+    readonly objectId: string;
+    readonly x: number;
+    readonly y: number;
+  } | null>(null);
+  const failedVersionIds = failedAssetVersionIds ?? localFailedVersionIds;
+
+  function svgPoint(event: ReactPointerEvent<SVGGElement>): Point | null {
+    const svg = event.currentTarget.ownerSVGElement;
+    const matrix = svg?.getScreenCTM();
+    if (svg === null || svg === undefined || matrix === null || matrix === undefined) return null;
+    const point = svg.createSVGPoint();
+    point.x = event.clientX;
+    point.y = event.clientY;
+    const local = point.matrixTransform(matrix.inverse());
+    return { x: local.x, y: local.y };
+  }
+  const renderingModel = useMemo(() => {
+    try {
+      const manifestAssetKeys = new Set(manifest.assets);
+      return {
+        error: null,
+        byObjectId: new Map(
+          manifest.objects.map((object) => [
+            object.id,
+            resolveWorldObjectRendering({
+              manifestAssetKeys,
+              object,
+              pins: assetPins,
+              candidates: assetCandidates,
+              mode: renderMode,
+              allowUnpinnedActive,
+              failedVersionIds,
+            }),
+          ]),
+        ),
+      };
+    } catch (error) {
+      return {
+        error,
+        byObjectId: new Map<string, ReturnType<typeof resolveWorldObjectRendering>>(),
+      };
+    }
+  }, [
+    allowUnpinnedActive,
+    assetCandidates,
+    assetPins,
+    failedVersionIds,
+    manifest.assets,
+    manifest.objects,
+    renderMode,
+  ]);
 
   try {
+    if (renderingModel.error !== null) throw renderingModel.error;
     const view = projection(manifest);
     const sortedTerrain = [...manifest.terrain].sort((left, right) => left.order - right.order);
-    const sortedObjects = [...manifest.objects].sort((left, right) => left.y - right.y);
+    const objectDepth = (object: AdminWorldManifest['objects'][number]) =>
+      depthForFootPosition(object.x, object.y, object.id) +
+      managedDepthOffset(object, assetPins, assetCandidates, scenePreviewOverride);
+    const sortedObjects = [...manifest.objects].sort(
+      (left, right) => objectDepth(left) - objectDepth(right) || left.id.localeCompare(right.id),
+    );
     const horizontalGrid = Array.from({ length: manifest.height + 1 }, (_, index) => index);
     const verticalGrid = Array.from({ length: manifest.width + 1 }, (_, index) => index);
     const boundsPoints = rectanglePoints(
@@ -150,6 +302,29 @@ export function WorldManifestCanvas({
     const skyFill = SKY_FILLS[manifest.background.palette] ?? SKY_FILLS.village;
     const rootClass = className === undefined ? 'world-canvas' : `world-canvas ${className}`;
     const emphasis = new Set(emphasisObjectIds);
+    const sceneCenter =
+      sceneCamera === undefined ? null : project(sceneCamera.center.x, sceneCamera.center.y, view);
+    const sceneViewBox = (() => {
+      if (sceneCenter === null || sceneCamera === undefined) {
+        return `0 0 ${WORLD_CANVAS_VIEW_WIDTH} ${WORLD_CANVAS_VIEW_HEIGHT}`;
+      }
+      const sceneViewWidth = 620 / sceneCamera.zoom;
+      const sceneViewHeight = 420 / sceneCamera.zoom;
+      return `${String(sceneCenter.x - sceneViewWidth / 2 + sceneCamera.panX)} ${String(sceneCenter.y - sceneViewHeight / 2 + sceneCamera.panY)} ${String(sceneViewWidth)} ${String(sceneViewHeight)}`;
+    })();
+    const playerBehindPreviewTarget =
+      playerPosition !== undefined && scenePreviewOverride !== undefined
+        ? depthForFootPosition(playerPosition.x, playerPosition.y, 'reference-player') <
+          depthForFootPosition(
+            manifest.objects.find(({ id }) => id === scenePreviewOverride.targetObjectId)?.x ?? 0,
+            manifest.objects.find(({ id }) => id === scenePreviewOverride.targetObjectId)?.y ?? 0,
+            scenePreviewOverride.targetObjectId,
+          ) +
+            depthOffsetForAnchors(
+              scenePreviewOverride.configuration.render.footAnchor.y,
+              scenePreviewOverride.configuration.render.depthAnchor.y,
+            )
+        : false;
 
     return (
       <svg
@@ -164,7 +339,7 @@ export function WorldManifestCanvas({
         onMouseLeave={() => setHoveredId(null)}
         preserveAspectRatio="xMidYMid meet"
         role="img"
-        viewBox={`0 0 ${WORLD_CANVAS_VIEW_WIDTH} ${WORLD_CANVAS_VIEW_HEIGHT}`}
+        viewBox={sceneViewBox}
         width="100%"
       >
         <title id="world-canvas-title">{`Structured isometric preview of ${manifest.name}`}</title>
@@ -361,13 +536,70 @@ export function WorldManifestCanvas({
           </g>
         ) : null}
 
+        {playerPosition !== undefined && playerBehindPreviewTarget ? (
+          <ReferencePlayer position={playerPosition} view={view} />
+        ) : null}
+
         <g className="world-canvas__objects">
           {sortedObjects.map((object) => {
-            const point = project(object.x, object.y, view);
+            const previewPosition = dragPreview?.objectId === object.id ? dragPreview : object;
+            const point = project(previewPosition.x, previewPosition.y, view);
             const isSelected = selected(selection, 'objects', object.id);
             const isHovered = hoveredId === object.id;
             const meta = OBJECT_KIND_META[object.kind];
-            const phase7 = objectIsPhase7(object);
+            const rendering = renderingModel.byObjectId.get(object.id);
+            if (rendering === undefined) {
+              throw new Error(`Missing safe rendering projection for world object ${object.id}.`);
+            }
+            const previewOverride =
+              scenePreviewOverride?.targetObjectId === object.id ? scenePreviewOverride : null;
+            const renderSource =
+              previewOverride === null && rendering.status === 'asset'
+                ? (rendering.pin ?? rendering.candidate)
+                : null;
+            const assetMetrics =
+              previewOverride !== null
+                ? worldAssetCanvasMetricsForRender(previewOverride.configuration.render)
+                : renderSource === null
+                  ? null
+                  : worldAssetCanvasMetrics(renderSource);
+            const renderConfiguration =
+              previewOverride?.configuration.render ??
+              (renderSource === null
+                ? null
+                : 'pinnedVersion' in renderSource
+                  ? renderSource.pinnedVersion.render
+                  : renderSource.activeVersion.render);
+            const renderAssetId =
+              previewOverride?.assetId ??
+              (renderSource === null
+                ? null
+                : 'pinnedVersion' in renderSource
+                  ? renderSource.assetId
+                  : renderSource.asset.id);
+            const renderedVersionId = previewOverride?.version.id ?? rendering.renderedVersionId;
+            const previewMediaFailed =
+              previewOverride !== null && failedVersionIds.has(previewOverride.version.id);
+            const mediaUrl = previewMediaFailed
+              ? null
+              : (previewOverride?.mediaUrl ?? rendering.mediaUrl);
+            const renderStatus =
+              previewOverride === null ? rendering.status : mediaUrl === null ? 'marker' : 'asset';
+            const assetLoading =
+              renderStatus === 'asset' &&
+              renderedVersionId !== null &&
+              !loadedVersionIds.has(renderedVersionId) &&
+              !failedVersionIds.has(renderedVersionId);
+            const phase7 =
+              previewOverride?.mediaUrl === null ||
+              objectIsPhase7(object) ||
+              rendering.candidate?.asset.productionStatus === 'development_marker';
+            const friendlyLabel =
+              previewOverride?.friendlyName ?? worldObjectFriendlyLabel(object, rendering);
+            const renderExplanation =
+              previewOverride === null
+                ? rendering.explanation
+                : `Preview only: ${previewOverride.presentation} Version ${String(previewOverride.version.versionNumber)} is temporarily rendered at ${object.id}. No world placement or asset state is changed.`;
             const showLabel = shouldShowObjectLabel({
               isSelected: isSelected || emphasis.has(object.id),
               isHovered,
@@ -377,20 +609,233 @@ export function WorldManifestCanvas({
             });
             return (
               <g
+                aria-label={`${friendlyLabel}, ${object.kind.replaceAll('_', ' ')}, ${renderStatus === 'asset' ? 'managed asset' : 'fallback marker'}`}
+                aria-pressed={onSelect ? isSelected : undefined}
                 className={`world-canvas__object ${isSelected ? 'is-selected' : ''} ${isHovered ? 'is-hovered' : ''} ${phase7 ? 'is-phase7' : ''}`}
                 data-object-id={object.id}
                 data-object-kind={object.kind}
+                data-render-reason={
+                  previewOverride === null
+                    ? rendering.reason
+                    : `scene_preview_${previewOverride.presentation}`
+                }
+                data-render-status={renderStatus}
                 data-show-label={showLabel ? 'true' : 'false'}
+                data-world-canvas-interactive="true"
                 key={object.id}
                 onClick={() => onSelect?.({ layer: 'objects', id: object.id })}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter' && event.key !== ' ') return;
+                  event.preventDefault();
+                  onSelect?.({ layer: 'objects', id: object.id });
+                }}
                 onMouseEnter={() => setHoveredId(object.id)}
                 onMouseLeave={() =>
                   setHoveredId((current) => (current === object.id ? null : current))
                 }
+                onPointerDown={(event) => {
+                  if (onObjectMove === undefined || event.button !== 0) return;
+                  const start = svgPoint(event);
+                  if (start === null) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  objectDrag.current = {
+                    pointerId: event.pointerId,
+                    objectId: object.id,
+                    startWorldX: object.x,
+                    startWorldY: object.y,
+                    startSvgX: start.x,
+                    startSvgY: start.y,
+                  };
+                  setDragPreview({ objectId: object.id, x: object.x, y: object.y });
+                  onSelect?.({ layer: 'objects', id: object.id });
+                }}
+                onPointerMove={(event) => {
+                  const drag = objectDrag.current;
+                  if (drag === null || drag.pointerId !== event.pointerId) return;
+                  const current = svgPoint(event);
+                  if (current === null) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const projectedX = (current.x - drag.startSvgX) / view.scaleX;
+                  const projectedY = (current.y - drag.startSvgY) / view.scaleY;
+                  const x = Math.min(
+                    manifest.safeSaveBounds.maxX,
+                    Math.max(
+                      manifest.safeSaveBounds.minX,
+                      drag.startWorldX + (projectedX + projectedY) / 2,
+                    ),
+                  );
+                  const y = Math.min(
+                    manifest.safeSaveBounds.maxY,
+                    Math.max(
+                      manifest.safeSaveBounds.minY,
+                      drag.startWorldY + (projectedY - projectedX) / 2,
+                    ),
+                  );
+                  setDragPreview({ objectId: object.id, x, y });
+                }}
+                onPointerUp={(event) => {
+                  const drag = objectDrag.current;
+                  if (drag === null || drag.pointerId !== event.pointerId) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  const preview = dragPreview;
+                  objectDrag.current = null;
+                  setDragPreview(null);
+                  if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                  }
+                  if (preview !== null) onObjectMove?.(object.id, preview.x, preview.y);
+                }}
+                onPointerCancel={() => {
+                  objectDrag.current = null;
+                  setDragPreview(null);
+                }}
+                role={onSelect ? 'button' : undefined}
                 style={{ cursor: onSelect ? 'pointer' : undefined }}
-                transform={`translate(${point.x} ${point.y}) scale(${object.scale})`}
+                tabIndex={onSelect ? 0 : undefined}
+                transform={`translate(${point.x} ${point.y}) scale(${object.scale}) rotate(${object.rotation ?? 0})`}
               >
-                <title>{`${friendlyObjectLabel(object)} · ${object.id}`}</title>
+                <title>{`${friendlyLabel} · ${object.id} · ${renderExplanation}`}</title>
+                <ellipse cx={0} cy={6} fill="rgba(10, 24, 20, 0.35)" rx={16} ry={7} />
+                {assetLoading ? (
+                  <g aria-hidden="true" className="world-canvas__asset-loading">
+                    <circle cx={0} cy={-12} fill={meta.fill} fillOpacity={0.45} r={13} />
+                    <text
+                      fill="#f7efd9"
+                      fillOpacity={0.75}
+                      fontSize={7}
+                      textAnchor="middle"
+                      x={0}
+                      y={-9}
+                    >
+                      …
+                    </text>
+                  </g>
+                ) : null}
+                {(renderSource !== null || previewOverride !== null) &&
+                mediaUrl !== null &&
+                renderedVersionId !== null &&
+                assetMetrics !== null &&
+                renderConfiguration !== null &&
+                renderAssetId !== null ? (
+                  <image
+                    className="world-canvas__managed-asset"
+                    data-asset-id={renderAssetId}
+                    data-depth-anchor-x={renderConfiguration.depthAnchor.x}
+                    data-depth-anchor-y={renderConfiguration.depthAnchor.y}
+                    data-media-state={assetLoading ? 'loading' : 'loaded'}
+                    data-rendered-version-id={renderedVersionId}
+                    height={assetMetrics.height}
+                    href={mediaUrl}
+                    onError={() => {
+                      setLocalFailedVersionIds((current) => {
+                        if (current.has(renderedVersionId)) return current;
+                        return new Set([...current, renderedVersionId]);
+                      });
+                      onAssetMediaError?.(renderedVersionId);
+                    }}
+                    onLoad={() => {
+                      setLoadedVersionIds((current) => {
+                        if (current.has(renderedVersionId)) return current;
+                        return new Set([...current, renderedVersionId]);
+                      });
+                    }}
+                    preserveAspectRatio="xMidYMid meet"
+                    width={assetMetrics.width}
+                    x={assetMetrics.x}
+                    y={assetMetrics.y}
+                  />
+                ) : phase7 ? (
+                  <polygon
+                    fill={meta.fill}
+                    points="0,-22 14,-6 0,10 -14,-6"
+                    stroke={isSelected ? 'rgba(247, 239, 217, 1)' : 'rgba(247, 239, 217, 0.75)'}
+                    strokeWidth={isSelected ? 2.25 : 1.5}
+                  />
+                ) : (
+                  <>
+                    <ellipse cx={0} cy={4} fill="rgba(20, 40, 32, 0.35)" rx={15} ry={7} />
+                    <circle
+                      cx={0}
+                      cy={-12}
+                      fill={meta.fill}
+                      r={13}
+                      stroke={isSelected ? 'rgba(247, 239, 217, 0.95)' : 'rgba(20, 40, 32, 0.35)'}
+                      strokeWidth={isSelected ? 2 : 1}
+                    />
+                  </>
+                )}
+                {renderStatus === 'marker' ? (
+                  <text
+                    className="world-canvas__object-glyph"
+                    fill="#f7efd9"
+                    fontSize={11}
+                    fontWeight={700}
+                    textAnchor="middle"
+                    x={0}
+                    y={phase7 ? -4 : -8}
+                  >
+                    {meta.glyph}
+                  </text>
+                ) : null}
+                {showSceneAnchors &&
+                previewOverride !== null &&
+                assetMetrics !== null &&
+                renderConfiguration !== null ? (
+                  <g className="world-canvas__asset-anchors" pointerEvents="none">
+                    <line
+                      stroke="rgba(226, 184, 92, 0.9)"
+                      strokeDasharray="3 2"
+                      strokeWidth={1.5}
+                      x1={-90}
+                      x2={90}
+                      y1={assetMetrics.y + assetMetrics.height * renderConfiguration.depthAnchor.y}
+                      y2={assetMetrics.y + assetMetrics.height * renderConfiguration.depthAnchor.y}
+                    />
+                    <circle
+                      aria-label="Asset foot anchor"
+                      cx={assetMetrics.x + assetMetrics.width * renderConfiguration.footAnchor.x}
+                      cy={assetMetrics.y + assetMetrics.height * renderConfiguration.footAnchor.y}
+                      fill="#81d7ad"
+                      r={3.5}
+                    />
+                    <circle
+                      aria-label="Asset depth anchor"
+                      cx={assetMetrics.x + assetMetrics.width * renderConfiguration.depthAnchor.x}
+                      cy={assetMetrics.y + assetMetrics.height * renderConfiguration.depthAnchor.y}
+                      fill="#e2b85c"
+                      r={3.5}
+                    />
+                  </g>
+                ) : null}
+                {previewOverride !== null ? (
+                  <text
+                    className="world-canvas__object-badge"
+                    fill="rgba(226, 184, 92, 0.98)"
+                    fontSize={7}
+                    fontWeight={700}
+                    textAnchor="middle"
+                    x={0}
+                    y={16}
+                  >
+                    {previewOverride.presentation === 'candidate' ? 'CANDIDATE' : 'ACTIVE'}
+                  </text>
+                ) : phase7 && renderStatus === 'marker' ? (
+                  <text
+                    className="world-canvas__object-badge"
+                    fill="rgba(226, 184, 92, 0.95)"
+                    fontSize={7}
+                    fontWeight={700}
+                    textAnchor="middle"
+                    x={0}
+                    y={16}
+                  >
+                    DEV
+                  </text>
+                ) : null}
                 {isSelected ? (
                   <>
                     <ellipse
@@ -435,61 +880,20 @@ export function WorldManifestCanvas({
                     strokeWidth={1.5}
                   />
                 ) : null}
-                <ellipse cx={0} cy={6} fill="rgba(10, 24, 20, 0.35)" rx={16} ry={7} />
-                {phase7 ? (
-                  <polygon
-                    fill={meta.fill}
-                    points="0,-22 14,-6 0,10 -14,-6"
-                    stroke={isSelected ? 'rgba(247, 239, 217, 1)' : 'rgba(247, 239, 217, 0.75)'}
-                    strokeWidth={isSelected ? 2.25 : 1.5}
-                  />
-                ) : (
-                  <>
-                    <ellipse cx={0} cy={4} fill="rgba(20, 40, 32, 0.35)" rx={15} ry={7} />
-                    <circle
-                      cx={0}
-                      cy={-12}
-                      fill={meta.fill}
-                      r={13}
-                      stroke={isSelected ? 'rgba(247, 239, 217, 0.95)' : 'rgba(20, 40, 32, 0.35)'}
-                      strokeWidth={isSelected ? 2 : 1}
-                    />
-                  </>
-                )}
-                <text
-                  className="world-canvas__object-glyph"
-                  fill="#f7efd9"
-                  fontSize={11}
-                  fontWeight={700}
-                  textAnchor="middle"
-                  x={0}
-                  y={phase7 ? -4 : -8}
-                >
-                  {meta.glyph}
-                </text>
-                {phase7 ? (
-                  <text
-                    className="world-canvas__object-badge"
-                    fill="rgba(226, 184, 92, 0.95)"
-                    fontSize={7}
-                    fontWeight={700}
-                    textAnchor="middle"
-                    x={0}
-                    y={16}
-                  >
-                    DEV
-                  </text>
-                ) : null}
                 {showLabel ? (
-                  <g className="world-canvas__object-label" pointerEvents="none">
+                  <g
+                    className="world-canvas__object-label"
+                    data-world-canvas-interactive="true"
+                    data-world-canvas-label="true"
+                  >
                     <rect
                       fill="rgba(10, 28, 24, 0.88)"
                       height={16}
                       rx={4}
                       stroke={isSelected ? 'rgba(129, 215, 173, 0.95)' : 'rgba(74, 166, 135, 0.45)'}
                       strokeWidth={1}
-                      width={Math.min(110, friendlyObjectLabel(object).length * 6.4 + 14)}
-                      x={-Math.min(55, friendlyObjectLabel(object).length * 3.2 + 7)}
+                      width={Math.min(130, friendlyLabel.length * 6.4 + 14)}
+                      x={-Math.min(65, friendlyLabel.length * 3.2 + 7)}
                       y={phase7 ? 20 : 14}
                     />
                     <text
@@ -500,7 +904,7 @@ export function WorldManifestCanvas({
                       x={0}
                       y={phase7 ? 31 : 25}
                     >
-                      {friendlyObjectLabel(object)}
+                      {friendlyLabel.length > 22 ? `${friendlyLabel.slice(0, 20)}…` : friendlyLabel}
                     </text>
                   </g>
                 ) : null}
@@ -508,6 +912,10 @@ export function WorldManifestCanvas({
             );
           })}
         </g>
+
+        {playerPosition !== undefined && !playerBehindPreviewTarget ? (
+          <ReferencePlayer position={playerPosition} view={view} />
+        ) : null}
 
         {showInteractions
           ? manifest.interactions.map((interaction) => {
@@ -620,35 +1028,6 @@ export function WorldManifestCanvas({
             })}
           </g>
         ) : null}
-
-        {playerPosition === undefined
-          ? null
-          : (() => {
-              const player = project(playerPosition.x, playerPosition.y, view);
-              return (
-                <g
-                  aria-label="Preview character"
-                  className="world-canvas__player"
-                  transform={`translate(${player.x} ${player.y})`}
-                >
-                  <ellipse cx={0} cy={2} fill="rgba(10, 24, 20, 0.4)" rx={9} ry={5} />
-                  <circle
-                    cx={0}
-                    cy={-15}
-                    fill="#f0d9a8"
-                    r={9}
-                    stroke="rgba(20, 40, 32, 0.4)"
-                    strokeWidth={1}
-                  />
-                  <path
-                    d="M -8 -6 L 8 -6 L 6 7 L -6 7 Z"
-                    fill="#4aa687"
-                    stroke="rgba(20, 40, 32, 0.35)"
-                    strokeWidth={1}
-                  />
-                </g>
-              );
-            })()}
       </svg>
     );
   } catch (error) {
@@ -665,3 +1044,6 @@ export function WorldManifestCanvas({
     );
   }
 }
+
+export const WorldManifestCanvas = memo(WorldManifestCanvasView);
+WorldManifestCanvas.displayName = 'WorldManifestCanvas';

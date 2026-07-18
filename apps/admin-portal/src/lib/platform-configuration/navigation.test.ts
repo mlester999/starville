@@ -1,7 +1,11 @@
 import { STARVILLE_DEFAULT_CONFIGURATION } from '@starville/platform-configuration';
 import { describe, expect, it } from 'vitest';
 
-import { platformRouteAccess, resolvePlatformNavigation } from './navigation';
+import {
+  platformRouteAccess,
+  resolveEconomyNavigationHref,
+  resolvePlatformNavigation,
+} from './navigation';
 
 const superAdminPermissions = [
   'overview.read',
@@ -89,5 +93,41 @@ describe('platform navigation authorization', () => {
       '/world-audit',
       '/platform-settings',
     ]);
+  });
+
+  it('routes subsection-only economy roles to their first authorized workspace', () => {
+    expect(
+      resolvePlatformNavigation(STARVILLE_DEFAULT_CONFIGURATION, ['economy.shop.read']),
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ href: '/economy/shops' })]));
+    expect(
+      resolvePlatformNavigation(STARVILLE_DEFAULT_CONFIGURATION, ['economy.risk.read']),
+    ).toEqual(expect.arrayContaining([expect.objectContaining({ href: '/economy/risk' })]));
+    expect(resolveEconomyNavigationHref(STARVILLE_DEFAULT_CONFIGURATION, [])).toBeNull();
+  });
+
+  it('does not expose a simulation-only economy entry while simulation is disabled', () => {
+    const configuration = structuredClone(STARVILLE_DEFAULT_CONFIGURATION);
+    configuration.modules.find(({ key }) => key === 'economy_simulation')!.enabled = false;
+    expect(resolveEconomyNavigationHref(configuration, ['economy.simulation.run'])).toBeNull();
+    expect(resolvePlatformNavigation(configuration, ['economy.simulation.run'])).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ label: 'Economy' })]),
+    );
+  });
+
+  it('shows the dedicated avatar content entry only with its module and permission', () => {
+    expect(
+      resolvePlatformNavigation(STARVILLE_DEFAULT_CONFIGURATION, ['avatar_content.read']),
+    ).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          href: '/game-content/avatars',
+          label: 'Avatar Content',
+          group: 'World Management',
+        }),
+      ]),
+    );
+    expect(resolvePlatformNavigation(STARVILLE_DEFAULT_CONFIGURATION, [])).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ href: '/game-content/avatars' })]),
+    );
   });
 });

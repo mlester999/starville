@@ -12,6 +12,8 @@ import {
   createWorldDraft,
   deriveWorldVersion,
   publishWorldDraft,
+  reviewWorldPublication,
+  rollbackWorldRevision,
   saveWorldDraft,
   validateWorldDraft,
 } from '../../lib/worlds/api';
@@ -225,6 +227,7 @@ export async function publishWorldDraftAction(
   const mapId = readUuid(formData, 'mapId');
   const versionId = readUuid(formData, 'versionId');
   const requestId = readUuid(formData, 'requestId');
+  const reviewRequestId = readUuid(formData, 'reviewRequestId');
   const expectedEditVersion = readPositiveInteger(formData, 'expectedEditVersion');
   const expectedActiveVersionId = readNullableUuid(formData, 'expectedActiveVersionId');
   const expectedChecksum = readString(formData, 'expectedChecksum', 128);
@@ -233,10 +236,12 @@ export async function publishWorldDraftAction(
     mapId === undefined ||
     versionId === undefined ||
     requestId === undefined ||
+    reviewRequestId === undefined ||
     expectedEditVersion === undefined ||
     expectedActiveVersionId === undefined ||
     expectedChecksum === undefined ||
     !safeReason(reason) ||
+    formData.get('impactAcknowledged') !== 'yes' ||
     formData.get('confirmed') !== 'yes'
   ) {
     return {
@@ -246,10 +251,21 @@ export async function publishWorldDraftAction(
   }
 
   try {
+    const review = await reviewWorldPublication(
+      mapId,
+      versionId,
+      {
+        expectedActiveVersionId,
+        operation: 'publish',
+        acknowledged: true,
+      },
+      reviewRequestId,
+    );
     const result = await publishWorldDraft(mapId, versionId, {
       expectedEditVersion,
       expectedActiveVersionId,
       expectedChecksum,
+      reviewId: review.reviewId,
       reason,
       requestId,
       confirmed: true,
@@ -258,6 +274,68 @@ export async function publishWorldDraftAction(
     return {
       outcome: 'success',
       message: `Version ${result.version.versionNumber} is now the immutable active publication.`,
+      versionId: result.version.id,
+      editVersion: result.version.editVersion,
+      checksum: result.version.checksum,
+    };
+  } catch (error) {
+    return errorState(error);
+  }
+}
+
+export async function rollbackWorldVersionAction(
+  _previousState: WorldActionState,
+  formData: FormData,
+): Promise<WorldActionState> {
+  await requireAuthorizedAdmin('maps.rollback');
+  const mapId = readUuid(formData, 'mapId');
+  const versionId = readUuid(formData, 'versionId');
+  const requestId = readUuid(formData, 'requestId');
+  const reviewRequestId = readUuid(formData, 'reviewRequestId');
+  const expectedActiveVersionId = readUuid(formData, 'expectedActiveVersionId');
+  const reason = readString(formData, 'reason', 500);
+  if (
+    mapId === undefined ||
+    versionId === undefined ||
+    requestId === undefined ||
+    reviewRequestId === undefined ||
+    expectedActiveVersionId === undefined ||
+    !safeReason(reason) ||
+    formData.get('impactAcknowledged') !== 'yes' ||
+    formData.get('confirmed') !== 'yes'
+  ) {
+    return {
+      outcome: 'error',
+      message: 'Acknowledge rollback impact and provide a clear reason of at least 12 characters.',
+    };
+  }
+
+  try {
+    const review = await reviewWorldPublication(
+      mapId,
+      versionId,
+      {
+        expectedActiveVersionId,
+        operation: 'rollback',
+        acknowledged: true,
+      },
+      reviewRequestId,
+    );
+    const result = await rollbackWorldRevision(
+      mapId,
+      versionId,
+      {
+        expectedActiveVersionId,
+        reviewId: review.reviewId,
+        reason,
+        confirmed: true,
+      },
+      requestId,
+    );
+    revalidateWorld(mapId);
+    return {
+      outcome: 'success',
+      message: `Rollback publication ${result.version.versionNumber} now serves the reviewed historical content.`,
       versionId: result.version.id,
       editVersion: result.version.editVersion,
       checksum: result.version.checksum,

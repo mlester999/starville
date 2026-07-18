@@ -10,6 +10,7 @@ import {
   loadAdminRecoveryConfig,
   loadApiConfig,
   loadHostedSupabaseSafetyConfig,
+  loadHostedWriteSafetyConfig,
   loadOperationsHealthConfig,
   loadPrivateSupabaseConfig,
   loadRealtimeConfig,
@@ -126,7 +127,36 @@ describe('service configuration', () => {
       logLevel: 'debug',
     });
 
-    expect(loadRealtimeConfig({}).connectionLimit).toBe(100);
+    expect(loadRealtimeConfig({})).toMatchObject({
+      connectionLimit: 100,
+      chatNearbyDistance: 8,
+      chatRateLimits: {
+        shortWindowMessages: 4,
+        minuteMessages: 20,
+        hourlyReports: 5,
+        minuteSafetyActions: 20,
+        malformedMessages: 10,
+      },
+      socialRateLimits: {
+        inspectPerMinute: 60,
+        requestsPerMinute: 6,
+        responsesPerMinute: 12,
+        offersPerMinute: 30,
+        confirmationsPerMinute: 20,
+        cancellationsPerMinute: 20,
+      },
+      socialGraphRateLimits: {
+        friendRequestsPerMinute: 4,
+        friendResponsesPerMinute: 12,
+        friendRemovalsPerMinute: 10,
+        partyCreationsPerHour: 3,
+        partyInvitationsPerMinute: 8,
+        partyResponsesPerMinute: 15,
+        partyMembershipActionsPerMinute: 12,
+        readyChecksPerMinute: 4,
+        readyResponsesPerMinute: 20,
+      },
+    });
     expect(loadWorkerConfig({}).retry).toEqual({ maxAttempts: 3, baseDelayMs: 1000 });
   });
 
@@ -163,6 +193,12 @@ describe('service configuration', () => {
 
   it('rejects invalid real-time and worker limits', () => {
     expect(() => loadRealtimeConfig({ REALTIME_MAX_CONNECTIONS: '0' })).toThrow();
+    expect(() => loadRealtimeConfig({ REALTIME_CHAT_NEARBY_DISTANCE: '21' })).toThrow();
+    expect(() => loadRealtimeConfig({ REALTIME_CHAT_MINUTE_LIMIT: '0' })).toThrow();
+    expect(() => loadRealtimeConfig({ REALTIME_SOCIAL_REQUEST_LIMIT: '0' })).toThrow();
+    expect(() => loadRealtimeConfig({ REALTIME_SOCIAL_INSPECT_LIMIT: '241' })).toThrow();
+    expect(() => loadRealtimeConfig({ REALTIME_FRIEND_REQUEST_LIMIT: '0' })).toThrow();
+    expect(() => loadRealtimeConfig({ REALTIME_PARTY_CREATE_HOURLY_LIMIT: '21' })).toThrow();
     expect(() => loadWorkerConfig({ WORKER_CONCURRENCY: '-1' })).toThrow();
   });
 
@@ -354,6 +390,16 @@ describe('private server configuration', () => {
       hostedTestsApproved: false,
       bootstrapEnabled: false,
     });
+  });
+
+  it('loads the narrow runtime hosted-write gate fail-closed', () => {
+    expect(loadHostedWriteSafetyConfig({})).toEqual({ remoteWritesApproved: false });
+    expect(loadHostedWriteSafetyConfig({ SUPABASE_REMOTE_WRITES_APPROVED: 'true' })).toEqual({
+      remoteWritesApproved: true,
+    });
+    expect(() => loadHostedWriteSafetyConfig({ SUPABASE_REMOTE_WRITES_APPROVED: 'yes' })).toThrow(
+      'must be either true or false',
+    );
   });
 
   it('rejects production, target mismatch, and ambiguous approval values', () => {

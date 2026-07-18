@@ -34,7 +34,10 @@ describe('Phase 6 development world graph', () => {
     for (const manifest of WORLD_MANIFESTS) {
       expect(manifest.schemaVersion).toBe(1);
       expect(manifest.developmentArt.temporary).toBe(true);
-      expect(manifest.interactions).toHaveLength(1);
+      expect(manifest.interactions).toHaveLength(manifest.id === 'lantern-square' ? 2 : 1);
+      expect(
+        manifest.interactions.every(({ type }) => type === 'notice' || type === 'starter_npc'),
+      ).toBe(true);
       expect(manifest.exits).toHaveLength(4);
       expect(Object.isFrozen(manifest)).toBe(true);
       expect(JSON.stringify(manifest)).not.toMatch(/<script|javascript:|https?:\/\//iu);

@@ -110,6 +110,7 @@ const mapObjectSchema = z
     x: z.number().finite(),
     y: z.number().finite(),
     scale: z.number().positive().max(4).default(1),
+    rotation: z.union([z.literal(0), z.literal(90), z.literal(180), z.literal(270)]).optional(),
   })
   .strict();
 const terrainAreaSchema = z
@@ -216,6 +217,7 @@ export interface MapObject {
   readonly x: number;
   readonly y: number;
   readonly scale: number;
+  readonly rotation?: 0 | 90 | 180 | 270;
 }
 
 export interface TerrainArea {

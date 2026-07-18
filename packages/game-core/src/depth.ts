@@ -9,3 +9,11 @@ export function stableDepthTieBreaker(id: string): number {
 export function depthForFootPosition(x: number, y: number, id: string): number {
   return Math.round((x + y) * 1_000) * 1_000 + stableDepthTieBreaker(id);
 }
+
+/**
+ * Keeps an asset's saved depth-anchor adjustment inside the same bounded band
+ * used by the game renderer. Logical foot position remains authoritative.
+ */
+export function depthOffsetForAnchors(footAnchorY: number, depthAnchorY: number): number {
+  return Math.round((depthAnchorY - footAnchorY) * 400);
+}

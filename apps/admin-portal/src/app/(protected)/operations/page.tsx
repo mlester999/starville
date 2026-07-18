@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { AdminApiError } from '../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../lib/auth/authorization';
 import { loadOperationsSummary } from '../../../lib/player-operations/api';
+import { loadRealtimeOverview } from '../../../lib/realtime/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -21,6 +22,9 @@ export default async function OperationsPage() {
 
   try {
     const summary = await loadOperationsSummary();
+    const realtime = hasAdminPermission(context, 'realtime.read')
+      ? await loadRealtimeOverview().catch(() => undefined)
+      : undefined;
     const metrics = [
       ['Total profiles', summary.players.total, 'Stored Starville player profiles.'],
       ['Active profiles', summary.players.active, 'Profiles without an application suspension.'],
@@ -67,6 +71,20 @@ export default async function OperationsPage() {
             </Link>
           </p>
         ) : null}
+        {hasAdminPermission(context, 'multiplayer_chat.reports.read') ? (
+          <p>
+            <Link className="button button--secondary" href="/operations/chat">
+              Review chat reports
+            </Link>
+          </p>
+        ) : null}
+        {hasAdminPermission(context, 'social_interactions.read') ? (
+          <p>
+            <Link className="button button--secondary" href="/operations/social">
+              Review gifts and trades
+            </Link>
+          </p>
+        ) : null}
 
         <section aria-labelledby="metrics-title">
           <h2 id="metrics-title">Measured state</h2>
@@ -80,6 +98,99 @@ export default async function OperationsPage() {
             ))}
           </dl>
         </section>
+
+        {realtime === undefined ? null : (
+          <section aria-labelledby="realtime-title">
+            <h2 id="realtime-title">Realtime multiplayer</h2>
+            <dl className="metric-grid">
+              <div className="metric-card">
+                <dt>Active sessions</dt>
+                <dd>{realtime.activeSessions.toLocaleString('en')}</dd>
+                <dd className="metric-definition">
+                  Server-admitted sessions with a heartbeat in the last 30 seconds.
+                </dd>
+              </div>
+              <div className="metric-card">
+                <dt>Stale sessions</dt>
+                <dd>{realtime.staleSessions.toLocaleString('en')}</dd>
+                <dd className="metric-definition">
+                  Sessions awaiting cleanup after their bounded heartbeat window.
+                </dd>
+              </div>
+              <div className="metric-card">
+                <dt>Recent reconnects</dt>
+                <dd>{realtime.reconnectingSessions.toLocaleString('en')}</dd>
+                <dd className="metric-definition">
+                  Connection-loss summaries from the last minute; not inferred activity.
+                </dd>
+              </div>
+              <div className="metric-card">
+                <dt>Maintenance impact</dt>
+                <dd>{realtime.maintenanceActive ? 'Admission blocked' : 'Open'}</dd>
+                <dd className="metric-definition">
+                  Active maintenance prevents new admission and disconnects revalidated sessions.
+                </dd>
+              </div>
+            </dl>
+            <div className="detail-card">
+              <h3>World and channel population</h3>
+              {realtime.populations.length === 0 ? (
+                <p className="card-note">No enabled channel definitions are available.</p>
+              ) : (
+                <div className="table-scroll">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>World</th>
+                        <th>Channel</th>
+                        <th>Active</th>
+                        <th>Stale</th>
+                        <th>Capacity</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {realtime.populations.map((population) => (
+                        <tr key={population.channelId}>
+                          <td>{population.worldName}</td>
+                          <td>Channel {population.channelNumber}</td>
+                          <td>{population.active}</td>
+                          <td>{population.stale}</td>
+                          <td>
+                            {population.active}/{population.capacity}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              <p className="card-note">
+                Observed {formatDate(realtime.generatedAt)}. No wallet, email, token balance,
+                session credential, IP address, or moderation history is exposed here.
+              </p>
+            </div>
+            <div className="detail-card">
+              <h3>Recent safe disconnect reasons</h3>
+              {realtime.recentDisconnects.length === 0 ? (
+                <p className="card-note">
+                  No disconnect summaries were recorded in the last 24 hours.
+                </p>
+              ) : (
+                <ul className="service-list">
+                  {realtime.recentDisconnects.map((item) => (
+                    <li key={item.reason}>
+                      <div>
+                        <strong>{item.reason.replaceAll('_', ' ')}</strong>
+                        <span>{item.count}</span>
+                      </div>
+                      <small>Latest {formatDate(item.latestAt)}</small>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </section>
+        )}
 
         <div className="operations-columns">
           <section className="detail-card" aria-labelledby="services-title">

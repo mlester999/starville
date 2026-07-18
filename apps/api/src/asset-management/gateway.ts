@@ -4,7 +4,9 @@ import type { AdminDatabaseIdentity } from '../contracts.js';
 import type { AdminAssetGateway } from './contracts.js';
 
 export class AdminAssetPersistenceError extends Error {
-  public constructor() {
+  public constructor(
+    public readonly safeReason: 'validated_version_immutable' | 'unavailable' = 'unavailable',
+  ) {
     super('Administrator asset persistence failed.');
     this.name = 'AdminAssetPersistenceError';
   }
@@ -22,7 +24,13 @@ async function execute(
     p_assurance_level: identity.assuranceLevel,
     ...input,
   });
-  if (result.error !== null) throw new AdminAssetPersistenceError();
+  if (result.error !== null) {
+    const safeReason =
+      result.error.code === '42501' && result.error.message === 'ASSET_VALIDATED_VERSION_IMMUTABLE'
+        ? 'validated_version_immutable'
+        : 'unavailable';
+    throw new AdminAssetPersistenceError(safeReason);
+  }
   return result.data;
 }
 
@@ -48,6 +56,8 @@ export function createSupabaseAdminAssetGateway(client: SupabaseClient): AdminAs
       call('update_admin_game_asset_version_draft', identity, input),
     validateVersion: (identity, input) =>
       call('validate_admin_game_asset_version', identity, input),
+    claimOperationIntent: (identity, input) =>
+      call('claim_admin_game_asset_operation_intent', identity, input),
     submitReview: (identity, input) => call('submit_admin_game_asset_review', identity, input),
     reviewVersion: (identity, input) => call('review_admin_game_asset_version', identity, input),
     previewMaterial: (identity, input) =>
@@ -58,7 +68,10 @@ export function createSupabaseAdminAssetGateway(client: SupabaseClient): AdminAs
       call('activate_admin_game_asset_version', identity, input),
     deprecateAsset: (identity, input) => call('deprecate_admin_game_asset', identity, input),
     archiveAsset: (identity, input) => call('archive_admin_game_asset', identity, input),
-    createVersion: (identity, input) => call('create_admin_game_asset_version', identity, input),
+    createVersion: (identity, input) =>
+      call('create_admin_game_asset_version_upload_v2', identity, input),
+    createVersionFromExisting: (identity, input) =>
+      call('create_admin_game_asset_version_from_existing', identity, input),
     listReviewQueue: (identity, input) =>
       call('list_admin_game_asset_review_queue', identity, input),
     listAudit: (identity, input) => call('list_admin_game_asset_audit', identity, input),

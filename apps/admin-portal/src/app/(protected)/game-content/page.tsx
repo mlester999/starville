@@ -1,3 +1,6 @@
+import Link from 'next/link';
+import { hasAdminPermission } from '@starville/admin-auth';
+
 import { requireAuthorizedAdmin } from '../../../lib/auth/authorization';
 import { loadAdminGameplayContent } from '../../../lib/cozy-gameplay/api';
 
@@ -13,7 +16,7 @@ function readiness(value: string) {
 }
 
 export default async function GameContentPage() {
-  await requireAuthorizedAdmin('items.read');
+  const context = await requireAuthorizedAdmin('items.read');
   const content = await loadAdminGameplayContent();
   return (
     <main className="operations-page game-content-page" aria-labelledby="game-content-title">
@@ -28,6 +31,21 @@ export default async function GameContentPage() {
         </div>
         <span className="state-chip state-chip--active">Content v{content.contentVersion}</span>
       </header>
+
+      <nav className="avatar-workflow-links detail-card" aria-label="Game content workspaces">
+        <Link href="/game-content/avatars">Avatar Content</Link>
+        <Link href="/game-content/cosmetics">Cosmetics, outfits, emotes, and collections</Link>
+        <Link href="/game-content/farming">Farming, personal plots, and starter quest</Link>
+        <Link href="/game-content/crafting">Cooking, crafting, recipes, and offline jobs</Link>
+        {hasAdminPermission(context, 'progression.skills.inspect') ? (
+          <Link href="/game-content/progression">
+            Progression, skills, quests, and achievements
+          </Link>
+        ) : null}
+        {hasAdminPermission(context, 'housing.furniture.inspect') ? (
+          <Link href="/game-content/housing">Housing, decoration, storage, and upgrades</Link>
+        ) : null}
+      </nav>
 
       <section className="detail-card" aria-labelledby="items-title">
         <h2 id="items-title">Items ({content.items.length})</h2>

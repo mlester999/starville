@@ -10,13 +10,23 @@ import {
 } from '../src';
 
 describe('Phase 7 local draft world content', () => {
-  it('does not mutate the canonical Phase 6 published manifest representation', () => {
+  it('keeps published source manifests free of local draft-only Phase 7 anchors', () => {
     expect(WORLD_MANIFESTS.every((manifest) => manifest.version === 1)).toBe(true);
     expect(
       WORLD_MANIFESTS.flatMap((manifest) => manifest.interactions).every(
-        (interaction) => interaction.type === 'notice',
+        (interaction) => interaction.type === 'notice' || interaction.type === 'starter_npc',
       ),
     ).toBe(true);
+    expect(
+      WORLD_MANIFESTS.flatMap((manifest) => manifest.interactions).filter(
+        (interaction) => interaction.type === 'starter_npc',
+      ),
+    ).toEqual([
+      expect.objectContaining({
+        id: 'phase11-willow-guide',
+        npcSlug: 'willow-guide',
+      }),
+    ]);
     expect(PHASE_7_LOCAL_DRAFTS.every((draft) => draft.lifecycle === 'local_draft')).toBe(true);
     expect(PHASE_7_LOCAL_DRAFTS.every((draft) => draft.manifest.version === 2)).toBe(true);
     expect(
@@ -42,7 +52,7 @@ describe('Phase 7 local draft world content', () => {
 
   it('provides strict stable-reference shop, station, and home anchors in Lantern Square', () => {
     const interactions = getPhase7LocalDraft('lantern-square').manifest.interactions.filter(
-      (interaction) => interaction.type !== 'notice',
+      (interaction) => interaction.id.startsWith('phase7-'),
     );
     expect(interactions.map((interaction) => interaction.type)).toEqual([
       'shop',
@@ -64,5 +74,29 @@ describe('Phase 7 local draft world content', () => {
     expect(
       PHASE_7_LOCAL_PREVIEW_WORLD.find((manifest) => manifest.id === 'lantern-square')?.exits,
     ).toEqual(WORLD_MANIFESTS.find((manifest) => manifest.id === 'lantern-square')?.exits);
+  });
+
+  it('keeps the Phase 10B mirror and furniture as reachable unpublished development anchors', () => {
+    const draft = getPhase7LocalDraft('lantern-square');
+    const anchors = draft.manifest.interactions.filter((interaction) =>
+      interaction.id.startsWith('phase10b-wardrobe-'),
+    );
+
+    expect(draft.lifecycle).toBe('local_draft');
+    expect(draft.manifest.developmentArt.label).toContain('not published');
+    expect(anchors.map((anchor) => anchor.id)).toEqual([
+      'phase10b-wardrobe-mirror',
+      'phase10b-wardrobe-furniture',
+    ]);
+    expect(
+      anchors.every((anchor) =>
+        isPositionWalkable(
+          anchor,
+          PLAYER_FOOT_RADIUS,
+          draft.manifest.safeSaveBounds,
+          draft.manifest.collisions,
+        ),
+      ),
+    ).toBe(true);
   });
 });

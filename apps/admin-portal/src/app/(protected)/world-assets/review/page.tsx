@@ -21,7 +21,10 @@ export default async function WorldAssetReviewPage(props: {
   try {
     const queue = await loadAssetReviewQueue(reviewQuery);
     return (
-      <main className="operations-page world-assets-page" aria-labelledby="asset-review-title">
+      <main
+        className="operations-page world-assets-page admin-content-shell"
+        aria-labelledby="asset-review-title"
+      >
         <header className="operations-intro">
           <div>
             <p className="eyebrow">Human quality gate</p>
@@ -65,7 +68,10 @@ export default async function WorldAssetReviewPage(props: {
     );
   } catch (error) {
     return (
-      <main className="operations-page world-assets-page" aria-labelledby="asset-review-title">
+      <main
+        className="operations-page world-assets-page admin-content-shell"
+        aria-labelledby="asset-review-title"
+      >
         <h1 id="asset-review-title">Asset Review Queue</h1>
         <WorldAssetEmptyState
           action={

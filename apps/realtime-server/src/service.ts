@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { buildRealtimeApp } from './app.js';
 import type { RealtimeRuntimeConfig, ServiceLogger } from './contracts.js';
+import type { RealtimePersistenceGateway } from './persistence/gateway.js';
 
 export interface RealtimeService {
   readonly app: FastifyInstance;
@@ -11,13 +12,15 @@ export interface RealtimeService {
 export interface CreateRealtimeServiceOptions {
   readonly config: RealtimeRuntimeConfig;
   readonly logger: ServiceLogger;
+  readonly persistence: RealtimePersistenceGateway;
 }
 
 export function createRealtimeService({
   config,
   logger,
+  persistence,
 }: CreateRealtimeServiceOptions): RealtimeService {
-  const { app } = buildRealtimeApp({ config, logger });
+  const { app } = buildRealtimeApp({ config, logger, persistence });
 
   return {
     app,

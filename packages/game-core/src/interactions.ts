@@ -53,6 +53,7 @@ export const cookingStationInteractionSchema = z
     ...interactionAnchorFields,
     type: z.literal('cooking_station'),
     stationType: z.literal('cooking_hearth'),
+    workstationInstanceId: z.uuid().optional(),
   })
   .strict();
 export const craftingStationInteractionSchema = z
@@ -60,6 +61,7 @@ export const craftingStationInteractionSchema = z
     ...interactionAnchorFields,
     type: z.literal('crafting_station'),
     stationType: z.literal('crafting_workbench'),
+    workstationInstanceId: z.uuid().optional(),
   })
   .strict();
 export const homeEntranceInteractionSchema = z
@@ -67,6 +69,21 @@ export const homeEntranceInteractionSchema = z
     ...interactionAnchorFields,
     type: z.literal('home_entrance'),
     homeTemplateSlug: interactionIdentifierSchema,
+  })
+  .strict();
+export const starterNpcInteractionSchema = z
+  .object({
+    ...interactionAnchorFields,
+    type: z.literal('starter_npc'),
+    npcSlug: interactionIdentifierSchema,
+  })
+  .strict();
+export const homeFarmTileInteractionSchema = z
+  .object({
+    ...interactionAnchorFields,
+    type: z.literal('home_farm_tile'),
+    tileKey: interactionIdentifierSchema,
+    slot: z.number().int().min(1).max(64),
   })
   .strict();
 
@@ -77,6 +94,8 @@ export const worldInteractionSchema = z.discriminatedUnion('type', [
   cookingStationInteractionSchema,
   craftingStationInteractionSchema,
   homeEntranceInteractionSchema,
+  starterNpcInteractionSchema,
+  homeFarmTileInteractionSchema,
 ]);
 export type WorldInteraction = z.infer<typeof worldInteractionSchema>;
 export const mapInteractionSchema = worldInteractionSchema;

@@ -11,6 +11,12 @@ function parameter(request: FastifyRequest, key: string): unknown {
     : undefined;
 }
 
+function queryParameter(request: FastifyRequest, key: string): unknown {
+  return typeof request.query === 'object' && request.query !== null
+    ? Reflect.get(request.query, key)
+    : undefined;
+}
+
 function response(data: unknown, requestId: string) {
   return { success: true, data, requestId } as const;
 }
@@ -71,6 +77,35 @@ export function registerAdminWorldRoutes(
       await options.service.getDraft(
         identity,
         parameter(request, 'mapId'),
+        parameter(request, 'versionId'),
+        request.id,
+      ),
+      request.id,
+    );
+  });
+
+  app.get('/api/v1/admin/worlds/:mapId/revisions/:versionId', async (request, reply) => {
+    disableResponseCaching(reply);
+    const identity = await authorize(request, 'maps.read');
+    return response(
+      await options.service.getRevision(
+        identity,
+        parameter(request, 'mapId'),
+        parameter(request, 'versionId'),
+        request.id,
+      ),
+      request.id,
+    );
+  });
+
+  app.get('/api/v1/admin/worlds/:mapId/revisions/:versionId/comparison', async (request, reply) => {
+    disableResponseCaching(reply);
+    const identity = await authorize(request, 'maps.read');
+    return response(
+      await options.service.compareRevisions(
+        identity,
+        parameter(request, 'mapId'),
+        queryParameter(request, 'fromVersionId'),
         parameter(request, 'versionId'),
         request.id,
       ),
@@ -142,6 +177,70 @@ export function registerAdminWorldRoutes(
       const identity = await authorize(request, 'maps.publish');
       return response(
         await options.service.publishVersion(
+          identity,
+          parameter(request, 'mapId'),
+          parameter(request, 'versionId'),
+          request.body,
+          request.id,
+        ),
+        request.id,
+      );
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/worlds/:mapId/versions/:versionId/publication-review',
+    { bodyLimit: 4_096 },
+    async (request, reply) => {
+      assertTrustedBrowserMutation(request, options.allowedOrigins);
+      disableResponseCaching(reply);
+      const identity = await authorize(request, 'maps.publish');
+      return response(
+        await options.service.reviewPublication(
+          identity,
+          parameter(request, 'mapId'),
+          parameter(request, 'versionId'),
+          typeof request.body === 'object' && request.body !== null
+            ? { ...request.body, operation: 'publish' }
+            : request.body,
+          request.id,
+        ),
+        request.id,
+      );
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/worlds/:mapId/versions/:versionId/rollback-review',
+    { bodyLimit: 4_096 },
+    async (request, reply) => {
+      assertTrustedBrowserMutation(request, options.allowedOrigins);
+      disableResponseCaching(reply);
+      const identity = await authorize(request, 'maps.rollback');
+      return response(
+        await options.service.reviewPublication(
+          identity,
+          parameter(request, 'mapId'),
+          parameter(request, 'versionId'),
+          typeof request.body === 'object' && request.body !== null
+            ? { ...request.body, operation: 'rollback' }
+            : request.body,
+          request.id,
+        ),
+        request.id,
+      );
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/worlds/:mapId/versions/:versionId/rollback',
+    { bodyLimit: 8_192 },
+    async (request, reply) => {
+      assertTrustedBrowserMutation(request, options.allowedOrigins);
+      disableResponseCaching(reply);
+      const identity = await authorize(request, 'maps.rollback');
+      return response(
+        await options.service.rollbackVersion(
           identity,
           parameter(request, 'mapId'),
           parameter(request, 'versionId'),

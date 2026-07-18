@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 
 const editor = readFileSync(new URL('./world-editor.tsx', import.meta.url), 'utf8');
 const canvas = readFileSync(new URL('./world-manifest-canvas.tsx', import.meta.url), 'utf8');
+const pointerGesture = readFileSync(
+  new URL('../lib/worlds/pointer-gesture.ts', import.meta.url),
+  'utf8',
+);
 const scroll = readFileSync(new URL('./editor-scroll-region.tsx', import.meta.url), 'utf8');
 const styles = readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
 
@@ -28,6 +32,8 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('Undo');
     expect(editor).toContain('Redo');
     expect(editor).toContain('world-editor-toggle');
+    expect(editor).toContain('label="Move tool"');
+    expect(editor).toContain('Selected tool:');
     expect(editor).toContain('label="Grid"');
     expect(editor).toContain('label="Collision"');
     expect(editor).toContain('label="Spawns"');
@@ -61,6 +67,15 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('InspectorSection');
     expect(editor).toContain('title="Identity"');
     expect(editor).toContain('title="Position"');
+    expect(editor).toContain('title="World Object"');
+    expect(editor).toContain('title="World Asset Binding"');
+    expect(editor).toContain('title="Rendering Explanation"');
+    expect(editor).toContain('title="Next Safe Action"');
+    expect(editor).toContain('Draft-pinned version');
+    expect(editor).toContain('Current active version');
+    expect(editor).toContain('Rendered version');
+    expect(editor).toContain('is validated but is not');
+    expect(editor).toContain('updates the world draft where required');
     expect(editor).not.toMatch(/<textarea[^>]+name=["'](?:json|manifest)/u);
   });
 
@@ -122,14 +137,24 @@ describe('world editor shell and presentation', () => {
 
   it('enables left-drag map panning with threshold, limits, and selection suppression', () => {
     expect(editor).toContain('CANVAS_PAN_DRAG_THRESHOLD_PX');
-    expect(editor).toContain('exceedsPanDragThreshold');
+    expect(editor).toContain('beginCanvasPointerGesture');
+    expect(editor).toContain('moveCanvasPointerGesture');
+    expect(editor).toContain('finishCanvasPointerGesture');
     expect(editor).toContain('clampCanvasPan');
     expect(editor).toContain('scheduleLivePan');
     expect(editor).toContain('suppressNextSelectRef');
     expect(editor).toContain('setPointerCapture');
+    expect(editor).toContain('releasePointerCapture');
     expect(editor).toContain('onLostPointerCapture');
+    expect(editor).toContain('onPointerCancel');
+    expect(editor).toContain('onClickCapture');
+    expect(editor).toContain('[data-world-canvas-interactive]');
+    expect(editor).toContain(
+      '.world-canvas-controls, .world-canvas-help, button, a, input, select, textarea',
+    );
     expect(editor).toContain('is-panning');
-    expect(editor).toContain('event.button === 0');
+    expect(pointerGesture).toContain('input.button !== 0');
+    expect(pointerGesture).toContain('input.isPrimary');
     expect(editor).toContain('event.button === 1');
     expect(editor).toContain('spaceHeldRef');
     expect(editor).toContain('hold left mouse on empty map space and drag');
@@ -137,6 +162,19 @@ describe('world editor shell and presentation', () => {
     // Must not create history from pan — only commitWorldEditorManifest mutates history.
     expect(editor).toContain('commitWorldEditorManifest');
     expect(editor).not.toContain('commitWorldEditorManifest(current, canvasPan');
+  });
+
+  it('keeps inspection accessible and read-only while exposing non-mutating render modes', () => {
+    expect(editor).toContain('aria-selected={pressed}');
+    expect(editor).toContain('role="listbox"');
+    expect(editor).toContain('role="option"');
+    expect(editor).toContain('assetPins={props.draft.assetPins}');
+    expect(editor).toContain("useState<WorldObjectRenderMode>('mixed')");
+    expect(editor).toContain('WORLD_OBJECT_RENDER_MODES');
+    expect(editor).toContain('editableDraft');
+    expect(editor).toContain('Read-only validated world version');
+    expect(styles).toContain("[data-mobile-panel='inspector'] .world-editor-drawer__panel");
+    expect(styles).toContain('max-height: min(72dvh, 38rem)');
   });
 
   it('keeps the validation dock as a layout sibling so Fit uses the unobstructed canvas host', () => {
@@ -176,7 +214,18 @@ describe('world editor shell and presentation', () => {
     expect(canvas).toContain('is-phase7');
     expect(canvas).toContain('shouldShowObjectLabel');
     expect(canvas).toContain('world-canvas__selection-glow');
+    expect(canvas).toContain('world-canvas__managed-asset');
+    expect(canvas).toContain('data-world-canvas-label');
+    expect(canvas).toContain("event.key !== 'Enter' && event.key !== ' '");
     expect(canvas).toContain('width="100%"');
     expect(canvas).toContain('height="100%"');
+  });
+
+  it('memoizes safe asset projections across unrelated inspector renders', () => {
+    expect(canvas).toContain('const renderingModel = useMemo');
+    expect(canvas).toContain('export const WorldManifestCanvas = memo(WorldManifestCanvasView)');
+    expect(editor).toContain('const canvasEmphasisObjectIds = useMemo');
+    expect(editor).toContain('onAssetMediaError={handleCanvasAssetMediaError}');
+    expect(editor).toContain('onSelect={handleCanvasSelect}');
   });
 });

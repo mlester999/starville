@@ -47,6 +47,8 @@ const options: GameRuntimeOptions = {
     onExitRequested() {},
     onMapChanged() {},
     onWorldAssetFallback() {},
+    onRemotePlayerSelected() {},
+    onActivityInteraction() {},
   },
 };
 

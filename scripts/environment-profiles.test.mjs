@@ -6,6 +6,7 @@ import { describe, expect, it } from 'vitest';
 import {
   loadAdminSecurityConfig,
   loadApiConfig,
+  loadHostedWriteSafetyConfig,
   loadPrivateSupabaseConfig,
 } from '../packages/config/src/server.ts';
 import { ENVIRONMENT_PROFILES, selectEnvironmentProfile } from './environment-profiles.mjs';
@@ -26,6 +27,7 @@ const fixtureEnvironment = {
   NEXT_PUBLIC_STARVILLE_DISCORD_URL: 'https://discord.gg/starville',
   NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
   NEXT_PUBLIC_SUPABASE_ANON_KEY: 'public-anonymous-placeholder',
+  NEXT_PUBLIC_GAME_BUILD_ID: 'local-game-test-build',
   SUPABASE_SERVICE_ROLE_KEY: 'server-only-placeholder',
   SUPABASE_DATABASE_URL: 'postgresql://user:password@example.invalid/starville',
   ADMIN_RECOVERY_COOKIE_SECRET: 'server-only-recovery-secret-at-least-32-characters',
@@ -74,10 +76,14 @@ describe('development environment profiles', () => {
     expect(environment).not.toHaveProperty('ADMIN_RECOVERY_COOKIE_SECRET');
   });
 
-  it('does not require or propagate maintenance gates during application runtime', () => {
+  it('propagates only the narrow asset-write gate to the admin and API runtimes', () => {
     for (const profile of Object.keys(ENVIRONMENT_PROFILES)) {
       const environment = selectEnvironmentProfile(profile, fixtureEnvironment);
-      expect(environment).not.toHaveProperty('SUPABASE_REMOTE_WRITES_APPROVED');
+      if (profile === 'admin-portal' || profile === 'api') {
+        expect(loadHostedWriteSafetyConfig(environment)).toEqual({ remoteWritesApproved: false });
+      } else {
+        expect(environment).not.toHaveProperty('SUPABASE_REMOTE_WRITES_APPROVED');
+      }
       expect(environment).not.toHaveProperty('RUN_HOSTED_SUPABASE_TESTS');
       expect(environment).not.toHaveProperty('ADMIN_BOOTSTRAP_ENABLED');
     }
@@ -106,6 +112,13 @@ describe('development environment profiles', () => {
     expect(api).toHaveProperty('SOLANA_RPC_URL');
     expect(api).toHaveProperty('TOKEN_ACCESS_COOKIE_SECRET');
     expect(api).not.toHaveProperty('NEXT_PUBLIC_REOWN_PROJECT_ID');
+  });
+
+  it('supplies the Game Test return target and immutable build identity to the game client', () => {
+    const gameClient = selectEnvironmentProfile('game-client', fixtureEnvironment);
+
+    expect(gameClient).toHaveProperty('NEXT_PUBLIC_ADMIN_URL', 'http://localhost:3002');
+    expect(gameClient).toHaveProperty('NEXT_PUBLIC_GAME_BUILD_ID', 'local-game-test-build');
   });
 
   it('limits the recovery secret to the admin portal server runtime', () => {

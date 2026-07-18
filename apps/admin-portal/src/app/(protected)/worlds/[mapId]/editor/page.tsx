@@ -3,12 +3,15 @@ import { randomUUID } from 'node:crypto';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { z } from 'zod';
+import { hasAdminPermission } from '@starville/admin-auth';
 
 import { WorldEditor } from '../../../../../components/world-editor';
 import { AdminApiError } from '../../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../../lib/auth/authorization';
 import { loadWorldEditorAssetCandidates } from '../../../../../lib/world-assets/api';
+import { parseAdminPublicConfig } from '../../../../../lib/public-config';
 import { loadWorldDraft } from '../../../../../lib/worlds/api';
+import { loadWorldGameTestStatus } from '../../../../../lib/worlds/game-test-api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -17,15 +20,25 @@ export default async function WorldEditorPage(props: {
   readonly params: Promise<{ readonly mapId: string }>;
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
-  await requireAuthorizedAdmin('maps.edit');
+  const context = await requireAuthorizedAdmin('maps.edit');
   await requireAuthorizedAdmin('assets.read');
   const { mapId } = await props.params;
-  const versionValue = (await props.searchParams)['version'];
+  const searchParameters = await props.searchParams;
+  const versionValue = searchParameters['version'];
+  const assetKeyValue = searchParameters['assetKey'];
+  const returnedGameTestSessionValue = searchParameters['gameTestSessionId'];
   const version = z.uuid().safeParse(typeof versionValue === 'string' ? versionValue : undefined);
+  const returnedGameTestSession = z
+    .uuid()
+    .safeParse(
+      typeof returnedGameTestSessionValue === 'string' ? returnedGameTestSessionValue : undefined,
+    );
   if (!version.success) notFound();
+  const canOpenGameTest = hasAdminPermission(context, 'maps.preview');
+  const publicConfig = parseAdminPublicConfig(process.env);
 
   try {
-    const [draft, assets] = await Promise.all([
+    const [draft, assets, gameTestStatus] = await Promise.all([
       loadWorldDraft(mapId, version.data),
       loadWorldEditorAssetCandidates({
         page: 1,
@@ -35,13 +48,30 @@ export default async function WorldEditorPage(props: {
         category: '',
         interaction: 'all',
       }),
+      canOpenGameTest && context.assuranceLevel === 'aal2'
+        ? loadWorldGameTestStatus(mapId, version.data, randomUUID()).catch(() => null)
+        : Promise.resolve(null),
     ]);
     if (!['draft', 'validated'].includes(draft.version.lifecycleStatus)) notFound();
 
     return (
       <WorldEditor
         approvedAssets={assets.items}
+        initialAssetKey={
+          typeof assetKeyValue === 'string' &&
+          /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(assetKeyValue)
+            ? assetKeyValue
+            : null
+        }
         draft={draft}
+        canOpenGameTest={canOpenGameTest}
+        assuranceLevel={context.assuranceLevel}
+        gameTestEnvironment={publicConfig.environment}
+        gameTestReopenUrl={new URL('/preview/world', publicConfig.gameUrl).toString()}
+        initialGameTestStatus={gameTestStatus}
+        returnedGameTestSessionId={
+          returnedGameTestSession.success ? returnedGameTestSession.data : null
+        }
         saveRequestId={randomUUID()}
         validationRequestId={randomUUID()}
       />

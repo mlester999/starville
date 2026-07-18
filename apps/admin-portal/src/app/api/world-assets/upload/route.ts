@@ -56,7 +56,10 @@ export async function POST(request: Request): Promise<Response> {
     return safeError(400, 'INVALID_ASSET_UPLOAD');
   }
 
-  const marker = formString(incoming, 'developmentMarkerReplacementKey')?.trim() || null;
+  // Ordinary creation omits the optional marker field; empty or missing values become null.
+  // Existing mappings and explicit intentional selections remain supported for compatibility.
+  const rawMarker = formString(incoming, 'developmentMarkerReplacementKey')?.trim();
+  const marker = rawMarker !== undefined && rawMarker.length > 0 ? rawMarker : null;
   const metadata = assetUploadMetadataSchema.safeParse({
     idempotencyKey: formString(incoming, 'idempotencyKey'),
     friendlyName: formString(incoming, 'friendlyName'),

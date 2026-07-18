@@ -14,6 +14,11 @@ import type {
   RecipeCatalog,
   ShopCatalog,
   ShopTransactionResult,
+  PlayableVerticalSlice,
+  VerticalSliceMutationResult,
+  WorkstationJobMutationResponse,
+  WorkstationTutorialMutationResponse,
+  WorkstationWorkspace,
 } from './contracts.js';
 import type { Inventory, ItemDefinition, Quickbar } from '@starville/cozy-gameplay';
 
@@ -41,6 +46,12 @@ const starterTool: ItemDefinition = {
   maxStackSize: 1,
   buyEligible: false,
   sellEligible: false,
+  giftable: false,
+  tradable: false,
+  accountBound: true,
+  permanentTool: true,
+  minimumTransferQuantity: 1,
+  maximumTransferQuantity: 1,
   defaultBuyPrice: null,
   defaultSellPrice: null,
   assetRef: null,
@@ -282,3 +293,154 @@ export const furnitureMutationFixture: FurnitureMutationResult = {
   inventoryStateVersion: 4,
   replayed: false,
 };
+
+export const HOME_FARM_TILE_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
+export const STARTER_QUEST_DEFINITION_ID = 'ffffffff-ffff-4fff-8fff-ffffffffffff';
+export const STARTER_QUEST_VERSION_ID = '12121212-1212-4212-8212-121212121212';
+export const STARTER_NPC_ID = '13131313-1313-4313-8313-131313131313';
+
+export const playableVerticalSliceFixture: PlayableVerticalSlice = {
+  contentVersion: 1,
+  plot: {
+    id: HOME_ID,
+    ownerPlayerId: PLAYER_ID,
+    lifecycle: 'active',
+    templateId: home.template.id,
+    templateSlug: home.template.slug,
+    templateVersion: home.template.templateVersion,
+    instanceKey: `personal-home:${HOME_ID}`,
+    bounds: home.template.bounds,
+    spawn: home.template.spawn,
+    exit: home.template.exit,
+    currentPosition: home.template.spawn,
+    location: 'personal_home',
+    tiles: [
+      {
+        id: HOME_FARM_TILE_ID,
+        tileKey: 'garden-one',
+        slot: 1,
+        x: 3,
+        y: 4,
+        state: 'empty',
+        preparedAt: null,
+        crop: null,
+        stateVersion: 1,
+        updatedAt: NOW,
+      },
+    ],
+    workstations: [],
+    farmingStateVersion: 1,
+    stateVersion: 3,
+    createdAt: NOW,
+    updatedAt: NOW,
+  },
+  inventory,
+  quickbar,
+  quest: {
+    definitionId: STARTER_QUEST_DEFINITION_ID,
+    versionId: STARTER_QUEST_VERSION_ID,
+    instanceId: null,
+    slug: 'a-place-to-grow',
+    name: 'A Place to Grow',
+    description: 'Meet Willow Guide and grow the first Moonbean crop at home.',
+    status: 'available',
+    objectives: [
+      { key: 'meet_guide', label: 'Meet Willow Guide', current: 0, required: 1, completed: false },
+      {
+        key: 'receive_starter_kit',
+        label: 'Receive the starter kit',
+        current: 0,
+        required: 1,
+        completed: false,
+      },
+      {
+        key: 'enter_home_plot',
+        label: 'Enter the personal home plot',
+        current: 0,
+        required: 1,
+        completed: false,
+      },
+      {
+        key: 'prepare_soil',
+        label: 'Prepare one soil tile',
+        current: 0,
+        required: 1,
+        completed: false,
+      },
+      {
+        key: 'plant_crops',
+        label: 'Plant two Moonbean seeds',
+        current: 0,
+        required: 2,
+        completed: false,
+      },
+      {
+        key: 'water_crops',
+        label: 'Water two Moonbean crops',
+        current: 0,
+        required: 2,
+        completed: false,
+      },
+      {
+        key: 'harvest_crop',
+        label: 'Harvest one mature crop',
+        current: 0,
+        required: 1,
+        completed: false,
+      },
+      {
+        key: 'deliver_produce',
+        label: 'Deliver two Moonbeans',
+        current: 0,
+        required: 2,
+        completed: false,
+      },
+      {
+        key: 'receive_reward',
+        label: 'Receive the DUST reward',
+        current: 0,
+        required: 1,
+        completed: false,
+      },
+    ],
+    starterSeedQuantity: 2,
+    deliveryQuantity: 2,
+    rewardDust: 25,
+    stateVersion: 0,
+    acceptedAt: null,
+    completedAt: null,
+    rewardReceiptId: null,
+  },
+  npc: {
+    id: STARTER_NPC_ID,
+    slug: 'willow-guide',
+    name: 'Willow Guide',
+    introduction: 'A patient village guide who helps new residents begin a home garden.',
+    worldId: 'lantern-square',
+    x: 12,
+    y: 10.5,
+    interactionRange: 2,
+    active: true,
+  },
+  liveOps: {
+    plantingEnabled: true,
+    harvestingEnabled: true,
+    plotProvisioningEnabled: true,
+    starterQuestEnabled: true,
+    tutorialRewardsEnabled: true,
+    maintenanceMessage: null,
+    configurationRevision: 1,
+  },
+  realtimeChannel: `private-home:${HOME_ID}`,
+  serverTime: NOW,
+};
+
+export const verticalSliceMutationFixture: VerticalSliceMutationResult = {
+  view: playableVerticalSliceFixture,
+  replayed: false,
+  announcement: 'Personal home plot updated.',
+};
+
+export const workstationWorkspaceFixture = {} as WorkstationWorkspace;
+export const workstationJobMutationFixture = {} as WorkstationJobMutationResponse;
+export const workstationTutorialMutationFixture = {} as WorkstationTutorialMutationResponse;

@@ -1,0 +1,92 @@
+begin;
+create extension if not exists pgtap with schema extensions;
+set local search_path = public, extensions, pg_catalog;
+
+select plan(78);
+
+select has_table('public','social_graph_settings','bounded social graph settings exist');
+select has_table('public','player_friend_requests','durable friend requests exist');
+select has_table('public','player_friendships','canonical friendships exist');
+select has_table('public','player_parties','durable parties exist');
+select has_table('public','player_party_members','party membership exists');
+select has_table('public','player_party_invitations','party invitations exist');
+select has_table('public','player_party_ready_checks','ready checks exist');
+select has_table('public','player_party_ready_responses','self ready responses exist');
+select has_table('public','player_social_notifications','bounded notifications exist');
+select has_table('public','player_social_audit','append-only social audit exists');
+select has_table('public','player_social_idempotency','durable social replay exists');
+
+select has_function('public','get_realtime_social_graph_bootstrap','social reconnect bootstrap exists');
+select has_function('public','send_realtime_friend_request','friend request authority exists');
+select has_function('public','respond_realtime_friend_request','friend response authority exists');
+select has_function('public','cancel_realtime_friend_request','friend cancellation authority exists');
+select has_function('public','remove_realtime_friend','friend removal authority exists');
+select has_function('public','create_realtime_party','party creation authority exists');
+select has_function('public','send_realtime_party_invitation','party invitation authority exists');
+select has_function('public','respond_realtime_party_invitation','party response authority exists');
+select has_function('public','cancel_realtime_party_invitation','party invitation cancellation exists');
+select has_function('public','leave_realtime_party','party leave authority exists');
+select has_function('public','kick_realtime_party_member','leader kick authority exists');
+select has_function('public','promote_realtime_party_leader','atomic promotion exists');
+select has_function('public','disband_realtime_party','party disband exists');
+select has_function('public','start_realtime_party_ready_check','ready start authority exists');
+select has_function('public','respond_realtime_party_ready_check','self ready response exists');
+select has_function('public','handle_realtime_social_graph_disconnect','disconnect reconciliation exists');
+select has_function('public','invalidate_realtime_social_graph_pair','block invalidation exists');
+select has_function('public','cleanup_social_graph','bounded cleanup exists');
+select has_function('public','get_admin_social_graph','admin graph summary exists');
+select has_function('public','get_admin_social_graph_party','admin party detail exists');
+select has_function('public','get_admin_social_graph_audit','admin audit list exists');
+select has_function('public','get_admin_social_graph_settings','admin settings read exists');
+select has_function('public','update_admin_social_graph_settings','admin settings edit exists');
+
+select is((select count(*)::integer from public.admin_permissions where key like 'social_graph.%'),4,'exactly four narrow graph permissions exist');
+select is((select count(*)::integer from public.admin_role_permissions m join public.admin_roles r on r.id=m.role_id join public.admin_permissions p on p.id=m.permission_id where r.key='game_administrator' and p.key like 'social_graph.%'),4,'Game Administrator has reviewed graph authority');
+select is((select count(*)::integer from public.admin_role_permissions m join public.admin_roles r on r.id=m.role_id join public.admin_permissions p on p.id=m.permission_id where r.key='read_only_analyst' and p.key like 'social_graph.%'),1,'Read-only Analyst has only graph summary read');
+select ok(not exists(select 1 from public.admin_role_permissions m join public.admin_roles r on r.id=m.role_id join public.admin_permissions p on p.id=m.permission_id where r.key='read_only_analyst' and p.key like 'social_graph.%' and p.key not like '%.read'),'analyst graph authority is read-only');
+select ok(not exists(select 1 from public.admin_role_permissions m join public.admin_roles r on r.id=m.role_id join public.admin_permissions p on p.id=m.permission_id where r.key='blockchain_operator' and p.key like 'social_graph.%'),'Blockchain Operator has no graph authority');
+
+select ok((select bool_and(relrowsecurity and relforcerowsecurity) from pg_class where oid in ('public.social_graph_settings'::regclass,'public.player_friend_requests'::regclass,'public.player_friendships'::regclass,'public.player_parties'::regclass,'public.player_party_members'::regclass,'public.player_party_invitations'::regclass,'public.player_party_ready_checks'::regclass,'public.player_party_ready_responses'::regclass,'public.player_social_notifications'::regclass,'public.player_social_audit'::regclass,'public.player_social_idempotency'::regclass)),'all graph tables force RLS');
+select ok(not exists(select 1 from pg_policies where schemaname='public' and tablename in ('social_graph_settings','player_friend_requests','player_friendships','player_parties','player_party_members','player_party_invitations','player_party_ready_checks','player_party_ready_responses','player_social_notifications','player_social_audit','player_social_idempotency')),'graph tables expose no browser policies');
+select ok(not has_table_privilege('anon','public.player_friendships','select'),'anonymous cannot read friendships');
+select ok(not has_table_privilege('authenticated','public.player_party_members','select'),'browser sessions cannot read party members directly');
+select ok(not has_table_privilege('service_role','public.player_parties','insert'),'service role cannot insert parties directly');
+select ok(not has_table_privilege('service_role','public.player_social_audit','delete'),'service role cannot delete audit directly');
+select ok(has_function_privilege('service_role','public.send_realtime_friend_request(uuid,uuid,text)','execute'),'realtime service can request friends');
+select ok(not has_function_privilege('authenticated','public.send_realtime_friend_request(uuid,uuid,text)','execute'),'browser cannot call friend authority');
+select ok(has_function_privilege('service_role','public.cleanup_social_graph(integer,text)','execute'),'worker can run bounded graph cleanup');
+select ok(not has_function_privilege('anon','public.get_admin_social_graph(uuid,uuid,text,text,text,integer,integer)','execute'),'anonymous cannot call admin graph summary');
+
+select ok(exists(select 1 from pg_indexes where schemaname='public' and indexname='player_friend_requests_one_pending_pair_idx' and indexdef ilike '%unique%'),'one pending request exists per unordered pair');
+select ok(exists(select 1 from pg_constraint where conrelid='public.player_friendships'::regclass and contype='u' and pg_get_constraintdef(oid) like '%player_one_profile_id, player_two_profile_id%'),'friendship pair is unique');
+select ok(exists(select 1 from pg_indexes where schemaname='public' and indexname='player_party_members_one_active_party_idx' and indexdef ilike '%unique%'),'one active party exists per player');
+select ok(exists(select 1 from pg_indexes where schemaname='public' and indexname='player_party_members_one_active_leader_idx' and indexdef ilike '%unique%'),'one active leader exists per party');
+select ok(exists(select 1 from pg_indexes where schemaname='public' and indexname='player_party_ready_checks_one_active_idx' and indexdef ilike '%unique%'),'one ready check exists per party');
+select ok(exists(select 1 from pg_constraint where conrelid='public.player_party_ready_responses'::regclass and contype='u' and pg_get_constraintdef(oid) like '%ready_check_id, player_profile_id%'),'one ready response exists per member');
+select ok(exists(select 1 from pg_trigger where tgrelid='public.player_social_audit'::regclass and tgname='player_social_audit_immutable' and not tgisinternal),'social audit is append-only');
+select ok(exists(select 1 from pg_trigger where tgrelid='public.player_social_idempotency'::regclass and tgname='player_social_idempotency_immutable' and not tgisinternal),'social replay outcomes are immutable');
+
+select ok(position('for update' in lower(pg_get_functiondef('public.respond_realtime_party_invitation(uuid,uuid,integer,text,text)'::regprocedure)))>0,'party acceptance locks authority rows');
+select ok(position('p_expected_revision' in pg_get_functiondef('public.respond_realtime_party_invitation(uuid,uuid,integer,text,text)'::regprocedure))>0,'party acceptance validates exact revision');
+select ok(position('social_graph_pair_blocked' in pg_get_functiondef('public.send_realtime_friend_request(uuid,uuid,text)'::regprocedure))>0,'friend requests enforce durable blocks');
+select ok(position('social_graph_pair_blocked' in pg_get_functiondef('public.respond_realtime_party_invitation(uuid,uuid,integer,text,text)'::regprocedure))>0,'party acceptance rechecks blocks');
+select ok(position('connection_status = ''online''' in pg_get_functiondef('public.cleanup_social_graph(integer,text)'::regprocedure))>0,'leader transfer chooses connected members');
+select ok(position('order by member.joined_at, member.id' in pg_get_functiondef('public.cleanup_social_graph(integer,text)'::regprocedure))>0,'leader transfer is deterministic');
+select ok(position('scope = ''party''' in pg_get_functiondef('public.get_realtime_chat_history(uuid,text,bigint)'::regprocedure))>0,'party history binds membership');
+select ok(position('active_party_id' in pg_get_functiondef('public.accept_realtime_chat_message(uuid,text,text,text,numeric,numeric)'::regprocedure))>0,'party chat derives party server-side');
+select is((select provolatile::text from pg_proc where oid='private.social_graph_ready_check_json(public.player_party_ready_checks)'::regprocedure),'s','ready-check serialization is truthfully stable');
+select is((select provolatile::text from pg_proc where oid='private.social_graph_party_json(public.player_parties)'::regprocedure),'s','party serialization is truthfully stable');
+select is((select provolatile::text from pg_proc where oid='public.get_admin_social_graph_party(uuid,uuid,text,uuid)'::regprocedure),'s','administrator party detail remains a stable read RPC');
+select ok(position('ready_response public.player_party_ready_responses' in lower(pg_get_functiondef('public.respond_realtime_party_ready_check(uuid,uuid,integer,text,text)'::regprocedure)))=0,'ready response has no unused row variable');
+select ok(position('perform 1 from public.player_party_ready_responses' in lower(pg_get_functiondef('public.respond_realtime_party_ready_check(uuid,uuid,integer,text,text)'::regprocedure)))>0,'ready response locks the actor membership row without a dummy read');
+select is((select count(*)::integer from pg_proc routine join pg_namespace namespace on namespace.oid=routine.pronamespace where namespace.nspname='public' and routine.proname='respond_realtime_party_ready_check'),1,'ready response has no obsolete overload');
+select is((select count(*)::integer from pg_proc routine join pg_namespace namespace on namespace.oid=routine.pronamespace where namespace.nspname='public' and routine.proname='get_admin_social_graph_party'),1,'administrator party detail has no obsolete overload');
+select ok(has_function_privilege('service_role','public.get_admin_social_graph_party(uuid,uuid,text,uuid)','execute') and not has_function_privilege('authenticated','public.get_admin_social_graph_party(uuid,uuid,text,uuid)','execute'),'administrator party detail execution remains service-role only');
+select ok(not has_function_privilege('service_role','private.social_graph_party_json(public.player_parties)','execute') and not has_function_privilege('service_role','private.social_graph_ready_check_json(public.player_party_ready_checks)','execute'),'private graph serializers remain inaccessible to the service role');
+select is((select count(*)::integer from public.social_graph_settings),1,'one versioned settings row exists');
+select ok((select maximum_friends between 1 and 500 and party_capacity between 2 and 8 and party_dormant_timeout_seconds between 300 and 604800 from public.social_graph_settings where singleton_key),'settings defaults remain bounded');
+select ok(not exists(select 1 from information_schema.columns where table_schema='public' and table_name in ('player_friend_requests','player_friendships','player_parties','player_party_members','player_party_invitations') and column_name in ('wallet_address','email','ip_address','session_token','authorization_header')),'graph storage excludes private credentials');
+select ok(exists(select 1 from pg_constraint where conrelid='public.multiplayer_chat_messages'::regclass and conname='multiplayer_chat_messages_party_scope_check'),'party chat requires an authoritative party ID');
+
+select * from finish();
+rollback;

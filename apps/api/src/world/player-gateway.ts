@@ -82,7 +82,7 @@ const playerStateSchema = z.object({
   lastTransitionAt: timestampSchema.nullable(),
   updatedAt: timestampSchema,
 });
-const pinnedAssetMaterialSchema = z
+export const pinnedAssetMaterialSchema = z
   .object({
     assetKey: assetIdentifierSchema,
     versionId: z.uuid(),

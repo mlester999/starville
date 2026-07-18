@@ -4,12 +4,26 @@ Starville is a premium 2D isometric cozy multiplayer life-simulation game platfo
 contains the public website, player client, administrator portal, authoritative API, dedicated
 real-time service, background worker, shared packages, and Supabase infrastructure.
 
-The active implementation scope is **Phase 7.5A: World Asset Manager and Production Art Pipeline**.
-Phases 4–7 remain intact. Phase 7.5A adds the local, permission-controlled foundation for PNG/WebP
-intake, authoritative image validation, immutable derivatives and versions, review, activation,
-asset previews, and safe draft-world visual replacement. It does not include final production
-artwork or automatic asset/map publication. All new migrations remain local until an owner
-explicitly approves hosted deployment. Phases 8 and 9 remain outside the current scope.
+The active implementation scope is **Phase 11E: server-authoritative personal housing, Decoration
+Mode, furniture placement, immutable layout revisions, private storage, and home upgrades**. Phases
+1–11D remain intact. Phase 11E reuses the canonical personal home, inventory, DUST, progression,
+World Asset, authorization, private-realtime, and worker foundations. Its implementation and clean
+local migration-chain execution are complete; hosted migration validation and signed-in owner
+acceptance remain pending. No hosted
+player/home/layout/furniture/inventory/storage/DUST/progression, world, asset, or platform
+configuration was changed.
+
+Phases 1–10A remain intact. Phase 10C: World Composer remains the immutable world-draft, Game Test,
+review, publication, and rollback foundation reused by the current phase.
+
+Phase 10B: Wardrobes, emotes, cosmetic collections, and cosmetic live operations remains the
+server-authoritative cosmetic foundation under Phase 10C.
+
+Phase 9B-A remains a disabled offline token-claim architecture. It has no treasury, signer, player
+claim action, blockchain transaction, or payout. Phase 10B does not add paid cosmetics, DUST
+cosmetic purchases, token-gated cosmetics, NFTs, a marketplace, trading, or stat equipment. Its shop
+is a structurally disabled preview with no offers, Buy control, purchase RPC, or publication path.
+Remaining Phase 8/9 acceptance is deferred, not waived.
 
 ## Requirements
 
@@ -202,9 +216,9 @@ Hosted tests use unique test-owned identities and exact-ID cleanup. They never r
 truncate tables, delete unknown Auth users, or use service role as the identity under RLS. This
 README does not replace command evidence; every hosted result must be reported by the current
 validation run. The current hosted migration state must be verified with `pnpm db:migrations:list`;
-this repository does not infer deployment from local files. All four Phase 7 migrations are local
-and pending owner-authorized deployment. Any hosted operation remains subject to the owner gates and
-must be verified against the current migration list rather than assumed from this document.
+this repository does not infer deployment from local files. Pending migrations remain subject to the
+owner gates and must be verified against the current migration list rather than assumed from this
+document.
 
 See [the hosted development runbook](docs/deployment/hosted-supabase-development.md) for target
 verification, raw CLI command forms, hosted Auth redirects, fixture safety, and prohibited
@@ -232,6 +246,11 @@ packages/
   asset-management/     Asset profiles, lifecycle, configuration, and safe delivery contracts
   player-operations/    Strict moderation, directory, audit, and operations contracts
   cozy-gameplay/        Strict Phase 7 DUST, inventory, farm, shop, recipe, and home contracts
+  realtime/             Strict Phase 8 presence, movement, chat, safety, and moderation contracts
+  avatar/               Phase 10A modular avatar, selection, rendering, and content contracts
+  cosmetics/            Phase 10B ownership, outfits, emotes, collections, and shop-off contracts
+  economy/              Phase 9A DUST authority and reporting contracts
+  economy-simulation/   Deterministic non-mutating economy planning models
   database/             Migration and type-generation conventions
   design-tokens/        Shared visual primitives
   eslint-config/        Shared lint policy
@@ -250,10 +269,11 @@ docs/                   Product specification and focused architecture records
 ```
 
 Analytics and shared UI packages remain omitted until their approved phases require real
-implementation. Phase 7 economy contracts live in the focused `cozy-gameplay` package rather than a
-speculative generic economy package. The Phase 6 visual editor lives in the administrator
-application and reuses the canonical `game-core` and `game-content` contracts rather than creating a
-duplicate editor package.
+implementation. Phase 7 gameplay contracts remain in `cozy-gameplay`; Phase 9A’s reviewed,
+cross-service economy contracts and isolated planning engine live in `economy` and
+`economy-simulation`. The Phase 6 visual editor lives in the administrator application and reuses
+the canonical `game-core` and `game-content` contracts rather than creating a duplicate editor
+package.
 
 ## Phase 4 behavior
 
@@ -411,16 +431,16 @@ owner-controlled wallet holding the configured threshold.
 Read [the Phase 1 trust boundaries](docs/security/phase-1-trust-boundaries.md) before adding an
 external integration.
 
-## Intentionally not implemented in Phase 7.5A
+## Intentionally not implemented in Phase 9A
 
-The following are **not started by design** in Phase 7.5A:
+The following remain **not started by design** in Phase 9A:
 
 - equipment, quests, combat, animals, NPC schedules, player businesses, stamina, hunger, health, or
   durability;
-- player marketplace, gifting, trading, Constellation Points, rewards, claims, or treasury
-  operations;
-- realtime player synchronization, chat, channels, friends, parties, guilds, trading, visits,
-  leaderboards, or nearby-player interactions;
+- player marketplace, auction house, DUST trading, token transfers, token rewards, claims, custody,
+  staking, burning, deposits, withdrawals, conversions, or treasury operations;
+- global cross-world chat, direct messages, guilds, clans, visits, leaderboards, or private social
+  profiles;
 - final production artwork, automated art generation, automatic asset/map approval or publication,
   realtime collaborative editing, or arbitrary new map-identity creation;
 - administrator invitation/management UI, role editing, permission editing, session-listing UI, or a
@@ -472,6 +492,88 @@ their pages, APIs, or business operations have been implemented.
 - [World asset storage security](docs/security/world-asset-storage.md)
 - [World asset administrator runbook](docs/admin/world-asset-runbook.md)
 - [Phase 7.5A deployment runbook](docs/deployment/phase-7-5a-world-assets.md)
+- [Phase 8A realtime architecture](docs/architecture/phase-8a-realtime-presence.md)
+- [Phase 8A protocol](docs/api/phase-8a-realtime-protocol.md)
+- [Phase 8A trust boundary](docs/security/phase-8a-realtime-trust-boundary.md)
+- [Phase 8A migration runbook](docs/deployment/phase-8a-realtime-migration.md)
+- [Phase 8A owner acceptance](docs/deployment/phase-8a-manual-qa.md)
+- [Phase 8A local load report](docs/deployment/phase-8a-local-load-report.md)
+- [Phase 8B chat architecture](docs/architecture/phase-8b-multiplayer-chat.md)
+- [Phase 8B realtime chat protocol](docs/api/phase-8b-realtime-chat-protocol.md)
+- [Phase 8B player safety and privacy](docs/security/phase-8b-player-safety-and-privacy.md)
+- [Phase 8B player chat safety guide](docs/game-design/phase-8b-player-chat-safety.md)
+- [Phase 8B abuse limits](docs/security/phase-8b-abuse-rate-limits.md)
+- [Phase 8B moderation runbook](docs/admin/phase-8b-chat-moderation-runbook.md)
+- [Phase 8B deployment runbook](docs/deployment/phase-8b-chat-deployment.md)
+- [Phase 8B owner acceptance](docs/deployment/phase-8b-owner-acceptance.md)
+- [Phase 8B controlled local load report](docs/deployment/phase-8b-local-load-report.md)
+- [Phase 8C nearby social architecture](docs/architecture/phase-8c-nearby-social-interactions.md)
+- [Phase 8C gifting and trading rules](docs/game-design/phase-8c-gifting-and-trading.md)
+- [Phase 8C realtime social protocol](docs/api/phase-8c-realtime-social-protocol.md)
+- [Phase 8C trust and settlement security](docs/security/phase-8c-social-trust-and-settlement.md)
+- [Phase 8C administrator audit runbook](docs/admin/phase-8c-social-audit-runbook.md)
+- [Phase 8C deployment guide](docs/deployment/phase-8c-social-deployment.md)
+- [Phase 8C owner acceptance](docs/deployment/phase-8c-owner-acceptance.md)
+- [Phase 8C controlled local load report](docs/deployment/phase-8c-local-load-report.md)
+- [Phase 8D-A friends and parties architecture](docs/architecture/phase-8d-friends-parties.md)
+- [Phase 8D-A realtime social graph protocol](docs/api/phase-8d-realtime-social-graph-protocol.md)
+- [Phase 8D-A privacy and trust boundaries](docs/security/phase-8d-social-privacy-trust-boundaries.md)
+- [Phase 8D-A administrator runbook](docs/admin/phase-8d-social-operations-runbook.md)
+- [Phase 8D-A deployment guide](docs/deployment/phase-8d-social-deployment.md)
+- [Phase 8D-A owner acceptance](docs/deployment/phase-8d-owner-acceptance.md)
+- [Phase 8D-A controlled local load report](docs/deployment/phase-8d-local-load-report.md)
+- [Phase 9A current economy inventory](docs/economy/phase-9a-current-inventory.md)
+- [Phase 9A off-chain economy architecture](docs/architecture/phase-9a-offchain-economy.md)
+- [Phase 9A simulation model](docs/economy/phase-9a-simulation.md)
+- [Phase 9A `$STAR` utility boundary](docs/economy/phase-9a-star-utility.md)
+- [Phase 9A trust boundaries](docs/security/phase-9a-economy-trust-boundaries.md)
+- [Phase 9A administrator operations](docs/admin/phase-9a-economy-operations.md)
+- [Phase 9A deployment guide](docs/deployment/phase-9a-economy.md)
+- [Phase 9A owner acceptance](docs/deployment/phase-9a-owner-acceptance.md)
+- [Phase 9A.1 administrator workflows](docs/admin/phase-9a1-economy-workflows.md)
+- [Phase 9A.1 tuning candidates](docs/economy/phase-9a1-tuning-candidates.md)
+- [Phase 9A.1 readiness and signed-in acceptance](docs/deployment/phase-9a1-hosted-readiness.md)
+- [Phase 9A.1 controlled local load report](docs/deployment/phase-9a1-local-load-report.md)
+- [Phase 9A.1 economy readiness security review](docs/security/phase-9a1-economy-readiness-review.md)
+- [Phase 9A.1 public documentation maintenance](docs/deployment/phase-9a1-documentation-maintenance.md)
+- [Phase 9B-A current Solana, wallet, and token-access assessment](docs/architecture/phase-9ba-current-solana-wallet-access.md)
+- [Phase 9B-A token-claim architecture decision record](docs/architecture/phase-9ba-token-claim-adr.md)
+- [Phase 9B-A disabled claim foundation](docs/architecture/phase-9ba-disabled-claim-foundation.md)
+- [Phase 9B-A treasury controls and offline simulation design](docs/architecture/phase-9ba-treasury-controls.md)
+- [Phase 9B-A token-claim threat model](docs/security/phase-9ba-token-claim-threat-model.md)
+- [Phase 9B-A incident-response runbooks](docs/security/phase-9ba-incident-response.md)
+- [Phase 9B-A key-rotation design](docs/deployment/phase-9ba-key-rotation.md)
+- [Phase 9B-A legal, compliance, and Phase 9B-B gate](docs/deployment/phase-9ba-legal-compliance-and-phase-9bb-gate.md)
+- [Phase 9B-A local offline simulation report](docs/deployment/phase-9ba-local-simulation-report.md)
+- [Phase 10A modular avatar architecture](docs/architecture/phase-10a-modular-avatar-system.md)
+- [Phase 10A character customization design](docs/game-design/phase-10a-character-customization.md)
+- [Phase 10A avatar trust boundaries](docs/security/phase-10a-avatar-trust-boundaries.md)
+- [Phase 10A avatar content operations](docs/admin/phase-10a-avatar-content-operations.md)
+- [Phase 10A deferred owner acceptance](docs/deployment/phase-10a-owner-acceptance.md)
+- [Phase 10B cosmetic platform architecture](docs/architecture/phase-10b-cosmetic-platform.md)
+- [Phase 10B cosmetic administrator operations](docs/admin/phase-10b-cosmetic-operations.md)
+- [Phase 10B cosmetic trust boundaries](docs/security/phase-10b-cosmetic-trust-boundaries.md)
+- [Phase 10B cosmetic economy simulation](docs/economy/phase-10b-cosmetic-simulation.md)
+- [Phase 10B hosted readiness and owner acceptance](docs/deployment/phase-10b-hosted-readiness.md)
+- [Phase 10B controlled local validation report](docs/deployment/phase-10b-local-validation-report.md)
+- [Phase 10C World Composer and revision lifecycle](docs/architecture/phase-10c-world-composer.md)
+- [Phase 10C World Composer operations](docs/admin/phase-10c-world-composer-operations.md)
+- [Phase 10C world publication trust boundary](docs/security/phase-10c-world-publication-trust-boundary.md)
+- [Phase 10C deferred owner acceptance](docs/deployment/phase-10c-owner-acceptance.md)
+- [Phase 11A playable vertical slice](docs/architecture/phase-11a-playable-vertical-slice.md)
+- [Phase 11B cooking and crafting](docs/architecture/phase-11b-cooking-crafting.md)
+- [Phase 11C General Store](docs/architecture/phase-11c-general-store.md)
+- [Phase 11D player progression](docs/architecture/phase-11d-player-progression.md)
+- [Phase 11D progression balance](docs/game-design/phase-11d-progression-balance.md)
+- [Phase 11D administrator operations](docs/admin/phase-11d-progression-operations.md)
+- [Phase 11D progression trust boundaries](docs/security/phase-11d-progression-trust-boundaries.md)
+- [Phase 11D deferred owner acceptance](docs/deployment/phase-11d-owner-acceptance.md)
+- [Phase 11E housing architecture](docs/architecture/phase-11e-housing.md)
+- [Phase 11E housing design and local tuning](docs/game-design/phase-11e-housing.md)
+- [Phase 11E administrator operations](docs/admin/phase-11e-housing-operations.md)
+- [Phase 11E housing trust boundaries](docs/security/phase-11e-housing-trust-boundaries.md)
+- [Phase 11E DUST sink](docs/economy/phase-11e-housing-dust-sink.md)
+- [Phase 11E deferred owner acceptance](docs/deployment/phase-11e-owner-acceptance.md)
 - [First Super Administrator bootstrap](docs/admin/admin-bootstrap.md)
 - [Roles and permissions](docs/admin/roles-and-permissions.md)
 - [Administrator authorization security](docs/security/admin-authorization.md)

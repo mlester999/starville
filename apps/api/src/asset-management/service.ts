@@ -8,6 +8,7 @@ import {
   GLOBAL_ASSET_DERIVATIVE_MAX_BYTES,
   GLOBAL_ASSET_INTAKE_MAX_BYTES,
   assetActivationActionSchema,
+  assetCreateVersionActionSchema,
   assetCreateVersionUploadMetadataSchema,
   assetDeprecationActionSchema,
   assetDraftUpdateSchema,
@@ -28,6 +29,7 @@ import type {
   AssetUploadInput,
   AssetVersionUploadInput,
 } from './contracts.js';
+import { AdminAssetPersistenceError } from './gateway.js';
 import {
   AssetProcessingError,
   detectRasterMediaType,
@@ -260,6 +262,7 @@ function mapFailure(value: unknown): void {
   if (status === 'not_found') throw new PublicApiError(404, 'ASSET_NOT_FOUND');
   if (status === 'rate_limited') throw new PublicApiError(429, 'RATE_LIMITED');
   if (status === 'duplicate_content') throw new PublicApiError(409, 'ASSET_DUPLICATE');
+  if (status === 'request_conflict') throw new PublicApiError(409, 'ASSET_REQUEST_CONFLICT');
   if (
     status === 'asset_version_conflict' ||
     status === 'upload_version_conflict' ||
@@ -274,6 +277,8 @@ function mapFailure(value: unknown): void {
     status === 'processing_not_available' ||
     status === 'asset_archived' ||
     status === 'open_version_exists' ||
+    status === 'version_not_copyable' ||
+    status === 'version_source_not_copyable' ||
     status === 'version_not_editable' ||
     status === 'version_not_validatable' ||
     status === 'version_not_submittable' ||
@@ -283,6 +288,10 @@ function mapFailure(value: unknown): void {
   ) {
     throw new PublicApiError(409, 'ASSET_STATE_CONFLICT');
   }
+}
+
+function reviewIntentFingerprint(values: readonly (string | number)[]): string {
+  return createHash('sha256').update(JSON.stringify(values)).digest('hex');
 }
 
 function parseResult<T>(value: unknown, project: (input: unknown) => T): T {
@@ -325,16 +334,41 @@ export function createAdminAssetService(
   const { gateway, storage, logger } = options;
   const now = options.now ?? (() => new Date());
 
-  const guarded = async <T>(requestId: string, operation: () => Promise<T>): Promise<T> => {
+  const guarded = async <T>(
+    requestId: string,
+    operation: () => Promise<T>,
+    logContext: Readonly<Record<string, unknown>> = {},
+  ): Promise<T> => {
     try {
       return await operation();
     } catch (error) {
       if (error instanceof PublicApiError) throw error;
+      const processingStage =
+        typeof logContext['processingStage'] === 'string'
+          ? logContext['processingStage']
+          : 'service_operation';
+      const operationLogger = logger.child({ requestId, ...logContext });
       if (error instanceof AssetStorageError) {
-        logger.child({ requestId }).error('admin.asset.storage_failed', { error });
+        operationLogger.error('admin.asset.storage_failed', {
+          processingStage,
+          errorCategory: 'storage_unavailable',
+        });
         throw new PublicApiError(503, 'ASSET_STORAGE_UNAVAILABLE');
       }
-      logger.child({ requestId }).error('admin.asset.failed', { error });
+      if (
+        error instanceof AdminAssetPersistenceError &&
+        error.safeReason === 'validated_version_immutable'
+      ) {
+        operationLogger.warn('admin.asset.lifecycle_conflict', {
+          processingStage,
+          errorCategory: 'validated_version_immutable',
+        });
+        throw new PublicApiError(409, 'ASSET_STATE_CONFLICT');
+      }
+      operationLogger.error('admin.asset.failed', {
+        processingStage,
+        errorCategory: 'database_or_service_unavailable',
+      });
       throw new PublicApiError(503, 'ASSET_MANAGEMENT_UNAVAILABLE');
     }
   };
@@ -357,8 +391,29 @@ export function createAdminAssetService(
         p_request_id: requestId,
         p_rate_limit: options.mutationRateLimit,
       });
-    } catch (error) {
-      logger.child({ requestId }).error('admin.asset.failure_record_failed', { error });
+    } catch {
+      logger
+        .child({ requestId, assetId: reservation.assetId })
+        .error('admin.asset.failure_record_failed', {
+          processingStage: 'failure_record',
+          errorCategory: 'database_unavailable',
+        });
+    }
+  }
+
+  async function cleanupPrivatePaths(
+    assetId: string,
+    paths: readonly string[],
+    requestId: string,
+  ): Promise<void> {
+    if (paths.length === 0) return;
+    try {
+      await storage.removePrivate(paths);
+    } catch {
+      logger.child({ requestId, assetId }).error('admin.asset.partial_upload_cleanup_failed', {
+        processingStage: 'cleanup',
+        errorCategory: 'private_storage_unavailable',
+      });
     }
   }
 
@@ -371,12 +426,14 @@ export function createAdminAssetService(
     requestId: string,
   ) {
     const originalFileName = safeFileName(input.originalFileName);
+    const log = logger.child({ requestId, assetId: reservation.assetId });
+    const newlyStoredPaths: string[] = [];
+    let processingStage = 'intake_storage';
     try {
-      await storage.storePrivateImmutable(
-        assertInternalStoragePath(reservation.intakePath),
-        input.bytes,
-        mediaType,
-      );
+      const intakePath = assertInternalStoragePath(reservation.intakePath);
+      const intakeResult = await storage.storePrivateImmutable(intakePath, input.bytes, mediaType);
+      if (intakeResult === 'stored') newlyStoredPaths.push(intakePath);
+      processingStage = 'image_processing';
       const processed = await processAssetImage(
         {
           bytes: input.bytes,
@@ -387,11 +444,28 @@ export function createAdminAssetService(
         now,
       );
       const paths = privateDerivativePaths(reservation.assetId, reservation.versionId);
-      await Promise.all([
+      processingStage = 'derivative_storage';
+      const derivativeWrites = await Promise.allSettled([
         storage.storePrivateImmutable(paths.source, processed.normalizedSource, 'image/webp'),
         storage.storePrivateImmutable(paths.preview, processed.preview, 'image/webp'),
         storage.storePrivateImmutable(paths.thumbnail, processed.thumbnail, 'image/webp'),
       ]);
+      const derivativePaths = [paths.source, paths.preview, paths.thumbnail] as const;
+      derivativeWrites.forEach((result, index) => {
+        const derivativePath = derivativePaths[index];
+        if (
+          derivativePath !== undefined &&
+          result.status === 'fulfilled' &&
+          result.value === 'stored'
+        ) {
+          newlyStoredPaths.push(derivativePath);
+        }
+      });
+      const derivativeFailure = derivativeWrites.find(
+        (result): result is PromiseRejectedResult => result.status === 'rejected',
+      );
+      if (derivativeFailure !== undefined) throw derivativeFailure.reason;
+      processingStage = 'database_completion';
       const result = await gateway.completeProcessing(identity, {
         p_asset_id: reservation.assetId,
         p_version_id: reservation.versionId,
@@ -422,22 +496,37 @@ export function createAdminAssetService(
       });
       return parseTargetedMutation(result, reservation.assetId, reservation.versionId);
     } catch (error) {
-      if (error instanceof PublicApiError) throw error;
       const storageFailure = error instanceof AssetStorageError;
       const processingError = error instanceof AssetProcessingError ? error : null;
-      if (!storageFailure && processingError === null) throw error;
+      const publicFailure = error instanceof PublicApiError ? error : null;
+      const completionOutcomeUnknown =
+        processingStage === 'database_completion' && publicFailure === null;
       const errorCode = storageFailure ? 'STORAGE_FAILED' : processingError?.code;
-      if (errorCode === undefined) throw error;
-      await recordProcessingFailure(
-        identity,
-        reservation,
-        requestId,
-        errorCode,
-        safeFailureValidation(errorCode, processingError?.validationIssues ?? [], now),
-      );
+      const errorCategory = storageFailure
+        ? 'private_storage_unavailable'
+        : processingError !== null
+          ? 'image_processing_rejected'
+          : completionOutcomeUnknown
+            ? 'database_completion_outcome_unknown'
+            : publicFailure !== null
+              ? publicFailure.code.toLowerCase()
+              : 'database_unavailable';
+      log.error('admin.asset.version_upload_failed', { processingStage, errorCategory });
+      if (errorCode !== undefined) {
+        await recordProcessingFailure(
+          identity,
+          reservation,
+          requestId,
+          errorCode,
+          safeFailureValidation(errorCode, processingError?.validationIssues ?? [], now),
+        );
+      }
+      if (!completionOutcomeUnknown) {
+        await cleanupPrivatePaths(reservation.assetId, newlyStoredPaths, requestId);
+      }
       if (storageFailure) throw new PublicApiError(503, 'ASSET_STORAGE_UNAVAILABLE');
-      if (processingError === null) throw error;
-      throw processingFailureStatus(processingError);
+      if (processingError !== null) throw processingFailureStatus(processingError);
+      throw error;
     }
   }
 
@@ -613,6 +702,21 @@ export function createAdminAssetService(
       const safeAssetId = validId(assetId);
       const safeVersionId = validId(versionId);
       return guarded(requestId, async () => {
+        const intent = await gateway.claimOperationIntent(identity, {
+          p_asset_id: safeAssetId,
+          p_version_id: safeVersionId,
+          p_operation: 'submit_asset_review',
+          p_request_id: requestId,
+          p_reason: parsed.reason,
+          p_intent_fingerprint: reviewIntentFingerprint([
+            'submit_asset_review',
+            safeAssetId,
+            safeVersionId,
+            parsed.expectedEditVersion,
+            parsed.reason,
+          ]),
+        });
+        mapFailure(intent);
         const value = await gateway.submitReview(identity, {
           p_asset_id: safeAssetId,
           p_version_id: safeVersionId,
@@ -630,6 +734,22 @@ export function createAdminAssetService(
       const safeAssetId = validId(assetId);
       const safeVersionId = validId(versionId);
       return guarded(requestId, async () => {
+        const intent = await gateway.claimOperationIntent(identity, {
+          p_asset_id: safeAssetId,
+          p_version_id: safeVersionId,
+          p_operation: 'review_asset_version',
+          p_request_id: requestId,
+          p_reason: parsed.reason,
+          p_intent_fingerprint: reviewIntentFingerprint([
+            'review_asset_version',
+            safeAssetId,
+            safeVersionId,
+            parsed.expectedEditVersion,
+            parsed.action,
+            parsed.reason,
+          ]),
+        });
+        mapFailure(intent);
         const value = await gateway.reviewVersion(identity, {
           p_asset_id: safeAssetId,
           p_version_id: safeVersionId,
@@ -648,6 +768,22 @@ export function createAdminAssetService(
       const safeAssetId = validId(assetId);
       const safeVersionId = validId(versionId);
       return guarded(requestId, async () => {
+        const intent = await gateway.claimOperationIntent(identity, {
+          p_asset_id: safeAssetId,
+          p_version_id: safeVersionId,
+          p_operation: 'activate_asset_version',
+          p_request_id: requestId,
+          p_reason: parsed.reason,
+          p_intent_fingerprint: reviewIntentFingerprint([
+            'activate_asset_version',
+            safeAssetId,
+            safeVersionId,
+            parsed.expectedAssetRevision,
+            parsed.expectedEditVersion,
+            parsed.reason,
+          ]),
+        });
+        mapFailure(intent);
         const rawMaterial = await gateway.activationMaterial(identity, {
           p_asset_id: safeAssetId,
           p_version_id: safeVersionId,
@@ -732,34 +868,67 @@ export function createAdminAssetService(
       const safeAssetId = validId(assetId);
       const originalFileName = safeFileName(input.originalFileName);
       const mediaType = declaredMediaType(input.declaredMediaType);
-      return guarded(requestId, async () => {
-        const detailValue = await gateway.getAsset(identity, {
-          p_asset_id: safeAssetId,
-          p_request_id: requestId,
-          p_rate_limit: options.readRateLimit,
-        });
-        const detail = parseResult(detailValue, projectAssetDetail);
-        assertTarget(detail.asset.id, safeAssetId);
-        const profile = assertProfileInput(
-          detail.asset.assetType,
-          detail.asset.category,
-          input.bytes.length,
-        );
-        const raw = await gateway.createVersion(identity, {
-          p_asset_id: safeAssetId,
-          p_expected_asset_revision: metadata.expectedAssetRevision,
-          p_reason: metadata.reason,
-          p_original_file_name: originalFileName,
-          p_declared_mime_type: mediaType,
-          p_declared_size_bytes: input.bytes.length,
-          p_request_id: requestId,
-          p_rate_limit: options.mutationRateLimit,
-        });
-        mapFailure(raw);
-        const reservation = assetUploadReservationSchema.parse(raw);
-        assertTarget(reservation.assetId, safeAssetId);
-        return processReservation(identity, reservation, input, profile, mediaType, requestId);
-      });
+      return guarded(
+        requestId,
+        async () => {
+          const detailValue = await gateway.getAsset(identity, {
+            p_asset_id: safeAssetId,
+            p_request_id: requestId,
+            p_rate_limit: options.readRateLimit,
+          });
+          const detail = parseResult(detailValue, projectAssetDetail);
+          assertTarget(detail.asset.id, safeAssetId);
+          const profile = assertProfileInput(
+            detail.asset.assetType,
+            detail.asset.category,
+            input.bytes.length,
+          );
+          const raw = await gateway.createVersion(identity, {
+            p_asset_id: safeAssetId,
+            p_source_version_id: metadata.sourceVersionId,
+            p_configuration_mode: metadata.configurationMode,
+            p_expected_asset_revision: metadata.expectedAssetRevision,
+            p_reason: metadata.reason,
+            p_original_file_name: originalFileName,
+            p_declared_mime_type: mediaType,
+            p_declared_size_bytes: input.bytes.length,
+            p_request_id: requestId,
+            p_rate_limit: options.mutationRateLimit,
+          });
+          mapFailure(raw);
+          const reservation = assetUploadReservationSchema.parse(raw);
+          assertTarget(reservation.assetId, safeAssetId);
+          return processReservation(identity, reservation, input, profile, mediaType, requestId);
+        },
+        {
+          assetId: safeAssetId,
+          processingStage: 'database_reservation',
+        },
+      );
+    },
+    async createVersionFromExisting(identity, assetId, body, requestId) {
+      const parsed = parseRequest(assetCreateVersionActionSchema, body);
+      assertIdempotency(parsed.idempotencyKey, requestId);
+      const safeAssetId = validId(assetId);
+      return guarded(
+        requestId,
+        async () => {
+          const value = await gateway.createVersionFromExisting(identity, {
+            p_asset_id: safeAssetId,
+            p_source_version_id: parsed.sourceVersionId,
+            p_configuration_mode: parsed.configurationMode,
+            p_expected_asset_revision: parsed.expectedAssetRevision,
+            p_reason: parsed.reason,
+            p_request_id: requestId,
+            p_rate_limit: options.mutationRateLimit,
+          });
+          return parseTargetedMutation(value, safeAssetId);
+        },
+        {
+          assetId: safeAssetId,
+          processingStage: 'database_successor_creation',
+        },
+      );
     },
     async listReviewQueue(identity, query, requestId) {
       const parsed = directoryQuerySchema.safeParse(query);

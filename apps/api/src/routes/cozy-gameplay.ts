@@ -274,6 +274,9 @@ export function registerCozyGameplayRoutes(
         disableResponseCaching(reply);
         const walletAddress = await authorizeCozyRequest(request, reply, options);
         claim(options.mutationLimiter, walletAddress, `shop-${operation}`);
+        if (operation === 'buy') {
+          throw new PublicApiError(409, 'ECONOMY_PURCHASE_ENDPOINT_REQUIRED');
+        }
         return {
           success: true,
           data: await options.service.executeShopTransaction(
@@ -299,6 +302,50 @@ export function registerCozyGameplayRoutes(
       requestId: request.id,
     };
   });
+
+  app.get(`${COZY_API_PREFIX}/vertical-slice`, async (request, reply) => {
+    disableResponseCaching(reply);
+    const walletAddress = await authorizeCozyRequest(request, reply, options);
+    claim(options.readLimiter, walletAddress, 'vertical-slice');
+    return {
+      success: true,
+      data: await options.service.getPlayableVerticalSlice(walletAddress, request.id),
+      requestId: request.id,
+    };
+  });
+
+  const verticalSliceActions = {
+    'quest/accept': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.acceptStarterQuest(walletAddress, body, requestId),
+    'quest/deliver': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.deliverStarterQuest(walletAddress, body, requestId),
+    'home-plot/prepare': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.prepareHomeSoil(walletAddress, body, requestId),
+    'home-plot/plant': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.plantHomeCrop(walletAddress, body, requestId),
+    'home-plot/water': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.waterHomeCrop(walletAddress, body, requestId),
+    'home-plot/harvest': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.harvestHomeCrop(walletAddress, body, requestId),
+  } as const;
+
+  for (const [route, action] of Object.entries(verticalSliceActions)) {
+    app.post(
+      `${COZY_API_PREFIX}/${route}`,
+      { bodyLimit: BODY_LIMIT_BYTES },
+      async (request, reply) => {
+        assertTrustedBrowserMutation(request, options.allowedOrigins);
+        disableResponseCaching(reply);
+        const walletAddress = await authorizeCozyRequest(request, reply, options);
+        claim(options.mutationLimiter, walletAddress, route);
+        return {
+          success: true,
+          data: await action(walletAddress, request.body, request.id),
+          requestId: request.id,
+        };
+      },
+    );
+  }
 
   for (const operation of ['enter', 'exit'] as const) {
     app.post(
@@ -340,6 +387,50 @@ export function registerCozyGameplayRoutes(
         return {
           success: true,
           data: await execute(walletAddress, request.body, request.id),
+          requestId: request.id,
+        };
+      },
+    );
+  }
+
+  app.get(`${COZY_API_PREFIX}/workstations/:workstationId`, async (request, reply) => {
+    disableResponseCaching(reply);
+    const walletAddress = await authorizeCozyRequest(request, reply, options);
+    claim(options.readLimiter, walletAddress, 'workstation');
+    return {
+      success: true,
+      data: await options.service.getWorkstationWorkspace(
+        walletAddress,
+        property(request.params, 'workstationId'),
+        request.id,
+      ),
+      requestId: request.id,
+    };
+  });
+
+  const workstationActions = {
+    'workstation-jobs/start': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.startWorkstationJob(walletAddress, body, requestId),
+    'workstation-jobs/collect': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.collectWorkstationJob(walletAddress, body, requestId),
+    'quest/workstations/accept': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.acceptWorkstationTutorial(walletAddress, body, requestId),
+    'quest/workstations/turn-in': (walletAddress: string, body: unknown, requestId: string) =>
+      options.service.turnInWorkstationTutorial(walletAddress, body, requestId),
+  } as const;
+
+  for (const [route, action] of Object.entries(workstationActions)) {
+    app.post(
+      `${COZY_API_PREFIX}/${route}`,
+      { bodyLimit: BODY_LIMIT_BYTES },
+      async (request, reply) => {
+        assertTrustedBrowserMutation(request, options.allowedOrigins);
+        disableResponseCaching(reply);
+        const walletAddress = await authorizeCozyRequest(request, reply, options);
+        claim(options.mutationLimiter, walletAddress, route);
+        return {
+          success: true,
+          data: await action(walletAddress, request.body, request.id),
           requestId: request.id,
         };
       },

@@ -8,34 +8,38 @@ import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 
 import type { WorldAssetType } from '../lib/world-assets/contracts';
+import {
+  inspectClientImage,
+  inspectionBlockingMessages,
+  type ClientImageInspection,
+} from '../lib/world-assets/image-inspection';
 import { assetTypeProfile, formatAssetBytes } from '../lib/world-assets/profiles';
 import {
   resolveAssetUploadAttempt,
   type AssetUploadAttempt,
 } from '../lib/world-assets/upload-attempt';
-import { advisoryFileIssues } from '../lib/world-assets/upload';
+import { assetVersionUploadErrorMessage } from '../lib/world-assets/version-upload-errors';
 
 type VersionUploadState = 'idle' | 'checking' | 'uploading' | 'processing' | 'complete' | 'error';
 
 interface UploadEnvelope {
   readonly success?: unknown;
   readonly data?: unknown;
+  readonly error?: unknown;
 }
 
-function safeMessage(status: number): string {
-  if (status === 409) {
-    return 'The asset changed or already has an open candidate. Reload before trying again.';
-  }
-  if (status === 413) return 'This file exceeds the source-size limit.';
-  if (status === 415 || status === 422) return 'This is not a supported PNG or WebP image.';
-  if (status === 429) return 'Too many uploads were attempted. Wait briefly and try again.';
-  return 'The new version could not be uploaded. Please try again.';
+function errorCode(envelope: UploadEnvelope): string | undefined {
+  if (typeof envelope.error !== 'object' || envelope.error === null) return undefined;
+  const code = Reflect.get(envelope.error, 'code');
+  return typeof code === 'string' ? code : undefined;
 }
 
 export function WorldAssetNewVersionUpload(props: {
   readonly assetId: string;
   readonly assetRevision: number;
   readonly assetType: WorldAssetType;
+  readonly sourceVersionId: string;
+  readonly configurationMode?: 'copy' | 'defaults';
 }) {
   const profile = assetTypeProfile(props.assetType);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -43,6 +47,7 @@ export function WorldAssetNewVersionUpload(props: {
   const attemptRef = useRef<AssetUploadAttempt | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [inspection, setInspection] = useState<ClientImageInspection | null>(null);
   const [issues, setIssues] = useState<readonly string[]>([]);
   const [reason, setReason] = useState('');
   const [state, setState] = useState<VersionUploadState>('idle');
@@ -64,6 +69,7 @@ export function WorldAssetNewVersionUpload(props: {
     if (previewUrl !== null) URL.revokeObjectURL(previewUrl);
     setPreviewUrl(null);
     setFile(null);
+    setInspection(null);
     setIssues([]);
     setResult(null);
     if (next === null) {
@@ -74,23 +80,19 @@ export function WorldAssetNewVersionUpload(props: {
     setState('checking');
     setMessage('Running browser advisory checks…');
     try {
-      const nextIssues = advisoryFileIssues(
-        {
-          name: next.name,
-          size: next.size,
-          browserMimeType: next.type,
-          bytes: new Uint8Array(await next.slice(0, 32).arrayBuffer()),
-        },
-        profile,
-      );
+      const nextInspection = await inspectClientImage(next, profile);
+      const nextIssues = inspectionBlockingMessages(nextInspection);
       setFile(next);
+      setInspection(nextInspection);
       setIssues(nextIssues);
       setPreviewUrl(URL.createObjectURL(next));
       setState(nextIssues.length === 0 ? 'idle' : 'error');
       setMessage(
         nextIssues.length === 0
-          ? 'Advisory checks passed. Server-side decoding and validation still apply.'
-          : 'Fix the advisory issues before uploading.',
+          ? nextInspection.warningCount > 0
+            ? 'Advisory warnings found. Server-side decoding and validation still apply.'
+            : 'Advisory checks passed. Server-side decoding and validation still apply.'
+          : 'Fix the blocking advisory issues before uploading.',
       );
     } catch {
       setState('error');
@@ -107,6 +109,8 @@ export function WorldAssetNewVersionUpload(props: {
     }
     const fingerprint = [
       props.assetId,
+      props.sourceVersionId,
+      props.configurationMode ?? 'copy',
       String(props.assetRevision),
       file.name,
       String(file.size),
@@ -121,6 +125,8 @@ export function WorldAssetNewVersionUpload(props: {
 
     const body = new FormData();
     body.set('expectedAssetRevision', String(props.assetRevision));
+    body.set('sourceVersionId', props.sourceVersionId);
+    body.set('configurationMode', props.configurationMode ?? 'copy');
     body.set('reason', trimmedReason);
     body.set('idempotencyKey', attempt.idempotencyKey);
     body.set('file', file, file.name);
@@ -128,6 +134,7 @@ export function WorldAssetNewVersionUpload(props: {
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
     xhr.open('POST', `/api/world-assets/${encodeURIComponent(props.assetId)}/versions`);
+    xhr.setRequestHeader('x-request-id', attempt.idempotencyKey);
     xhr.responseType = 'json';
     setProgress(0);
     setState('uploading');
@@ -146,7 +153,7 @@ export function WorldAssetNewVersionUpload(props: {
       const parsed = assetMutationResponseSchema.safeParse(envelope.data);
       if (xhr.status < 200 || xhr.status >= 300 || envelope.success !== true || !parsed.success) {
         setState('error');
-        setMessage(safeMessage(xhr.status));
+        setMessage(assetVersionUploadErrorMessage(xhr.status, errorCode(envelope)));
         return;
       }
       setResult(parsed.data);
@@ -229,11 +236,28 @@ export function WorldAssetNewVersionUpload(props: {
           </div>
         )}
       </div>
-      {issues.length === 0 ? null : (
-        <ul className="asset-validation-list" role="alert">
-          {issues.map((issue) => (
-            <li className="is-blocking" key={issue}>
-              {issue}
+      {inspection === null || inspection.findings.length === 0 ? null : (
+        <ul
+          className="asset-validation-list asset-inspection-list"
+          aria-label="Browser advisory validation results"
+        >
+          {inspection.findings.map((finding) => (
+            <li
+              className={
+                finding.level === 'blocking'
+                  ? 'is-blocking'
+                  : finding.level === 'warning'
+                    ? 'is-warning'
+                    : 'is-pass'
+              }
+              key={finding.id}
+              role={finding.level === 'blocking' ? 'alert' : undefined}
+            >
+              <strong>
+                <span className="sr-only">{finding.level}. </span>
+                {finding.label}
+              </strong>
+              <span>{finding.detail}</span>
             </li>
           ))}
         </ul>

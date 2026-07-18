@@ -18,9 +18,14 @@
     "clean": "rimraf dist coverage .turbo tsconfig.tsbuildinfo"
   },
   "dependencies": {
+    "@starville/cooperative-activities": "workspace:*",
     "@starville/config": "workspace:*",
     "@starville/logger": "workspace:*",
-    "@starville/shared-types": "workspace:*"
+    "@starville/progression": "workspace:*",
+    "@starville/shared-types": "workspace:*",
+    "@starville/supabase": "workspace:*",
+    "@supabase/supabase-js": "^2.110.1",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@starville/eslint-config": "workspace:*",

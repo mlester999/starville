@@ -127,6 +127,50 @@ describe('asset persistence projection', () => {
     ).toThrow();
   });
 
+  it('accepts only the bounded authenticated media routes returned for a processed draft', () => {
+    const mediaPrefix = `/api/v1/admin/world-assets/${assetId}/versions/${versionId}`;
+    const detail = projectAssetDetail({
+      status: 'loaded',
+      asset: rawAsset(),
+      versions: [
+        {
+          ...rawVersion(),
+          sourcePreviewUrl: `${mediaPrefix}/source`,
+          previewUrl: `${mediaPrefix}/preview`,
+          thumbnailUrl: `${mediaPrefix}/thumbnail`,
+        },
+      ],
+      referenceSummary: rawAsset().referenceSummary,
+    });
+
+    expect(detail.versions[0]).toMatchObject({
+      sourceUrl: `${mediaPrefix}/source`,
+      previewUrl: `${mediaPrefix}/preview`,
+      thumbnailUrl: `${mediaPrefix}/thumbnail`,
+    });
+  });
+
+  it('projects a successful processed-version mutation with relative private media routes', () => {
+    const mediaPrefix = `/api/v1/admin/world-assets/${assetId}/versions/${versionId}`;
+    expect(
+      projectAssetMutation({
+        status: 'validated',
+        asset: { ...rawAsset(), activeVersionId: versionId },
+        version: {
+          ...rawVersion(),
+          lifecycleStatus: 'validated',
+          sourcePreviewUrl: `${mediaPrefix}/source`,
+          previewUrl: `${mediaPrefix}/preview`,
+          thumbnailUrl: `${mediaPrefix}/thumbnail`,
+        },
+      }),
+    ).toMatchObject({
+      status: 'validated',
+      asset: { id: assetId, activeVersionId: versionId },
+      version: { id: versionId, lifecycleStatus: 'validated' },
+    });
+  });
+
   it('keeps the exact sanitized candidate version and reference impact in review rows', () => {
     const queue = projectReviewQueue({
       status: 'loaded',

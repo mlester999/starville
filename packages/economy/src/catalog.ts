@@ -1,0 +1,188 @@
+import {
+  economySinkDefinitionSchema,
+  economySourceDefinitionSchema,
+  starUtilityDefinitionSchema,
+} from './contracts';
+
+export const ECONOMY_SOURCE_CATALOG = Object.freeze([
+  economySourceDefinitionSchema.parse({
+    key: 'starter-grant',
+    operationKey: 'starter_grant',
+    category: 'starter_grant',
+    label: 'Starter grant',
+    description: 'One server-issued beginner balance applied during the first cozy-game bootstrap.',
+    minimumAmount: 250,
+    maximumAmount: 250,
+    status: 'active',
+    repeatable: false,
+    dailyLimit: 1,
+    weeklyLimit: 1,
+    accountLifetimeLimit: 1,
+    walletDailyLimit: 1,
+    cooldownSeconds: 0,
+    beginnerProtected: true,
+    riskWeight: 1,
+    version: 1,
+  }),
+  economySourceDefinitionSchema.parse({
+    key: 'starter-farming-tutorial',
+    operationKey: 'starter_farming_quest_reward',
+    category: 'gameplay_reward',
+    label: 'Starter farming tutorial',
+    description:
+      'One bounded server-authoritative reward for completing the starter farming quest.',
+    minimumAmount: 25,
+    maximumAmount: 25,
+    status: 'active',
+    repeatable: false,
+    dailyLimit: 1,
+    weeklyLimit: 1,
+    accountLifetimeLimit: 1,
+    walletDailyLimit: 1,
+    cooldownSeconds: 0,
+    beginnerProtected: true,
+    riskWeight: 2,
+    version: 1,
+  }),
+  economySourceDefinitionSchema.parse({
+    key: 'shop-sale',
+    operationKey: 'shop_sale',
+    category: 'gameplay_reward',
+    label: 'Village shop sale',
+    description: 'DUST paid by a published system shop for explicitly accepted player items.',
+    minimumAmount: 1,
+    maximumAmount: 1_000_000,
+    status: 'active',
+    repeatable: true,
+    dailyLimit: null,
+    weeklyLimit: null,
+    accountLifetimeLimit: null,
+    walletDailyLimit: null,
+    cooldownSeconds: 0,
+    beginnerProtected: false,
+    riskWeight: 4,
+    version: 1,
+  }),
+  economySourceDefinitionSchema.parse({
+    key: 'starter-shop-tutorial',
+    operationKey: 'starter_shop_quest_reward',
+    category: 'gameplay_reward',
+    label: 'General Store tutorial',
+    description:
+      'One bounded server-authoritative reward for completing the General Store tutorial.',
+    minimumAmount: 15,
+    maximumAmount: 15,
+    status: 'active',
+    repeatable: false,
+    dailyLimit: 1,
+    weeklyLimit: 1,
+    accountLifetimeLimit: 1,
+    walletDailyLimit: 1,
+    cooldownSeconds: 0,
+    beginnerProtected: true,
+    riskWeight: 2,
+    version: 1,
+  }),
+  economySourceDefinitionSchema.parse({
+    key: 'moonpetal-harvest-help',
+    operationKey: 'cooperative_activity_reward',
+    category: 'activity_reward',
+    label: 'Moonpetal Harvest Help',
+    description:
+      'Bounded cooperative activity reward with contribution, cooldown, and daily limits.',
+    minimumAmount: 15,
+    maximumAmount: 15,
+    status: 'active',
+    repeatable: true,
+    dailyLimit: 2,
+    weeklyLimit: 14,
+    accountLifetimeLimit: null,
+    walletDailyLimit: 2,
+    cooldownSeconds: 300,
+    beginnerProtected: false,
+    riskWeight: 8,
+    version: 1,
+  }),
+] as const);
+
+export const ECONOMY_SINK_CATALOG = Object.freeze([
+  economySinkDefinitionSchema.parse({
+    key: 'village-supply-shop',
+    operationKey: 'shop_purchase',
+    category: 'shop_purchase',
+    label: 'Village Supply Shop',
+    description: 'Published ordinary-item purchases settled atomically against the DUST ledger.',
+    minimumAmount: 1,
+    maximumAmount: 1_000_000,
+    status: 'active',
+    reversibleByRefund: true,
+    beginnerProtected: true,
+    version: 1,
+  }),
+  economySinkDefinitionSchema.parse({
+    key: 'crafting-fee',
+    operationKey: 'crafting_fee',
+    category: 'crafting_cost',
+    label: 'Crafting fee',
+    description: 'Reserved structural sink; all currently published recipes have a zero DUST fee.',
+    minimumAmount: 1,
+    maximumAmount: 1_000_000,
+    status: 'disabled',
+    reversibleByRefund: true,
+    beginnerProtected: true,
+    version: 1,
+  }),
+] as const);
+
+export const STAR_UTILITY_CATALOG = Object.freeze([
+  starUtilityDefinitionSchema.parse({
+    key: 'verified-village-access',
+    label: 'Verified village access',
+    description:
+      '$STAR currently provides read-only wallet eligibility for village access; verification requests a signature, never a transfer.',
+    category: 'access',
+    status: 'current',
+    requiresTransaction: false,
+    transfersValue: false,
+    changesDustRewards: false,
+    changesGameplayPower: false,
+    custodyRequired: false,
+  }),
+  starUtilityDefinitionSchema.parse({
+    key: 'cosmetic-entitlement-signals',
+    label: 'Cosmetic entitlement signals',
+    description:
+      'A future design boundary for non-transferable presentation entitlements with no gameplay or DUST advantage.',
+    category: 'cosmetic_entitlement',
+    status: 'future_design',
+    requiresTransaction: false,
+    transfersValue: false,
+    changesDustRewards: false,
+    changesGameplayPower: false,
+    custodyRequired: false,
+  }),
+  starUtilityDefinitionSchema.parse({
+    key: 'dust-reward-multipliers',
+    label: 'DUST reward multipliers',
+    description: '$STAR holdings must not multiply DUST rewards or create pay-to-earn advantages.',
+    category: 'community_recognition',
+    status: 'rejected',
+    requiresTransaction: false,
+    transfersValue: false,
+    changesDustRewards: false,
+    changesGameplayPower: false,
+    custodyRequired: false,
+  }),
+] as const);
+
+export function findActiveEconomySource(operationKey: string) {
+  return ECONOMY_SOURCE_CATALOG.find(
+    (definition) => definition.operationKey === operationKey && definition.status === 'active',
+  );
+}
+
+export function findActiveEconomySink(operationKey: string) {
+  return ECONOMY_SINK_CATALOG.find(
+    (definition) => definition.operationKey === operationKey && definition.status === 'active',
+  );
+}

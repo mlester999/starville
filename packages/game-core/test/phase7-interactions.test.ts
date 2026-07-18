@@ -36,8 +36,14 @@ const interactions: readonly MapInteraction[] = [
 ];
 
 describe('Phase 7 map interaction boundary', () => {
-  it('preserves notices and strictly validates every data-only Phase 7 interaction kind', () => {
-    expect(mapInteractionSchema.parse(lanternSquareManifest().interactions[0]).type).toBe('notice');
+  it('preserves world anchors and strictly validates every data-only interaction kind through Phase 11A', () => {
+    const manifestInteractions = lanternSquareManifest().interactions;
+    expect(manifestInteractions.map(({ type }) => type)).toEqual(['starter_npc', 'notice']);
+    expect(
+      manifestInteractions.every(
+        (interaction) => mapInteractionSchema.safeParse(interaction).success,
+      ),
+    ).toBe(true);
     expect(
       [
         interactions[0],
@@ -80,6 +86,27 @@ describe('Phase 7 map interaction boundary', () => {
           title: 'Starter home',
           content: 'Enter the private home.',
           homeTemplateSlug: 'starter-cottage-interior',
+        },
+        {
+          id: 'guide',
+          type: 'starter_npc',
+          x: 8,
+          y: 8,
+          range: 1.5,
+          title: 'Willow Guide',
+          content: 'Open the server-authoritative starter quest.',
+          npcSlug: 'willow-guide',
+        },
+        {
+          id: 'garden-one',
+          type: 'home_farm_tile',
+          x: 3,
+          y: 3,
+          range: 1.5,
+          title: 'Garden one',
+          content: 'Use the selected farming tool or seed.',
+          tileKey: 'garden-1',
+          slot: 1,
         },
       ].every((value) => mapInteractionSchema.safeParse(value).success),
     ).toBe(true);

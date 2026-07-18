@@ -272,5 +272,13 @@ export function validatePlatformConfiguration(value: unknown): ValidationResult 
 }
 
 export function isModuleEnabled(configuration: PlatformConfiguration, moduleKey: string): boolean {
-  return configuration.modules.some((module) => module.key === moduleKey && module.enabled);
+  const configured = configuration.modules.find((module) => module.key === moduleKey);
+  if (configured !== undefined) return configured.enabled;
+  return (
+    moduleKey === 'social_graph' ||
+    moduleKey === 'cooperative_activities' ||
+    moduleKey === 'offchain_economy' ||
+    moduleKey === 'economy_simulation' ||
+    moduleKey === 'avatar_customization'
+  );
 }

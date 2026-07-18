@@ -41,6 +41,38 @@ export interface RealtimeConfig {
   readonly port: number;
   readonly allowedOrigins: readonly string[];
   readonly connectionLimit: number;
+  readonly ticketSecret: string;
+  readonly authenticationTimeoutMs: number;
+  readonly checkpointIntervalMs: number;
+  readonly revalidationIntervalMs: number;
+  readonly idleTimeoutMs: number;
+  readonly chatNearbyDistance: number;
+  readonly chatRateLimits: {
+    readonly shortWindowMessages: number;
+    readonly minuteMessages: number;
+    readonly hourlyReports: number;
+    readonly minuteSafetyActions: number;
+    readonly malformedMessages: number;
+  };
+  readonly socialRateLimits: {
+    readonly inspectPerMinute: number;
+    readonly requestsPerMinute: number;
+    readonly responsesPerMinute: number;
+    readonly offersPerMinute: number;
+    readonly confirmationsPerMinute: number;
+    readonly cancellationsPerMinute: number;
+  };
+  readonly socialGraphRateLimits: {
+    readonly friendRequestsPerMinute: number;
+    readonly friendResponsesPerMinute: number;
+    readonly friendRemovalsPerMinute: number;
+    readonly partyCreationsPerHour: number;
+    readonly partyInvitationsPerMinute: number;
+    readonly partyResponsesPerMinute: number;
+    readonly partyMembershipActionsPerMinute: number;
+    readonly readyChecksPerMinute: number;
+    readonly readyResponsesPerMinute: number;
+  };
   readonly logLevel: LogLevel;
 }
 
@@ -99,6 +131,10 @@ export interface HostedSupabaseSafetyConfig {
   readonly remoteWritesApproved: boolean;
   readonly hostedTestsApproved: boolean;
   readonly bootstrapEnabled: boolean;
+}
+
+export interface HostedWriteSafetyConfig {
+  readonly remoteWritesApproved: boolean;
 }
 
 export interface TokenAccessServerConfig {
@@ -236,6 +272,100 @@ export function loadRealtimeConfig(env: EnvironmentVariables): RealtimeConfig {
       'REALTIME_ALLOWED_ORIGINS or CORS_ALLOWED_ORIGINS',
     ),
     connectionLimit: positiveIntegerSchema.parse(env['REALTIME_MAX_CONNECTIONS'] ?? 100),
+    ticketSecret: z
+      .string()
+      .min(32, 'REALTIME_TICKET_SECRET must contain at least 32 characters')
+      .parse(
+        env['REALTIME_TICKET_SECRET'] ??
+          env['TOKEN_ACCESS_COOKIE_SECRET'] ??
+          (environment === 'development' ? 'development-only-realtime-ticket-secret' : undefined),
+      ),
+    authenticationTimeoutMs: positiveIntegerSchema
+      .min(1_000)
+      .max(30_000)
+      .parse(env['REALTIME_AUTH_TIMEOUT_MS'] ?? 5_000),
+    checkpointIntervalMs: positiveIntegerSchema
+      .min(5_000)
+      .max(120_000)
+      .parse(env['REALTIME_CHECKPOINT_INTERVAL_MS'] ?? 15_000),
+    revalidationIntervalMs: positiveIntegerSchema
+      .min(5_000)
+      .max(120_000)
+      .parse(env['REALTIME_REVALIDATION_INTERVAL_MS'] ?? 15_000),
+    idleTimeoutMs: positiveIntegerSchema
+      .min(15_000)
+      .max(300_000)
+      .parse(env['REALTIME_IDLE_TIMEOUT_MS'] ?? 45_000),
+    chatNearbyDistance: z.coerce
+      .number()
+      .finite()
+      .min(2)
+      .max(20)
+      .parse(env['REALTIME_CHAT_NEARBY_DISTANCE'] ?? 8),
+    chatRateLimits: {
+      shortWindowMessages: positiveIntegerSchema
+        .max(10)
+        .parse(env['REALTIME_CHAT_SHORT_WINDOW_LIMIT'] ?? 4),
+      minuteMessages: positiveIntegerSchema.max(120).parse(env['REALTIME_CHAT_MINUTE_LIMIT'] ?? 20),
+      hourlyReports: positiveIntegerSchema
+        .max(30)
+        .parse(env['REALTIME_CHAT_REPORT_HOURLY_LIMIT'] ?? 5),
+      minuteSafetyActions: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_CHAT_SAFETY_ACTION_LIMIT'] ?? 20),
+      malformedMessages: positiveIntegerSchema
+        .max(50)
+        .parse(env['REALTIME_CHAT_MALFORMED_LIMIT'] ?? 10),
+    },
+    socialRateLimits: {
+      inspectPerMinute: positiveIntegerSchema
+        .max(240)
+        .parse(env['REALTIME_SOCIAL_INSPECT_LIMIT'] ?? 60),
+      requestsPerMinute: positiveIntegerSchema
+        .max(60)
+        .parse(env['REALTIME_SOCIAL_REQUEST_LIMIT'] ?? 6),
+      responsesPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_SOCIAL_RESPONSE_LIMIT'] ?? 12),
+      offersPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_SOCIAL_OFFER_LIMIT'] ?? 30),
+      confirmationsPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_SOCIAL_CONFIRM_LIMIT'] ?? 20),
+      cancellationsPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_SOCIAL_CANCEL_LIMIT'] ?? 20),
+    },
+    socialGraphRateLimits: {
+      friendRequestsPerMinute: positiveIntegerSchema
+        .max(30)
+        .parse(env['REALTIME_FRIEND_REQUEST_LIMIT'] ?? 4),
+      friendResponsesPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_FRIEND_RESPONSE_LIMIT'] ?? 12),
+      friendRemovalsPerMinute: positiveIntegerSchema
+        .max(60)
+        .parse(env['REALTIME_FRIEND_REMOVE_LIMIT'] ?? 10),
+      partyCreationsPerHour: positiveIntegerSchema
+        .max(20)
+        .parse(env['REALTIME_PARTY_CREATE_HOURLY_LIMIT'] ?? 3),
+      partyInvitationsPerMinute: positiveIntegerSchema
+        .max(60)
+        .parse(env['REALTIME_PARTY_INVITE_LIMIT'] ?? 8),
+      partyResponsesPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_PARTY_RESPONSE_LIMIT'] ?? 15),
+      partyMembershipActionsPerMinute: positiveIntegerSchema
+        .max(60)
+        .parse(env['REALTIME_PARTY_MEMBERSHIP_LIMIT'] ?? 12),
+      readyChecksPerMinute: positiveIntegerSchema
+        .max(20)
+        .parse(env['REALTIME_PARTY_READY_CHECK_LIMIT'] ?? 4),
+      readyResponsesPerMinute: positiveIntegerSchema
+        .max(120)
+        .parse(env['REALTIME_PARTY_READY_RESPONSE_LIMIT'] ?? 20),
+    },
     logLevel: logLevelSchema.parse(env['LOG_LEVEL'] ?? defaultLogLevel(environment)),
   };
 }
@@ -475,6 +605,15 @@ export function loadHostedSupabaseSafetyConfig(
     ),
     hostedTestsApproved: safeBoolean(env['RUN_HOSTED_SUPABASE_TESTS'], 'RUN_HOSTED_SUPABASE_TESTS'),
     bootstrapEnabled: safeBoolean(env['ADMIN_BOOTSTRAP_ENABLED'], 'ADMIN_BOOTSTRAP_ENABLED'),
+  };
+}
+
+export function loadHostedWriteSafetyConfig(env: EnvironmentVariables): HostedWriteSafetyConfig {
+  return {
+    remoteWritesApproved: safeBoolean(
+      env['SUPABASE_REMOTE_WRITES_APPROVED'],
+      'SUPABASE_REMOTE_WRITES_APPROVED',
+    ),
   };
 }
 

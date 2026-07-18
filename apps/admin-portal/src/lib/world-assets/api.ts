@@ -59,10 +59,11 @@ export function loadWorldEditorAssetCandidates(
   });
 }
 
-export function loadAssetDetail(assetId: string): Promise<WorldAssetDetail> {
+export function loadAssetDetail(assetId: string, requestId?: string): Promise<WorldAssetDetail> {
   return callTrustedAdminApi({
     method: 'GET',
     pathname: `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}`,
+    ...(requestId === undefined ? {} : { requestId }),
     parser: (value) => worldAssetDetailSchema.parse(value),
   });
 }
@@ -71,6 +72,7 @@ export function loadAssetReferences(
   assetId: string,
   page = 1,
   pageSize: 10 | 50 | 100 = 10,
+  requestId?: string,
 ): Promise<AssetReferenceDirectory> {
   const query = new URLSearchParams({
     limit: String(pageSize),
@@ -79,6 +81,7 @@ export function loadAssetReferences(
   return callTrustedAdminApi({
     method: 'GET',
     pathname: `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/references?${query}`,
+    ...(requestId === undefined ? {} : { requestId }),
     parser: (value) => assetReferenceDirectorySchema.parse(value),
   });
 }
@@ -86,10 +89,12 @@ export function loadAssetReferences(
 export function loadAssetVersionDetail(
   assetId: string,
   versionId: string,
+  requestId?: string,
 ): Promise<WorldAssetVersionDetail> {
   return callTrustedAdminApi({
     method: 'GET',
     pathname: `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(versionId)}`,
+    ...(requestId === undefined ? {} : { requestId }),
     parser: (value) => worldAssetVersionDetailSchema.parse(value),
   });
 }
@@ -137,6 +142,25 @@ export function applyAssetVersionOperation(
         ? `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/${operation}`
         : `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(versionId)}/${operation}`,
     body: input,
+    requestId: input.idempotencyKey,
+    parser: (value) => assetMutationResponseSchema.parse(value),
+  });
+}
+
+export function createAssetVersionFromExisting(
+  assetId: string,
+  input: {
+    readonly sourceVersionId: string;
+    readonly configurationMode: 'copy' | 'defaults';
+    readonly expectedAssetRevision: number;
+    readonly reason: string;
+    readonly idempotencyKey: string;
+  },
+): Promise<AssetMutationResponse> {
+  return callTrustedAdminApi({
+    method: 'POST',
+    pathname: `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/versions/from-existing`,
+    body: { ...input, confirmed: true },
     requestId: input.idempotencyKey,
     parser: (value) => assetMutationResponseSchema.parse(value),
   });

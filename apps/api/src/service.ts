@@ -20,6 +20,17 @@ export interface CreateApiServiceOptions {
   readonly adminCozy?: BuildApiAppOptions['adminCozy'];
   readonly adminAssets?: BuildApiAppOptions['adminAssets'];
   readonly platformConfiguration?: BuildApiAppOptions['platformConfiguration'];
+  readonly adminRealtime?: BuildApiAppOptions['adminRealtime'];
+  readonly adminChat?: BuildApiAppOptions['adminChat'];
+  readonly adminSocial?: BuildApiAppOptions['adminSocial'];
+  readonly adminSocialGraph?: BuildApiAppOptions['adminSocialGraph'];
+  readonly adminCooperativeActivities?: BuildApiAppOptions['adminCooperativeActivities'];
+  readonly economy?: BuildApiAppOptions['economy'];
+  readonly progression?: BuildApiAppOptions['progression'];
+  readonly housing?: BuildApiAppOptions['housing'];
+  readonly adminAvatar?: BuildApiAppOptions['adminAvatar'];
+  readonly adminCosmetics?: BuildApiAppOptions['adminCosmetics'];
+  readonly worldGameTest?: BuildApiAppOptions['worldGameTest'];
 }
 
 export function createApiService({
@@ -34,6 +45,17 @@ export function createApiService({
   adminCozy,
   adminAssets,
   platformConfiguration,
+  adminRealtime,
+  adminChat,
+  adminSocial,
+  adminSocialGraph,
+  adminCooperativeActivities,
+  economy,
+  progression,
+  housing,
+  adminAvatar,
+  adminCosmetics,
+  worldGameTest,
 }: CreateApiServiceOptions): ApiService {
   const app = buildApiApp({
     config,
@@ -47,6 +69,17 @@ export function createApiService({
     ...(adminCozy === undefined ? {} : { adminCozy }),
     ...(adminAssets === undefined ? {} : { adminAssets }),
     ...(platformConfiguration === undefined ? {} : { platformConfiguration }),
+    ...(adminRealtime === undefined ? {} : { adminRealtime }),
+    ...(adminChat === undefined ? {} : { adminChat }),
+    ...(adminSocial === undefined ? {} : { adminSocial }),
+    ...(adminSocialGraph === undefined ? {} : { adminSocialGraph }),
+    ...(adminCooperativeActivities === undefined ? {} : { adminCooperativeActivities }),
+    ...(economy === undefined ? {} : { economy }),
+    ...(progression === undefined ? {} : { progression }),
+    ...(housing === undefined ? {} : { housing }),
+    ...(adminAvatar === undefined ? {} : { adminAvatar }),
+    ...(adminCosmetics === undefined ? {} : { adminCosmetics }),
+    ...(worldGameTest === undefined ? {} : { worldGameTest }),
   });
 
   return {

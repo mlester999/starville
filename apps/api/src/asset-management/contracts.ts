@@ -1,4 +1,5 @@
 import type {
+  AssetCreateVersionAction,
   AssetCreateVersionUploadMetadata,
   AssetDraftUpdate,
   AssetUploadMetadata,
@@ -55,6 +56,10 @@ export interface AdminAssetGateway {
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
+  claimOperationIntent(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
   submitReview(
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
@@ -84,6 +89,10 @@ export interface AdminAssetGateway {
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
   createVersion(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
+  createVersionFromExisting(
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
@@ -183,6 +192,12 @@ export interface AdminAssetService {
     identity: AdminDatabaseIdentity,
     assetId: unknown,
     input: AssetVersionUploadInput,
+    requestId: string,
+  ): Promise<unknown>;
+  createVersionFromExisting(
+    identity: AdminDatabaseIdentity,
+    assetId: unknown,
+    body: AssetCreateVersionAction,
     requestId: string,
   ): Promise<unknown>;
   listReviewQueue(

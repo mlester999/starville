@@ -15,6 +15,30 @@ const persistenceMocks = vi.hoisted(() => ({
   cancelTransition: vi.fn(),
 }));
 const canvasCapture = vi.hoisted(() => ({ props: undefined as unknown }));
+const avatarProfileMocks = vi.hoisted(() => ({
+  localAuthoritative: true,
+  localProfile: {
+    appearanceId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    revision: 2,
+    presetKey: 'moss-starter',
+    legacyFallbackPreset: 'moss' as const,
+    selection: {
+      body: 'meadow-frame',
+      skinTone: 'peach-warm',
+      face: 'soft-smile',
+      eyes: 'round-eyes',
+      eyebrows: 'gentle-brows',
+      hair: 'short-waves',
+      hairColor: 'espresso',
+      top: 'moss-tunic',
+      bottom: 'meadow-trousers',
+      footwear: 'trail-boots',
+      accessories: ['leaf-clip'],
+    },
+  },
+  remoteProfiles: {},
+  setLocalProfile: vi.fn(),
+}));
 
 vi.mock('../app/use-player-persistence', () => ({
   usePlayerPersistence: () => ({
@@ -23,6 +47,9 @@ vi.mock('../app/use-player-persistence', () => ({
   }),
 }));
 vi.mock('../app/use-narrow-game-viewport', () => ({ useNarrowGameViewport: () => false }));
+vi.mock('../app/use-avatar-profiles', () => ({
+  useAvatarProfiles: () => avatarProfileMocks,
+}));
 vi.mock('./GameCanvas', () => ({
   GameCanvas: (props: { readonly inputBlocked: boolean }) => {
     canvasCapture.props = props;
@@ -150,6 +177,14 @@ describe('GameWorld controls and settings boundary', () => {
     );
     expect(settings?.classList.contains('world-settings-button')).toBe(true);
     expect(settings?.getAttribute('aria-expanded')).toBe('false');
+    expect(container.querySelectorAll('.player-status-dock')).toHaveLength(1);
+    expect(container.querySelector('.player-status-dock')?.textContent).toContain('Inventory');
+    expect(container.querySelector('.player-status-dock')?.textContent).toContain('Nearby');
+    expect(container.querySelector('.player-status-dock')?.textContent).toContain('Friends');
+    expect(container.querySelector('.player-status-dock select')).toBeNull();
+    expect(container.querySelectorAll('.social-launcher')).toHaveLength(0);
+    expect(container.querySelectorAll('.social-graph-launcher')).toHaveLength(0);
+    expect(container.querySelectorAll('.activity-launcher')).toHaveLength(0);
     await act(async () => settings?.click());
     expect(container.querySelector('[role="dialog"]')).not.toBeNull();
     expect(
@@ -157,6 +192,81 @@ describe('GameWorld controls and settings boundary', () => {
         .querySelector('[data-testid="game-canvas-boundary"]')
         ?.getAttribute('data-input-blocked'),
     ).toBe('true');
+  });
+
+  it('keeps the trusted world visible when a focus-driven parent refresh changes callbacks', async () => {
+    const initialWorldFetch = globalThis.fetch;
+    let requestCount = 0;
+    globalThis.fetch = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const requestUrl = input instanceof Request ? input.url : String(input);
+      if (!requestUrl.endsWith('/world/current')) return initialWorldFetch(input, init);
+      requestCount += 1;
+      if (requestCount === 1) return initialWorldFetch(input, init);
+      return new Promise<Response>(() => undefined);
+    });
+    const profile = {
+      id: '11111111-1111-4111-8111-111111111111',
+      displayName: 'Luna Vale',
+      appearancePreset: 'moss' as const,
+      mapId: 'lantern-square' as const,
+      mapVersionId: null,
+      x: 12,
+      y: 7.5,
+      facingDirection: 'south' as const,
+      gameStateVersion: 1,
+      stateVersion: 1,
+      lastTransitionAt: null,
+      createdAt: '2026-07-11T04:00:00.000Z',
+      updatedAt: '2026-07-11T04:00:00.000Z',
+      lastEnteredAt: '2026-07-11T04:00:00.000Z',
+    };
+    const access = {
+      access: 'granted' as const,
+      walletAddress: '11111111111111111111111111111111',
+      network: 'solana:mainnet-beta' as const,
+      symbol: 'STAR',
+      requiredAmount: '1000',
+      observedAmount: '1000',
+      expiresAt: '2099-07-11T05:00:00.000Z',
+    };
+
+    await act(async () => {
+      root.render(
+        <GameWorld
+          access={access}
+          apiUrl="http://localhost:4000"
+          landingUrl="http://localhost:3000"
+          onAccessInvalid={vi.fn()}
+          onLeaveVillage={vi.fn(async () => undefined)}
+          onRecheck={vi.fn(async () => undefined)}
+          profile={profile}
+          rechecking={false}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.textContent).toContain('Lantern Square');
+    expect(requestCount).toBe(1);
+
+    await act(async () => {
+      root.render(
+        <GameWorld
+          access={{ ...access }}
+          apiUrl="http://localhost:4000"
+          landingUrl="http://localhost:3000"
+          onAccessInvalid={vi.fn()}
+          onLeaveVillage={vi.fn(async () => undefined)}
+          onRecheck={vi.fn(async () => undefined)}
+          profile={{ ...profile }}
+          rechecking
+        />,
+      );
+    });
+
+    expect(container.textContent).toContain('Lantern Square');
+    expect(container.textContent).not.toContain('Preparing your safe arrival');
+    expect(requestCount).toBe(1);
   });
 
   it('keeps one runtime, applies only the server-authoritative destination, and updates the HUD', async () => {

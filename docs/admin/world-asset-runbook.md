@@ -12,22 +12,33 @@ staffing model supports separation of duties. Confirm the exact permission befor
 
 ## Normal production-candidate flow
 
-1. Open `/world-assets/upload`.
-2. Select the exact asset profile and read its requirements.
-3. Upload one PNG/WebP. A local preview is advisory.
-4. Wait for authoritative processing. On a safe retry, reuse the presented operation rather than
+For a deliberate hosted upload session, the owner must temporarily set
+`SUPABASE_REMOTE_WRITES_APPROVED=true` and restart both the API and admin portal so their narrow
+runtime profiles receive the approval. Keep the value `false` for ordinary diagnosis and local mock
+testing. After the one reviewed draft upload and audit check, restore `false` and restart both
+services. This approval permits the upload attempt only; review and activation remain separate
+administrator actions.
+
+1. Optionally open `/world-assets/guide` for type checklists and a local blank PNG template.
+2. Open `/world-assets/upload`.
+3. Select the exact asset profile and read its requirements.
+4. Upload one PNG/WebP. A local preview is advisory.
+5. Wait for authoritative processing. On a safe retry, reuse the presented operation rather than
    changing the file or repeatedly submitting.
-5. Resolve validation failures by creating a corrected attempt/version.
-6. Configure name, tags, render size, anchors, depth, rotations, and collision.
-7. Compare the authenticated original with the normalized preview and thumbnail in all relevant
-   preview modes. The original must never reveal an intake URL.
-8. Validate, submit for review, and record a concise reason.
-9. Review duplicate/reference/validation impact.
-10. Approve and activate only after the immutable candidate is correct.
-11. Confirm the active version is visible to draft World Editor selection.
+6. Resolve validation failures by creating a corrected attempt/version.
+7. Configure name, tags, render size, anchors, depth, rotations, and collision.
+8. Compare the authenticated original with the normalized preview and thumbnail in the Preview room.
+   The original must never reveal an intake URL.
+9. Validate, submit for review, and record a concise reason.
+10. Review duplicate/reference/validation impact.
+11. Approve and activate only after the immutable candidate is correct.
+12. Confirm the active version is visible to draft World Editor selection.
 
 ## Failure handling
 
+- **Remote uploads disabled**: keep the gate closed during diagnosis. If the owner has explicitly
+  approved one hosted upload, verify that both the API and admin portal were restarted after the
+  temporary approval was set; never remove or bypass the gate.
 - **Invalid image/type/dimensions/transparency**: do not rename or bypass it. Correct the source and
   create a new attempt.
 - **Duplicate checksum**: inspect the authorized duplicate summary. Reuse the existing asset/version

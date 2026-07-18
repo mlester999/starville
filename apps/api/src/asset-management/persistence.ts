@@ -281,6 +281,10 @@ function projectVersion(value: unknown, assetType: AssetType): AssetVersion {
     internalNotes: raw.internalNotes ?? '',
     validationResult: raw.validationResults,
     editVersion: raw.editVersion,
+    createdByAdminId: raw.createdByAdminId,
+    submittedByAdminId: raw.submittedByAdminId,
+    reviewedByAdminId: raw.reviewedByAdminId,
+    approvedByAdminId: raw.approvedByAdminId,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,
     submittedAt: raw.submittedAt,
@@ -384,6 +388,7 @@ export function projectAssetVersionDetail(value: unknown) {
     reviews: raw.reviews.map((review) => ({
       id: review.id,
       action: review.action,
+      administratorUserId: review.administratorUserId,
       reason: review.reason,
       createdAt: review.createdAt,
     })),

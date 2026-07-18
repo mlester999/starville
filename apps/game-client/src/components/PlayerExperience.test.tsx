@@ -7,7 +7,29 @@ import type { PlayerProfile } from '@starville/game-core';
 import { PlayerExperience } from './PlayerExperience';
 
 vi.mock('./CharacterSetup', () => ({
-  CharacterSetup: () => <div data-testid="character-setup" />,
+  CharacterSetup: ({
+    onCreate,
+  }: {
+    readonly onCreate: (input: {
+      readonly displayName: string;
+      readonly appearancePreset: 'moss';
+    }) => Promise<PlayerProfile>;
+  }) => (
+    <button
+      data-testid="character-setup"
+      type="button"
+      onClick={() => void onCreate({ displayName: 'Luna Vale', appearancePreset: 'moss' })}
+    >
+      Create profile
+    </button>
+  ),
+}));
+vi.mock('./CharacterCustomization', () => ({
+  FirstTimeCharacterCreator: ({ onComplete }: { readonly onComplete: () => void }) => (
+    <button data-testid="character-creator" type="button" onClick={onComplete}>
+      Confirm appearance
+    </button>
+  ),
 }));
 vi.mock('./GameWorld', () => ({
   GameWorld: ({ profile }: { readonly profile: PlayerProfile }) => (
@@ -96,7 +118,7 @@ async function renderExperience() {
   });
 }
 
-function entryResponse(entryState: 'active' | 'rename_required') {
+function entryResponse(entryState: 'active' | 'rename_required' | 'appearance_required') {
   return Response.json({ success: true, data: { entryState, profile } });
 }
 
@@ -134,6 +156,37 @@ describe('PlayerExperience moderation bootstrap boundary', () => {
     globalThis.fetch = vi.fn(async () => entryResponse('active'));
     await renderExperience();
     expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
+  });
+
+  it('keeps the world unmounted until the required first-time appearance is confirmed', async () => {
+    globalThis.fetch = vi.fn(async () => entryResponse('appearance_required'));
+    await renderExperience();
+    expect(container.querySelector('[data-testid="game-world"]')).toBeNull();
+    const creator = container.querySelector<HTMLButtonElement>('[data-testid="character-creator"]');
+    expect(creator).not.toBeNull();
+    await act(async () => creator?.click());
+    expect(container.querySelector('[data-testid="character-creator"]')).toBeNull();
+    expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
+  });
+
+  it('continues to the creator when profile creation succeeds but entry reconciliation drops', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ success: true, data: { entryState: 'active', profile: null } }),
+      )
+      .mockResolvedValueOnce(Response.json({ success: true, data: { profile } }))
+      .mockRejectedValueOnce(new TypeError('network interrupted'));
+    await renderExperience();
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="character-setup"]')?.click();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector('[data-testid="character-setup"]')).toBeNull();
+    expect(container.querySelector('[data-testid="character-creator"]')).not.toBeNull();
+    expect(container.querySelector('[data-testid="game-world"]')).toBeNull();
   });
 
   it('refreshes an administrator-renamed display name when the window regains focus', async () => {

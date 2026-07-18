@@ -9,7 +9,11 @@ import {
   worldDraftSchema,
   worldPreviewSchema,
   publishedWorldTopologySchema,
+  worldPublicationReviewSchema,
   worldPublishResponseSchema,
+  worldRevisionComparisonSchema,
+  worldRevisionSchema,
+  worldRollbackResponseSchema,
   worldValidationResponseSchema,
 } from '@starville/game-content';
 import { mapManifestSchema } from '@starville/game-core';
@@ -68,8 +72,24 @@ const publishSchema = z
     expectedEditVersion: z.number().int().positive(),
     expectedActiveVersionId: uuidSchema.nullable(),
     expectedChecksum: checksumSchema,
+    reviewId: uuidSchema,
     reason: safeReasonSchema,
     requestId: uuidSchema.optional(),
+    confirmed: z.literal(true),
+  })
+  .strict();
+const publicationReviewSchema = z
+  .object({
+    expectedActiveVersionId: uuidSchema.nullable(),
+    operation: z.enum(['publish', 'rollback']),
+    acknowledged: z.literal(true),
+  })
+  .strict();
+const rollbackSchema = z
+  .object({
+    expectedActiveVersionId: uuidSchema,
+    reviewId: uuidSchema,
+    reason: safeReasonSchema,
     confirmed: z.literal(true),
   })
   .strict();
@@ -87,6 +107,12 @@ const failureSchema = z.object({
     'version_conflict',
     'state_conflict',
     'validation_failed',
+    'mfa_required',
+    'acknowledgment_required',
+    'review_required',
+    'test_required',
+    'maintenance_blocked',
+    'revision_unavailable',
   ]),
 });
 
@@ -108,6 +134,22 @@ function mapFailure(
     throw new PublicApiError(422, 'WORLD_VALIDATION_FAILED');
   }
   if (parsed.data.status === 'validation_failed') return;
+  if (parsed.data.status === 'mfa_required') throw new PublicApiError(403, 'MFA_REQUIRED');
+  if (parsed.data.status === 'acknowledgment_required') {
+    throw new PublicApiError(422, 'WORLD_IMPACT_ACKNOWLEDGMENT_REQUIRED');
+  }
+  if (parsed.data.status === 'review_required') {
+    throw new PublicApiError(422, 'WORLD_PUBLICATION_REVIEW_REQUIRED');
+  }
+  if (parsed.data.status === 'test_required') {
+    throw new PublicApiError(422, 'WORLD_GAME_TEST_REQUIRED');
+  }
+  if (parsed.data.status === 'maintenance_blocked') {
+    throw new PublicApiError(409, 'WORLD_MAINTENANCE_BLOCKED');
+  }
+  if (parsed.data.status === 'revision_unavailable') {
+    throw new PublicApiError(422, 'WORLD_REVISION_UNAVAILABLE');
+  }
   throw new PublicApiError(409, conflictCode);
 }
 
@@ -210,6 +252,33 @@ export function createAdminWorldService(options: {
         ),
       );
     },
+    async getRevision(identity, mapId, versionId, requestId) {
+      return guarded(requestId, async () =>
+        parseResponse(
+          worldRevisionSchema,
+          await gateway.getRevision(identity, {
+            p_world_map_id: validId(mapId),
+            p_version_id: validId(versionId),
+            p_request_id: requestId,
+            p_rate_limit: options.readRateLimit,
+          }),
+        ),
+      );
+    },
+    async compareRevisions(identity, mapId, fromVersionId, toVersionId, requestId) {
+      return guarded(requestId, async () =>
+        parseResponse(
+          worldRevisionComparisonSchema,
+          await gateway.compareRevisions(identity, {
+            p_world_map_id: validId(mapId),
+            p_from_version_id: validId(fromVersionId),
+            p_to_version_id: validId(toVersionId),
+            p_request_id: requestId,
+            p_rate_limit: options.readRateLimit,
+          }),
+        ),
+      );
+    },
     async createDraft(identity, mapId, body, requestId) {
       const parsed = createDraftSchema.safeParse(body);
       if (!parsed.success) throw new PublicApiError(400, 'INVALID_WORLD_ADMIN_REQUEST');
@@ -253,6 +322,44 @@ export function createAdminWorldService(options: {
         ),
       );
     },
+    async reviewPublication(identity, mapId, versionId, body, requestId) {
+      const parsed = publicationReviewSchema.safeParse(body);
+      if (!parsed.success) throw new PublicApiError(400, 'INVALID_WORLD_ADMIN_REQUEST');
+      return guarded(requestId, async () =>
+        parseResponse(
+          worldPublicationReviewSchema,
+          await gateway.reviewPublication(identity, {
+            p_world_map_id: validId(mapId),
+            p_target_version_id: validId(versionId),
+            p_expected_active_version_id: parsed.data.expectedActiveVersionId,
+            p_operation: parsed.data.operation,
+            p_acknowledged: parsed.data.acknowledged,
+            p_request_id: requestId,
+            p_rate_limit: options.publishRateLimit,
+          }),
+          'WORLD_PUBLISH_CONFLICT',
+        ),
+      );
+    },
+    async rollbackVersion(identity, mapId, versionId, body, requestId) {
+      const parsed = rollbackSchema.safeParse(body);
+      if (!parsed.success) throw new PublicApiError(400, 'INVALID_WORLD_ADMIN_REQUEST');
+      return guarded(requestId, async () =>
+        parseResponse(
+          worldRollbackResponseSchema,
+          await gateway.rollbackVersion(identity, {
+            p_world_map_id: validId(mapId),
+            p_target_version_id: validId(versionId),
+            p_expected_active_version_id: parsed.data.expectedActiveVersionId,
+            p_review_id: parsed.data.reviewId,
+            p_reason: parsed.data.reason,
+            p_request_id: requestId,
+            p_rate_limit: options.publishRateLimit,
+          }),
+          'WORLD_PUBLISH_CONFLICT',
+        ),
+      );
+    },
     async validateDraft(identity, mapId, versionId, body, requestId) {
       const parsed = validateDraftSchema.safeParse(body);
       if (!parsed.success) throw new PublicApiError(400, 'INVALID_WORLD_ADMIN_REQUEST');
@@ -280,10 +387,11 @@ export function createAdminWorldService(options: {
           worldPublishResponseSchema,
           await gateway.publishVersion(identity, {
             p_world_map_id: validId(mapId),
-            p_version_id: validId(versionId),
+            p_source_version_id: validId(versionId),
             p_expected_edit_version: parsed.data.expectedEditVersion,
             p_expected_active_version_id: parsed.data.expectedActiveVersionId,
             p_expected_checksum: parsed.data.expectedChecksum,
+            p_review_id: parsed.data.reviewId,
             p_reason: parsed.data.reason,
             p_request_id: requestId,
             p_rate_limit: options.publishRateLimit,

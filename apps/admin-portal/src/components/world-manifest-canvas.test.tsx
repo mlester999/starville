@@ -4,12 +4,17 @@ import { describe, expect, it } from 'vitest';
 import { getPhase7LocalDraft } from '@starville/game-content';
 import { mapManifestSchema } from '@starville/game-core';
 
+import type { WorldEditorAssetCandidate } from '../lib/world-assets/contracts';
+import type { AssetSceneRenderOverride } from '../lib/world-assets/scene-preview-model';
 import {
   WORLD_CANVAS_VIEW_HEIGHT,
   WORLD_CANVAS_VIEW_WIDTH,
   WorldManifestCanvas,
 } from './world-manifest-canvas';
-import type { AdminWorldManifest } from '../lib/worlds/contracts';
+import type { AdminWorldManifest, WorldDraftAssetPin } from '../lib/worlds/contracts';
+
+const TREE_ASSET_ID = '36f4dc81-50f0-4ebd-81f0-f014b27217a5';
+const TREE_VERSION_ID = 'ee26ba4b-d21c-4b35-9fd4-c7c565f30f4e';
 
 function baseManifest(overrides: Partial<AdminWorldManifest> = {}): AdminWorldManifest {
   return mapManifestSchema.parse({
@@ -114,7 +119,136 @@ function baseManifest(overrides: Partial<AdminWorldManifest> = {}): AdminWorldMa
   });
 }
 
+function managedTreeCandidate(): WorldEditorAssetCandidate {
+  const timestamp = '2026-07-16T00:00:00.000Z';
+  return {
+    assetKey: 'tree-pine',
+    versionId: TREE_VERSION_ID,
+    asset: {
+      id: TREE_ASSET_ID,
+      gameId: 'starville',
+      slug: 'tree-pine',
+      friendlyName: 'Tree Pine',
+      assetType: 'tree',
+      category: 'nature',
+      lifecycleStatus: 'active',
+      productionStatus: 'approved_production',
+      activeVersionId: TREE_VERSION_ID,
+      developmentMarkerReplacementKey: null,
+      versionCount: 2,
+      referenceCount: 4,
+      revision: 2,
+      thumbnailUrl: `/api/v1/admin/world-assets/${TREE_ASSET_ID}/versions/${TREE_VERSION_ID}/thumbnail`,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    },
+    activeVersion: {
+      id: TREE_VERSION_ID,
+      assetId: TREE_ASSET_ID,
+      versionNumber: 1,
+      lifecycleStatus: 'active',
+      processingStatus: 'completed',
+      validationStatus: 'valid',
+      detectedMediaType: 'image/webp',
+      width: 512,
+      height: 640,
+      sourceSizeBytes: 4096,
+      checksumPrefix: '0123456789ab',
+      sourceUrl: `/api/v1/admin/world-assets/${TREE_ASSET_ID}/versions/${TREE_VERSION_ID}/source`,
+      previewUrl: `/api/v1/admin/world-assets/${TREE_ASSET_ID}/versions/${TREE_VERSION_ID}/preview`,
+      thumbnailUrl: `/api/v1/admin/world-assets/${TREE_ASSET_ID}/versions/${TREE_VERSION_ID}/thumbnail`,
+      render: {
+        renderWidth: 256,
+        renderHeight: 320,
+        scale: 1,
+        anchor: { x: 0.5, y: 0.5 },
+        footAnchor: { x: 0.5, y: 0.9 },
+        depthAnchor: { x: 0.5, y: 0.88 },
+        supportedRotations: [0],
+        defaultRotation: 0,
+      },
+      collision: { shape: 'none', blocking: false },
+      interactionCompatibility: ['decorative'],
+      tags: ['tree'],
+      internalNotes: '',
+      validationResult: null,
+      editVersion: 1,
+      createdByAdminId: null,
+      submittedByAdminId: null,
+      reviewedByAdminId: null,
+      approvedByAdminId: null,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      submittedAt: timestamp,
+      reviewedAt: timestamp,
+      approvedAt: timestamp,
+      activatedAt: timestamp,
+    },
+    supportedInteractions: ['decorative'],
+    supportedRotations: [0],
+  };
+}
+
+function managedTreePin(): WorldDraftAssetPin {
+  const candidate = managedTreeCandidate();
+  return {
+    assetId: TREE_ASSET_ID,
+    assetKey: 'tree-pine',
+    friendlyName: 'Tree Pine',
+    assetType: 'tree',
+    productionStatus: 'approved_production',
+    activeVersionId: TREE_VERSION_ID,
+    referenceCount: 4,
+    pinnedVersion: {
+      id: TREE_VERSION_ID,
+      versionNumber: 1,
+      lifecycleStatus: 'active',
+      processingStatus: 'completed',
+      validationStatus: 'valid',
+      sourceWidth: 512,
+      sourceHeight: 640,
+      sourceKind: 'storage_raster',
+      processedSourceAvailable: true,
+      processedWidth: 512,
+      processedHeight: 640,
+      render: candidate.activeVersion.render,
+      collision: candidate.activeVersion.collision,
+    },
+    latestVersion: {
+      id: '9a03dc7d-1039-4841-8680-40775c9b08de',
+      versionNumber: 2,
+      lifecycleStatus: 'validated',
+      processingStatus: 'completed',
+      validationStatus: 'valid',
+      sourceWidth: 480,
+      sourceHeight: 600,
+    },
+  };
+}
+
 describe('WorldManifestCanvas', () => {
+  it('renders cardinal rotation as a non-mutating object transform', () => {
+    const initial = baseManifest();
+    const first = initial.objects[0];
+    if (first === undefined) throw new Error('Canvas fixture object is missing');
+    const rotated = baseManifest({
+      objects: [{ ...first, rotation: 90 }, ...initial.objects.slice(1)],
+    });
+    const before = JSON.stringify(rotated);
+    const markup = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest: rotated,
+        showGrid: true,
+        showCollisions: true,
+        showSpawns: true,
+        showExits: true,
+      }),
+    );
+
+    expect(markup).toContain('rotate(90)');
+    expect(JSON.stringify(rotated)).toBe(before);
+  });
+
   it('paints a structured isometric workspace with valid dimensions and grid', () => {
     const markup = renderToStaticMarkup(
       createElement(WorldManifestCanvas, {
@@ -222,7 +356,7 @@ describe('WorldManifestCanvas', () => {
     expect(quiet).toContain('data-show-label="false"');
     expect(selected).toContain('data-show-label="true"');
     expect(selected).toContain('world-canvas__selection-glow');
-    expect(selected).toContain('Building');
+    expect(selected).toContain('Cottage Amber');
   });
 
   it('honors collision, spawn, exit, and grid toggles', () => {
@@ -272,6 +406,153 @@ describe('WorldManifestCanvas', () => {
     expect(markup).toContain('world-canvas__selection-glow');
     expect(markup).toContain('fill="#c9894a"');
     expect(markup).not.toMatch(/class="world-canvas__sky[^"]*"\s+height=/u);
+  });
+
+  it('renders eligible active processed media with anchors and canonical UUIDs', () => {
+    const manifest = baseManifest({
+      assets: ['tree-pine'],
+      objects: [
+        { id: 'tree-ne', assetId: 'tree-pine', kind: 'tree', x: 20.8, y: 9.1, scale: 1.05 },
+      ],
+    });
+    const markup = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        assetCandidates: [managedTreeCandidate()],
+        assetPins: [managedTreePin()],
+        onSelect: () => undefined,
+        renderMode: 'mixed',
+        showGrid: true,
+        showCollisions: true,
+        showSpawns: true,
+        showExits: true,
+        zoom: 1.5,
+      }),
+    );
+
+    expect(markup).toContain('world-canvas__managed-asset');
+    expect(markup).toContain('world-canvas__asset-loading');
+    expect(markup).toContain('data-media-state="loading"');
+    expect(markup).toContain(`data-rendered-version-id="${TREE_VERSION_ID}"`);
+    expect(markup).toContain(
+      `href="/api/world-assets/${TREE_ASSET_ID}/versions/${TREE_VERSION_ID}/source"`,
+    );
+    expect(markup).not.toContain('/original');
+    expect(markup).toContain('data-render-status="asset"');
+    expect(markup).toContain('data-render-reason="pinned_asset"');
+    expect(markup).toContain('aria-label="Tree Pine, tree, managed asset"');
+    expect(markup).toContain('role="button"');
+    expect(markup).toContain('tabindex="0"');
+    expect(markup).toContain('data-world-canvas-label="true"');
+  });
+
+  it('keeps explicit marker and collision-debug fallbacks deterministic', () => {
+    const manifest = baseManifest({
+      assets: ['tree-pine'],
+      objects: [
+        { id: 'tree-ne', assetId: 'tree-pine', kind: 'tree', x: 20.8, y: 9.1, scale: 1.05 },
+      ],
+    });
+    const markerMarkup = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        assetCandidates: [managedTreeCandidate()],
+        renderMode: 'markers',
+        showGrid: true,
+        showCollisions: true,
+        showSpawns: true,
+        showExits: true,
+      }),
+    );
+    const collisionMarkup = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        assetCandidates: [managedTreeCandidate()],
+        renderMode: 'collision',
+        showGrid: true,
+        showCollisions: true,
+        showSpawns: true,
+        showExits: true,
+      }),
+    );
+
+    expect(markerMarkup).not.toContain('world-canvas__managed-asset');
+    expect(markerMarkup).toContain('data-render-reason="marker_mode"');
+    expect(collisionMarkup).toContain('data-render-reason="collision_debug_mode"');
+  });
+
+  it('renders a non-active candidate through the protected derivative and orders the reference player around its saved depth anchor', () => {
+    const candidate = managedTreeCandidate().activeVersion;
+    const previewVersion = {
+      ...candidate,
+      id: '9a03dc7d-1039-4841-8680-40775c9b08de',
+      versionNumber: 2,
+      lifecycleStatus: 'in_review' as const,
+      sourceUrl: '/private-upstream-source',
+      activatedAt: null,
+    };
+    const manifest = baseManifest({
+      assets: ['tree-pine'],
+      objects: [{ id: 'tree-ne', assetId: 'tree-pine', kind: 'tree', x: 10, y: 10, scale: 1 }],
+    });
+    const scenePreviewOverride: AssetSceneRenderOverride = {
+      targetObjectId: 'tree-ne',
+      assetId: TREE_ASSET_ID,
+      assetKey: 'tree-pine',
+      friendlyName: 'Tree Pine',
+      version: previewVersion,
+      configuration: {
+        friendlyName: 'Tree Pine',
+        category: 'nature',
+        tags: previewVersion.tags,
+        internalNotes: '',
+        render: previewVersion.render,
+        collision: previewVersion.collision,
+        interactionCompatibility: previewVersion.interactionCompatibility,
+      },
+      mediaUrl: `/api/world-assets/${TREE_ASSET_ID}/versions/${previewVersion.id}/source`,
+      presentation: 'candidate',
+    };
+    const behind = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        scenePreviewOverride,
+        sceneCamera: { center: { x: 10, y: 10 }, zoom: 1.25, panX: 0, panY: 0 },
+        playerPosition: { x: 9, y: 9 },
+        showSceneAnchors: true,
+        showGrid: false,
+        showCollisions: true,
+        showSpawns: false,
+        showExits: false,
+      }),
+    );
+    const front = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        scenePreviewOverride,
+        sceneCamera: { center: { x: 10, y: 10 }, zoom: 1.25, panX: 0, panY: 0 },
+        playerPosition: { x: 11, y: 11 },
+        showSceneAnchors: true,
+        showGrid: false,
+        showCollisions: true,
+        showSpawns: false,
+        showExits: false,
+      }),
+    );
+
+    expect(behind).toContain('data-render-reason="scene_preview_candidate"');
+    expect(behind).toContain('CANDIDATE');
+    expect(behind).toContain('world-canvas__asset-anchors');
+    expect(behind).toContain(
+      `href="/api/world-assets/${TREE_ASSET_ID}/versions/${previewVersion.id}/source"`,
+    );
+    expect(behind).not.toContain('/private-upstream-source');
+    expect(behind.indexOf('data-world-canvas-reference-player')).toBeLessThan(
+      behind.indexOf('data-render-reason="scene_preview_candidate"'),
+    );
+    expect(front.indexOf('data-world-canvas-reference-player')).toBeGreaterThan(
+      front.indexOf('data-render-reason="scene_preview_candidate"'),
+    );
   });
 
   it('surfaces a safe error panel when rendering fails', () => {

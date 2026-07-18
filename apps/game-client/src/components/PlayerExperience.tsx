@@ -2,11 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { AppearancePreset, PlayerProfile } from '@starville/game-core';
 
-import { PlayerRequestError, createPlayerProfile, loadPlayerEntry } from '../app/player-client';
+import {
+  PlayerRequestError,
+  createPlayerProfile,
+  loadPlayerEntry,
+  type PlayerExperienceEntryState,
+} from '../app/player-client';
 import type { TrustedTokenAccess } from '../app/token-access-client';
 import { CharacterSetup } from './CharacterSetup';
 import { GameWorld } from './GameWorld';
 import { RequiredRename } from './RequiredRename';
+import { FirstTimeCharacterCreator } from './CharacterCustomization';
 
 interface PlayerExperienceProps {
   readonly apiUrl: string;
@@ -17,6 +23,7 @@ interface PlayerExperienceProps {
   readonly onAccessInvalid: () => void;
   readonly onLeaveVillage: () => Promise<void>;
   readonly onRegisterMaintenanceFlush?: (handler: (() => Promise<void>) | undefined) => void;
+  readonly realtimeUrl?: string | undefined;
 }
 
 const PROFILE_RECONCILIATION_INTERVAL_MS = 60_000;
@@ -30,11 +37,10 @@ export function PlayerExperience({
   onAccessInvalid,
   onLeaveVillage,
   onRegisterMaintenanceFlush,
+  realtimeUrl,
 }: PlayerExperienceProps) {
   const [profile, setProfile] = useState<PlayerProfile | null>();
-  const [entryState, setEntryState] = useState<'active' | 'rename_required' | 'suspended'>(
-    'active',
-  );
+  const [entryState, setEntryState] = useState<PlayerExperienceEntryState>('active');
   const [loadError, setLoadError] = useState(false);
   const [retryVersion, setRetryVersion] = useState(0);
   const [backgroundWarning, setBackgroundWarning] = useState(false);
@@ -133,7 +139,18 @@ export function PlayerExperience({
       try {
         const created = await createPlayerProfile(apiUrl, input);
         setProfile(created);
-        setBackgroundWarning(false);
+        try {
+          const entry = await loadPlayerEntry(apiUrl);
+          setProfile(entry.profile ?? created);
+          setEntryState(entry.entryState);
+          setBackgroundWarning(false);
+        } catch (error) {
+          // The profile is already durable. Continue to the required creator
+          // instead of asking the player to submit the profile a second time.
+          setEntryState('appearance_required');
+          setBackgroundWarning(true);
+          if (error instanceof PlayerRequestError && error.status === 401) onAccessInvalid();
+        }
         return created;
       } catch (error) {
         if (error instanceof PlayerRequestError && error.status === 401) onAccessInvalid();
@@ -209,6 +226,16 @@ export function PlayerExperience({
 
   if (profile === null) return <CharacterSetup onCreate={createCharacter} />;
 
+  if (entryState === 'appearance_required') {
+    return (
+      <FirstTimeCharacterCreator
+        apiUrl={apiUrl}
+        legacyFallbackPreset={profile.appearancePreset}
+        onComplete={() => setEntryState('active')}
+      />
+    );
+  }
+
   if (entryState === 'rename_required') {
     return (
       <RequiredRename
@@ -248,6 +275,7 @@ export function PlayerExperience({
         onRecheck={onRecheck}
         profile={profile}
         rechecking={rechecking}
+        realtimeUrl={realtimeUrl}
       />
     </>
   );

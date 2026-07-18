@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { WorldAssetSummary } from '../lib/world-assets/contracts';
 import { availableAdminAssetMediaPath } from '../lib/world-assets/media';
 import { assetTypeLabel } from '../lib/world-assets/profiles';
+import { canonicalWorldAssetPath } from '../lib/world-assets/version-recovery';
 import { WorldAssetThumbnail } from './world-asset-thumbnail';
 
 function formatDate(value: string): string {
@@ -91,7 +92,7 @@ export function WorldAssetTable(props: {
               <td data-label="References">{asset.referenceCount} tracked</td>
               <td data-label="Updated">{formatDate(asset.updatedAt)}</td>
               <td data-label="Open">
-                <Link className="table-link" href={`/world-assets/${asset.id}`}>
+                <Link className="table-link" href={canonicalWorldAssetPath(asset.id)}>
                   {props.reviewQueue ? 'Review' : 'Manage'}
                   <span className="sr-only"> {asset.friendlyName}</span>
                 </Link>

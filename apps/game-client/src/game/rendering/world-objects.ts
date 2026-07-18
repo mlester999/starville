@@ -91,7 +91,10 @@ function drawNotice(graphics: Phaser.GameObjects.Graphics): void {
   graphics.fillRect(-22, -65, 44, 3);
 }
 
-function drawSmallObject(graphics: Phaser.GameObjects.Graphics, object: MapObject): void {
+function drawSmallObject(
+  graphics: Phaser.GameObjects.Graphics,
+  object: Pick<MapObject, 'kind'>,
+): void {
   if (object.kind === 'rock') {
     graphics.fillStyle(WORLD_COLORS.shadow, 0.2).fillEllipse(0, 0, 75, 20);
     graphics.fillStyle(0x788176).fillPoints(
@@ -127,7 +130,10 @@ function drawSmallObject(graphics: Phaser.GameObjects.Graphics, object: MapObjec
   graphics.fillStyle(0x77986a, 0.65).fillCircle(2, -39, 17);
 }
 
-function drawObject(graphics: Phaser.GameObjects.Graphics, object: MapObject): void {
+function drawObject(
+  graphics: Phaser.GameObjects.Graphics,
+  object: Pick<MapObject, 'assetId' | 'kind'>,
+): void {
   if (object.kind === 'building') {
     drawBuilding(graphics, object.assetId.includes('sage'));
   } else if (object.kind === 'tree') {
@@ -175,7 +181,7 @@ export function renderWorldObjects(
         delivery.renderWidth * delivery.scale,
         delivery.renderHeight * delivery.scale,
       );
-      image.setAngle(delivery.defaultRotation);
+      image.setAngle(object.rotation ?? delivery.defaultRotation);
       visual = image;
       depthOffset = placement.depthOffset;
     } else {

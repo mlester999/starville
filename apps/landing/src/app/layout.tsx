@@ -4,11 +4,14 @@ import './globals.css';
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { loadPublishedPlatformConfiguration } from '../lib/platform-configuration';
+import { parseLandingPublicConfig } from '../lib/public-config';
 
 // eslint-disable-next-line react-refresh/only-export-components
 export async function generateMetadata(): Promise<Metadata> {
   const platform = await loadPublishedPlatformConfiguration();
+  const publicConfig = parseLandingPublicConfig(process.env);
   return {
+    metadataBase: new URL(publicConfig.appUrl),
     title: `${platform.configuration.branding.fullGameName} · ${platform.configuration.branding.tagline}`,
     description: platform.configuration.branding.shortDescription,
     ...(platform.assetUrls.branding.favicon === null

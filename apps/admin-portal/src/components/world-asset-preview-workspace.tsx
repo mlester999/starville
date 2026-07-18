@@ -104,9 +104,14 @@ export function WorldAssetPreviewWorkspace(props: {
     <section className="asset-preview-workspace" aria-labelledby="asset-preview-title">
       <header>
         <div>
-          <p className="eyebrow">Non-mutating visual workspace</p>
-          <h2 id="asset-preview-title">Isometric preview</h2>
+          <p className="eyebrow">Preview workspace</p>
+          <h2 id="asset-preview-title">Preview room</h2>
+          <p className="field-hint">
+            Compare terrain, anchors, collision, and player scale. Camera and overlay controls are
+            preview only. Dragging an anchor changes draft configuration when editing is allowed.
+          </p>
         </div>
+        <span className="control-category control-category--preview">Preview only controls</span>
         <div className="asset-preview-toolbar">
           <PremiumSelect
             aria-label="Preview derivative"
@@ -121,12 +126,12 @@ export function WorldAssetPreviewWorkspace(props: {
             value={source}
           />
           <PremiumSelect
-            aria-label="Preview backdrop"
+            aria-label="Preview terrain backdrop"
             onChange={(value) => setBackdrop(value as typeof backdrop)}
             options={[
               { value: 'checkerboard', label: 'Checkerboard' },
-              { value: 'light', label: 'Light backdrop' },
-              { value: 'dark', label: 'Dark backdrop' },
+              { value: 'light', label: 'Light terrain' },
+              { value: 'dark', label: 'Dark terrain' },
             ]}
             size="compact"
             value={backdrop}
@@ -240,6 +245,60 @@ export function WorldAssetPreviewWorkspace(props: {
         </span>
       </div>
 
+      <details className="asset-control-help">
+        <summary>Preview control help</summary>
+        <dl>
+          <div>
+            <dt>Normalized preview</dt>
+            <dd>Displays the asset at standardized game-world scale using saved configuration.</dd>
+          </div>
+          <div>
+            <dt>Checkerboard</dt>
+            <dd>
+              Shows transparent pixels. A solid rectangle may indicate an incorrectly exported
+              asset.
+            </dd>
+          </div>
+          <div>
+            <dt>Light / dark terrain</dt>
+            <dd>Checks whether the silhouette remains readable on bright and dark ground.</dd>
+          </div>
+          <div>
+            <dt>Rotation</dt>
+            <dd>
+              Previews a supported orientation. It does not imply that every asset has directional
+              artwork.
+            </dd>
+          </div>
+          <div>
+            <dt>Grid, anchors, collision</dt>
+            <dd>
+              Shows world-tile scale, saved anchor positions, and the physical movement blocker.
+            </dd>
+          </div>
+          <div>
+            <dt>Mobile size</dt>
+            <dd>Previews readability and scale on a smaller viewport.</dd>
+          </div>
+          <div>
+            <dt>Zoom and pan</dt>
+            <dd>Moves only the preview camera. It never changes saved asset scale or position.</dd>
+          </div>
+          <div>
+            <dt>Fit / reset</dt>
+            <dd>Returns the preview camera to its default framing.</dd>
+          </div>
+          <div>
+            <dt>Reference player</dt>
+            <dd>The player is a size comparison and is not part of the asset.</dd>
+          </div>
+          <div>
+            <dt>Player foot marker</dt>
+            <dd>Shows where the reference player touches the ground.</dd>
+          </div>
+        </dl>
+      </details>
+
       <div
         className={`asset-preview-canvas asset-preview-canvas--${backdrop} ${mobilePreview ? 'is-mobile' : ''}`}
       >
@@ -314,10 +373,41 @@ export function WorldAssetPreviewWorkspace(props: {
           </div>
         </div>
       </div>
+      <aside className="asset-preview-legend" aria-label="Preview legend">
+        <h3>Preview legend</h3>
+        <ul>
+          <li>
+            <span className="legend-mark legend-mark--player" aria-hidden="true" /> Reference player
+          </li>
+          <li>
+            <span className="legend-mark legend-mark--player-foot" aria-hidden="true" /> Player foot
+            marker
+          </li>
+          <li>
+            <span className="legend-mark legend-mark--foot" aria-hidden="true" /> Asset foot anchor
+          </li>
+          <li>
+            <span className="legend-mark legend-mark--depth" aria-hidden="true" /> Asset depth
+            anchor
+          </li>
+          <li>
+            <span className="legend-mark legend-mark--collision" aria-hidden="true" /> Collision
+            shape
+          </li>
+          <li>
+            <span className="legend-mark legend-mark--grid" aria-hidden="true" /> Grid / approximate
+            footprint
+          </li>
+          <li>
+            <span className="legend-mark legend-mark--interaction" aria-hidden="true" /> Interaction
+            point (not stored by the current contract)
+          </li>
+        </ul>
+      </aside>
       <p className="field-hint">
-        The reference player and foot marker shows collision scale. Foot anchor is where the object
-        touches the ground. Depth anchor controls whether the player appears in front of or behind
-        it. Preview changes are saved only with Save draft.
+        Foot anchor marks ground contact. Depth anchor controls front/behind sorting. Collision
+        covers only physical ground obstacles. Anchor changes persist only after an authorized draft
+        save; all camera and overlay controls remain preview only.
       </p>
     </section>
   );

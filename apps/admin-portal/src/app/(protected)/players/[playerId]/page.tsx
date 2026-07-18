@@ -13,6 +13,7 @@ import { loadAdminPlayer, loadAdminPlayerActivity } from '../../../../lib/player
 import {
   loadAdminPlayerCozy,
   loadAdminPlayerEconomy,
+  loadAdminPlayerFarming,
   loadAdminPlayerInventory,
 } from '../../../../lib/cozy-gameplay/api';
 
@@ -56,7 +57,7 @@ export default async function PlayerDetailPage(props: {
     Number.isInteger(rawInventoryPage) && rawInventoryPage > 0 ? rawInventoryPage : 1;
 
   try {
-    const [player, activity, economy, inventory, cozy] = await Promise.all([
+    const [player, activity, economy, inventory, cozy, farming] = await Promise.all([
       loadAdminPlayer(playerId),
       hasAdminPermission(context, 'player_audit.read')
         ? loadAdminPlayerActivity(playerId, { accessPage, accessPageSize })
@@ -69,6 +70,9 @@ export default async function PlayerDetailPage(props: {
         : Promise.resolve(undefined),
       hasAdminPermission(context, 'cozy_gameplay.read')
         ? loadAdminPlayerCozy(playerId)
+        : Promise.resolve(undefined),
+      hasAdminPermission(context, 'farming.player_read')
+        ? loadAdminPlayerFarming(playerId)
         : Promise.resolve(undefined),
     ]);
     const canReadWallet = hasAdminPermission(context, 'wallets.read');
@@ -90,6 +94,17 @@ export default async function PlayerDetailPage(props: {
           </div>
           <span className={`state-chip state-chip--${moderation.status}`}>{moderation.status}</span>
         </header>
+
+        {hasAdminPermission(context, 'progression.players.inspect') &&
+        player.profile.walletAddress !== null ? (
+          <nav className="avatar-workflow-links detail-card" aria-label="Player progression tools">
+            <Link
+              href={`/game-content/progression?wallet=${encodeURIComponent(player.profile.walletAddress)}`}
+            >
+              Inspect authoritative progression, quests, rewards, and reconciliation
+            </Link>
+          </nav>
+        ) : null}
 
         <div className="detail-grid">
           <section className="detail-card" aria-labelledby="identity-title">
@@ -228,7 +243,10 @@ export default async function PlayerDetailPage(props: {
           </section>
         </div>
 
-        {economy !== undefined || inventory !== undefined || cozy !== undefined ? (
+        {economy !== undefined ||
+        inventory !== undefined ||
+        cozy !== undefined ||
+        farming !== undefined ? (
           <section className="cozy-admin-section" aria-labelledby="cozy-state-title">
             <div className="cozy-admin-section__heading">
               <div>
@@ -410,6 +428,70 @@ export default async function PlayerDetailPage(props: {
                       <dd>{formatDate(cozy.lastGameplayUpdate)}</dd>
                     </div>
                   </dl>
+                </section>
+              ) : null}
+
+              {farming !== undefined ? (
+                <section className="detail-card" aria-labelledby="personal-farming-title">
+                  <h3 id="personal-farming-title">Personal-plot farming</h3>
+                  {!farming.initialized || farming.view === null ? (
+                    <p>No personal plot has been provisioned for this player.</p>
+                  ) : (
+                    <>
+                      <dl className="detail-list">
+                        <div>
+                          <dt>Plot lifecycle</dt>
+                          <dd>{farming.view.plot.lifecycle.replaceAll('_', ' ')}</dd>
+                        </div>
+                        <div>
+                          <dt>Private instance</dt>
+                          <dd>
+                            <code>{farming.view.plot.instanceKey}</code>
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Farm tiles</dt>
+                          <dd>{farming.view.plot.tiles.length}</dd>
+                        </div>
+                        <div>
+                          <dt>Active crops</dt>
+                          <dd>
+                            {farming.view.plot.tiles.filter((tile) => tile.crop !== null).length}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt>Starter quest</dt>
+                          <dd>{farming.view.quest.status.replaceAll('_', ' ')}</dd>
+                        </div>
+                        <div>
+                          <dt>Last farming action</dt>
+                          <dd>{formatDate(farming.lastFarmingAction ?? null)}</dd>
+                        </div>
+                        <div>
+                          <dt>Pending reconciliation</dt>
+                          <dd>{farming.pendingReconciliationCount ?? 0}</dd>
+                        </div>
+                        <div>
+                          <dt>DUST receipt</dt>
+                          <dd>{farming.view.quest.rewardReceiptId ?? 'Not settled'}</dd>
+                        </div>
+                      </dl>
+                      <ul className="cozy-definition-list">
+                        {farming.view.plot.tiles.map((tile) => (
+                          <li key={tile.id}>
+                            <strong>
+                              Tile {tile.slot}: {tile.state}
+                            </strong>
+                            <span>
+                              {tile.crop === null
+                                ? 'No crop'
+                                : `${tile.crop.snapshot.cropName} · ${Math.round(tile.crop.growthProgress * 100)}% · stage ${tile.crop.growthStage}`}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </section>
               ) : null}
             </div>

@@ -119,6 +119,10 @@ export const inventoryMovementReasonSchema = z.enum([
   'crafting',
   'furniture_placement',
   'furniture_removal',
+  'social_gift',
+  'social_trade',
+  'cooperative_activity_reward',
+  'tutorial_delivery',
   'system_refund',
 ]);
 export const MAX_INVENTORY_AGGREGATE_QUANTITY = 199_800 as const;

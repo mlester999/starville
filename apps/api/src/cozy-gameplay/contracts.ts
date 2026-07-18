@@ -10,6 +10,7 @@ import {
   inventoryMovementSchema,
   inventorySchema,
   itemCatalogSchema,
+  playableVerticalSliceSchema,
   paginationMetaSchema,
   quickbarSchema,
   recipeActionResponseSchema,
@@ -20,21 +21,36 @@ import {
   slugSchema,
   stateVersionSchema,
   timestampSchema,
+  verticalSliceMutationResponseSchema,
+  workstationJobMutationResponseSchema,
+  workstationTutorialMutationResponseSchema,
+  workstationWorkspaceSchema,
   type DustAccount,
   type DustLedgerEntry,
   type Inventory,
   type InventoryMovement,
   type Quickbar,
+  type CollectCraftingJobRequest,
+  type StartCraftingJobRequest,
+  type WorkstationJobMutationResponse,
+  type WorkstationTutorialMutationResponse,
+  type WorkstationWorkspace,
 } from '@starville/cozy-gameplay';
 import type {
+  harvestHomeCropRequestSchema,
   harvestRequestSchema,
   homeAccessRequestSchema,
   moveFurnitureRequestSchema,
+  plantHomeCropRequestSchema,
   plantRequestSchema,
   placeFurnitureRequestSchema,
+  prepareHomeSoilRequestSchema,
   recipeActionRequestSchema,
   removeFurnitureRequestSchema,
   rotateFurnitureRequestSchema,
+  starterQuestAcceptRequestSchema,
+  starterQuestDeliveryRequestSchema,
+  waterHomeCropRequestSchema,
   waterRequestSchema,
 } from '@starville/cozy-gameplay';
 import { z } from 'zod';
@@ -141,6 +157,20 @@ export const persistedHomeAccessSchema = homeAccessResponseSchema.extend({
 export const persistedFurnitureMutationSchema = furnitureMutationResponseSchema.extend({
   status: z.enum(['updated', 'replayed']),
 });
+export const loadedPlayableVerticalSliceSchema = playableVerticalSliceSchema.extend({
+  status: z.literal('loaded'),
+});
+export const persistedVerticalSliceMutationSchema = verticalSliceMutationResponseSchema.extend({
+  status: z.enum(['updated', 'replayed']),
+});
+export const loadedWorkstationWorkspaceSchema = z
+  .object({ status: z.literal('loaded'), workspace: workstationWorkspaceSchema })
+  .strict();
+export const persistedWorkstationJobMutationSchema = workstationJobMutationResponseSchema.extend({
+  status: z.enum(['updated', 'replayed']),
+});
+export const persistedWorkstationTutorialMutationSchema =
+  workstationTutorialMutationResponseSchema.extend({ status: z.enum(['updated', 'replayed']) });
 export const cozyPersistenceStatusSchema = z
   .object({
     status: z.enum([
@@ -165,6 +195,57 @@ export const cozyPersistenceStatusSchema = z
       'bootstrap_required',
       'home_access_denied',
       'invalid_placement',
+      'plot_not_found',
+      'plot_provisioning_failed',
+      'plot_permission_denied',
+      'plot_world_mismatch',
+      'farming_system_disabled',
+      'farming_tile_not_found',
+      'farming_tile_not_eligible',
+      'farming_tile_conflict',
+      'tool_not_owned',
+      'tool_action_too_far',
+      'tool_action_cooldown',
+      'seed_not_owned',
+      'seed_not_enabled',
+      'crop_not_found',
+      'crop_not_waterable',
+      'crop_not_mature',
+      'crop_already_harvested',
+      'crop_state_conflict',
+      'quest_not_available',
+      'quest_already_accepted',
+      'quest_objective_incomplete',
+      'quest_already_completed',
+      'quest_reward_already_settled',
+      'tutorial_delivery_insufficient',
+      'economy_settlement_failed',
+      'preview_persistence_disabled',
+      'recipe_job_required',
+      'workstation_unavailable',
+      'workstation_not_found',
+      'workstation_disabled',
+      'workstation_world_mismatch',
+      'workstation_too_far',
+      'recipe_not_found',
+      'recipe_disabled',
+      'recipe_wrong_workstation',
+      'recipe_not_unlocked',
+      'recipe_batch_invalid',
+      'recipe_configuration_invalid',
+      'cooking_system_disabled',
+      'crafting_system_disabled',
+      'crafting_queue_full',
+      'inventory_conflict',
+      'ingredient_quantity_insufficient',
+      'dust_balance_insufficient',
+      'collection_temporarily_disabled',
+      'crafting_job_not_found',
+      'crafting_job_not_ready',
+      'crafting_job_conflict',
+      'crafting_job_already_collected',
+      'crafting_job_canceled',
+      'crafting_job_failed',
     ]),
   })
   .strict();
@@ -200,6 +281,14 @@ export type MoveFurnitureInput = z.infer<typeof moveFurnitureRequestSchema>;
 export type RotateFurnitureInput = z.infer<typeof rotateFurnitureRequestSchema>;
 export type RemoveFurnitureInput = z.infer<typeof removeFurnitureRequestSchema>;
 export type FurnitureMutationResult = z.infer<typeof furnitureMutationResponseSchema>;
+export type PlayableVerticalSlice = z.infer<typeof playableVerticalSliceSchema>;
+export type VerticalSliceMutationResult = z.infer<typeof verticalSliceMutationResponseSchema>;
+export type PrepareHomeSoilInput = z.infer<typeof prepareHomeSoilRequestSchema>;
+export type PlantHomeCropInput = z.infer<typeof plantHomeCropRequestSchema>;
+export type WaterHomeCropInput = z.infer<typeof waterHomeCropRequestSchema>;
+export type HarvestHomeCropInput = z.infer<typeof harvestHomeCropRequestSchema>;
+export type StarterQuestAcceptInput = z.infer<typeof starterQuestAcceptRequestSchema>;
+export type StarterQuestDeliveryInput = z.infer<typeof starterQuestDeliveryRequestSchema>;
 export type CozyPersistenceStatus = z.infer<typeof cozyPersistenceStatusSchema>['status'];
 
 export interface CozyGameplayGateway {
@@ -303,6 +392,65 @@ export interface CozyGameplayGateway {
     input: RemoveFurnitureInput,
     requestId: string,
   ): Promise<FurnitureMutationResult | CozyPersistenceStatus>;
+  getPlayableVerticalSlice(
+    walletAddress: string,
+    requestId: string,
+  ): Promise<PlayableVerticalSlice | CozyPersistenceStatus>;
+  acceptStarterQuest(
+    walletAddress: string,
+    input: StarterQuestAcceptInput,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult | CozyPersistenceStatus>;
+  prepareHomeSoil(
+    walletAddress: string,
+    input: PrepareHomeSoilInput,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult | CozyPersistenceStatus>;
+  plantHomeCrop(
+    walletAddress: string,
+    input: PlantHomeCropInput,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult | CozyPersistenceStatus>;
+  waterHomeCrop(
+    walletAddress: string,
+    input: WaterHomeCropInput,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult | CozyPersistenceStatus>;
+  harvestHomeCrop(
+    walletAddress: string,
+    input: HarvestHomeCropInput,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult | CozyPersistenceStatus>;
+  deliverStarterQuest(
+    walletAddress: string,
+    input: StarterQuestDeliveryInput,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult | CozyPersistenceStatus>;
+  getWorkstationWorkspace(
+    walletAddress: string,
+    workstationInstanceId: string,
+    requestId: string,
+  ): Promise<WorkstationWorkspace | CozyPersistenceStatus>;
+  startWorkstationJob(
+    walletAddress: string,
+    input: StartCraftingJobRequest,
+    requestId: string,
+  ): Promise<WorkstationJobMutationResponse | CozyPersistenceStatus>;
+  collectWorkstationJob(
+    walletAddress: string,
+    input: CollectCraftingJobRequest,
+    requestId: string,
+  ): Promise<WorkstationJobMutationResponse | CozyPersistenceStatus>;
+  acceptWorkstationTutorial(
+    walletAddress: string,
+    input: StarterQuestAcceptInput,
+    requestId: string,
+  ): Promise<WorkstationTutorialMutationResponse | CozyPersistenceStatus>;
+  turnInWorkstationTutorial(
+    walletAddress: string,
+    input: StarterQuestDeliveryInput,
+    requestId: string,
+  ): Promise<WorkstationTutorialMutationResponse | CozyPersistenceStatus>;
 }
 
 export interface CozyGameplayService {
@@ -363,6 +511,76 @@ export interface CozyGameplayService {
     body: unknown,
     requestId: string,
   ): Promise<FurnitureMutationResult>;
+  getPlayableVerticalSlice(
+    walletAddress: string,
+    requestId: string,
+  ): Promise<PlayableVerticalSlice>;
+  acceptStarterQuest(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult>;
+  prepareHomeSoil(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult>;
+  plantHomeCrop(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult>;
+  waterHomeCrop(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult>;
+  harvestHomeCrop(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult>;
+  deliverStarterQuest(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<VerticalSliceMutationResult>;
+  getWorkstationWorkspace(
+    walletAddress: string,
+    workstationInstanceId: unknown,
+    requestId: string,
+  ): Promise<WorkstationWorkspace>;
+  startWorkstationJob(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<WorkstationJobMutationResponse>;
+  collectWorkstationJob(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<WorkstationJobMutationResponse>;
+  acceptWorkstationTutorial(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<WorkstationTutorialMutationResponse>;
+  turnInWorkstationTutorial(
+    walletAddress: string,
+    body: unknown,
+    requestId: string,
+  ): Promise<WorkstationTutorialMutationResponse>;
 }
 
-export type { DustAccount, DustLedgerEntry, Inventory, InventoryMovement, Quickbar };
+export type {
+  CollectCraftingJobRequest,
+  DustAccount,
+  DustLedgerEntry,
+  Inventory,
+  InventoryMovement,
+  Quickbar,
+  StartCraftingJobRequest,
+  WorkstationJobMutationResponse,
+  WorkstationTutorialMutationResponse,
+  WorkstationWorkspace,
+};

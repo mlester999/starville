@@ -14,6 +14,14 @@ export interface AdminWorldGateway {
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
+  getRevision(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
+  compareRevisions(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
   createDraft(
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
@@ -27,6 +35,14 @@ export interface AdminWorldGateway {
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
   publishVersion(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
+  reviewPublication(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
+  rollbackVersion(
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
@@ -58,6 +74,19 @@ export interface AdminWorldService {
     versionId: unknown,
     requestId: string,
   ): Promise<unknown>;
+  getRevision(
+    identity: AdminDatabaseIdentity,
+    mapId: unknown,
+    versionId: unknown,
+    requestId: string,
+  ): Promise<unknown>;
+  compareRevisions(
+    identity: AdminDatabaseIdentity,
+    mapId: unknown,
+    fromVersionId: unknown,
+    toVersionId: unknown,
+    requestId: string,
+  ): Promise<unknown>;
   createDraft(
     identity: AdminDatabaseIdentity,
     mapId: unknown,
@@ -79,6 +108,20 @@ export interface AdminWorldService {
     requestId: string,
   ): Promise<unknown>;
   publishVersion(
+    identity: AdminDatabaseIdentity,
+    mapId: unknown,
+    versionId: unknown,
+    body: unknown,
+    requestId: string,
+  ): Promise<unknown>;
+  reviewPublication(
+    identity: AdminDatabaseIdentity,
+    mapId: unknown,
+    versionId: unknown,
+    body: unknown,
+    requestId: string,
+  ): Promise<unknown>;
+  rollbackVersion(
     identity: AdminDatabaseIdentity,
     mapId: unknown,
     versionId: unknown,

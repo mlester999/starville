@@ -75,6 +75,56 @@ export const worldVersionSummarySchema = z
     publishedAt: nullableTimestampSchema,
     publicationReason: z.string().trim().max(500).nullable(),
     supersedesVersionId: z.uuid().nullable(),
+    derivedFromVersionId: z.uuid().nullable(),
+  })
+  .strict();
+
+export const worldRevisionChangeSummarySchema = z
+  .object({
+    objectsAdded: z.number().int().nonnegative(),
+    objectsRemoved: z.number().int().nonnegative(),
+    objectsMoved: z.number().int().nonnegative(),
+    objectsModified: z.number().int().nonnegative(),
+    assetBindingsChanged: z.number().int().nonnegative(),
+    collisionsChanged: z.number().int().nonnegative(),
+    interactionsChanged: z.number().int().nonnegative(),
+    exitsChanged: z.number().int().nonnegative(),
+    spawnsChanged: z.number().int().nonnegative(),
+    terrainChanged: z.boolean(),
+    metadataChanged: z
+      .object({ name: z.boolean(), description: z.boolean(), bounds: z.boolean() })
+      .strict()
+      .optional(),
+    legacyBackfill: z.boolean().optional(),
+  })
+  .strict();
+
+export const worldRevisionMetadataSchema = z
+  .object({
+    versionId: z.uuid(),
+    parentRevisionId: z.uuid().nullable(),
+    revisionKind: z.enum([
+      'legacy',
+      'draft_created',
+      'draft_saved',
+      'restored',
+      'published',
+      'rollback',
+    ]),
+    changeSummary: worldRevisionChangeSummarySchema,
+    createdAt: timestampSchema,
+  })
+  .strict();
+
+export const worldPublicationHistorySchema = z
+  .object({
+    id: z.uuid(),
+    operation: z.enum(['publish', 'rollback']),
+    sourceRevisionId: z.uuid(),
+    publishedVersionId: z.uuid(),
+    previousPublishedVersionId: z.uuid().nullable(),
+    reason: z.string().trim().min(12).max(500),
+    createdAt: timestampSchema,
   })
   .strict();
 
@@ -106,6 +156,9 @@ export const worldDetailSchema = z
     status: z.literal('loaded'),
     map: worldMapSchema,
     versions: z.array(worldVersionSummarySchema).max(250),
+    draftHeadVersionId: z.uuid().nullable(),
+    revisionMetadata: z.array(worldRevisionMetadataSchema).max(500),
+    publicationHistory: z.array(worldPublicationHistorySchema).max(500),
   })
   .strict();
 
@@ -132,14 +185,116 @@ export const publishedWorldTopologySchema = z
 
 export const worldDraftSchema = z
   .object({
-    status: z.enum(['created', 'updated']),
+    status: z.enum(['created', 'updated', 'unchanged']),
     map: worldMapSchema,
     version: worldVersionSummarySchema,
     manifest: mapManifestSchema,
+    changeSummary: worldRevisionChangeSummarySchema.optional(),
+    idempotentReplay: z.boolean().optional(),
   })
   .strict();
 
-export const worldDraftLoadSchema = worldDraftSchema.extend({ status: z.literal('loaded') });
+const worldDraftAssetRotationSchema = z.union([
+  z.literal(0),
+  z.literal(90),
+  z.literal(180),
+  z.literal(270),
+]);
+const worldDraftAssetAnchorSchema = z
+  .object({ x: z.number().finite().min(0).max(1), y: z.number().finite().min(0).max(1) })
+  .strict();
+const worldDraftAssetCollisionSchema = z.discriminatedUnion('shape', [
+  z.object({ shape: z.literal('none'), blocking: z.literal(false) }).strict(),
+  z
+    .object({
+      shape: z.literal('rectangle'),
+      blocking: z.boolean(),
+      offsetX: z.number().finite(),
+      offsetY: z.number().finite(),
+      width: z.number().finite().positive(),
+      height: z.number().finite().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      shape: z.literal('capsule'),
+      blocking: z.boolean(),
+      startX: z.number().finite(),
+      startY: z.number().finite(),
+      endX: z.number().finite(),
+      endY: z.number().finite(),
+      radius: z.number().finite().positive(),
+    })
+    .strict(),
+]);
+const worldDraftAssetVersionStateSchema = z
+  .object({
+    id: z.uuid(),
+    versionNumber: positiveVersionSchema,
+    lifecycleStatus: z.enum([
+      'draft',
+      'processing',
+      'validation_failed',
+      'validated',
+      'in_review',
+      'changes_requested',
+      'rejected',
+      'approved',
+      'active',
+      'deprecated',
+      'archived',
+    ]),
+    processingStatus: z.enum(['pending', 'completed']),
+    validationStatus: z.enum(['pending', 'valid', 'invalid']),
+    sourceWidth: z.number().int().positive().nullable(),
+    sourceHeight: z.number().int().positive().nullable(),
+  })
+  .strict();
+
+/** Exact immutable asset-version material retained by a draft world version. */
+export const worldDraftAssetPinSchema = z
+  .object({
+    assetId: z.uuid(),
+    assetKey: z.string().trim().min(1).max(96),
+    friendlyName: z.string().trim().min(1).max(100),
+    assetType: z.string().trim().min(1).max(64),
+    productionStatus: z.enum([
+      'development_marker',
+      'production_candidate',
+      'approved_production',
+      'deprecated',
+    ]),
+    activeVersionId: z.uuid().nullable(),
+    referenceCount: z.number().int().nonnegative(),
+    pinnedVersion: worldDraftAssetVersionStateSchema.extend({
+      sourceKind: z.enum(['repository_procedural', 'legacy_storage_raster', 'storage_raster']),
+      processedSourceAvailable: z.boolean(),
+      processedWidth: z.number().int().positive().nullable(),
+      processedHeight: z.number().int().positive().nullable(),
+      render: z
+        .object({
+          renderWidth: z.number().int().positive(),
+          renderHeight: z.number().int().positive(),
+          scale: z.number().finite().positive(),
+          anchor: worldDraftAssetAnchorSchema,
+          footAnchor: worldDraftAssetAnchorSchema,
+          depthAnchor: worldDraftAssetAnchorSchema,
+          supportedRotations: z.array(worldDraftAssetRotationSchema).min(1).max(4),
+          defaultRotation: worldDraftAssetRotationSchema,
+        })
+        .strict(),
+      collision: worldDraftAssetCollisionSchema,
+    }),
+    latestVersion: worldDraftAssetVersionStateSchema.nullable(),
+  })
+  .strict();
+
+export const worldDraftLoadSchema = worldDraftSchema
+  .extend({
+    status: z.literal('loaded'),
+    assetPins: z.array(worldDraftAssetPinSchema).max(128),
+  })
+  .strict();
 
 export const worldValidationResponseSchema = z
   .object({
@@ -155,7 +310,49 @@ export const worldPublishResponseSchema = z
     status: z.literal('published'),
     map: worldMapSchema,
     version: worldVersionSummarySchema,
+    sourceRevisionId: z.uuid(),
     previousVersionId: z.uuid().nullable(),
+    publicationId: z.uuid(),
+    operation: z.literal('publish'),
+  })
+  .strict();
+
+export const worldRollbackResponseSchema = worldPublishResponseSchema
+  .omit({ status: true, operation: true })
+  .extend({ status: z.literal('rolled_back'), operation: z.literal('rollback') })
+  .strict();
+
+export const worldRevisionSchema = z
+  .object({
+    status: z.literal('loaded'),
+    map: worldMapSchema,
+    version: worldVersionSummarySchema,
+    manifest: mapManifestSchema,
+    isDraftHead: z.boolean(),
+    revisionMetadata: worldRevisionMetadataSchema.omit({ versionId: true }).strict(),
+  })
+  .strict();
+
+export const worldRevisionComparisonSchema = z
+  .object({
+    status: z.literal('loaded'),
+    fromVersion: worldVersionSummarySchema,
+    toVersion: worldVersionSummarySchema,
+    changeSummary: worldRevisionChangeSummarySchema,
+  })
+  .strict();
+
+export const worldPublicationReviewSchema = z
+  .object({
+    status: z.literal('reviewed'),
+    reviewId: z.uuid(),
+    operation: z.enum(['publish', 'rollback']),
+    targetRevisionId: z.uuid(),
+    expectedActiveVersionId: z.uuid().nullable(),
+    changeSummary: worldRevisionChangeSummarySchema,
+    gameTestEvidenceId: z.uuid().nullable().optional(),
+    expiresAt: timestampSchema,
+    idempotentReplay: z.boolean().optional(),
   })
   .strict();
 
@@ -240,10 +437,15 @@ export type WorldDetail = z.infer<typeof worldDetailSchema>;
 export type PublishedWorldTopology = z.infer<typeof publishedWorldTopologySchema>;
 export type WorldDraft = z.infer<typeof worldDraftSchema>;
 export type WorldDraftLoad = z.infer<typeof worldDraftLoadSchema>;
+export type WorldDraftAssetPin = z.infer<typeof worldDraftAssetPinSchema>;
 export type WorldPreview = z.infer<typeof worldPreviewSchema>;
 export type WorldAsset = z.infer<typeof worldAssetSchema>;
 export type WorldAssetDirectory = z.infer<typeof worldAssetDirectorySchema>;
 export type WorldAuditEvent = z.infer<typeof worldAuditEventSchema>;
 export type WorldAuditDirectory = z.infer<typeof worldAuditDirectorySchema>;
 export type WorldValidationResult = z.infer<typeof worldValidationResultSchema>;
+export type WorldRevisionChangeSummary = z.infer<typeof worldRevisionChangeSummarySchema>;
+export type WorldRevision = z.infer<typeof worldRevisionSchema>;
+export type WorldRevisionComparison = z.infer<typeof worldRevisionComparisonSchema>;
+export type WorldPublicationReview = z.infer<typeof worldPublicationReviewSchema>;
 export type AdminWorldManifest = z.infer<typeof mapManifestSchema>;

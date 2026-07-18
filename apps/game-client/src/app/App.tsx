@@ -6,10 +6,12 @@ import {
   compiledPlatformConfiguration,
   fetchPlatformConfiguration,
 } from './platform-configuration';
+import { WorldGameTest } from '../components/WorldGameTest';
 
 export function App() {
   const config = parseGameClientPublicConfig(import.meta.env);
   const [platform, setPlatform] = useState(compiledPlatformConfiguration);
+  const gameTest = window.location.pathname === '/preview/world';
 
   useEffect(() => {
     const controller = new AbortController();
@@ -21,7 +23,7 @@ export function App() {
 
   useEffect(() => {
     const presentation = platform.configuration;
-    document.title = `${presentation.branding.fullGameName} · Game`;
+    document.title = `${presentation.branding.fullGameName} · ${gameTest ? 'Game Test' : 'Game'}`;
     document.documentElement.style.setProperty(
       '--game-runtime-focus',
       presentation.theme.tokens.focusRing,
@@ -38,13 +40,24 @@ export function App() {
       '--starville-font-sans',
       PLATFORM_FONT_REGISTRY[presentation.typography.body].stack,
     );
-  }, [platform]);
+  }, [gameTest, platform]);
+
+  if (gameTest) {
+    return (
+      <WorldGameTest
+        adminUrl={config.adminUrl}
+        apiUrl={config.apiUrl}
+        gameClientBuild={config.buildId}
+      />
+    );
+  }
 
   return (
     <TokenAccessGate
       apiUrl={config.apiUrl}
       gameName={platform.configuration.branding.shortGameName}
       landingUrl={config.landingUrl}
+      realtimeUrl={config.realtimeUrl}
     />
   );
 }

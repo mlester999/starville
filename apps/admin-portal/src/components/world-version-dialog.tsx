@@ -7,6 +7,7 @@ import { useActionState, useEffect, useId, useRef, type KeyboardEvent } from 're
 import {
   deriveWorldVersionAction,
   publishWorldDraftAction,
+  rollbackWorldVersionAction,
   type WorldActionState,
 } from '../app/actions/worlds';
 import { focusTrapTarget } from './dialog-focus';
@@ -14,12 +15,13 @@ import { focusTrapTarget } from './dialog-focus';
 const INITIAL_STATE: WorldActionState = { outcome: 'idle' };
 
 interface WorldVersionDialogProps {
-  readonly operation: 'publish' | 'derive';
+  readonly operation: 'publish' | 'derive' | 'rollback';
   readonly mapId: string;
   readonly mapName: string;
   readonly versionId: string;
   readonly versionNumber: number;
   readonly requestId: string;
+  readonly reviewRequestId: string;
   readonly expectedEditVersion: number;
   readonly expectedRecordVersion: number;
   readonly expectedActiveVersionId: string | null;
@@ -33,9 +35,16 @@ export function WorldVersionDialog(props: WorldVersionDialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   const reasonRef = useRef<HTMLTextAreaElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
-  const action = props.operation === 'publish' ? publishWorldDraftAction : deriveWorldVersionAction;
+  const action =
+    props.operation === 'publish'
+      ? publishWorldDraftAction
+      : props.operation === 'rollback'
+        ? rollbackWorldVersionAction
+        : deriveWorldVersionAction;
   const [state, formAction, pending] = useActionState(action, INITIAL_STATE);
   const publishing = props.operation === 'publish';
+  const rollingBack = props.operation === 'rollback';
+  const highImpact = publishing || rollingBack;
 
   useEffect(() => {
     if (state.outcome === 'success') closeRef.current?.focus();
@@ -69,20 +78,26 @@ export function WorldVersionDialog(props: WorldVersionDialogProps) {
     }
   }
 
-  const title = publishing ? 'Publish this validated version?' : 'Derive a new draft?';
+  const title = publishing
+    ? 'Review and publish this validated revision?'
+    : rollingBack
+      ? 'Review rollback impact?'
+      : 'Restore as a new draft?';
   const description = publishing
-    ? 'Publication creates an immutable active version and supersedes the current publication without mutating history.'
-    : 'The selected historical version remains immutable. A separate editable draft will be created from it.';
+    ? 'Publication copies the exact tested revision into a new immutable active publication. The tested draft and prior public version remain history.'
+    : rollingBack
+      ? 'Rollback creates a new immutable publication from this historical version. It does not reopen, edit, or delete either revision.'
+      : 'The selected historical version remains immutable. A separate editable draft head will be restored from it.';
 
   return (
     <>
       <button
-        className={publishing ? 'button button--danger' : 'button button--secondary'}
+        className={highImpact ? 'button button--danger' : 'button button--secondary'}
         onClick={open}
         ref={triggerRef}
         type="button"
       >
-        {publishing ? 'Publish version' : 'Derive draft'}
+        {publishing ? 'Review & publish' : rollingBack ? 'Review rollback' : 'Restore as draft'}
       </button>
       <dialog
         aria-describedby={`${id}-description`}
@@ -99,6 +114,7 @@ export function WorldVersionDialog(props: WorldVersionDialogProps) {
           <input name="mapId" type="hidden" value={props.mapId} />
           <input name="versionId" type="hidden" value={props.versionId} />
           <input name="requestId" type="hidden" value={props.requestId} />
+          <input name="reviewRequestId" type="hidden" value={props.reviewRequestId} />
           <input name="expectedEditVersion" type="hidden" value={props.expectedEditVersion} />
           <input name="expectedRecordVersion" type="hidden" value={props.expectedRecordVersion} />
           <input
@@ -121,7 +137,7 @@ export function WorldVersionDialog(props: WorldVersionDialogProps) {
             <div className="operation-dialog__result" role="status">
               <strong>Operation complete</strong>
               <p>{state.message}</p>
-              {!publishing && state.versionId !== undefined ? (
+              {props.operation === 'derive' && state.versionId !== undefined ? (
                 <Link href={`/worlds/${props.mapId}/editor?version=${state.versionId}`}>
                   Open derived draft
                 </Link>
@@ -145,6 +161,16 @@ export function WorldVersionDialog(props: WorldVersionDialogProps) {
                 This reason becomes part of the append-only world audit history. Do not include
                 secrets.
               </p>
+              {highImpact ? (
+                <label className="editor-check">
+                  <input name="impactAcknowledged" required type="checkbox" value="yes" />
+                  <span>
+                    I reviewed the current public revision, target checksum, validation and Game
+                    Test evidence, asset bindings, collision/spawn/exit impact, and reconnect
+                    behavior.
+                  </span>
+                </label>
+              ) : null}
               {state.outcome === 'error' ? <p role="alert">{state.message}</p> : null}
             </>
           )}
@@ -161,11 +187,17 @@ export function WorldVersionDialog(props: WorldVersionDialogProps) {
             </button>
             {state.outcome === 'success' ? null : (
               <button
-                className={publishing ? 'button button--danger' : 'button button--primary'}
-                disabled={pending || (publishing && props.expectedChecksum === null)}
+                className={highImpact ? 'button button--danger' : 'button button--primary'}
+                disabled={pending || (highImpact && props.expectedChecksum === null)}
                 type="submit"
               >
-                {pending ? 'Applying…' : publishing ? 'Confirm publication' : 'Confirm derivation'}
+                {pending
+                  ? 'Applying…'
+                  : publishing
+                    ? 'Acknowledge and publish'
+                    : rollingBack
+                      ? 'Acknowledge and roll back'
+                      : 'Confirm restoration'}
               </button>
             )}
           </footer>

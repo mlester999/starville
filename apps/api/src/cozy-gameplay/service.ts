@@ -1,5 +1,6 @@
 import type { ServiceLogger } from '../contracts.js';
-import { PublicApiError } from '../errors.js';
+import { z } from 'zod';
+import { PublicApiError, type SafeApiErrorCode } from '../errors.js';
 import {
   farmMutationResponseSchema,
   furnitureMutationResponseSchema,
@@ -10,6 +11,7 @@ import {
   itemCatalogSchema,
   plantRequestSchema,
   placeFurnitureRequestSchema,
+  plantHomeCropRequestSchema,
   recipeActionRequestSchema,
   recipeActionResponseSchema,
   recipeCatalogSchema,
@@ -18,11 +20,24 @@ import {
   moveFurnitureRequestSchema,
   removeFurnitureRequestSchema,
   rotateFurnitureRequestSchema,
+  starterQuestAcceptRequestSchema,
+  starterQuestDeliveryRequestSchema,
+  prepareHomeSoilRequestSchema,
+  harvestHomeCropRequestSchema,
+  playableVerticalSliceSchema,
+  verticalSliceMutationResponseSchema,
+  waterHomeCropRequestSchema,
   waterRequestSchema,
+  collectCraftingJobRequestSchema,
+  startCraftingJobRequestSchema,
+  workstationJobMutationResponseSchema,
+  workstationTutorialMutationResponseSchema,
+  workstationWorkspaceSchema,
 } from '@starville/cozy-gameplay';
 import {
   cozyBootstrapInputSchema,
   cozyBootstrapSchema,
+  cozyPersistenceStatusSchema,
   cozyCursorQuerySchema,
   dustLedgerViewSchema,
   farmPlotListSchema,
@@ -75,6 +90,63 @@ function persistenceFailure(status: CozyPersistenceStatus): never {
   if (status === 'invalid_placement') {
     throw new PublicApiError(409, 'INVALID_FURNITURE_PLACEMENT');
   }
+  const phase11Errors: Partial<
+    Record<CozyPersistenceStatus, readonly [PublicApiError['statusCode'], SafeApiErrorCode]>
+  > = {
+    plot_not_found: [404, 'PLOT_NOT_FOUND'],
+    plot_provisioning_failed: [503, 'PLOT_PROVISIONING_FAILED'],
+    plot_permission_denied: [403, 'PLOT_PERMISSION_DENIED'],
+    plot_world_mismatch: [409, 'PLOT_WORLD_MISMATCH'],
+    farming_system_disabled: [503, 'FARMING_SYSTEM_DISABLED'],
+    farming_tile_not_found: [404, 'FARMING_TILE_NOT_FOUND'],
+    farming_tile_not_eligible: [409, 'FARMING_TILE_NOT_ELIGIBLE'],
+    farming_tile_conflict: [409, 'FARMING_TILE_CONFLICT'],
+    tool_not_owned: [409, 'TOOL_NOT_OWNED'],
+    tool_action_too_far: [409, 'TOOL_ACTION_TOO_FAR'],
+    tool_action_cooldown: [429, 'TOOL_ACTION_COOLDOWN'],
+    seed_not_owned: [409, 'SEED_NOT_OWNED'],
+    seed_not_enabled: [409, 'SEED_NOT_ENABLED'],
+    crop_not_found: [404, 'CROP_NOT_FOUND'],
+    crop_not_waterable: [409, 'CROP_NOT_WATERABLE'],
+    crop_not_mature: [409, 'CROP_NOT_MATURE'],
+    crop_already_harvested: [409, 'CROP_ALREADY_HARVESTED'],
+    crop_state_conflict: [409, 'CROP_STATE_CONFLICT'],
+    quest_not_available: [409, 'QUEST_NOT_AVAILABLE'],
+    quest_already_accepted: [409, 'QUEST_ALREADY_ACCEPTED'],
+    quest_objective_incomplete: [409, 'QUEST_OBJECTIVE_INCOMPLETE'],
+    quest_already_completed: [409, 'QUEST_ALREADY_COMPLETED'],
+    quest_reward_already_settled: [409, 'QUEST_REWARD_ALREADY_SETTLED'],
+    tutorial_delivery_insufficient: [409, 'TUTORIAL_DELIVERY_INSUFFICIENT'],
+    economy_settlement_failed: [503, 'ECONOMY_SETTLEMENT_FAILED'],
+    preview_persistence_disabled: [409, 'PREVIEW_PERSISTENCE_DISABLED'],
+    recipe_job_required: [409, 'RECIPE_UNAVAILABLE'],
+    workstation_unavailable: [503, 'WORKSTATION_UNAVAILABLE'],
+    workstation_not_found: [404, 'WORKSTATION_NOT_FOUND'],
+    workstation_disabled: [409, 'WORKSTATION_DISABLED'],
+    workstation_world_mismatch: [409, 'WORKSTATION_WORLD_MISMATCH'],
+    workstation_too_far: [409, 'WORKSTATION_TOO_FAR'],
+    recipe_not_found: [409, 'RECIPE_UNAVAILABLE'],
+    recipe_disabled: [409, 'RECIPE_UNAVAILABLE'],
+    recipe_wrong_workstation: [409, 'RECIPE_UNAVAILABLE'],
+    recipe_not_unlocked: [409, 'RECIPE_NOT_UNLOCKED'],
+    recipe_batch_invalid: [400, 'RECIPE_BATCH_INVALID'],
+    recipe_configuration_invalid: [503, 'WORKSTATION_UNAVAILABLE'],
+    cooking_system_disabled: [503, 'WORKSTATION_UNAVAILABLE'],
+    crafting_system_disabled: [503, 'WORKSTATION_UNAVAILABLE'],
+    crafting_queue_full: [409, 'CRAFTING_QUEUE_FULL'],
+    inventory_conflict: [409, 'INVENTORY_STATE_CONFLICT'],
+    ingredient_quantity_insufficient: [409, 'MISSING_INGREDIENTS'],
+    dust_balance_insufficient: [409, 'INSUFFICIENT_DUST'],
+    collection_temporarily_disabled: [503, 'COLLECTION_DISABLED'],
+    crafting_job_not_found: [404, 'CRAFTING_JOB_NOT_FOUND'],
+    crafting_job_not_ready: [409, 'CRAFTING_JOB_NOT_READY'],
+    crafting_job_conflict: [409, 'CRAFTING_JOB_CONFLICT'],
+    crafting_job_already_collected: [409, 'CRAFTING_JOB_ALREADY_COLLECTED'],
+    crafting_job_canceled: [409, 'CRAFTING_JOB_FAILED'],
+    crafting_job_failed: [409, 'CRAFTING_JOB_FAILED'],
+  };
+  const phase11Error = phase11Errors[status];
+  if (phase11Error !== undefined) throw new PublicApiError(phase11Error[0], phase11Error[1]);
   throw new PublicApiError(409, 'REQUEST_ALREADY_PROCESSED');
 }
 
@@ -94,30 +166,7 @@ async function trustedOperation<Result>(operation: () => Promise<Result>): Promi
 
 function isPersistenceStatus(value: unknown): value is CozyPersistenceStatus {
   return (
-    typeof value === 'string' &&
-    [
-      'not_found',
-      'suspended',
-      'rename_required',
-      'rate_limited',
-      'state_conflict',
-      'item_unavailable',
-      'request_already_processed',
-      'plot_occupied',
-      'seed_unavailable',
-      'plot_not_ready',
-      'plot_does_not_need_water',
-      'inventory_full',
-      'recipe_unavailable',
-      'missing_ingredients',
-      'shop_offer_unavailable',
-      'insufficient_dust',
-      'invalid_quantity',
-      'invalid_station',
-      'bootstrap_required',
-      'home_access_denied',
-      'invalid_placement',
-    ].includes(value)
+    typeof value === 'string' && cozyPersistenceStatusSchema.safeParse({ status: value }).success
   );
 }
 
@@ -342,6 +391,181 @@ export function createCozyGameplayService(options: {
       );
       if (isPersistenceStatus(result)) return persistenceFailure(result);
       return furnitureMutationResponseSchema.parse(result);
+    },
+
+    async getPlayableVerticalSlice(walletAddress, requestId) {
+      const result = await trustedOperation(() =>
+        gateway.getPlayableVerticalSlice(walletAddress, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = playableVerticalSliceSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.vertical_slice.loaded');
+      return response;
+    },
+
+    async acceptStarterQuest(walletAddress, body, requestId) {
+      const parsed = starterQuestAcceptRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.acceptStarterQuest(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = verticalSliceMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.starter_quest.accepted', {
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async prepareHomeSoil(walletAddress, body, requestId) {
+      const parsed = prepareHomeSoilRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.prepareHomeSoil(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = verticalSliceMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.home_soil.prepared', {
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async plantHomeCrop(walletAddress, body, requestId) {
+      const parsed = plantHomeCropRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.plantHomeCrop(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = verticalSliceMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.home_crop.planted', {
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async waterHomeCrop(walletAddress, body, requestId) {
+      const parsed = waterHomeCropRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.waterHomeCrop(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = verticalSliceMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.home_crop.watered', {
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async harvestHomeCrop(walletAddress, body, requestId) {
+      const parsed = harvestHomeCropRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.harvestHomeCrop(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = verticalSliceMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.home_crop.harvested', {
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async deliverStarterQuest(walletAddress, body, requestId) {
+      const parsed = starterQuestDeliveryRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.deliverStarterQuest(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      const response = verticalSliceMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.starter_quest.delivered', {
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async getWorkstationWorkspace(walletAddress, workstationInstanceId, requestId) {
+      const parsedId = z.string().uuid().safeParse(workstationInstanceId);
+      if (!parsedId.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.getWorkstationWorkspace(walletAddress, parsedId.data, requestId),
+      );
+      if (isPersistenceStatus(result)) {
+        logger.child({ requestId }).warn('cozy_gameplay.workstation.open_failed', {
+          resultCategory: result,
+        });
+        return persistenceFailure(result);
+      }
+      const workspace = workstationWorkspaceSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.workstation.opened', {
+        workstationInstanceId: workspace.workstation.id,
+        recipeCount: workspace.recipes.length,
+        activeJobCount: workspace.jobs.filter((job) => job.status !== 'collected').length,
+      });
+      return workspace;
+    },
+
+    async startWorkstationJob(walletAddress, body, requestId) {
+      const parsed = startCraftingJobRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.startWorkstationJob(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) {
+        logger.child({ requestId }).warn('cozy_gameplay.workstation_job.start_failed', {
+          resultCategory: result,
+        });
+        return persistenceFailure(result);
+      }
+      const response = workstationJobMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.workstation_job.started', {
+        jobId: response.job.id,
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async collectWorkstationJob(walletAddress, body, requestId) {
+      const parsed = collectCraftingJobRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.collectWorkstationJob(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) {
+        logger.child({ requestId }).warn('cozy_gameplay.workstation_job.collection_failed', {
+          resultCategory: result,
+        });
+        return persistenceFailure(result);
+      }
+      const response = workstationJobMutationResponseSchema.parse(result);
+      logger.child({ requestId }).info('cozy_gameplay.workstation_job.collected', {
+        jobId: response.job.id,
+        replayed: response.replayed,
+      });
+      return response;
+    },
+
+    async acceptWorkstationTutorial(walletAddress, body, requestId) {
+      const parsed = starterQuestAcceptRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.acceptWorkstationTutorial(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      return workstationTutorialMutationResponseSchema.parse(result);
+    },
+
+    async turnInWorkstationTutorial(walletAddress, body, requestId) {
+      const parsed = starterQuestDeliveryRequestSchema.safeParse(body);
+      if (!parsed.success) return invalidRequest();
+      const result = await trustedOperation(() =>
+        gateway.turnInWorkstationTutorial(walletAddress, parsed.data, requestId),
+      );
+      if (isPersistenceStatus(result)) return persistenceFailure(result);
+      return workstationTutorialMutationResponseSchema.parse(result);
     },
   };
 }

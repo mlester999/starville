@@ -27,6 +27,7 @@ declare
   active_revision integer;
   original_active_id uuid;
   config jsonb;
+  upgraded jsonb;
   denied boolean := false;
   immutable boolean := false;
 begin
@@ -35,6 +36,43 @@ begin
       (select configuration from public.game_platform_configuration_versions where version_number = 1)
     ),
     'seeded Starville baseline satisfies the database configuration boundary'
+  );
+  select configuration into strict config
+  from public.game_platform_configuration_versions where version_number = 1;
+  upgraded := private.upgrade_phase8db_platform_configuration(config);
+  perform pg_temp.assert_platform_true(
+    jsonb_array_length(config -> 'modules') = 15
+      and private.valid_platform_configuration(config)
+      and jsonb_array_length(upgraded -> 'modules') = 17
+      and private.valid_platform_configuration(upgraded)
+      and upgraded = private.upgrade_phase8db_platform_configuration(config),
+    'published 15-module configuration and deterministic 17-module upgrade remain valid'
+  );
+  perform pg_temp.assert_platform_true(
+    (select provolatile='i' and proisstrict and prosecdef and proparallel='u'
+      from pg_proc where oid='private.valid_platform_configuration(jsonb)'::regprocedure)
+      and (select provolatile='i' and proisstrict and prosecdef and proparallel='u'
+        from pg_proc where oid='private.upgrade_phase8db_platform_configuration(jsonb)'::regprocedure)
+      and (select provolatile='v' and prosecdef and proparallel='u'
+        from pg_proc where oid='private.upgrade_phase8db_platform_draft()'::regprocedure)
+      and (select count(*)=1 from pg_proc routine join pg_namespace namespace on namespace.oid=routine.pronamespace
+        where namespace.nspname='private' and routine.proname='valid_platform_configuration')
+      and (select count(*)=1 from pg_proc routine join pg_namespace namespace on namespace.oid=routine.pronamespace
+        where namespace.nspname='private' and routine.proname='upgrade_phase8db_platform_configuration')
+      and pg_get_functiondef('private.valid_platform_configuration(jsonb)'::regprocedure) !~* 'jsonb_agg[[:space:]]*[(]'
+      and pg_get_functiondef('private.upgrade_phase8db_platform_configuration(jsonb)'::regprocedure) !~* 'jsonb_build_(array|object)[[:space:]]*[(]',
+    'platform repair has truthful volatility, one signature, and immutable dependencies only'
+  );
+  perform pg_temp.assert_platform_true(
+    not has_function_privilege('public','private.valid_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('anon','private.valid_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('authenticated','private.valid_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('service_role','private.valid_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('public','private.upgrade_phase8db_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('anon','private.upgrade_phase8db_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('authenticated','private.upgrade_phase8db_platform_configuration(jsonb)','execute')
+      and not has_function_privilege('service_role','private.upgrade_phase8db_platform_configuration(jsonb)','execute'),
+    'private platform helpers remain unavailable to all untrusted roles'
   );
   result := public.get_active_platform_configuration('starville');
   original_active_id := (result ->> 'versionId')::uuid;

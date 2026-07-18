@@ -1,8 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { LogContext, ServiceLogger } from './contracts.js';
 import { executeJobWithRetry } from './jobs/executor.js';
 import type { WorkerJob } from './jobs/job.js';
 import { createWorkerRuntime, type WorkerRuntime } from './runtime.js';
+import { ChatRetentionCleanupJob } from './jobs/chat-retention-cleanup-job.js';
+import { SocialInteractionCleanupJob } from './jobs/social-interaction-cleanup-job.js';
+import { SocialGraphCleanupJob } from './jobs/social-graph-cleanup-job.js';
+import { CooperativeActivityCleanupJob } from './jobs/cooperative-activity-cleanup-job.js';
 
 class SilentLogger implements ServiceLogger {
   child(_bindings: LogContext): ServiceLogger {
@@ -108,5 +112,61 @@ describe('worker foundation', () => {
         logger: new SilentLogger(),
       }),
     ).toThrow('Worker concurrency must be a positive integer.');
+  });
+
+  it('runs bounded chat retention through the protected cleanup gateway', async () => {
+    const cleanup = vi.fn(async () => ({ removedMessages: 12, expiredMutes: 2 }));
+    const job = new ChatRetentionCleanupJob({ cleanup }, 500);
+    await expect(job.execute()).resolves.toEqual({ removedMessages: 12, expiredMutes: 2 });
+    expect(cleanup).toHaveBeenCalledWith(500);
+    expect(() => new ChatRetentionCleanupJob({ cleanup }, 10_001)).toThrow(
+      'Chat cleanup batch limit',
+    );
+  });
+
+  it('expires social requests and releases reservations through one protected job', async () => {
+    const cleanup = vi.fn(async () => ({ processed: 4, reservationsReleased: 2 }));
+    const job = new SocialInteractionCleanupJob({ cleanup }, 250);
+    await expect(job.execute()).resolves.toEqual({ processed: 4, reservationsReleased: 2 });
+    expect(cleanup).toHaveBeenCalledWith(250);
+    expect(() => new SocialInteractionCleanupJob({ cleanup }, 0)).toThrow(
+      'Social interaction cleanup batch size',
+    );
+  });
+
+  it('runs bounded friendship, invitation, ready, leader, and retention cleanup', async () => {
+    const result = {
+      expiredFriendRequests: 2,
+      expiredInvitations: 3,
+      expiredReadyChecks: 1,
+      leadersTransferred: 1,
+      partiesExpired: 0,
+      notificationsRemoved: 4,
+      idempotencyRemoved: 5,
+      auditRemoved: 0,
+    };
+    const cleanup = vi.fn(async () => result);
+    const job = new SocialGraphCleanupJob({ cleanup }, 300);
+    await expect(job.execute()).resolves.toEqual(result);
+    expect(cleanup).toHaveBeenCalledWith(300);
+    expect(() => new SocialGraphCleanupJob({ cleanup }, 10_001)).toThrow(
+      'Social graph cleanup batch size',
+    );
+  });
+
+  it('runs bounded activity expiry, reconnect, temporary state, and pending reward cleanup', async () => {
+    const result = {
+      processed: 5,
+      failed: 2,
+      reconnectsExpired: 1,
+      pendingRewardsClaimed: 2,
+    };
+    const cleanup = vi.fn(async () => result);
+    const job = new CooperativeActivityCleanupJob({ cleanup }, 200);
+    await expect(job.execute()).resolves.toEqual(result);
+    expect(cleanup).toHaveBeenCalledWith(200);
+    expect(() => new CooperativeActivityCleanupJob({ cleanup }, 501)).toThrow(
+      'Cooperative activity cleanup batch size',
+    );
   });
 });

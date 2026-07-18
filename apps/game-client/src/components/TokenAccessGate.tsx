@@ -16,6 +16,7 @@ interface TokenAccessGateProps {
   readonly apiUrl: string;
   readonly landingUrl: string;
   readonly gameName?: string;
+  readonly realtimeUrl?: string | undefined;
 }
 
 const SESSION_RECONCILE_INTERVAL_MS = 30_000;
@@ -28,6 +29,7 @@ export function TokenAccessGate({
   apiUrl,
   landingUrl,
   gameName = 'Starville',
+  realtimeUrl,
 }: TokenAccessGateProps) {
   const [screen, setScreen] = useState<GateScreen>('checking');
   const [access, setAccess] = useState<TrustedTokenAccess>();
@@ -238,6 +240,7 @@ export function TokenAccessGate({
           }}
           onRecheck={recheckSession}
           rechecking={rechecking}
+          realtimeUrl={realtimeUrl}
         />
       ) : (
         <main className="gate-shell">

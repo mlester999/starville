@@ -1,6 +1,7 @@
 import {
   loadAdminSecurityConfig,
   loadApiConfig,
+  loadHostedWriteSafetyConfig,
   loadPrivateSupabaseConfig,
   loadOperationsHealthConfig,
   loadTokenAccessServerConfig,
@@ -32,6 +33,26 @@ import { createAdminAssetService } from './asset-management/service.js';
 import { createSupabaseAssetStorage } from './asset-management/storage.js';
 import { createSupabasePlatformConfigurationGateway } from './platform-configuration/gateway.js';
 import { createPlatformConfigurationService } from './platform-configuration/service.js';
+import { createSupabaseRealtimeTicketGateway } from './realtime/gateway.js';
+import { createRealtimeTicketService } from './realtime/service.js';
+import { createSupabaseAdminRealtimeGateway } from './realtime/admin-gateway.js';
+import { createSupabaseAdminChatGateway } from './realtime/chat-admin-gateway.js';
+import { createSupabaseAdminSocialGateway } from './realtime/social-admin-gateway.js';
+import { createSupabaseAdminSocialGraphGateway } from './realtime/social-graph-admin-gateway.js';
+import { createSupabaseAdminCooperativeActivityGateway } from './realtime/cooperative-activity-admin-gateway.js';
+import { createSupabaseEconomyGateway } from './economy/gateway.js';
+import { createSupabaseProgressionGateway } from './progression/gateway.js';
+import { createSupabaseHousingGateway } from './housing/gateway.js';
+import { createSupabaseAvatarGateway } from './avatar/gateway.js';
+import { createAvatarService } from './avatar/service.js';
+import { createSupabaseAdminAvatarGateway } from './avatar/admin-gateway.js';
+import {
+  createSupabaseAdminCosmeticGateway,
+  createSupabaseCosmeticGateway,
+} from './cosmetics/gateway.js';
+import { createCosmeticService } from './cosmetics/service.js';
+import { createSupabaseWorldGameTestGateway } from './world/game-test-gateway.js';
+import { createWorldGameTestService } from './world/game-test-service.js';
 
 const config = loadApiConfig(process.env);
 const adminSecurity = loadAdminSecurityConfig(process.env);
@@ -39,6 +60,7 @@ const supabaseConfig = loadPrivateSupabaseConfig(process.env);
 const tokenAccessConfig = loadTokenAccessServerConfig(process.env);
 const operationsConfig = loadOperationsHealthConfig(process.env);
 const worldConfig = loadWorldManagementConfig(process.env);
+const hostedWriteSafety = loadHostedWriteSafetyConfig(process.env);
 const logger = createLogger({
   service: config.application,
   environment: config.environment,
@@ -119,6 +141,25 @@ const platformConfigurationService = createPlatformConfigurationService({
   logger,
   publicAssetUrl: (path) => assetStorage.publicUrl(path),
 });
+const realtimeTicketService = createRealtimeTicketService({
+  gateway: createSupabaseRealtimeTicketGateway(privilegedSupabase),
+  accessTokenSecret: tokenAccessConfig.cookieSecret,
+  ticketSecret: process.env['REALTIME_TICKET_SECRET'] ?? tokenAccessConfig.cookieSecret,
+});
+const avatarService = createAvatarService({
+  gateway: createSupabaseAvatarGateway(privilegedSupabase),
+  logger,
+});
+const cosmeticGateway = createSupabaseCosmeticGateway(privilegedSupabase);
+const cosmeticService = createCosmeticService(cosmeticGateway);
+const worldGameTestService = createWorldGameTestService({
+  gateway: createSupabaseWorldGameTestGateway(privilegedSupabase),
+  logger,
+  environment: config.environment,
+  publicAssetUrl: (path) => assetStorage.publicUrl(path),
+  ttlMinutes: 20,
+  adminRateLimit: worldConfig.adminValidationRateLimit,
+});
 const service = createApiService({
   config,
   logger,
@@ -132,6 +173,10 @@ const service = createApiService({
     playerService,
     worldService: playerWorldService,
     cozyGameplayService,
+    realtimeTicketService,
+    avatarService,
+    cosmeticService,
+    cosmeticGateway,
   },
   adminOperations: {
     service: adminOperationsService,
@@ -143,8 +188,28 @@ const service = createApiService({
   },
   liveOperations: { service: liveOperationsService },
   adminCozy: { service: adminCozyService },
-  adminAssets: { service: adminAssetService },
+  adminAssets: {
+    service: adminAssetService,
+    remoteWritesApproved: hostedWriteSafety.remoteWritesApproved,
+  },
   platformConfiguration: { service: platformConfigurationService },
+  adminRealtime: { gateway: createSupabaseAdminRealtimeGateway(privilegedSupabase) },
+  adminChat: { gateway: createSupabaseAdminChatGateway(privilegedSupabase) },
+  adminSocial: { gateway: createSupabaseAdminSocialGateway(privilegedSupabase) },
+  adminSocialGraph: { gateway: createSupabaseAdminSocialGraphGateway(privilegedSupabase) },
+  adminCooperativeActivities: {
+    gateway: createSupabaseAdminCooperativeActivityGateway(privilegedSupabase),
+  },
+  economy: { gateway: createSupabaseEconomyGateway(privilegedSupabase) },
+  progression: { gateway: createSupabaseProgressionGateway(privilegedSupabase) },
+  housing: { gateway: createSupabaseHousingGateway(privilegedSupabase) },
+  adminAvatar: { gateway: createSupabaseAdminAvatarGateway(privilegedSupabase) },
+  adminCosmetics: { gateway: createSupabaseAdminCosmeticGateway(privilegedSupabase) },
+  worldGameTest: {
+    service: worldGameTestService,
+    cookieSecure: config.environment === 'production',
+    cookieMaxAgeSeconds: 20 * 60,
+  },
 });
 
 let isShuttingDown = false;

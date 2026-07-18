@@ -101,7 +101,7 @@ export type WorldTransition = Omit<z.infer<typeof transitionWorldSchema>, 'manif
   readonly manifest: MapManifest;
 };
 
-function validatedManifest(
+export function validatedManifest(
   value: z.infer<typeof mapManifestSchema>,
   deliveries: readonly WorldAssetDelivery[],
 ): MapManifest {

@@ -58,6 +58,67 @@ select pg_temp.assert_true(
   'published-world manifest helper has no lint-unused profile row variable'
 );
 
+select pg_temp.assert_true(
+  (select provolatile = 'i' and prosecdef and proconfig @> array['search_path=""']
+   from pg_proc
+   where oid = 'private.world_manifest_change_summary(jsonb,jsonb)'::regprocedure)
+  and
+  (select provolatile = 's' and prosecdef and proconfig @> array['search_path=""']
+   from pg_proc
+   where oid = 'private.world_manifest_rotations_compatible(uuid,jsonb)'::regprocedure)
+  and
+  (select provolatile = 's' and prosecdef and proconfig @> array['search_path=""']
+   from pg_proc
+   where oid = 'private.world_revision_assets_runtime_ready(uuid)'::regprocedure)
+  and
+  (select provolatile = 'v' and prosecdef and proconfig @> array['search_path=""']
+   from pg_proc
+   where oid = 'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)'::regprocedure)
+  and
+  (select provolatile = 'v' and prosecdef and proconfig @> array['search_path=""']
+   from pg_proc
+   where oid = 'public.rollback_admin_world_revision(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,integer)'::regprocedure),
+  'Phase 10C routines use volatility compatible with their expressions and an empty search path'
+);
+
+select pg_temp.assert_true(
+  not exists (
+    select 1
+    from pg_class as relation
+    join pg_namespace as namespace on namespace.oid = relation.relnamespace
+    where namespace.nspname = 'public'
+      and relation.relname in (
+        'world_draft_heads', 'world_revision_metadata',
+        'world_publication_reviews', 'world_publication_records'
+      )
+      and (not relation.relrowsecurity or not relation.relforcerowsecurity)
+  )
+  and not has_table_privilege('anon', 'public.world_draft_heads', 'SELECT')
+  and not has_table_privilege('authenticated', 'public.world_revision_metadata', 'SELECT')
+  and not has_table_privilege('service_role', 'public.world_publication_reviews', 'SELECT')
+  and not has_function_privilege(
+    'anon',
+    'public.rollback_admin_world_revision(uuid,uuid,text,uuid,uuid,uuid,uuid,text,text,integer)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)',
+    'EXECUTE'
+  )
+  and not has_function_privilege(
+    'service_role',
+    'public.publish_admin_world_version(uuid,uuid,text,uuid,uuid,integer,uuid,text,text,text,integer)',
+    'EXECUTE'
+  )
+  and has_function_privilege(
+    'service_role',
+    'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)',
+    'EXECUTE'
+  ),
+  'Phase 10C forced RLS denies direct draft/publication reads and exposes only narrow trusted RPCs'
+);
+
 do $$
 declare
   admin_user_id constant uuid := '10000000-0000-4000-8000-000000000001';
@@ -297,8 +358,8 @@ begin
     'destination spawns are outside every enabled exit trigger'
   );
   perform pg_temp.assert_true(
-    (select count(*) = 67 and count(distinct key) = 67 from public.admin_permissions where is_system),
-    'the current system permission catalog has sixty-seven unique keys'
+    (select count(*) = 171 and count(distinct key) = 171 from public.admin_permissions where is_system),
+    'the current system permission catalog has one hundred seventy-one unique keys'
   );
   perform pg_temp.assert_true(
     not has_function_privilege(
@@ -400,7 +461,8 @@ begin
       join public.admin_permissions as permission on permission.id = mapping.permission_id
       where role.key = 'world_designer'
         and permission.key in (
-          'maps.read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.audit_read', 'assets.read'
+          'maps.read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.rollback',
+          'maps.audit_read', 'assets.read'
         )
     ) = array[
       'assets.read', 'maps.audit_read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.read'
@@ -415,7 +477,8 @@ begin
       join public.admin_permissions as permission on permission.id = mapping.permission_id
       where role.key = 'game_administrator'
         and permission.key in (
-          'maps.read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.audit_read', 'assets.read'
+          'maps.read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.rollback',
+          'maps.audit_read', 'assets.read'
         )
     ) = array[
       'assets.read', 'maps.audit_read', 'maps.edit', 'maps.preview', 'maps.read'
@@ -430,10 +493,11 @@ begin
       join public.admin_permissions as permission on permission.id = mapping.permission_id
       where role.key = 'live_operations_manager'
         and permission.key in (
-          'maps.read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.audit_read', 'assets.read'
+          'maps.read', 'maps.edit', 'maps.preview', 'maps.publish', 'maps.rollback',
+          'maps.audit_read', 'assets.read'
         )
-    ) = array['assets.read', 'maps.audit_read', 'maps.read']::text[],
-    'Live Operations retains read and audit visibility without world mutation'
+    ) = array['assets.read', 'maps.audit_read', 'maps.read', 'maps.rollback']::text[],
+    'Live Operations receives reviewed rollback authority without draft or publish authority'
   );
   perform pg_temp.assert_true(
     not exists (
@@ -442,7 +506,7 @@ begin
       join public.admin_roles as role on role.id = mapping.role_id
       join public.admin_permissions as permission on permission.id = mapping.permission_id
       where role.key in ('blockchain_operator', 'read_only_analyst')
-        and permission.key in ('maps.edit', 'maps.preview', 'maps.publish')
+        and permission.key in ('maps.edit', 'maps.preview', 'maps.publish', 'maps.rollback')
     ),
     'Blockchain Operator and Read-only Analyst receive no world mutation authority'
   );
@@ -930,6 +994,15 @@ declare
   draft_edit_version integer;
   draft_checksum text;
   draft_manifest jsonb;
+  parent_draft_id uuid;
+  parent_draft_checksum text;
+  created_game_test_session_id uuid;
+  successor_draft_id uuid;
+  publication_review_id uuid;
+  published_version_id uuid;
+  rollback_review_id uuid;
+  rollback_version_id uuid;
+  immutable_draft_rejected boolean := false;
   result jsonb;
 begin
   result := public.list_admin_world_maps(
@@ -1091,6 +1164,13 @@ begin
     'derived drafts clone every exact immutable asset-version pin from their source'
   );
 
+  parent_draft_id := draft_id;
+  parent_draft_checksum := draft_checksum;
+  draft_manifest := jsonb_set(
+    draft_manifest,
+    '{description}',
+    to_jsonb((draft_manifest ->> 'description') || ' Immutable revision fixture.')
+  );
   result := public.save_admin_world_draft(
     admin_user_id,
     auth_session_id,
@@ -1104,10 +1184,15 @@ begin
     120
   );
   perform pg_temp.assert_status(result, 'updated', 'the trusted draft save executes');
+  draft_id := (result -> 'version' ->> 'id')::uuid;
   draft_edit_version := (result -> 'version' ->> 'editVersion')::integer;
   draft_checksum := result -> 'version' ->> 'checksum';
+  draft_manifest := result -> 'manifest';
   perform pg_temp.assert_true(
-    not exists (
+    (select lifecycle_status = 'draft' from public.world_map_versions where id = parent_draft_id)
+      and (select derived_from_version_id = parent_draft_id
+           from public.world_map_versions where id = draft_id)
+      and not exists (
       (select world_asset_id, world_asset_version_id
        from public.world_map_version_assets where world_map_version_id = active_version.id)
       except
@@ -1120,7 +1205,34 @@ begin
       (select world_asset_id, world_asset_version_id
        from public.world_map_version_assets where world_map_version_id = active_version.id)
     ),
-    'an unchanged draft save preserves its inherited pins instead of rebinding active versions'
+    'a save creates an immutable successor and preserves inherited pins without rebinding'
+  );
+  result := public.save_admin_world_draft(
+    admin_user_id, auth_session_id, 'aal2', map_record.id,
+    parent_draft_id, 1, parent_draft_checksum, draft_manifest,
+    'postgres:admin-stale-save', 120
+  );
+  perform pg_temp.assert_status(
+    result, 'version_conflict', 'a stale draft head cannot overwrite its immutable successor'
+  );
+  result := public.save_admin_world_draft(
+    admin_user_id, auth_session_id, 'aal2', map_record.id,
+    draft_id, draft_edit_version, draft_checksum, draft_manifest,
+    'postgres:admin-noop-save', 120
+  );
+  perform pg_temp.assert_status(
+    result, 'unchanged', 'a no-op save preserves the clean immutable head without a new revision'
+  );
+  begin
+    update public.world_map_versions
+    set manifest = draft_manifest
+    where id = parent_draft_id;
+  exception when insufficient_privilege then
+    immutable_draft_rejected := true;
+  end;
+  perform pg_temp.assert_true(
+    immutable_draft_rejected,
+    'database protection rejects direct mutation of a historical draft revision'
   );
 
   result := public.get_admin_world_draft(
@@ -1133,6 +1245,24 @@ begin
     120
   );
   perform pg_temp.assert_status(result, 'loaded', 'the saved draft loads through its trusted RPC');
+  perform pg_temp.assert_true(
+    jsonb_typeof(result -> 'assetPins') = 'array'
+      and jsonb_array_length(result -> 'assetPins') = jsonb_array_length(
+        result -> 'manifest' -> 'assets'
+      )
+      and not exists (
+        select 1
+        from jsonb_array_elements(result -> 'assetPins') as pin(value)
+        left join public.world_map_version_assets as reference
+          on reference.world_map_version_id = draft_id
+         and reference.world_asset_id = (pin.value ->> 'assetId')::uuid
+         and reference.world_asset_version_id = (
+           pin.value -> 'pinnedVersion' ->> 'id'
+         )::uuid
+        where reference.world_asset_id is null
+      ),
+    'draft loading exposes every exact retained asset-version pin without rebinding it'
+  );
 
   result := public.validate_admin_world_draft(
     admin_user_id,
@@ -1162,7 +1292,190 @@ begin
     'the preview is explicitly identified as a draft preview'
   );
 
-  result := public.publish_admin_world_version(
+  result := public.create_admin_world_game_test(
+    admin_user_id,
+    auth_session_id,
+    'aal1',
+    map_record.id,
+    draft_id,
+    draft_edit_version,
+    draft_checksum,
+    'test',
+    repeat('1', 64),
+    '/worlds/' || map_record.id || '/editor?version=' || draft_id,
+    '40000000-0000-4000-8000-000000000001',
+    'postgres:game-test-aal1',
+    120,
+    20
+  );
+  perform pg_temp.assert_status(result, 'mfa_required', 'Game Test issuance requires AAL2');
+
+  result := public.create_admin_world_game_test(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    draft_id,
+    draft_edit_version + 1,
+    draft_checksum,
+    'test',
+    repeat('2', 64),
+    '/worlds/' || map_record.id || '/editor?version=' || draft_id,
+    '40000000-0000-4000-8000-000000000002',
+    'postgres:game-test-stale',
+    120,
+    20
+  );
+  perform pg_temp.assert_status(result, 'stale_revision', 'Game Test rejects a stale edit revision');
+
+  begin
+    perform public.create_admin_world_game_test(
+      admin_user_id, auth_session_id, 'aal2', map_record.id, draft_id,
+      draft_edit_version, draft_checksum, 'test', repeat('9', 64),
+      '//untrusted.example/escape', '40000000-0000-4000-8000-000000000009',
+      'postgres:game-test-open-redirect', 120, 20
+    );
+    raise exception 'unsafe Game Test return path was accepted';
+  exception when sqlstate '22023' then
+    null;
+  end;
+
+  result := public.create_admin_world_game_test(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    draft_id,
+    draft_edit_version,
+    draft_checksum,
+    'test',
+    repeat('3', 64),
+    '/worlds/' || map_record.id || '/editor?version=' || draft_id,
+    '40000000-0000-4000-8000-000000000003',
+    'postgres:game-test-create',
+    120,
+    20
+  );
+  perform pg_temp.assert_status(result, 'issued', 'an exact validated revision issues a grant');
+  created_game_test_session_id := (result ->> 'sessionId')::uuid;
+  perform pg_temp.assert_true(
+    not has_table_privilege('anon', 'public.world_game_test_sessions', 'SELECT')
+      and not has_table_privilege('authenticated', 'public.world_game_test_sessions', 'SELECT')
+      and not has_table_privilege('anon', 'public.world_game_test_evidence', 'SELECT')
+      and not has_function_privilege(
+        'anon',
+        'public.get_admin_world_game_test_status(uuid,uuid,text,uuid,uuid,text)',
+        'EXECUTE'
+      ),
+    'anonymous and ordinary authenticated roles cannot enumerate Game Test state'
+  );
+  perform pg_temp.assert_true(
+    (select grant_token_hash = repeat('3', 64)
+       and session_token_hash is null
+       and expires_at between created_at + interval '15 minutes'
+                          and created_at + interval '30 minutes'
+     from public.world_game_test_sessions where id = created_game_test_session_id),
+    'the issued session stores only a bounded-lifetime grant hash'
+  );
+
+  result := public.exchange_world_game_test_grant(
+    repeat('3', 64), repeat('4', 64), 'test', 'game-client:test',
+    'postgres:game-test-exchange'
+  );
+  perform pg_temp.assert_status(result, 'loaded', 'the one-time Game Test grant exchanges');
+  perform pg_temp.assert_true(
+    (result -> 'session' ->> 'worldMapVersionId')::uuid = draft_id
+      and result -> 'version' ->> 'checksum' = draft_checksum
+      and result -> 'manifest' = draft_manifest
+      and jsonb_array_length(result -> 'assetDeliveries') = jsonb_array_length(
+        draft_manifest -> 'assets'
+      )
+      and result -> 'realtime' ->> 'mode' = 'disabled_private_solo'
+      and not (result -> 'realtime' ->> 'publicChannelJoined')::boolean,
+    'the game projection is exact, asset-pinned, and isolated from public realtime'
+  );
+  perform pg_temp.assert_true(
+    (select status = 'active'
+       and grant_token_hash is null
+       and session_token_hash = repeat('4', 64)
+     from public.world_game_test_sessions where id = created_game_test_session_id),
+    'exchange atomically consumes the grant and retains only the session hash'
+  );
+
+  result := public.exchange_world_game_test_grant(
+    repeat('3', 64), repeat('5', 64), 'test', 'game-client:test',
+    'postgres:game-test-replay'
+  );
+  perform pg_temp.assert_status(result, 'invalid_grant', 'a consumed grant cannot replay');
+
+  result := public.get_world_game_test_session(
+    repeat('4', 64), 'test', 'postgres:game-test-reload'
+  );
+  perform pg_temp.assert_status(result, 'loaded', 'the scoped session hash supports safe reloads');
+  perform pg_temp.assert_true(
+    result -> 'session' ->> 'id' = created_game_test_session_id::text,
+    'reload remains pinned to the original Game Test session'
+  );
+
+  result := public.record_admin_world_game_test_evidence(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    created_game_test_session_id,
+    'passed',
+    '{"movement_camera":true,"collision_depth":true,"objects_assets":true,"no_progression":true}'::jsonb,
+    'PostgreSQL verified the exact revision and non-progression boundary.',
+    'postgres:game-test-evidence'
+  );
+  perform pg_temp.assert_status(result, 'recorded', 'explicit Game Test evidence records');
+  perform pg_temp.assert_true(
+    result ->> 'worldMapVersionId' = draft_id::text
+      and result ->> 'publicationReadiness' = 'recommended'
+      and (select count(*) = 1 from public.world_game_test_evidence as evidence
+           where evidence.game_test_session_id = created_game_test_session_id
+             and evidence.world_map_version_id = draft_id
+             and evidence.result = 'passed'),
+    'passed evidence is append-only, exact-revision bound, and only a recommendation'
+  );
+
+  result := public.get_admin_world_game_test_status(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    draft_id,
+    'postgres:game-test-status'
+  );
+  perform pg_temp.assert_status(result, 'loaded', 'revision-specific Game Test status loads');
+  perform pg_temp.assert_true(
+    result ->> 'gameTestStatus' = 'passed'
+      and result -> 'latestEvidence' ->> 'testerAdministratorId' = admin_user_id::text
+      and jsonb_array_length(result -> 'activeSessions') = 1
+      and not (result::text ~ '(grant_token_hash|session_token_hash)'),
+    'administrator status returns bounded evidence and sessions without token hashes'
+  );
+
+  begin
+    perform public.record_admin_world_game_test_evidence(
+      admin_user_id, auth_session_id, 'aal2', created_game_test_session_id,
+      'passed', '[]'::jsonb, 'Malformed checklist rejection fixture.',
+      'postgres:game-test-malformed-evidence'
+    );
+    raise exception 'malformed Game Test evidence was accepted';
+  exception when sqlstate '22023' then
+    null;
+  end;
+
+  result := public.exit_world_game_test_session(
+    repeat('4', 64), 'test', 'postgres:game-test-exit'
+  );
+  perform pg_temp.assert_status(result, 'exited', 'explicit Game Test exit succeeds');
+  result := public.get_world_game_test_session(
+    repeat('4', 64), 'test', 'postgres:game-test-after-exit'
+  );
+  perform pg_temp.assert_status(result, 'invalid_session', 'an exited session cannot reload');
+
+  result := public.publish_admin_world_revision(
     admin_user_id,
     auth_session_id,
     'aal2',
@@ -1171,16 +1484,136 @@ begin
     draft_edit_version,
     active_version.id,
     draft_checksum,
+    gen_random_uuid(),
+    'Attempt publication without acknowledged impact.',
+    'postgres:admin-publish-without-review',
+    120
+  );
+  perform pg_temp.assert_status(
+    result, 'review_required', 'publication cannot bypass exact impact review'
+  );
+  result := public.review_admin_world_publication(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    draft_id,
+    active_version.id,
+    'publish',
+    true,
+    'postgres:admin-publish-review',
+    120
+  );
+  perform pg_temp.assert_status(result, 'reviewed', 'the exact tested revision impact is reviewed');
+  publication_review_id := (result ->> 'reviewId')::uuid;
+  result := public.publish_admin_world_revision(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    draft_id,
+    draft_edit_version,
+    active_version.id,
+    draft_checksum,
+    publication_review_id,
     'PostgreSQL execution publication',
     'postgres:admin-publish',
     120
   );
   perform pg_temp.assert_status(result, 'published', 'the validated version publishes atomically');
+  published_version_id := (result #>> '{version,id}')::uuid;
   perform pg_temp.assert_true(
-    (select active_published_version_id = draft_id from public.world_maps where id = map_record.id)
+    published_version_id <> draft_id
+      and (select active_published_version_id = published_version_id
+           from public.world_maps where id = map_record.id)
       and (select lifecycle_status = 'superseded' from public.world_map_versions where id = active_version.id)
-      and (select lifecycle_status = 'published' from public.world_map_versions where id = draft_id),
-    'publication swaps the active version while retaining immutable history'
+      and (select lifecycle_status = 'validated' from public.world_map_versions where id = draft_id)
+      and (select lifecycle_status = 'published'
+             and derived_from_version_id = draft_id
+           from public.world_map_versions where id = published_version_id),
+    'publication copies the reviewed source and swaps the pointer while retaining immutable history'
+  );
+
+  result := public.review_admin_world_publication(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    active_version.id,
+    published_version_id,
+    'rollback',
+    true,
+    'postgres:admin-rollback-review',
+    120
+  );
+  perform pg_temp.assert_status(result, 'reviewed', 'historical rollback impact is reviewed');
+  rollback_review_id := (result ->> 'reviewId')::uuid;
+  result := public.rollback_admin_world_revision(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    active_version.id,
+    published_version_id,
+    rollback_review_id,
+    'Restore the prior verified public layout.',
+    'postgres:admin-rollback',
+    120
+  );
+  perform pg_temp.assert_status(result, 'rolled_back', 'reviewed rollback publishes atomically');
+  rollback_version_id := (result #>> '{version,id}')::uuid;
+  perform pg_temp.assert_true(
+    rollback_version_id not in (active_version.id, published_version_id, draft_id)
+      and (select active_published_version_id = rollback_version_id
+           from public.world_maps where id = map_record.id)
+      and (select lifecycle_status = 'superseded'
+           from public.world_map_versions where id = published_version_id)
+      and (select lifecycle_status = 'superseded'
+           from public.world_map_versions where id = active_version.id)
+      and (select lifecycle_status = 'published'
+             and manifest = active_version.manifest
+             and derived_from_version_id = active_version.id
+           from public.world_map_versions where id = rollback_version_id),
+    'rollback creates a new publication while preserving both historical revisions'
+  );
+
+  select map.* into strict map_record
+  from public.world_maps as map
+  where map.id = map_record.id;
+  result := public.derive_admin_world_version(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    rollback_version_id,
+    map_record.record_version,
+    'PostgreSQL changed-draft evidence fixture',
+    'postgres:game-test-new-draft',
+    120
+  );
+  perform pg_temp.assert_status(result, 'created', 'a successor draft derives after Game Test');
+  successor_draft_id := (result -> 'version' ->> 'id')::uuid;
+  perform pg_temp.assert_true(
+    not exists (
+      select 1
+      from public.world_game_test_evidence as evidence
+      where evidence.world_map_version_id = successor_draft_id
+    ),
+    'evidence for the prior immutable revision is outdated for a changed successor draft'
+  );
+  result := public.get_admin_world_game_test_status(
+    admin_user_id,
+    auth_session_id,
+    'aal2',
+    map_record.id,
+    successor_draft_id,
+    'postgres:game-test-outdated'
+  );
+  perform pg_temp.assert_status(result, 'loaded', 'successor draft Game Test status loads');
+  perform pg_temp.assert_true(
+    result ->> 'gameTestStatus' = 'test_outdated'
+      and result -> 'latestEvidence' = 'null'::jsonb,
+    'a previous pass remains historical and is outdated for a successor draft'
   );
 
   result := public.list_admin_world_audit(
@@ -1197,8 +1630,9 @@ begin
   perform pg_temp.assert_status(result, 'loaded', 'the trusted world audit RPC executes');
   perform pg_temp.assert_true(
     (result ->> 'total')::integer >= 6
-      and result -> 'items' @> '[{"eventKey":"world.version_published"}]'::jsonb,
-    'the lifecycle appends a bounded publication audit trail'
+      and result -> 'items' @> '[{"eventKey":"world.version_published"}]'::jsonb
+      and result -> 'items' @> '[{"eventKey":"world.version_rolled_back"}]'::jsonb,
+    'the lifecycle appends bounded publication and rollback audit trails'
   );
 end;
 $$;

@@ -52,7 +52,7 @@ function exactPublicSourcePath(assetKey: string, value: string): string {
   return safe;
 }
 
-function projectDeliveries(
+export function projectWorldAssetDeliveries(
   manifestAssets: readonly string[],
   materials: readonly PinnedWorldAssetMaterial[],
   publicAssetUrl: (path: string) => string,
@@ -107,7 +107,7 @@ function validatePublishedManifest(
   publicAssetUrl: (path: string) => string,
 ): PublishedManifestView {
   try {
-    const assetDeliveries = projectDeliveries(
+    const assetDeliveries = projectWorldAssetDeliveries(
       view.manifest.assets,
       view.assetDeliveries,
       publicAssetUrl,

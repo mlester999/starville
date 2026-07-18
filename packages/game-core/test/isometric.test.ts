@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { projectWorld, tileToWorld, unprojectScreen, worldToTile } from '../src/index';
+import {
+  depthOffsetForAnchors,
+  projectWorld,
+  tileToWorld,
+  unprojectScreen,
+  worldToTile,
+} from '../src/index';
 
 const projection = { tileWidth: 96, tileHeight: 48, originX: 1152, originY: 96 };
 
@@ -20,5 +26,12 @@ describe('isometric coordinates', () => {
       expect(restored.x).toBeCloseTo(world.x, 8);
       expect(restored.y).toBeCloseTo(world.y, 8);
     }
+  });
+});
+
+describe('asset depth anchors', () => {
+  it('uses the same bounded anchor offset for game and read-only preview rendering', () => {
+    expect(depthOffsetForAnchors(0.9, 0.95)).toBe(20);
+    expect(Math.abs(depthOffsetForAnchors(1, 0))).toBeLessThan(1_000);
   });
 });

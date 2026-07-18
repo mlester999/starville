@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -47,6 +47,38 @@ function payload(active: boolean) {
 }
 
 describe('LiveOperationsBoundary', () => {
+  it('recovers the initial trusted snapshot when StrictMode aborts its first effect', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockImplementation((_input, init) => {
+      const signal = init?.signal;
+      if (fetchMock.mock.calls.length === 1) {
+        return new Promise((_resolve, reject) => {
+          signal?.addEventListener('abort', () =>
+            reject(new DOMException('Aborted', 'AbortError')),
+          );
+        });
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(payload(false)), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      );
+    });
+    await act(async () => {
+      root.render(
+        <StrictMode>
+          <LiveOperationsBoundary apiUrl="http://localhost:4000" landingUrl="http://localhost:3000">
+            <div id="world">world</div>
+          </LiveOperationsBoundary>
+        </StrictMode>,
+      );
+      await Promise.resolve();
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(container.querySelector('#world')).not.toBeNull();
+    expect(container.textContent).not.toContain('Preparing Starville');
+  });
+
   it('shows full-screen Preparing Starville only before the first trusted snapshot', async () => {
     let resolve!: (value: Response) => void;
     vi.spyOn(globalThis, 'fetch').mockReturnValue(

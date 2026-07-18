@@ -26,7 +26,7 @@ function readErrorCode(value: unknown): string {
 }
 
 export async function callTrustedAdminApi<Data>(options: {
-  readonly method: 'GET' | 'POST' | 'PATCH';
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   readonly pathname: string;
   readonly parser: (value: unknown) => Data;
   readonly body?: unknown;

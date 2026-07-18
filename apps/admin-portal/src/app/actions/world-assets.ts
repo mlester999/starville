@@ -4,7 +4,12 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 
 import { AdminApiError } from '../../lib/admin-api';
-import { applyAssetVersionOperation, saveAssetVersionDraft } from '../../lib/world-assets/api';
+import {
+  applyAssetVersionOperation,
+  createAssetVersionFromExisting,
+  loadAssetVersionDetail,
+  saveAssetVersionDraft,
+} from '../../lib/world-assets/api';
 import {
   requireAssetManagerPermission,
   type AssetManagerPermission,
@@ -14,9 +19,24 @@ import { assetDraftConfigurationSchema } from '../../lib/world-assets/contracts'
 export interface WorldAssetActionState {
   readonly outcome: 'idle' | 'success' | 'error';
   readonly message?: string;
+  readonly errorKind?:
+    | 'validation'
+    | 'revision_conflict'
+    | 'actual_concurrent_change'
+    | 'same_session_stale'
+    | 'stale_revision'
+    | 'already_approved'
+    | 'request_conflict'
+    | 'permission'
+    | 'temporary'
+    | 'incomplete';
+  readonly requestId?: string;
+  readonly savedAt?: string;
   readonly editVersion?: number;
   readonly lifecycleStatus?: string;
   readonly validationStatus?: string;
+  readonly createdVersionId?: string;
+  readonly createdVersionNumber?: number;
 }
 
 const uuidSchema = z.uuid();
@@ -68,10 +88,93 @@ function messageForError(error: unknown): string {
   if (!(error instanceof AdminApiError)) return 'The asset operation did not complete.';
   if (error.status === 403) return 'Your current administrator role cannot perform this action.';
   if (error.status === 404) return 'This asset or version no longer exists.';
-  if (error.status === 409) return 'This asset changed in another session. Reload before retrying.';
+  if (error.status === 409) return 'The current asset state must be refreshed before retrying.';
   if (error.status === 422) return 'The trusted asset validator rejected this configuration.';
   if (error.status === 429) return 'Too many asset operations were attempted. Wait briefly.';
   return 'The trusted asset service is temporarily unavailable.';
+}
+
+async function classifyOperationFailure(input: {
+  readonly error: unknown;
+  readonly operation: AssetOperation;
+  readonly assetId: string;
+  readonly versionId: string;
+  readonly expectedRevision: number;
+  readonly administratorUserId: string;
+  readonly requestId: string;
+}): Promise<Pick<WorldAssetActionState, 'errorKind' | 'message'>> {
+  if (!(input.error instanceof AdminApiError)) {
+    return {
+      errorKind: 'temporary',
+      message:
+        'The operation could not be confirmed. The lifecycle state is unchanged or requires refresh.',
+    };
+  }
+  if (input.error.code === 'ASSET_REQUEST_CONFLICT') {
+    return {
+      errorKind: 'request_conflict',
+      message:
+        'This request identifier was previously used for different asset-operation intent. Start a new request.',
+    };
+  }
+  if (input.error.status !== 409) {
+    return { errorKind: errorKindForError(input.error), message: messageForError(input.error) };
+  }
+
+  try {
+    const current = await loadAssetVersionDetail(input.assetId, input.versionId, input.requestId);
+    if (input.operation === 'approve' && current.version.lifecycleStatus === 'approved') {
+      return {
+        errorKind: 'already_approved',
+        message: `Version ${String(current.version.versionNumber)} is already approved. No duplicate approval was created. Continue to activation review.`,
+      };
+    }
+    if (input.error.code === 'ASSET_VERSION_CONFLICT') {
+      const latestReview = current.reviews[0];
+      if (
+        input.operation === 'approve' &&
+        current.version.lifecycleStatus === 'in_review' &&
+        current.version.editVersion === input.expectedRevision + 1 &&
+        latestReview?.action === 'submitted' &&
+        latestReview.administratorUserId === input.administratorUserId
+      ) {
+        return {
+          errorKind: 'same_session_stale',
+          message:
+            'The previous lifecycle action completed, but this page needs the latest revision before continuing.',
+        };
+      }
+      if (
+        latestReview !== undefined &&
+        latestReview.administratorUserId !== input.administratorUserId
+      ) {
+        return {
+          errorKind: 'actual_concurrent_change',
+          message:
+            'This version changed after you opened the page. Review the latest state before approving.',
+        };
+      }
+      return {
+        errorKind: 'stale_revision',
+        message:
+          'The version revision no longer matches this operation form. Reload the latest state.',
+      };
+    }
+  } catch {
+    // Preserve a safe conflict response when the follow-up read is temporarily unavailable.
+  }
+  return {
+    errorKind: 'stale_revision',
+    message: 'The current lifecycle no longer accepts this operation. Refresh before continuing.',
+  };
+}
+
+function errorKindForError(error: unknown): Exclude<WorldAssetActionState['errorKind'], undefined> {
+  if (!(error instanceof AdminApiError)) return 'temporary';
+  if (error.status === 403) return 'permission';
+  if (error.status === 409) return 'revision_conflict';
+  if (error.status === 422) return 'validation';
+  return 'temporary';
 }
 
 function revalidateAsset(assetId: string, versionId: string): void {
@@ -100,18 +203,32 @@ export async function saveWorldAssetDraftAction(
     serialized === undefined ||
     formData.get('confirmed') !== 'yes'
   ) {
-    return { outcome: 'error', message: 'The asset draft request is incomplete.' };
+    return {
+      outcome: 'error',
+      errorKind: 'incomplete',
+      message: 'The asset draft request is incomplete.',
+    };
   }
 
   let unknownConfiguration: unknown;
   try {
     unknownConfiguration = JSON.parse(serialized);
   } catch {
-    return { outcome: 'error', message: 'The structured asset configuration could not be read.' };
+    return {
+      outcome: 'error',
+      errorKind: 'incomplete',
+      message: 'The structured asset configuration could not be read.',
+      requestId,
+    };
   }
   const configuration = assetDraftConfigurationSchema.safeParse(unknownConfiguration);
   if (!configuration.success) {
-    return { outcome: 'error', message: 'Fix the highlighted asset fields before saving.' };
+    return {
+      outcome: 'error',
+      errorKind: 'validation',
+      message: 'Fix the highlighted asset fields before saving.',
+      requestId,
+    };
   }
 
   try {
@@ -124,6 +241,8 @@ export async function saveWorldAssetDraftAction(
     return {
       outcome: 'success',
       message: 'Asset version draft saved. Approved versions were not changed.',
+      requestId,
+      savedAt: new Date().toISOString(),
       ...(result.version === null
         ? {}
         : {
@@ -133,7 +252,12 @@ export async function saveWorldAssetDraftAction(
           }),
     };
   } catch (error) {
-    return { outcome: 'error', message: messageForError(error) };
+    return {
+      outcome: 'error',
+      errorKind: errorKindForError(error),
+      message: messageForError(error),
+      requestId,
+    };
   }
 }
 
@@ -143,7 +267,7 @@ export async function worldAssetOperationAction(
 ): Promise<WorldAssetActionState> {
   const operation = operationSchema.safeParse(readString(formData, 'operation', 32));
   if (!operation.success) return { outcome: 'error', message: 'Unknown asset operation.' };
-  await requireAssetManagerPermission(OPERATION_PERMISSIONS[operation.data]);
+  const context = await requireAssetManagerPermission(OPERATION_PERMISSIONS[operation.data]);
   if (operation.data === 'approve') {
     await requireAssetManagerPermission('assets.review');
   }
@@ -222,7 +346,15 @@ export async function worldAssetOperationAction(
     revalidateAsset(assetId, versionId);
     return {
       outcome: 'success',
-      message: `Asset operation completed: ${result.status.replaceAll('_', ' ')}.`,
+      message:
+        result.status === 'replayed'
+          ? `This ${operation.data.replaceAll('-', ' ')} request was already completed.`
+          : operation.data === 'approve'
+            ? 'Approval confirmed. The candidate is approved but not active; world references and publication are unchanged.'
+            : operation.data === 'activate'
+              ? 'Activation confirmed. The canonical active pointer changed; pinned world references and publication are unchanged.'
+              : `Asset operation completed: ${result.status.replaceAll('_', ' ')}.`,
+      requestId,
       ...(result.version === null
         ? {}
         : {
@@ -232,6 +364,80 @@ export async function worldAssetOperationAction(
           }),
     };
   } catch (error) {
-    return { outcome: 'error', message: messageForError(error) };
+    const failure = await classifyOperationFailure({
+      error,
+      operation: operation.data,
+      assetId,
+      versionId,
+      expectedRevision,
+      administratorUserId: context.userId,
+      requestId,
+    });
+    return { outcome: 'error', ...failure, requestId };
+  }
+}
+
+export async function createWorldAssetVersionFromExistingAction(
+  _previous: WorldAssetActionState,
+  formData: FormData,
+): Promise<WorldAssetActionState> {
+  await requireAssetManagerPermission('assets.upload');
+  const assetId = readUuid(formData, 'assetId');
+  const sourceVersionId = readUuid(formData, 'sourceVersionId');
+  const requestId = readUuid(formData, 'requestId');
+  const expectedAssetRevision = readPositiveInteger(formData, 'expectedAssetRevision');
+  const reason = readString(formData, 'reason', 500);
+  const configurationMode = z
+    .enum(['copy', 'defaults'])
+    .safeParse(readString(formData, 'configurationMode', 16));
+  if (
+    assetId === undefined ||
+    sourceVersionId === undefined ||
+    requestId === undefined ||
+    expectedAssetRevision === undefined ||
+    !safeReason(reason) ||
+    !configurationMode.success ||
+    formData.get('confirmed') !== 'yes'
+  ) {
+    return {
+      outcome: 'error',
+      errorKind: 'incomplete',
+      message: 'Choose a starting point and provide a clear reason of at least 12 characters.',
+      ...(requestId === undefined ? {} : { requestId }),
+    };
+  }
+  try {
+    const result = await createAssetVersionFromExisting(assetId, {
+      sourceVersionId,
+      configurationMode: configurationMode.data,
+      expectedAssetRevision,
+      reason,
+      idempotencyKey: requestId,
+    });
+    revalidatePath('/world-assets');
+    revalidatePath('/world-assets/review');
+    revalidatePath('/world-assets/audit');
+    revalidatePath(`/world-assets/${assetId}`);
+    if (result.version !== null) {
+      revalidatePath(`/world-assets/${assetId}/versions/${result.version.id}`);
+    }
+    return {
+      outcome: 'success',
+      message: 'The successor draft was created. The source and active versions remain unchanged.',
+      requestId,
+      ...(result.version === null
+        ? {}
+        : {
+            createdVersionId: result.version.id,
+            createdVersionNumber: result.version.versionNumber,
+          }),
+    };
+  } catch (error) {
+    return {
+      outcome: 'error',
+      errorKind: errorKindForError(error),
+      message: messageForError(error),
+      requestId,
+    };
   }
 }

@@ -145,7 +145,7 @@ export function LiveOperationsBoundary({
   const [backgroundSyncVisible, setBackgroundSyncVisible] = useState(false);
   const [sessionSyncVisible, setSessionSyncVisible] = useState(false);
   const [liveOpsConnectionWarning, setLiveOpsConnectionWarning] = useState(false);
-  const refreshInFlight = useRef(false);
+  const refreshInFlight = useRef<AbortSignal | true | undefined>(undefined);
   const indicatorTimer = useRef<number | undefined>(undefined);
   const sessionIndicatorTimer = useRef<number | undefined>(undefined);
 
@@ -158,8 +158,10 @@ export function LiveOperationsBoundary({
 
   const refresh = useCallback(
     async (signal?: AbortSignal, options?: { readonly manual?: boolean }) => {
-      if (refreshInFlight.current) return;
-      refreshInFlight.current = true;
+      const activeRequest = refreshInFlight.current;
+      if (activeRequest === true || (activeRequest !== undefined && !activeRequest.aborted)) return;
+      const requestMarker = signal ?? true;
+      refreshInFlight.current = requestMarker;
       const hasTrustedSnapshot = statusRef.current !== undefined;
       const isBackground = options?.manual !== true && hasTrustedSnapshot;
 
@@ -207,7 +209,7 @@ export function LiveOperationsBoundary({
           setLiveOpsConnectionWarning(true);
         }
       } finally {
-        refreshInFlight.current = false;
+        if (refreshInFlight.current === requestMarker) refreshInFlight.current = undefined;
         clearIndicatorTimer();
         setBackgroundSyncVisible(false);
         if (options?.manual === true) setChecking(false);

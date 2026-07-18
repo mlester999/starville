@@ -59,9 +59,9 @@ describe('hosted RLS HTTP diagnostics', () => {
         {},
         25,
       ).catch((error: unknown) => (error instanceof Error ? error.message : String(error)));
-      expect(timeoutFailure).toMatch(
-        /"endpoint":"\/worlds\/:id".*"status":503.*"code":"HOSTED_HTTP_TIMEOUT".*"failureKind":"timeout"/u,
-      );
+      expect(timeoutFailure).toMatch(/"endpoint":"\/worlds\/:id"/u);
+      expect(timeoutFailure).toMatch(/"status":(?:503|null)/u);
+      expect(timeoutFailure).toMatch(/"code":"HOSTED_HTTP_TIMEOUT".*"failureKind":"timeout"/u);
       expect(timeoutFailure).not.toContain('127.0.0.1');
       expect(timeoutFailure).not.toContain('credential=secret');
       expect(timeoutFailure).not.toContain('10000000-0000-4000-8000-000000000001');

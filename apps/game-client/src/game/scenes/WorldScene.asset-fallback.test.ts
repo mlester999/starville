@@ -62,6 +62,8 @@ describe('WorldScene production-asset fallback', () => {
       onExitRequested: vi.fn(),
       onMapChanged: vi.fn(),
       onWorldAssetFallback: vi.fn(),
+      onRemotePlayerSelected: vi.fn(),
+      onActivityInteraction: vi.fn(),
     };
     const initialState = {
       mapId: 'lantern-square' as const,
@@ -120,5 +122,64 @@ describe('WorldScene production-asset fallback', () => {
     expect(callbacks.onCheckpoint).not.toHaveBeenCalled();
     expect(callbacks.onExitRequested).not.toHaveBeenCalled();
     expect(callbacks.onMapChanged).not.toHaveBeenCalled();
+  });
+
+  it('reports one stopped phase from the Phaser scene and preserves the last facing', () => {
+    const onStateChanged = vi.fn();
+    const initialState = {
+      mapId: 'lantern-square' as const,
+      x: 12.2,
+      y: 7.4,
+      facingDirection: 'northeast' as const,
+    };
+    const scene = new WorldScene({
+      initialState,
+      initialWorld: {
+        manifest: lanternSquareManifest(),
+        versionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        checksum: 'b'.repeat(64),
+        assetDeliveries: [],
+      },
+      appearancePreset: 'moss',
+      reducedMotion: false,
+      collisionDebug: false,
+      audioSettings: { masterVolume: 0.8, muted: false },
+      callbacks: {
+        onReady: vi.fn(),
+        onError: vi.fn(),
+        onStateChanged,
+        onCheckpoint: vi.fn(),
+        onInteractionTarget: vi.fn(),
+        onInteractionOpen: vi.fn(),
+        onSettingsRequested: vi.fn(),
+        onExitRequested: vi.fn(),
+        onMapChanged: vi.fn(),
+        onWorldAssetFallback: vi.fn(),
+        onRemotePlayerSelected: vi.fn(),
+        onActivityInteraction: vi.fn(),
+      },
+    });
+    const updatePlayer = vi.fn();
+    Object.assign(scene, {
+      wasMoving: true,
+      time: { now: 250 },
+      player: { update: updatePlayer },
+    });
+    const reportStoppedMovement = (
+      scene as unknown as { readonly reportStoppedMovement: () => void }
+    ).reportStoppedMovement.bind(scene);
+
+    reportStoppedMovement();
+    reportStoppedMovement();
+
+    expect(onStateChanged).toHaveBeenCalledTimes(1);
+    expect(onStateChanged).toHaveBeenCalledWith(initialState, 'stopped');
+    expect(updatePlayer).toHaveBeenCalledWith(
+      { x: initialState.x, y: initialState.y },
+      'northeast',
+      false,
+      250,
+      false,
+    );
   });
 });

@@ -65,4 +65,24 @@ describe('asset storage boundaries', () => {
       storage.storePublicImmutable('starville/willow-tree/v1/source.webp', Buffer.from('new')),
     ).rejects.toEqual(expect.objectContaining({ code: 'STORAGE_CONTENT_CONFLICT' }));
   });
+
+  it('removes only validated private keys during partial-failure cleanup', async () => {
+    const bucket = {
+      remove: vi.fn(async () => ({ data: [], error: null })),
+    };
+    const client = { storage: { from: vi.fn(() => bucket) } };
+    const storage = createSupabaseAssetStorage(client as never);
+
+    await expect(
+      storage.removePrivate([
+        'starville/asset/version/processed/source.webp',
+        'starville/asset/version/processed/preview.webp',
+      ]),
+    ).resolves.toBeUndefined();
+    expect(bucket.remove).toHaveBeenCalledWith([
+      'starville/asset/version/processed/source.webp',
+      'starville/asset/version/processed/preview.webp',
+    ]);
+    await expect(storage.removePrivate(['../unsafe'])).rejects.toBeInstanceOf(AssetStorageError);
+  });
 });

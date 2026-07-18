@@ -239,7 +239,8 @@ begin
       from public.admin_role_permissions mapping
       join public.admin_roles role on role.id = mapping.role_id
       join public.admin_permissions permission on permission.id = mapping.permission_id
-      where role.key = 'read_only_analyst' and permission.key not like '%.read'
+      where role.key = 'read_only_analyst'
+        and permission.key not like '%.read' and permission.key not like '%.inspect'
     ) and not exists (
       select 1 from public.admin_permissions where key = 'assets.audit_read'
     ),
@@ -347,6 +348,10 @@ declare
   archived_active_asset_id uuid := gen_random_uuid();
   archived_active_version_id uuid := gen_random_uuid();
   version_two_reservation jsonb;
+  clone_result jsonb;
+  clone_replay jsonb;
+  clone_version_id uuid;
+  clone_active_before uuid;
   draft_version public.world_map_versions%rowtype;
   published_manifest_before jsonb;
   replacement_manifest jsonb;
@@ -354,10 +359,12 @@ declare
   incompatible_object_index integer;
   accepted_edit_version integer;
   accepted_checksum text;
+  accepted_draft_version_id uuid;
   result jsonb;
   denied boolean := false;
   unsafe_rejected boolean := false;
   immutable_rejected boolean := false;
+  validated_edit_rejected boolean := false;
   wallet constant text := 'A7777777777777777777777777777777';
 begin
   begin
@@ -448,6 +455,22 @@ begin
     'an exact upload reservation retry returns the original bounded reservation'
   );
 
+  result := public.update_admin_game_asset_version_draft(
+    super_user_id, super_auth_session_id, 'aal2',
+    asset_id, version_id, version_edit_version,
+    'Moonlit General Store', 'shop', array['phase7', 'shop']::text[],
+    'Production replacement for the procedural general-store marker.',
+    512, 512, 1, 0.5, 1, 0.5, 1, 0.5, 1,
+    '{"shape":"rectangle","blocking":true,"offsetX":0,"offsetY":0,"width":2,"height":1}'::jsonb,
+    array[0, 90, 180, 270]::smallint[], 0::smallint, array['shop']::text[],
+    'asset-fixture-edit-one', 1000
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'updated', 'bounded draft metadata is saved before trusted validation'
+  );
+  asset_revision := (result #>> '{asset,recordVersion}')::integer;
+  version_edit_version := (result #>> '{version,editVersion}')::integer;
+
   result := public.complete_admin_game_asset_processing(
     designer_user_id, designer_auth_session_id, 'aal2',
     asset_id, version_id, upload_id, upload_revision,
@@ -505,26 +528,125 @@ begin
     result, 'replayed', 'a lost successful processing response is safely replayed'
   );
 
-  result := public.update_admin_game_asset_version_draft(
-    super_user_id, super_auth_session_id, 'aal2',
-    asset_id, version_id, version_edit_version,
-    'Moonlit General Store', 'shop', array['phase7', 'shop']::text[],
-    'Production replacement for the procedural general-store marker.',
-    512, 512, 1, 0.5, 1, 0.5, 1, 0.5, 1,
-    '{"shape":"rectangle","blocking":true,"offsetX":0,"offsetY":0,"width":2,"height":1}'::jsonb,
-    array[0, 90, 180, 270]::smallint[], 0::smallint, array['shop']::text[],
-    'asset-fixture-edit-one', 1000
+  begin
+    perform public.update_admin_game_asset_version_draft(
+      super_user_id, super_auth_session_id, 'aal2',
+      asset_id, version_id, version_edit_version,
+      'Illicit Validated Edit', 'shop', array['phase7', 'shop']::text[],
+      'A validated candidate must not be reset through the draft RPC.',
+      512, 512, 1, 0.5, 1, 0.5, 0.9, 0.5, 1,
+      '{"shape":"rectangle","blocking":true,"offsetX":0,"offsetY":0,"width":2,"height":1}'::jsonb,
+      array[0, 90, 180, 270]::smallint[], 0::smallint, array['shop']::text[],
+      'asset-fixture-validated-edit-denied', 1000
+    );
+  exception when insufficient_privilege then
+    validated_edit_rejected := true;
+  end;
+  perform pg_temp.assert_asset_true(
+    validated_edit_rejected
+      and (select friendly_name = 'Moonlit General Store'
+           from public.world_assets where id = asset_id)
+      and (select target.lifecycle_status = 'validated'
+             and target.edit_version = (result #>> '{version,editVersion}')::integer
+           from public.world_asset_versions as target where target.id = version_id),
+    'validated artwork and configuration reject draft mutation without partial asset changes'
   );
-  perform pg_temp.assert_asset_status(result, 'updated', 'bounded draft metadata is saved');
-  asset_revision := (result #>> '{asset,recordVersion}')::integer;
-  version_edit_version := (result #>> '{version,editVersion}')::integer;
 
-  result := public.validate_admin_game_asset_version(
-    super_user_id, super_auth_session_id, 'aal2', asset_id, version_id,
-    version_edit_version, 'asset-fixture-validate-one', 1000
-  );
-  perform pg_temp.assert_asset_status(result, 'validated', 'file and configuration validation passes');
-  version_edit_version := (result #>> '{version,editVersion}')::integer;
+  -- Exercise successor creation inside a rolled-back subtransaction so the
+  -- remainder of this fixture can continue its original review lifecycle.
+  begin
+    select active_version_id into clone_active_before
+    from public.world_assets where id = asset_id;
+    clone_result := public.create_admin_game_asset_version_from_existing(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, version_id,
+      'copy', asset_revision,
+      'Create an editable successor while preserving the validated source.',
+      'asset-fixture-clone-copy', 1000
+    );
+    perform pg_temp.assert_asset_status(
+      clone_result, 'created', 'a validated version can create an explicit successor draft'
+    );
+    clone_version_id := (clone_result #>> '{version,id}')::uuid;
+    perform pg_temp.assert_asset_true(
+      (clone_result #>> '{version,lifecycleStatus}') = 'draft'
+        and (clone_result #>> '{version,validationStatus}') = 'pending'
+        and (clone_result #>> '{version,versionNumber}')::integer = 2
+        and (select lifecycle_status = 'validated' from public.world_asset_versions
+          where id = version_id)
+        and (select active_version_id is not distinct from clone_active_before
+          from public.world_assets where id = asset_id)
+        and (select target.processed_source_path = source.processed_source_path
+          and target.processed_preview_path = source.processed_preview_path
+          and target.processed_thumbnail_path = source.processed_thumbnail_path
+          and target.foot_anchor_x = source.foot_anchor_x
+          and target.depth_anchor_y = source.depth_anchor_y
+          and target.collision_profile = source.collision_profile
+          and target.validation_results is null
+          from public.world_asset_versions target
+          join public.world_asset_versions source on source.id = version_id
+          where target.id = clone_version_id)
+        and (select count(*) = 2 from public.world_asset_version_tags
+          where world_asset_version_id = clone_version_id),
+      'copy mode reuses immutable artwork and configuration without changing source or active state'
+    );
+    clone_replay := public.create_admin_game_asset_version_from_existing(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, version_id,
+      'copy', asset_revision,
+      'Create an editable successor while preserving the validated source.',
+      'asset-fixture-clone-copy', 1000
+    );
+    perform pg_temp.assert_asset_true(
+      clone_replay #>> '{version,id}' = clone_version_id::text,
+      'an exact successor-creation retry replays the original draft'
+    );
+
+    update public.world_asset_versions set lifecycle_status = 'archived'
+    where id = clone_version_id;
+    clone_result := public.create_admin_game_asset_version_from_existing(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, version_id,
+      'defaults', asset_revision + 1,
+      'Create a successor with safe defaults for complete reconfiguration.',
+      'asset-fixture-clone-defaults', 1000
+    );
+    clone_version_id := (clone_result #>> '{version,id}')::uuid;
+    perform pg_temp.assert_asset_true(
+      clone_result ->> 'status' = 'created'
+        and (select anchor_x = 0.5 and anchor_y = 1
+          and foot_anchor_x = 0.5 and foot_anchor_y = 1
+          and collision_profile = '{"shape":"none","blocking":false}'::jsonb
+          and internal_notes = '' and validation_results is null
+          from public.world_asset_versions where id = clone_version_id)
+        and not exists (
+          select 1 from public.world_asset_version_tags
+          where world_asset_version_id = clone_version_id
+        ),
+      'default mode preserves copied artwork but resets editable configuration and validation'
+    );
+
+    update public.world_asset_versions set lifecycle_status = 'archived'
+    where id = clone_version_id;
+    clone_result := public.create_admin_game_asset_version_upload_v2(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, version_id,
+      'copy', asset_revision + 2,
+      'Upload replacement artwork using this validated configuration as the source.',
+      'replacement.png', 'image/png', 2048,
+      'asset-fixture-successor-upload', 1000
+    );
+    perform pg_temp.assert_asset_true(
+      clone_result ->> 'status' = 'created'
+        and (select target.foot_anchor_x = source.foot_anchor_x
+          and target.collision_profile = source.collision_profile
+          from public.world_asset_versions target
+          join public.world_asset_versions source on source.id = version_id
+          where target.id = (clone_result ->> 'versionId')::uuid)
+        and (select active_version_id is not distinct from clone_active_before
+          from public.world_assets where id = asset_id),
+      'replacement upload reserves a draft from the explicitly selected source configuration'
+    );
+    raise sqlstate 'ZX001' using message = 'rollback successor fixture';
+  exception when sqlstate 'ZX001' then
+    null;
+  end;
 
   result := public.submit_admin_game_asset_review(
     super_user_id, super_auth_session_id, 'aal2', asset_id, version_id,
@@ -742,16 +864,17 @@ begin
     replacement_manifest, 'asset-fixture-world-replacement', 1000
   );
   perform pg_temp.assert_asset_status(result, 'updated', 'a draft explicitly replaces the visual key');
+  accepted_draft_version_id := (result #>> '{version,id}')::uuid;
   perform pg_temp.assert_asset_true(
     exists (
       select 1 from public.world_map_version_assets reference
-      where reference.world_map_version_id = draft_version.id
+      where reference.world_map_version_id = accepted_draft_version_id
         and reference.world_asset_id = asset_id
         and reference.world_asset_version_id = version_id
     ) and not exists (
       select 1 from public.world_map_version_assets reference
       join public.world_assets marker on marker.id = reference.world_asset_id
-      where reference.world_map_version_id = draft_version.id
+      where reference.world_map_version_id = accepted_draft_version_id
         and marker.asset_key = 'phase7-general-store-marker'
     ) and exists (
       select 1 from public.world_map_versions published
@@ -769,7 +892,7 @@ begin
         and event.event_key = 'asset.world.replacement_performed'
         and event.permission_key = 'maps.edit'
         and event.target_world_map_id = draft_version.world_map_id
-        and event.target_world_map_version_id = draft_version.id
+        and event.target_world_map_version_id = accepted_draft_version_id
         and event.target_world_asset_id = asset_id
         and event.metadata #>> '{replacements,0,beforeAssetKey}' = 'phase7-general-store-marker'
         and event.metadata #>> '{replacements,0,afterAssetKey}' = 'phase7-general-store-production'
@@ -799,7 +922,7 @@ begin
   );
   result := public.save_admin_world_draft(
     super_user_id, super_auth_session_id, 'aal2', draft_version.world_map_id,
-    draft_version.id, accepted_edit_version, accepted_checksum,
+    accepted_draft_version_id, accepted_edit_version, accepted_checksum,
     incompatible_manifest, 'asset-fixture-world-incompatible', 1000
   );
   perform pg_temp.assert_asset_status(
@@ -809,7 +932,7 @@ begin
   perform pg_temp.assert_asset_true(
     exists (
       select 1 from public.world_map_versions as version
-      where version.id = draft_version.id
+      where version.id = accepted_draft_version_id
         and version.edit_version = accepted_edit_version
         and version.checksum = accepted_checksum
         and version.manifest = replacement_manifest
@@ -851,7 +974,7 @@ begin
   perform pg_temp.assert_asset_status(result, 'referenced', 'referenced asset archival is blocked');
 
   delete from public.world_map_version_assets
-  where world_map_version_id = draft_version.id and world_asset_id = asset_id;
+  where world_map_version_id = accepted_draft_version_id and world_asset_id = asset_id;
   result := public.archive_admin_game_asset(
     super_user_id, super_auth_session_id, 'aal2', asset_id, asset_revision,
     'Attempt archival while active item content still pins this asset.',
@@ -1054,6 +1177,13 @@ begin
       and result #>> '{reviews,0,reason}' = 'Bounded review evidence 105.',
     'version detail bounds validation and review aggregates to deterministic newest-first pages'
   );
+  result := public.get_admin_game_asset_version(
+    super_user_id, super_auth_session_id, 'aal2', archived_active_asset_id, version_id,
+    'asset-fixture-version-ownership-mismatch', 1000
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'not_found', 'version detail rejects a canonical version paired with another asset'
+  );
   result := public.get_admin_game_asset(
     super_user_id, super_auth_session_id, 'aal2', asset_id,
     'asset-fixture-bounded-asset-detail', 1000
@@ -1137,6 +1267,117 @@ begin
   perform pg_temp.assert_asset_true(
     not private.world_manifest_assets_compatible(moonpetal_version_id, candidate_manifest),
     'newly introduced keys validate against active N plus one compatibility metadata'
+  );
+end;
+$$;
+
+do $$
+declare
+  super_user_id constant uuid := 'a5000000-0000-4000-8000-000000000001';
+  super_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000002';
+  canonical_asset_id uuid;
+  active_version_before uuid;
+  asset_revision integer;
+  reference_count_before integer;
+  failed_version_id uuid;
+  result jsonb;
+begin
+  select asset.id, asset.active_version_id, asset.record_version
+    into strict canonical_asset_id, active_version_before, asset_revision
+  from public.world_assets as asset
+  where asset.asset_key = 'tree-pine';
+  select count(*)::integer into reference_count_before
+  from public.world_map_version_assets as reference
+  where reference.world_asset_id = canonical_asset_id;
+
+  result := public.create_admin_game_asset_version(
+    super_user_id, super_auth_session_id, 'aal2', canonical_asset_id, asset_revision,
+    'Exercise terminal cleanup for a failed draft-version upload.',
+    'tree-pine-retry.png', 'image/png', 2048,
+    'asset-fixture-version-failure-recovery', 1000
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'created', 'a new Tree Pine candidate is reserved against the canonical asset'
+  );
+  failed_version_id := (result ->> 'versionId')::uuid;
+
+  result := public.fail_admin_game_asset_processing(
+    super_user_id, super_auth_session_id, 'aal2', canonical_asset_id,
+    failed_version_id, (result ->> 'uploadId')::uuid,
+    (result ->> 'uploadRevision')::integer, 'STORAGE_FAILED',
+    jsonb_build_object(
+      'valid', false, 'checkedAt', '2026-07-16T04:00:00.000Z', 'issues', '[]'::jsonb
+    ), 'asset-fixture-version-failure-recovery', 1000
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'archived', 'a technical failure leaves no open draft candidate'
+  );
+  perform pg_temp.assert_asset_true(
+    (select active_version_id = active_version_before
+      from public.world_assets where id = canonical_asset_id)
+      and (select lifecycle_status = 'archived'
+        from public.world_asset_versions where id = failed_version_id)
+      and not exists (
+        select 1 from public.world_map_version_assets
+        where world_asset_version_id = failed_version_id
+      )
+      and (select count(*) = reference_count_before
+        from public.world_map_version_assets where world_asset_id = canonical_asset_id),
+    'failure recovery preserves the canonical active version and all published or draft references'
+  );
+end;
+$$;
+
+do $$
+declare
+  super_user_id constant uuid := 'a5000000-0000-4000-8000-000000000001';
+  super_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000002';
+  canonical_asset_id uuid;
+  active_version_id uuid;
+  lifecycle_before text;
+  result jsonb;
+begin
+  select asset.id, asset.active_version_id
+    into strict canonical_asset_id, active_version_id
+  from public.world_assets as asset
+  where asset.asset_key = 'tree-pine';
+  select lifecycle_status into strict lifecycle_before
+  from public.world_asset_versions where id = active_version_id;
+
+  result := public.claim_admin_game_asset_operation_intent(
+    super_user_id, super_auth_session_id, 'aal2', canonical_asset_id, active_version_id,
+    'review_asset_version', 'asset-fixture-review-intent',
+    'Review intent fingerprint fixture with no lifecycle mutation.', repeat('a', 64)
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'claimed', 'a first review intent claims its request identifier'
+  );
+  result := public.claim_admin_game_asset_operation_intent(
+    super_user_id, super_auth_session_id, 'aal2', canonical_asset_id, active_version_id,
+    'review_asset_version', 'asset-fixture-review-intent',
+    'Review intent fingerprint fixture with no lifecycle mutation.', repeat('a', 64)
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'exact_replay', 'an identical review intent remains safely retryable'
+  );
+  result := public.claim_admin_game_asset_operation_intent(
+    super_user_id, super_auth_session_id, 'aal2', canonical_asset_id, active_version_id,
+    'review_asset_version', 'asset-fixture-review-intent',
+    'Changed review intent remains safely rejected before mutation.', repeat('b', 64)
+  );
+  perform pg_temp.assert_asset_status(
+    result, 'request_conflict', 'changed intent cannot reuse the request identifier'
+  );
+  perform pg_temp.assert_asset_true(
+    (select lifecycle_status = lifecycle_before
+     from public.world_asset_versions where id = active_version_id)
+    and exists (
+      select 1 from public.world_asset_audit_events
+      where request_id = 'asset-fixture-review-intent'
+        and event_key = 'asset.request.intent_conflict'
+        and outcome = 'error'
+    ),
+    'intent conflict is audited without changing lifecycle or world references'
   );
 end;
 $$;

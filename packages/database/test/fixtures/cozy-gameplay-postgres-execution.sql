@@ -12,8 +12,8 @@ end;
 $$;
 
 select pg_temp.assert_true(
-  (select count(*) = 21 from public.cozy_item_definitions),
-  'canonical Phase 7 item catalog is complete'
+  (select count(*) = 23 from public.cozy_item_definitions),
+  'canonical item catalog includes the additive Phase 11A hoe and Phase 11B Garden Soup'
 );
 select pg_temp.assert_true(
   exists (
@@ -370,23 +370,22 @@ begin
   select state_version into strict inventory_version from public.player_inventory_state where player_profile_id=player_id;
   result:=public.perform_player_recipe_action(wallet,'cooking','meadow-biscuit','phase7-cooking-hearth',
     1,inventory_version,dust_version,'phase7-fixture-cook-0001','phase7-fixture:recipe:cook');
-  perform pg_temp.assert_true(result->>'status'='updated' and result->>'outputItemSlug'='meadow-biscuit'
-    and (result->>'outputQuantity')::integer=2
-    and private.cozy_owned_quantity(player_id,'71000000-0000-4000-8000-000000000012')=2,
-    'cooking atomically consumes ingredients and produces deterministic output');
+  perform pg_temp.assert_true(result->>'status'='recipe_job_required'
+    and private.cozy_owned_quantity(player_id,'71000000-0000-4000-8000-000000000012')=0,
+    'legacy immediate cooking is retired in favor of server-timed Phase 11B jobs');
   replay:=public.perform_player_recipe_action(wallet,'cooking','meadow-biscuit','phase7-cooking-hearth',
     1,inventory_version,dust_version,'phase7-fixture-cook-0001','phase7-fixture:recipe:cook-replay');
-  perform pg_temp.assert_true(replay->>'status'='replayed'
-    and private.cozy_owned_quantity(player_id,'71000000-0000-4000-8000-000000000012')=2,
-    'recipe replay cannot duplicate output');
+  perform pg_temp.assert_true(replay->>'status'='recipe_job_required'
+    and private.cozy_owned_quantity(player_id,'71000000-0000-4000-8000-000000000012')=0,
+    'legacy recipe retries cannot consume ingredients or create output');
 
   update public.player_profiles set safe_position_x=14.8,safe_position_y=7.8 where id=player_id;
   select state_version into strict dust_version from public.player_dust_accounts where player_profile_id=player_id;
   select state_version into strict inventory_version from public.player_inventory_state where player_profile_id=player_id;
   result:=public.perform_player_recipe_action(wallet,'crafting','garden-twine','phase7-crafting-workbench',
     1,inventory_version,dust_version,'phase7-fixture-craft-0001','phase7-fixture:recipe:craft');
-  perform pg_temp.assert_true(result->>'status'='updated' and result->>'outputItemSlug'='garden-twine',
-    'crafting uses a distinct trusted station and recipe kind');
+  perform pg_temp.assert_true(result->>'status'='recipe_job_required',
+    'legacy immediate crafting cannot bypass the Phase 11B job lifecycle');
 
   update public.player_profiles set safe_position_x=5,safe_position_y=5.7 where id=player_id;
   select state_version into strict dust_version from public.player_dust_accounts where player_profile_id=player_id;
@@ -402,7 +401,7 @@ begin
   perform pg_temp.assert_true(result->>'status'='updated' and (result->>'dustBalance')::bigint=balance_before+7,
     'selling atomically removes an eligible item and grants server-priced DUST');
   perform pg_temp.assert_true(
-    (select count(*)>=7 from public.cozy_gameplay_action_events where player_profile_id=player_id),
+    (select count(*)>=5 from public.cozy_gameplay_action_events where player_profile_id=player_id),
     'value-changing Phase 7B actions append safe operational events'
   );
 end;
@@ -630,7 +629,7 @@ begin
   result:=public.get_admin_gameplay_content(admin_user_id,auth_session_id,'aal2');
   perform pg_temp.assert_true(
     result->>'status'='loaded'
-      and jsonb_array_length(result->'items')=21
+      and jsonb_array_length(result->'items')=23
       and jsonb_array_length(result->'furniture')=6
       and jsonb_array_length(result->'homeTemplates')=1,
     'authorized administrator reads the versioned gameplay content catalog'

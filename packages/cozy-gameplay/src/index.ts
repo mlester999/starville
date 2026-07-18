@@ -8,3 +8,5 @@ export * from './inventory';
 export * from './items';
 export * from './recipes';
 export * from './shops';
+export * from './vertical-slice';
+export * from './workstations';

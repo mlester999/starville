@@ -192,9 +192,13 @@ export const assetRenderConfigurationSchema = z
     }
   });
 
-const absoluteAssetUrlSchema = z
-  .url()
-  .refine((value) => ['http:', 'https:'].includes(new URL(value).protocol));
+const absoluteAssetUrlSchema = z.url().refine((value) => {
+  try {
+    return ['http:', 'https:'].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+});
 const nullableDeliveryUrlSchema = absoluteAssetUrlSchema.nullable();
 const adminAssetMediaUrlSchema = z.union([
   absoluteAssetUrlSchema,
@@ -324,6 +328,10 @@ export const assetVersionSchema = z
     internalNotes: assetSafeTextSchema(0, 2000),
     validationResult: assetValidationResultSchema.nullable(),
     editVersion: z.number().int().positive(),
+    createdByAdminId: assetUuidSchema.nullable(),
+    submittedByAdminId: assetUuidSchema.nullable(),
+    reviewedByAdminId: assetUuidSchema.nullable(),
+    approvedByAdminId: assetUuidSchema.nullable(),
     createdAt: assetTimestampSchema,
     updatedAt: assetTimestampSchema,
     submittedAt: assetTimestampSchema.nullable(),
@@ -409,6 +417,7 @@ export const assetVersionDetailSchema = z
           .object({
             id: assetUuidSchema,
             action: z.enum(['submitted', 'changes_requested', 'rejected', 'approved']),
+            administratorUserId: assetUuidSchema,
             reason: assetSafeTextSchema(1, 500),
             createdAt: assetTimestampSchema,
           })
@@ -480,10 +489,18 @@ export const assetDeprecationActionSchema = z
   .strict();
 export type AssetDeprecationAction = z.infer<typeof assetDeprecationActionSchema>;
 
-export const assetCreateVersionActionSchema = assetDeprecationActionSchema;
+export const assetCreateVersionActionSchema = assetDeprecationActionSchema
+  .extend({
+    sourceVersionId: assetUuidSchema,
+    configurationMode: z.enum(['copy', 'defaults']),
+  })
+  .strict();
+export type AssetCreateVersionAction = z.infer<typeof assetCreateVersionActionSchema>;
 
 export const assetCreateVersionUploadMetadataSchema = z
   .object({
+    sourceVersionId: assetUuidSchema,
+    configurationMode: z.enum(['copy', 'defaults']),
     expectedAssetRevision: z.number().int().positive(),
     reason: assetSafeTextSchema(12, 500),
     idempotencyKey: assetUuidSchema,

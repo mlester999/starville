@@ -4,7 +4,9 @@ import { extname, join } from 'node:path';
 import process from 'node:process';
 
 import { parse } from 'dotenv';
+import { inspectAvatarSource } from './avatar-security-boundary';
 import { inspectBrowserOutput } from './browser-secret-boundary';
+import { inspectTokenClaimSource } from './token-claim-boundary';
 
 const root = process.cwd();
 const allowedReferenceFiles = new Set([
@@ -128,6 +130,9 @@ for (const [path, content] of sourceText) {
   ) {
     failures.push(`credential-shaped logger argument in ${path}`);
   }
+
+  failures.push(...inspectTokenClaimSource({ content, path }));
+  failures.push(...inspectAvatarSource({ content, path }));
 }
 
 const secrets = safeLocalSecrets();

@@ -24,7 +24,7 @@ export const WORLD_EDITOR_GUIDE_STEPS = [
   },
   {
     title: 'Place or select an object',
-    body: 'Select an approved asset and use Place at center. Click an existing map object to select it. Pan: hold the left mouse button on empty map space and drag (or Space+drag / middle mouse). Zoom with + and −. Fit shows the complete map; Reset returns to the default fitted view.',
+    body: 'Select an approved asset and use Place at center. Click an existing map object to select it. Turn on Move tool before pointer or touch dragging an existing object. Pan: hold the left mouse button on empty map space and drag (or Space+drag / middle mouse). Zoom with + and −. Fit shows the complete map; Reset returns to the default fitted view.',
   },
   {
     title: 'Edit in Inspector',

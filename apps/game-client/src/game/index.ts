@@ -25,6 +25,24 @@ export function startGame(parent: HTMLElement, options: GameRuntimeOptions): Gam
       game.sound.setVolume(settings.masterVolume);
       game.sound.setMute(settings.muted);
     },
+    setRemotePresences(presences) {
+      if (!destroyed) scene.setRemotePresences(presences);
+    },
+    setLocalAvatarProfile(profile) {
+      if (!destroyed) scene.setLocalAvatarProfile(profile);
+    },
+    setRemoteAvatarProfiles(profiles) {
+      if (!destroyed) scene.setRemoteAvatarProfiles(profiles);
+    },
+    setRemotePlayerNamesVisible(visible) {
+      if (!destroyed) scene.setRemotePlayerNamesVisible(visible);
+    },
+    setSelectedRemotePresence(presenceId) {
+      if (!destroyed) scene.setSelectedRemotePresence(presenceId);
+    },
+    setActivityInstance(instance) {
+      if (!destroyed) scene.setActivityInstance(instance);
+    },
     interact() {
       if (!destroyed) scene.interact();
     },

@@ -9,6 +9,8 @@ import {
   type TokenAccessCookieOptions,
 } from '../token-access/http.js';
 import type { LiveOperationsService } from '../live-operations/contracts.js';
+import type { RealtimeTicketService } from '../realtime/contracts.js';
+import { readTokenAccessCookie } from '../token-access/http.js';
 
 const PLAYER_API_PREFIX = '/api/v1/token-access/player';
 const BODY_LIMIT_BYTES = 4_096;
@@ -19,6 +21,7 @@ export interface RegisterPlayerRoutesOptions {
   readonly cookie: TokenAccessCookieOptions;
   readonly allowedOrigins: ReadonlySet<string>;
   readonly liveOperationsService?: LiveOperationsService;
+  readonly realtimeTicketService?: RealtimeTicketService;
 }
 
 function stateView(profile: Awaited<ReturnType<PlayerService['saveState']>>) {
@@ -53,6 +56,55 @@ export function registerPlayerRoutes(
       requestId: request.id,
     };
   });
+
+  if (options.realtimeTicketService !== undefined) {
+    const realtimeTicketService = options.realtimeTicketService;
+    app.post(`${PLAYER_API_PREFIX}/realtime-ticket`, async (request, reply) => {
+      assertTrustedBrowserMutation(request, allowedOrigins);
+      if (
+        (await options.liveOperationsService?.getPublic(request.id))?.maintenance.active === true
+      ) {
+        throw new PublicApiError(503, 'GAME_MAINTENANCE');
+      }
+      const walletAddress = await authorizePlayerRequest(
+        request,
+        reply,
+        tokenAccessService,
+        cookie,
+      );
+      await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+      const body = request.body as { readonly channelId?: unknown } | undefined;
+      const data = await realtimeTicketService.issue({
+        rawAccessToken: readTokenAccessCookie(request),
+        requestedChannelId: body?.channelId,
+        requestId: request.id,
+      });
+      return { success: true, data, requestId: request.id };
+    });
+
+    app.post(`${PLAYER_API_PREFIX}/private-home-realtime-ticket`, async (request, reply) => {
+      assertTrustedBrowserMutation(request, allowedOrigins);
+      if (
+        (await options.liveOperationsService?.getPublic(request.id))?.maintenance.active === true
+      ) {
+        throw new PublicApiError(503, 'GAME_MAINTENANCE');
+      }
+      const walletAddress = await authorizePlayerRequest(
+        request,
+        reply,
+        tokenAccessService,
+        cookie,
+      );
+      await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+      const body = request.body as { readonly homeId?: unknown } | undefined;
+      const data = await realtimeTicketService.issuePrivateHome({
+        rawAccessToken: readTokenAccessCookie(request),
+        homeId: body?.homeId,
+        requestId: request.id,
+      });
+      return { success: true, data, requestId: request.id };
+    });
+  }
 
   app.post(
     `${PLAYER_API_PREFIX}/profile`,

@@ -16,7 +16,10 @@ describe('Lantern Square manifest', () => {
     expect(manifest.id).toBe('lantern-square');
     expect(manifest.objects.length).toBeGreaterThanOrEqual(10);
     expect(manifest.collisions.some(({ id }) => id.startsWith('water-'))).toBe(true);
-    expect(manifest.interactions).toHaveLength(1);
+    expect(manifest.interactions.map(({ id, type }) => ({ id, type }))).toEqual([
+      { id: 'phase11-willow-guide', type: 'starter_npc' },
+      { id: 'welcome-notice', type: 'notice' },
+    ]);
   });
 
   it('rejects missing assets, duplicate IDs, invalid spawn, and malformed collision data', () => {

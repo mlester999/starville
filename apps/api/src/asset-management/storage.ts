@@ -28,6 +28,7 @@ export interface AssetStorage {
     mediaType: 'image/png' | 'image/webp',
   ): Promise<'stored' | 'replayed'>;
   readPrivate(path: string): Promise<Buffer>;
+  removePrivate(paths: readonly string[]): Promise<void>;
   storePublicImmutable(path: string, bytes: Buffer): Promise<'stored' | 'replayed'>;
   publicUrl(path: string): string;
 }
@@ -120,6 +121,14 @@ export function createSupabaseAssetStorage(client: SupabaseClient): AssetStorage
     },
     readPrivate(path) {
       return read(ASSET_INTAKE_BUCKET, path, 'PRIVATE_STORAGE_UNAVAILABLE');
+    },
+    async removePrivate(paths) {
+      const safePaths = paths.map(assertInternalStoragePath);
+      if (safePaths.length === 0) return;
+      const result = await client.storage.from(ASSET_INTAKE_BUCKET).remove(safePaths);
+      if (result.error !== null) {
+        throw new AssetStorageError('PRIVATE_STORAGE_UNAVAILABLE');
+      }
     },
     storePublicImmutable(path, bytes) {
       return store(

@@ -90,17 +90,25 @@ function parseProfileData(value: unknown): PlayerProfile | null {
 
 export interface PlayerEntryView {
   readonly profile: PlayerProfile | null;
-  readonly entryState: PlayerEntryState;
+  readonly entryState: PlayerExperienceEntryState;
 }
+
+export type PlayerExperienceEntryState = PlayerEntryState | 'appearance_required';
 
 function parseEntryData(value: unknown): PlayerEntryView {
   if (!isRecord(value)) throw new PlayerRequestError(502, 'INVALID_PLAYER_RESPONSE');
   const profile = playerProfileSchema.nullable().safeParse(value['profile']);
-  const entryState = playerEntryStateSchema.safeParse(value['entryState']);
-  if (!profile.success || !entryState.success) {
+  const legacyEntryState = playerEntryStateSchema.safeParse(value['entryState']);
+  const entryState: PlayerExperienceEntryState | undefined =
+    value['entryState'] === 'appearance_required'
+      ? 'appearance_required'
+      : legacyEntryState.success
+        ? legacyEntryState.data
+        : undefined;
+  if (!profile.success || entryState === undefined) {
     throw new PlayerRequestError(502, 'INVALID_PLAYER_RESPONSE');
   }
-  return { profile: profile.data, entryState: entryState.data };
+  return { profile: profile.data, entryState };
 }
 
 export async function loadPlayerEntry(

@@ -3,13 +3,14 @@ import type Phaser from 'phaser';
 import {
   depthForFootPosition,
   projectWorld,
-  type AppearancePreset,
   type FacingDirection,
   type IsometricProjection,
   type Point,
 } from '@starville/game-core';
 
-import { CHARACTER_PALETTES, WORLD_COLORS } from './palette';
+import { avatarSelectionsEqual, type ResolvedAvatarProfile } from '../../app/avatar-client';
+import { WORLD_COLORS } from './palette';
+import { resolveAvatarFallbackStyle, type AvatarFallbackStyle } from './avatar-style';
 
 const FACING_VECTOR: Readonly<Record<FacingDirection, Point>> = {
   north: { x: 0, y: -1 },
@@ -22,29 +23,96 @@ const FACING_VECTOR: Readonly<Record<FacingDirection, Point>> = {
   northwest: { x: -0.72, y: -0.72 },
 };
 
+interface AvatarMotionFrame {
+  readonly bob: number;
+  readonly stride: number;
+  readonly armSwing: number;
+}
+
+function motionFrame(
+  time: number,
+  moving: boolean,
+  jogging: boolean,
+  reducedMotion: boolean,
+): AvatarMotionFrame {
+  if (reducedMotion) return { bob: 0, stride: 0, armSwing: 0 };
+  if (!moving) {
+    const breath = Math.sin(time * 0.003);
+    return { bob: breath * 0.7, stride: 0, armSwing: 0 };
+  }
+  const phase = Math.sin(time * (jogging ? 0.019 : 0.012));
+  return {
+    bob: Math.abs(phase) * (jogging ? 3.5 : 2.3),
+    stride: phase * (jogging ? 8 : 5),
+    armSwing: phase * (jogging ? 7 : 4.5),
+  };
+}
+
+/**
+ * Foot-anchored modular development renderer. Each visual layer owns an
+ * independent Graphics object so an appearance update redraws in place without
+ * replacing the Phaser container, its input binding, position, or depth.
+ */
 export class PlayerRenderer {
   public readonly container: Phaser.GameObjects.Container;
-  private readonly art: Phaser.GameObjects.Graphics;
   private readonly shadow: Phaser.GameObjects.Graphics;
-  private readonly palette;
+  private readonly backLayer: Phaser.GameObjects.Graphics;
+  private readonly legsLayer: Phaser.GameObjects.Graphics;
+  private readonly bodyLayer: Phaser.GameObjects.Graphics;
+  private readonly headLayer: Phaser.GameObjects.Graphics;
+  private readonly faceLayer: Phaser.GameObjects.Graphics;
+  private readonly frontLayer: Phaser.GameObjects.Graphics;
   private readonly reducedMotion: boolean;
+  private style: AvatarFallbackStyle;
+  private profile: ResolvedAvatarProfile;
 
   public constructor(
     scene: Phaser.Scene,
-    appearancePreset: AppearancePreset,
+    profile: ResolvedAvatarProfile,
     private projection: IsometricProjection,
     reducedMotion: boolean,
+    private readonly depthTie = 0,
   ) {
-    this.palette = CHARACTER_PALETTES[appearancePreset];
+    this.profile = profile;
+    this.style = resolveAvatarFallbackStyle(profile.selection);
     this.reducedMotion = reducedMotion;
     this.shadow = scene.add.graphics();
-    this.art = scene.add.graphics();
-    this.container = scene.add.container(0, 0, [this.shadow, this.art]);
-    this.container.setSize(54, 94);
+    this.backLayer = scene.add.graphics();
+    this.legsLayer = scene.add.graphics();
+    this.bodyLayer = scene.add.graphics();
+    this.headLayer = scene.add.graphics();
+    this.faceLayer = scene.add.graphics();
+    this.frontLayer = scene.add.graphics();
+    this.container = scene.add.container(0, 0, [
+      this.shadow,
+      this.backLayer,
+      this.legsLayer,
+      this.bodyLayer,
+      this.headLayer,
+      this.faceLayer,
+      this.frontLayer,
+    ]);
+    this.container.setSize(58, 98);
   }
 
   public setProjection(projection: IsometricProjection): void {
     this.projection = projection;
+  }
+
+  public setAppearance(profile: ResolvedAvatarProfile): void {
+    if (
+      profile.appearanceId === this.profile.appearanceId &&
+      profile.revision === this.profile.revision &&
+      avatarSelectionsEqual(profile.selection, this.profile.selection)
+    ) {
+      return;
+    }
+    this.profile = profile;
+    this.style = resolveAvatarFallbackStyle(profile.selection);
+  }
+
+  public getAppearanceReference(): { readonly appearanceId: string; readonly revision: number } {
+    return { appearanceId: this.profile.appearanceId, revision: this.profile.revision };
   }
 
   public destroy(): void {
@@ -59,47 +127,157 @@ export class PlayerRenderer {
     jogging = false,
   ): void {
     const screen = projectWorld(position, this.projection);
-    const motion = this.reducedMotion
-      ? 0
-      : Math.sin(time * (moving ? (jogging ? 0.015 : 0.011) : 0.003));
-    const bob = moving ? Math.abs(motion) * 2.5 : motion * 0.8;
-    const stride = moving ? motion * 5 : 0;
+    const motion = motionFrame(time, moving, jogging, this.reducedMotion);
     const facingVector = FACING_VECTOR[facing];
+    const horizontal = facingVector.x;
+    const backFacing = facingVector.y < -0.2;
+    const scale = this.style.bodyScale;
 
     this.container.setPosition(screen.x, screen.y);
-    this.container.setDepth(depthForFootPosition(position.x, position.y, 'player'));
+    this.container.setDepth(depthForFootPosition(position.x, position.y, 'player') + this.depthTie);
+    this.container.setScale(scale, 1);
+
+    this.drawShadow(moving);
+    this.drawBackLayer(motion, backFacing);
+    this.drawLegs(motion);
+    this.drawBody(motion, horizontal, backFacing);
+    this.drawHead(motion, horizontal);
+    this.drawFace(motion, facingVector, backFacing);
+    this.drawFrontAccessories(motion, horizontal, backFacing);
+  }
+
+  private drawShadow(moving: boolean): void {
     this.shadow.clear().fillStyle(WORLD_COLORS.shadow, moving ? 0.3 : 0.25);
     this.shadow.fillEllipse(0, 0, moving ? 39 : 43, moving ? 13 : 15);
+  }
 
-    this.art.clear();
-    this.art.lineStyle(7, this.palette.coatShade, 1);
-    this.art.lineBetween(-9, -10, -10 - stride, -31 + bob);
-    this.art.lineBetween(9, -10, 10 + stride, -31 + bob);
-    this.art.fillStyle(0x3b362f).fillEllipse(-10 - stride, -7, 16, 9);
-    this.art.fillEllipse(10 + stride, -7, 16, 9);
-
-    if (facingVector.y < -0.2) {
-      this.art.fillStyle(this.palette.accent, 0.95).fillRoundedRect(-25, -67 + bob, 50, 48, 13);
+  private drawBackLayer(motion: AvatarMotionFrame, backFacing: boolean): void {
+    this.backLayer.clear();
+    if (this.style.hairVariant === 2 || this.style.hairVariant === 5) {
+      this.backLayer.fillStyle(this.style.hair).fillRoundedRect(-18, -88 + motion.bob, 36, 49, 15);
+    } else if (this.style.hairVariant === 3 || this.style.hairVariant === 4) {
+      this.backLayer.fillStyle(this.style.hair).fillCircle(0, -78 + motion.bob, 24);
     }
-
-    this.art.fillStyle(this.palette.coat).fillRoundedRect(-22, -66 + bob, 44, 51, 14);
-    this.art
-      .fillStyle(this.palette.coatShade)
-      .fillTriangle(-20, -29 + bob, 20, -29 + bob, 0, -9 + bob);
-    this.art.fillStyle(this.palette.accent).fillRoundedRect(-22, -56 + bob, 44, 7, 3);
-    this.art.fillStyle(this.palette.skin).fillCircle(0, -78 + bob, 18);
-    this.art.fillStyle(this.palette.hair).fillCircle(0, -84 + bob, 19);
-    this.art.fillStyle(this.palette.skin).fillEllipse(0, -75 + bob, 31, 27);
-    this.art.fillStyle(this.palette.hair).fillRoundedRect(-17, -91 + bob, 34, 12, 6);
-    this.art.fillCircle(-14, -82 + bob, 7);
-
-    if (facingVector.y > -0.65) {
-      const eyeY = -76 + bob + facingVector.y * 2;
-      this.art.fillStyle(0x3a302a);
-      if (facingVector.x <= 0.45) this.art.fillCircle(-6 + facingVector.x * 3, eyeY, 1.8);
-      if (facingVector.x >= -0.45) this.art.fillCircle(6 + facingVector.x * 3, eyeY, 1.8);
+    if (this.style.accessoryKey === 'small-satchel') {
+      this.backLayer
+        .lineStyle(4, this.style.accessory, 1)
+        .lineBetween(-15, -62 + motion.bob, 15, -28 + motion.bob)
+        .fillStyle(this.style.accessory)
+        .fillRoundedRect(backFacing ? -18 : 7, -39 + motion.bob, 18, 20, 5);
     }
+  }
 
-    this.art.fillStyle(this.palette.accent).fillCircle(-facingVector.x * 22, -51 + bob, 5);
+  private drawLegs(motion: AvatarMotionFrame): void {
+    this.legsLayer.clear();
+    this.legsLayer.lineStyle(8, this.style.bottom, 1);
+    this.legsLayer.lineBetween(-9, -13, -10 - motion.stride, -31 + motion.bob);
+    this.legsLayer.lineBetween(9, -13, 10 + motion.stride, -31 + motion.bob);
+    this.legsLayer.fillStyle(this.style.footwear).fillEllipse(-10 - motion.stride, -7, 17, 9);
+    this.legsLayer.fillEllipse(10 + motion.stride, -7, 17, 9);
+  }
+
+  private drawBody(motion: AvatarMotionFrame, horizontal: number, backFacing: boolean): void {
+    this.bodyLayer.clear();
+    this.bodyLayer.lineStyle(7, this.style.topShade, 1);
+    this.bodyLayer.lineBetween(
+      -19,
+      -56 + motion.bob,
+      -24 - motion.armSwing + horizontal * 2,
+      -34 + motion.bob,
+    );
+    this.bodyLayer.lineBetween(
+      19,
+      -56 + motion.bob,
+      24 + motion.armSwing + horizontal * 2,
+      -34 + motion.bob,
+    );
+    if (backFacing) {
+      this.bodyLayer
+        .fillStyle(this.style.accessory, 0.95)
+        .fillRoundedRect(-25, -68 + motion.bob, 50, 49, 13);
+    }
+    this.bodyLayer.fillStyle(this.style.top).fillRoundedRect(-22, -67 + motion.bob, 44, 52, 14);
+    this.bodyLayer
+      .fillStyle(this.style.topShade)
+      .fillTriangle(-20, -30 + motion.bob, 20, -30 + motion.bob, 0, -10 + motion.bob);
+    this.bodyLayer.fillStyle(this.style.accessory).fillRoundedRect(-22, -57 + motion.bob, 44, 6, 3);
+  }
+
+  private drawHead(motion: AvatarMotionFrame, horizontal: number): void {
+    this.headLayer.clear();
+    this.headLayer.fillStyle(this.style.hair).fillCircle(horizontal * 2, -84 + motion.bob, 20);
+    this.headLayer.fillStyle(this.style.skin).fillEllipse(horizontal * 2, -76 + motion.bob, 32, 28);
+    if (this.style.hairVariant === 1) {
+      this.headLayer
+        .fillStyle(this.style.hair)
+        .fillRoundedRect(-18 + horizontal * 2, -93 + motion.bob, 36, 16, 8);
+    } else if (this.style.hairVariant === 6) {
+      this.headLayer.fillStyle(this.style.hair).fillCircle(-15, -79 + motion.bob, 8);
+      this.headLayer.fillCircle(15, -79 + motion.bob, 8);
+    } else {
+      this.headLayer
+        .fillStyle(this.style.hair)
+        .fillRoundedRect(-17 + horizontal * 2, -92 + motion.bob, 34, 12, 6);
+      this.headLayer.fillCircle(-14 + horizontal * 2, -83 + motion.bob, 7);
+    }
+  }
+
+  private drawFace(motion: AvatarMotionFrame, facing: Point, backFacing: boolean): void {
+    this.faceLayer.clear();
+    if (backFacing) return;
+    const eyeY = -77 + motion.bob + facing.y * 2;
+    this.faceLayer.fillStyle(0x3a302a);
+    if (facing.x <= 0.45) this.faceLayer.fillCircle(-6 + facing.x * 4, eyeY, 1.8);
+    if (facing.x >= -0.45) this.faceLayer.fillCircle(6 + facing.x * 4, eyeY, 1.8);
+    if (this.style.faceVariant === 0 || this.style.faceVariant === 2) {
+      this.faceLayer.lineStyle(1.5, this.style.skinShade, 1);
+      this.faceLayer.beginPath();
+      this.faceLayer.arc(facing.x * 3, -69 + motion.bob, 4, 0.15, Math.PI - 0.15);
+      this.faceLayer.strokePath();
+    } else {
+      this.faceLayer
+        .fillStyle(this.style.skinShade)
+        .fillEllipse(facing.x * 3, -68 + motion.bob, 5, 2);
+    }
+  }
+
+  private drawFrontAccessories(
+    motion: AvatarMotionFrame,
+    horizontal: number,
+    backFacing: boolean,
+  ): void {
+    this.frontLayer.clear();
+    const key = this.style.accessoryKey;
+    if (key === 'star-hairpin' || key === 'leaf-clip' || key === 'flower-crown') {
+      this.frontLayer.fillStyle(this.style.accessory);
+      if (key === 'flower-crown') {
+        for (const x of [-12, -6, 0, 6, 12]) {
+          this.frontLayer.fillCircle(x + horizontal * 2, -94 + motion.bob, 3.2);
+        }
+      } else {
+        this.frontLayer.fillCircle(
+          12 + horizontal * 2,
+          -90 + motion.bob,
+          key === 'star-hairpin' ? 4 : 3.5,
+        );
+      }
+    }
+    if (key === 'round-glasses' && !backFacing) {
+      this.frontLayer.lineStyle(2, this.style.accessory, 1);
+      this.frontLayer.strokeCircle(-7 + horizontal * 3, -77 + motion.bob, 5);
+      this.frontLayer.strokeCircle(7 + horizontal * 3, -77 + motion.bob, 5);
+      this.frontLayer.lineBetween(
+        -2 + horizontal * 3,
+        -77 + motion.bob,
+        2 + horizontal * 3,
+        -77 + motion.bob,
+      );
+    }
+    if (key === 'cozy-scarf') {
+      this.frontLayer
+        .fillStyle(this.style.accessory)
+        .fillRoundedRect(-18, -65 + motion.bob, 36, 8, 4)
+        .fillRoundedRect(9, -61 + motion.bob, 8, 23, 4);
+    }
   }
 }

@@ -6,6 +6,7 @@ import type { GameRuntimeHandle, GameRuntimeOptions } from '../game/contracts';
 import { WORLD_ASSET_FALLBACK_EVENT_NAME } from '../game/contracts';
 import { lanternSquareManifest } from '@starville/game-core';
 import { GameCanvas } from './GameCanvas';
+import { fallbackResolvedAvatar } from '../app/avatar-client';
 
 const startGame = vi.fn();
 
@@ -37,6 +38,12 @@ describe('GameCanvas lifecycle', () => {
     const handle: GameRuntimeHandle = {
       setInputBlocked: vi.fn(),
       setAudioSettings: vi.fn(),
+      setRemotePresences: vi.fn(),
+      setLocalAvatarProfile: vi.fn(),
+      setRemoteAvatarProfiles: vi.fn(),
+      setRemotePlayerNamesVisible: vi.fn(),
+      setSelectedRemotePresence: vi.fn(),
+      setActivityInstance: vi.fn(),
       interact: vi.fn(),
       getState: vi.fn(() => ({
         mapId: 'lantern-square' as const,
@@ -83,16 +90,33 @@ describe('GameCanvas lifecycle', () => {
       await Promise.resolve();
     });
     await act(async () => {
-      root.render(<GameCanvas {...common} inputBlocked />);
+      root.render(
+        <GameCanvas
+          {...common}
+          avatarProfile={fallbackResolvedAvatar('river', '22222222-2222-4222-8222-222222222222')}
+          inputBlocked
+          remoteAvatarProfiles={{
+            remote: fallbackResolvedAvatar('moonberry', '33333333-3333-4333-8333-333333333333'),
+          }}
+        />,
+      );
       await Promise.resolve();
     });
 
     expect(startGame).toHaveBeenCalledTimes(1);
     expect(handle.setInputBlocked).toHaveBeenCalledWith(true);
+    expect(handle.setLocalAvatarProfile).toHaveBeenCalledTimes(1);
+    expect(handle.setRemoteAvatarProfiles).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        remote: expect.objectContaining({ legacyFallbackPreset: 'moonberry' }),
+      }),
+    );
 
     const observedFallback = vi.fn();
     window.addEventListener(WORLD_ASSET_FALLBACK_EVENT_NAME, observedFallback);
     const runtimeOptions = startGame.mock.calls[0]![1] as GameRuntimeOptions;
+    runtimeOptions.callbacks.onStateChanged(common.initialState, 'stopped');
+    expect(common.onStateChanged).toHaveBeenCalledWith(common.initialState, 'stopped');
     runtimeOptions.callbacks.onWorldAssetFallback({
       code: 'WORLD_ASSET_LOAD_FAILED',
       assetKey: 'cottage-amber',

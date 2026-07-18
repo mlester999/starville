@@ -61,6 +61,8 @@ export const WORLD_ASSETS = [
   asset('phase7-cooking-hearth-marker', 'cooking_station'),
   asset('phase7-crafting-workbench-marker', 'crafting_station'),
   asset('phase7-home-entrance-marker', 'home_entrance'),
+  asset('phase10b-wardrobe-mirror-marker', 'decoration'),
+  asset('phase10b-wardrobe-furniture-marker', 'decoration'),
 ] as const satisfies readonly RepositoryWorldAsset[];
 
 export const WORLD_ASSET_CATALOG: ReadonlyMap<string, RepositoryWorldAsset> = new Map(

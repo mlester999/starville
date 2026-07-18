@@ -23,12 +23,192 @@ export const ADMIN_ROUTE_METADATA: readonly {
   readonly meta: AdminRouteMeta;
 }[] = [
   {
+    path: '/game-content/progression',
+    meta: {
+      title: 'Progression operations',
+      description:
+        'Versioned skills, curves, unlocks, quest chains, achievements, corrections, and live ops.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Game content',
+      parentHref: '/game-content',
+    },
+  },
+  {
+    path: '/economy/token-claims',
+    meta: {
+      title: 'Token claim security',
+      description:
+        'Disabled token-claim architecture, treasury threat modeling, and offline simulations.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/ledger',
+    meta: {
+      title: 'DUST ledger',
+      description: 'Immutable DUST entries, bounded filters, and safe receipt references.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/sources',
+    meta: {
+      title: 'DUST sources',
+      description: 'Closed, versioned registry of approved DUST creation operations.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/sinks',
+    meta: {
+      title: 'DUST sinks',
+      description: 'Closed, versioned registry of approved DUST spending operations.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/shops',
+    meta: {
+      title: 'Economy shops',
+      description: 'Reviewed shop versions, structured offers, scheduling, and publication.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/policies',
+    meta: {
+      title: 'Economy policies',
+      description: 'Bounded policy drafts, validation, independent review, and activation.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/reconciliation',
+    meta: {
+      title: 'Economy reconciliation',
+      description: 'Read-only balance evidence and reviewed mismatch workflows.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/risk',
+    meta: {
+      title: 'Economy risk review',
+      description: 'Human-reviewed economy signals with bounded, audited dispositions.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/corrections',
+    meta: {
+      title: 'Economy corrections',
+      description: 'Reviewed DUST deltas with separation of duties and immutable settlement.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/simulations',
+    meta: {
+      title: 'Economy simulations',
+      description: 'Deterministic planning comparisons that never mutate player balances.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy/audit',
+    meta: {
+      title: 'Economy audit',
+      description: 'Append-only evidence for economy administration and review decisions.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Economy',
+      parentHref: '/economy',
+    },
+  },
+  {
+    path: '/economy',
+    meta: {
+      title: 'DUST economy',
+      description: 'Off-chain DUST ledger, shops, reconciliation, risk, and corrections.',
+      breadcrumbGroup: 'Administration',
+    },
+  },
+  {
     path: '/overview',
     exact: true,
     meta: {
       title: 'Overview',
       description: 'Session assurance and administrator access summary.',
       breadcrumbGroup: 'Administration',
+    },
+  },
+  {
+    path: '/operations/social/parties',
+    meta: {
+      title: 'Parties',
+      description: 'Read-only party membership, reconnect, invitation, and audit visibility.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Social interactions',
+      parentHref: '/operations/social',
+    },
+  },
+  {
+    path: '/operations/social/friends',
+    meta: {
+      title: 'Friendships',
+      description: 'Privacy-bounded friendship and request health.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Social interactions',
+      parentHref: '/operations/social',
+    },
+  },
+  {
+    path: '/operations/social/audit',
+    meta: {
+      title: 'Social graph audit',
+      description: 'Append-only friends and parties lifecycle evidence.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Social interactions',
+      parentHref: '/operations/social',
+    },
+  },
+  {
+    path: '/operations/social',
+    meta: {
+      title: 'Social interactions',
+      description: 'Read-only gift, trade, receipt, and settlement audit visibility.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
+    },
+  },
+  {
+    path: '/operations/chat',
+    meta: {
+      title: 'Chat moderation',
+      description: 'Protected chat evidence, player reports, and audited safety actions.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
     },
   },
   {
@@ -74,6 +254,16 @@ export const ADMIN_ROUTE_METADATA: readonly {
     },
   },
   {
+    path: '/world-assets/guide',
+    meta: {
+      title: 'Asset guide & templates',
+      description: 'Type checklists and local blank PNG templates for World Assets.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'World Assets',
+      parentHref: '/world-assets',
+    },
+  },
+  {
     path: '/world-assets/upload',
     meta: {
       title: 'Upload asset',
@@ -106,6 +296,186 @@ export const ADMIN_ROUTE_METADATA: readonly {
       title: 'World Assets',
       description: 'Approved world asset library and review workflow.',
       breadcrumbGroup: 'World Management',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/catalog',
+    meta: {
+      title: 'Cosmetic catalog',
+      description: 'Canonical avatar definitions with cosmetic lifecycle and readiness context.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/collections',
+    meta: {
+      title: 'Cosmetic collections',
+      description: 'Structured cosmetic-only collections and exact-once completion rewards.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/emotes',
+    meta: {
+      title: 'Cosmetic emotes',
+      description: 'Bounded server-authoritative emote definitions and lifecycle.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/grants',
+    meta: {
+      title: 'Cosmetic grants',
+      description: 'Controlled one-player, one-cosmetic grants with immutable receipts.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/revocations',
+    meta: {
+      title: 'Cosmetic revocations',
+      description: 'Audited revocation with safe appearance fallback.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/shop',
+    meta: {
+      title: 'Disabled cosmetic shop',
+      description: 'Draft-only future DUST sink architecture; purchases are disabled.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/review',
+    meta: {
+      title: 'Cosmetic review',
+      description: 'Separated content review using existing Avatar and World Asset pipelines.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/audit',
+    meta: {
+      title: 'Cosmetic audit',
+      description: 'Immutable ownership and collection reward receipts.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics/settings',
+    meta: {
+      title: 'Cosmetic settings',
+      description: 'Revisioned Wardrobe, emote, collection, and disabled-shop controls.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Cosmetics',
+      parentHref: '/game-content/cosmetics',
+    },
+  },
+  {
+    path: '/game-content/cosmetics',
+    meta: {
+      title: 'Cosmetics',
+      description: 'Wardrobes, outfits, emotes, collections, grants, and safe revocations.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Game Content',
+      parentHref: '/game-content',
+    },
+  },
+  {
+    path: '/game-content/avatars/settings',
+    meta: {
+      title: 'Avatar settings',
+      description: 'Bounded creator availability, fallback, and starter-catalog settings.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars/audit',
+    meta: {
+      title: 'Avatar audit',
+      description: 'Append-only avatar catalog, review, activation, and settings evidence.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars/presets',
+    meta: {
+      title: 'Avatar presets',
+      description: 'Curated, versioned starter combinations using active approved content.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars/validation',
+    meta: {
+      title: 'Avatar validation',
+      description: 'Non-mutating eight-direction layer and animation validation previews.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars/review',
+    meta: {
+      title: 'Avatar review',
+      description: 'Separated review, approval, activation, and superseding workflow.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars/assets',
+    meta: {
+      title: 'Avatar assets',
+      description: 'Approved World Asset Manager references used by avatar content versions.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars/catalog',
+    meta: {
+      title: 'Avatar catalog',
+      description: 'Bounded, filterable avatar definitions and immutable active versions.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Avatar Content',
+      parentHref: '/game-content/avatars',
+    },
+  },
+  {
+    path: '/game-content/avatars',
+    meta: {
+      title: 'Avatar Content',
+      description: 'Character catalog, production assets, validation, review, and presets.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Game Content',
+      parentHref: '/game-content',
     },
   },
   {

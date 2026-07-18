@@ -23,7 +23,13 @@ export default async function WorldsPage(props: {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
   await requireAuthorizedAdmin('maps.read');
-  const query = parseWorldDirectoryQuery(await props.searchParams);
+  const rawSearchParams = await props.searchParams;
+  const query = parseWorldDirectoryQuery(rawSearchParams);
+  const requestedAsset =
+    typeof rawSearchParams['assetKey'] === 'string' &&
+    /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u.test(rawSearchParams['assetKey'])
+      ? rawSearchParams['assetKey']
+      : null;
 
   try {
     const [directory, topology] = await Promise.all([
@@ -47,6 +53,16 @@ export default async function WorldsPage(props: {
         </header>
 
         <WorldTopology topology={topology} />
+
+        {requestedAsset === null ? null : (
+          <section className="notice notice--info" aria-label="World draft placement request">
+            <strong>Choose a compatible world draft</strong>
+            <p>
+              Asset <code>{requestedAsset}</code> will be preselected only. Opening the Composer,
+              previewing placement, confirming placement, and saving a new revision remain explicit.
+            </p>
+          </section>
+        )}
 
         <form className="player-filters" method="get" role="search">
           <label>
@@ -183,9 +199,18 @@ export default async function WorldsPage(props: {
                     </td>
                     <td data-label="Updated">{formatDate(world.updatedAt)}</td>
                     <td data-label="Open">
-                      <Link className="table-link" href={`/worlds/${world.id}`}>
-                        Manage<span className="sr-only"> {world.displayName}</span>
-                      </Link>
+                      {requestedAsset !== null && world.draftVersionId !== null ? (
+                        <Link
+                          className="table-link"
+                          href={`/worlds/${world.id}/editor?version=${world.draftVersionId}&assetKey=${encodeURIComponent(requestedAsset)}`}
+                        >
+                          Use in draft<span className="sr-only"> {world.displayName}</span>
+                        </Link>
+                      ) : (
+                        <Link className="table-link" href={`/worlds/${world.id}`}>
+                          Manage<span className="sr-only"> {world.displayName}</span>
+                        </Link>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -26,6 +26,11 @@ import {
   recipeCatalogFixture,
   shopCatalogFixture,
   shopTransactionFixture,
+  playableVerticalSliceFixture,
+  verticalSliceMutationFixture,
+  workstationJobMutationFixture,
+  workstationTutorialMutationFixture,
+  workstationWorkspaceFixture,
 } from './test-fixtures.js';
 
 class SilentLogger implements ServiceLogger {
@@ -162,6 +167,18 @@ function cozyService(): CozyGameplayService {
     moveFurniture: vi.fn(async () => furnitureMutationFixture),
     rotateFurniture: vi.fn(async () => furnitureMutationFixture),
     removeFurniture: vi.fn(async () => furnitureMutationFixture),
+    getPlayableVerticalSlice: vi.fn(async () => playableVerticalSliceFixture),
+    acceptStarterQuest: vi.fn(async () => verticalSliceMutationFixture),
+    prepareHomeSoil: vi.fn(async () => verticalSliceMutationFixture),
+    plantHomeCrop: vi.fn(async () => verticalSliceMutationFixture),
+    waterHomeCrop: vi.fn(async () => verticalSliceMutationFixture),
+    harvestHomeCrop: vi.fn(async () => verticalSliceMutationFixture),
+    deliverStarterQuest: vi.fn(async () => verticalSliceMutationFixture),
+    getWorkstationWorkspace: vi.fn(async () => workstationWorkspaceFixture),
+    startWorkstationJob: vi.fn(async () => workstationJobMutationFixture),
+    collectWorkstationJob: vi.fn(async () => workstationJobMutationFixture),
+    acceptWorkstationTutorial: vi.fn(async () => workstationTutorialMutationFixture),
+    turnInWorkstationTutorial: vi.fn(async () => workstationTutorialMutationFixture),
   };
 }
 
@@ -462,7 +479,7 @@ describe('protected cozy gameplay routes', () => {
     );
   });
 
-  it('routes value mutations without accepting client-computed outcomes or prices', async () => {
+  it('routes value mutations without accepting computed outcomes and retires legacy buying', async () => {
     const { app, service } = createApp();
     const plant = await app.inject({
       method: 'POST',
@@ -501,7 +518,11 @@ describe('protected cozy gameplay routes', () => {
       },
     });
 
-    expect([plant.statusCode, cook.statusCode, buy.statusCode]).toEqual([200, 200, 200]);
+    expect([plant.statusCode, cook.statusCode, buy.statusCode]).toEqual([200, 200, 409]);
+    expect(buy.json()).toMatchObject({
+      success: false,
+      error: { code: 'ECONOMY_PURCHASE_ENDPOINT_REQUIRED' },
+    });
     expect(service.plant).toHaveBeenCalledWith(
       WALLET_ADDRESS,
       expect.not.objectContaining({ readyAt: expect.anything(), yield: expect.anything() }),
@@ -516,13 +537,7 @@ describe('protected cozy gameplay routes', () => {
       }),
       expect.any(String),
     );
-    expect(service.executeShopTransaction).toHaveBeenCalledWith(
-      WALLET_ADDRESS,
-      'moonpetal-general-store',
-      'buy',
-      expect.not.objectContaining({ buyPrice: expect.anything(), total: expect.anything() }),
-      expect.any(String),
-    );
+    expect(service.executeShopTransaction).not.toHaveBeenCalled();
   });
 
   it('applies maintenance takeover to Phase 7B reads and mutations', async () => {
@@ -576,5 +591,148 @@ describe('protected cozy gameplay routes', () => {
       expect.not.objectContaining({ ownerPlayerId: expect.anything() }),
       expect.any(String),
     );
+  });
+
+  it('routes the playable vertical slice and exact home-farming intents through the trusted wallet', async () => {
+    const service = cozyService();
+    const { app } = createApp({ cozy: service });
+    const view = await app.inject({
+      method: 'GET',
+      url: '/api/v1/token-access/player/cozy/vertical-slice',
+    });
+    const prepare = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/cozy/home-plot/prepare',
+      headers: { origin: 'http://localhost:3001' },
+      payload: {
+        tileId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        expectedTileStateVersion: 1,
+        idempotencyKey: 'phase11-prepare-route-0001',
+      },
+    });
+    const deliver = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/cozy/quest/deliver',
+      headers: { origin: 'http://localhost:3001' },
+      payload: {
+        expectedQuestStateVersion: 9,
+        idempotencyKey: 'phase11-delivery-route-0001',
+      },
+    });
+
+    expect([view.statusCode, prepare.statusCode, deliver.statusCode]).toEqual([200, 200, 200]);
+    expect(view.json()).toMatchObject({
+      success: true,
+      data: { plot: { instanceKey: `personal-home:${homeViewFixture.home.id}` } },
+    });
+    expect(service.getPlayableVerticalSlice).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      expect.any(String),
+    );
+    expect(service.prepareHomeSoil).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      expect.not.objectContaining({ ownerPlayerId: expect.anything() }),
+      expect.any(String),
+    );
+    expect(service.deliverStarterQuest).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      expect.not.objectContaining({ rewardDust: expect.anything() }),
+      expect.any(String),
+    );
+  });
+
+  it('rejects untrusted origins for Phase 11A persistent farming mutations', async () => {
+    const service = cozyService();
+    const { app } = createApp({ cozy: service });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/cozy/home-plot/harvest',
+      headers: { origin: 'https://untrusted.example' },
+      payload: {
+        tileId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+        cropInstanceId: '14141414-1414-4414-8414-141414141414',
+        expectedTileStateVersion: 4,
+        expectedCropStateVersion: 2,
+        idempotencyKey: 'phase11-harvest-route-0001',
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(service.harvestHomeCrop).not.toHaveBeenCalled();
+  });
+
+  it('routes canonical workstation UUID intents without accepting computed outcomes', async () => {
+    const service = cozyService();
+    const { app } = createApp({ cozy: service });
+    const workstationInstanceId = 'b1100000-0000-4000-8000-000000000101';
+    const recipeVersionId = 'b1100000-0000-4000-8000-000000000211';
+    const craftingJobId = 'b1100000-0000-4000-8000-000000000301';
+    const workspace = await app.inject({
+      method: 'GET',
+      url: `/api/v1/token-access/player/cozy/workstations/${workstationInstanceId}`,
+    });
+    const start = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/cozy/workstation-jobs/start',
+      headers: { origin: 'http://localhost:3001' },
+      payload: {
+        workstationInstanceId,
+        recipeVersionId,
+        quantity: 1,
+        expectedInventoryStateVersion: 2,
+        expectedDustStateVersion: 1,
+        expectedWorkstationStateVersion: 1,
+        idempotencyKey: 'phase11b-start-route-0001',
+      },
+    });
+    const collect = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/cozy/workstation-jobs/collect',
+      headers: { origin: 'http://localhost:3001' },
+      payload: {
+        workstationInstanceId,
+        craftingJobId,
+        expectedJobStateVersion: 2,
+        expectedInventoryStateVersion: 3,
+        expectedWorkstationStateVersion: 2,
+        idempotencyKey: 'phase11b-collect-route-0001',
+      },
+    });
+
+    expect([workspace.statusCode, start.statusCode, collect.statusCode]).toEqual([200, 200, 200]);
+    expect(service.getWorkstationWorkspace).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      workstationInstanceId,
+      expect.any(String),
+    );
+    expect(service.startWorkstationJob).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      expect.not.objectContaining({
+        outputItemSlug: expect.anything(),
+        outputQuantity: expect.anything(),
+        completesAt: expect.anything(),
+        dustFee: expect.anything(),
+      }),
+      expect.any(String),
+    );
+    expect(service.collectWorkstationJob).toHaveBeenCalledWith(
+      WALLET_ADDRESS,
+      expect.objectContaining({ workstationInstanceId, craftingJobId }),
+      expect.any(String),
+    );
+  });
+
+  it('rejects untrusted origins for persistent workstation jobs', async () => {
+    const service = cozyService();
+    const { app } = createApp({ cozy: service });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/cozy/workstation-jobs/start',
+      headers: { origin: 'https://untrusted.example' },
+      payload: {},
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(service.startWorkstationJob).not.toHaveBeenCalled();
   });
 });

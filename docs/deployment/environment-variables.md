@@ -77,7 +77,9 @@ None of these values are browser-safe.
 
 - `SUPABASE_ENVIRONMENT` must equal `development` for Phase 2 and Phase 3 hosted tooling.
 - `SUPABASE_PROJECT_REF` must match both the public Supabase hostname and canonical CLI link.
-- `SUPABASE_REMOTE_WRITES_APPROVED` is a deny-by-default migration/bootstrap write gate.
+- `SUPABASE_REMOTE_WRITES_APPROVED` is a deny-by-default migration, bootstrap, and hosted
+  world-asset upload gate. Only the admin portal and API application profiles receive it for runtime
+  upload enforcement; it remains server-only.
 - `RUN_HOSTED_SUPABASE_TESTS` is a separate deny-by-default fixture-write gate.
 
 The two approval variables are independent. Enabling one does not authorize the other, and neither

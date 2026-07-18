@@ -120,4 +120,50 @@ describe('platform configuration', () => {
     expect(PLATFORM_ROUTE_REGISTRY.world_assets.permission).toBe('assets.read');
     expect(PLATFORM_MODULE_REGISTRY.world_assets.dependencies).toEqual(['world_management']);
   });
+
+  it('keeps additive social modules available for legacy published configurations', () => {
+    const legacy = copy();
+    legacy.modules = legacy.modules.filter(
+      ({ key }) => key !== 'social_graph' && key !== 'cooperative_activities',
+    );
+    expect(isModuleEnabled(legacy, 'social_graph')).toBe(true);
+    expect(isModuleEnabled(legacy, 'cooperative_activities')).toBe(true);
+    expect(validatePlatformConfiguration(legacy).valid).toBe(false);
+  });
+
+  it('keeps additive off-chain economy modules available without enabling future $STAR utility', () => {
+    const legacy = copy();
+    legacy.modules = legacy.modules.filter(
+      ({ key }) =>
+        key !== 'offchain_economy' && key !== 'economy_simulation' && key !== 'star_utility',
+    );
+    expect(isModuleEnabled(legacy, 'offchain_economy')).toBe(true);
+    expect(isModuleEnabled(legacy, 'economy_simulation')).toBe(true);
+    expect(isModuleEnabled(legacy, 'star_utility')).toBe(false);
+    expect(
+      STARVILLE_DEFAULT_CONFIGURATION.modules.find(({ key }) => key === 'star_utility')?.enabled,
+    ).toBe(false);
+  });
+
+  it('keeps additive avatar customization safe for legacy configuration and permission-bound routes', () => {
+    const legacy = copy();
+    legacy.modules = legacy.modules.filter(({ key }) => key !== 'avatar_customization');
+    expect(isModuleEnabled(legacy, 'avatar_customization')).toBe(true);
+    expect(PLATFORM_ROUTE_REGISTRY.avatar_content).toEqual({
+      href: '/game-content/avatars',
+      permission: 'avatar_content.read',
+      module: 'avatar_customization',
+    });
+    expect(PLATFORM_MODULE_REGISTRY.avatar_customization.dependencies).toEqual([
+      'players',
+      'world_assets',
+      'content_management',
+      'operations',
+      'audit',
+    ]);
+    expect(
+      STARVILLE_DEFAULT_CONFIGURATION.modules.find(({ key }) => key === 'avatar_customization')
+        ?.enabled,
+    ).toBe(true);
+  });
 });

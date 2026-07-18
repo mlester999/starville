@@ -11,12 +11,17 @@ import {
   loadedFarmPlotListSchema,
   loadedRecipeCatalogSchema,
   loadedShopCatalogSchema,
+  loadedPlayableVerticalSliceSchema,
   persistedFarmMutationSchema,
   persistedFurnitureMutationSchema,
   persistedHomeAccessSchema,
   persistedQuickbarMutationSchema,
   persistedRecipeActionSchema,
   persistedShopTransactionSchema,
+  persistedVerticalSliceMutationSchema,
+  loadedWorkstationWorkspaceSchema,
+  persistedWorkstationJobMutationSchema,
+  persistedWorkstationTutorialMutationSchema,
   type CozyGameplayGateway,
   type CozyPersistenceStatus,
 } from './contracts.js';
@@ -376,6 +381,196 @@ export function createSupabaseCozyGameplayGateway(client: SupabaseClient): CozyG
       const status = persistenceStatus(value);
       if (status !== undefined) return status;
       const parsed = persistedFurnitureMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async getPlayableVerticalSlice(walletAddress, requestId) {
+      const value = await executeRpc(client, 'get_player_playable_vertical_slice', {
+        p_wallet_address: walletAddress,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = loadedPlayableVerticalSliceSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async acceptStarterQuest(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'accept_player_starter_farming_quest', {
+        p_wallet_address: walletAddress,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedVerticalSliceMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async prepareHomeSoil(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'prepare_player_home_soil', {
+        p_wallet_address: walletAddress,
+        p_tile_id: input.tileId,
+        p_expected_tile_state_version: input.expectedTileStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedVerticalSliceMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async plantHomeCrop(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'plant_player_home_crop', {
+        p_wallet_address: walletAddress,
+        p_tile_id: input.tileId,
+        p_seed_item_slug: input.seedItemSlug,
+        p_expected_tile_state_version: input.expectedTileStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedVerticalSliceMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async waterHomeCrop(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'water_player_home_crop', {
+        p_wallet_address: walletAddress,
+        p_tile_id: input.tileId,
+        p_crop_instance_id: input.cropInstanceId,
+        p_expected_tile_state_version: input.expectedTileStateVersion,
+        p_expected_crop_state_version: input.expectedCropStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedVerticalSliceMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async harvestHomeCrop(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'harvest_player_home_crop', {
+        p_wallet_address: walletAddress,
+        p_tile_id: input.tileId,
+        p_crop_instance_id: input.cropInstanceId,
+        p_expected_tile_state_version: input.expectedTileStateVersion,
+        p_expected_crop_state_version: input.expectedCropStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedVerticalSliceMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async deliverStarterQuest(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'deliver_player_starter_farming_quest', {
+        p_wallet_address: walletAddress,
+        p_expected_quest_state_version: input.expectedQuestStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedVerticalSliceMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async getWorkstationWorkspace(walletAddress, workstationInstanceId, requestId) {
+      const value = await executeRpc(client, 'get_player_workstation_workspace', {
+        p_wallet_address: walletAddress,
+        p_workstation_instance_id: workstationInstanceId,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      return loadedWorkstationWorkspaceSchema.parse(value).workspace;
+    },
+
+    async startWorkstationJob(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'start_player_workstation_job', {
+        p_wallet_address: walletAddress,
+        p_workstation_instance_id: input.workstationInstanceId,
+        p_recipe_version_id: input.recipeVersionId,
+        p_quantity: input.quantity,
+        p_expected_inventory_state_version: input.expectedInventoryStateVersion,
+        p_expected_dust_state_version: input.expectedDustStateVersion,
+        p_expected_workstation_state_version: input.expectedWorkstationStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedWorkstationJobMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async collectWorkstationJob(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'collect_player_workstation_job', {
+        p_wallet_address: walletAddress,
+        p_workstation_instance_id: input.workstationInstanceId,
+        p_crafting_job_id: input.craftingJobId,
+        p_expected_job_state_version: input.expectedJobStateVersion,
+        p_expected_inventory_state_version: input.expectedInventoryStateVersion,
+        p_expected_workstation_state_version: input.expectedWorkstationStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedWorkstationJobMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async acceptWorkstationTutorial(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'accept_player_workstation_tutorial', {
+        p_wallet_address: walletAddress,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedWorkstationTutorialMutationSchema.parse(value);
+      const { status: _status, ...result } = parsed;
+      void _status;
+      return result;
+    },
+
+    async turnInWorkstationTutorial(walletAddress, input, requestId) {
+      const value = await executeRpc(client, 'turn_in_player_workstation_tutorial', {
+        p_wallet_address: walletAddress,
+        p_expected_quest_state_version: input.expectedQuestStateVersion,
+        p_idempotency_key: input.idempotencyKey,
+        p_request_id: requestId,
+      });
+      const status = persistenceStatus(value);
+      if (status !== undefined) return status;
+      const parsed = persistedWorkstationTutorialMutationSchema.parse(value);
       const { status: _status, ...result } = parsed;
       void _status;
       return result;

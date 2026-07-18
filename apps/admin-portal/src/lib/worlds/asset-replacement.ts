@@ -45,28 +45,37 @@ export function objectInteractionRequirements(
   manifest: AdminWorldManifest,
   object: MapObject,
 ): readonly AssetInteractionCompatibility[] {
-  const interactionKind = {
-    notice: 'sign',
-    farm_plot: 'farm_plot',
-    shop: 'shop',
-    cooking_station: 'cooking_station',
-    crafting_station: 'crafting_station',
-    home_entrance: 'home_entrance',
-  } as const satisfies Record<
-    AdminWorldManifest['interactions'][number]['type'],
-    MapObject['kind']
-  >;
+  function compatibility(type: AdminWorldManifest['interactions'][number]['type']):
+    | {
+        readonly objectKind: MapObject['kind'];
+        readonly interaction: AssetInteractionCompatibility;
+      }
+    | undefined {
+    if (type === 'notice') return { objectKind: 'sign', interaction: 'sign' };
+    if (type === 'farm_plot') return { objectKind: 'farm_plot', interaction: 'farm_plot' };
+    if (type === 'shop') return { objectKind: 'shop', interaction: 'shop' };
+    if (type === 'cooking_station') {
+      return { objectKind: 'cooking_station', interaction: 'cooking_station' };
+    }
+    if (type === 'crafting_station') {
+      return { objectKind: 'crafting_station', interaction: 'crafting_station' };
+    }
+    if (type === 'home_entrance') {
+      return { objectKind: 'home_entrance', interaction: 'home_entrance' };
+    }
+    return undefined;
+  }
 
   return [
     ...new Set(
       manifest.interactions
         .filter((entry) => {
-          const requiredKind = interactionKind[entry.type];
-          if (object.kind !== requiredKind) return false;
+          const requirement = compatibility(entry.type);
+          if (requirement === undefined || object.kind !== requirement.objectKind) return false;
           const nearest = [...manifest.objects]
             .filter(
               (candidate) =>
-                candidate.kind === requiredKind &&
+                candidate.kind === requirement.objectKind &&
                 Math.hypot(entry.x - candidate.x, entry.y - candidate.y) <= entry.range,
             )
             .sort(
@@ -77,7 +86,10 @@ export function objectInteractionRequirements(
             )[0];
           return nearest?.id === object.id;
         })
-        .map((entry) => (entry.type === 'notice' ? 'sign' : entry.type)),
+        .flatMap((entry) => {
+          const requirement = compatibility(entry.type);
+          return requirement === undefined ? [] : [requirement.interaction];
+        }),
     ),
   ];
 }

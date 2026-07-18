@@ -1,5 +1,7 @@
-import { loadRealtimeConfig } from '@starville/config/server';
+import { loadPrivateSupabaseConfig, loadRealtimeConfig } from '@starville/config/server';
 import { createLogger } from '@starville/logger';
+import { createSupabaseServiceRoleClient } from '@starville/supabase/server';
+import { createSupabaseRealtimePersistenceGateway } from './persistence/gateway.js';
 import { createRealtimeService } from './service.js';
 
 const config = loadRealtimeConfig(process.env);
@@ -8,7 +10,16 @@ const logger = createLogger({
   environment: config.environment,
   level: config.logLevel,
 });
-const service = createRealtimeService({ config, logger });
+const supabase = loadPrivateSupabaseConfig(process.env);
+const privilegedSupabase = createSupabaseServiceRoleClient({
+  url: supabase.url,
+  serviceRoleKey: supabase.serviceRoleKey,
+});
+const service = createRealtimeService({
+  config,
+  logger,
+  persistence: createSupabaseRealtimePersistenceGateway(privilegedSupabase),
+});
 
 let isShuttingDown = false;
 
