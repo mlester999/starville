@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48" fill="none"><title>Lantern Stone Path</title><desc>Lantern Stone Path rendered on the canonical 96 by 48 isometric tile plane.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b7c2b6"/><stop offset="1" stop-color="#818e8f"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#818e8f"/><stop offset="1" stop-color="#58636a"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f4e8b4" stop-opacity=".92"/><stop offset="1" stop-color="#d6c28e" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><polygon points="48,2 94,24 48,46 2,24" fill="#aaa894" stroke="#30363b" stroke-width="2" opacity=".98"/><path d="M13.44 24l34.56-9.6 34.56 9.6-34.56 9.6z" fill="#c8c2a9" stroke="#58636a" stroke-width="1.5"/><path d="M29.76 19.68l36.48 9.12M21.12 26.4l36.48-9.6M38.4 33.12l36.48-9.6" stroke="#818e8f" stroke-width="1.2"/></g></svg>

@@ -96,5 +96,45 @@ export function createRealtimeTicketService(options: {
       }
       throw new PublicApiError(401, 'TOKEN_ACCESS_REVOKED');
     },
+    async issueHomeVisit(input) {
+      if (
+        input.rawAccessToken === undefined ||
+        !/^[A-Za-z0-9_-]{43}$/u.test(input.rawAccessToken)
+      ) {
+        throw new PublicApiError(401, 'TOKEN_ACCESS_REQUIRED');
+      }
+      const participantId = z.uuid().safeParse(input.participantId);
+      if (!participantId.success) throw new PublicApiError(400, 'INVALID_HOME_VISIT_REQUEST');
+      const ticket = createTicket();
+      const result = await options.gateway.issueHomeVisit({
+        accessSessionTokenHash: hashAccessSessionToken(
+          input.rawAccessToken,
+          options.accessTokenSecret,
+        ),
+        ticketHash: hashAccessSessionToken(ticket, options.ticketSecret),
+        participantId: participantId.data,
+        requestId: input.requestId,
+      });
+      if (result.status === 'issued') {
+        return {
+          ticket,
+          participantId: result.participantId,
+          visitSessionId: result.sessionId,
+          homeId: result.homeId,
+          expiresAt: result.expiresAt,
+        };
+      }
+      if (result.status === 'player_suspended') throw new PublicApiError(403, 'PLAYER_SUSPENDED');
+      if (result.status === 'rename_required')
+        throw new PublicApiError(409, 'PLAYER_RENAME_REQUIRED');
+      if (result.status === 'maintenance') throw new PublicApiError(503, 'GAME_MAINTENANCE');
+      if (result.status === 'home_visitor_not_found')
+        throw new PublicApiError(404, 'HOME_VISITOR_NOT_FOUND');
+      if (result.status === 'home_visit_session_closing')
+        throw new PublicApiError(409, 'HOME_VISIT_SESSION_CLOSING');
+      if (result.status === 'home_visit_blocked')
+        throw new PublicApiError(403, 'HOME_VISIT_BLOCKED');
+      throw new PublicApiError(401, 'TOKEN_ACCESS_REVOKED');
+    },
   };
 }

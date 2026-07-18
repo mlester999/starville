@@ -1,5 +1,7 @@
 import 'server-only';
 
+import type { AssetRestoreBundledDefaultAction } from '@starville/asset-management';
+
 import { callTrustedAdminApi } from '../admin-api';
 import {
   assetAuditDirectorySchema,
@@ -161,6 +163,19 @@ export function createAssetVersionFromExisting(
     method: 'POST',
     pathname: `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/versions/from-existing`,
     body: { ...input, confirmed: true },
+    requestId: input.idempotencyKey,
+    parser: (value) => assetMutationResponseSchema.parse(value),
+  });
+}
+
+export function restoreAssetBundledDefault(
+  assetId: string,
+  input: AssetRestoreBundledDefaultAction,
+): Promise<AssetMutationResponse> {
+  return callTrustedAdminApi({
+    method: 'POST',
+    pathname: `/api/v1/admin/world-assets/${encodeURIComponent(assetId)}/restore-bundled-default`,
+    body: input,
     requestId: input.idempotencyKey,
     parser: (value) => assetMutationResponseSchema.parse(value),
   });

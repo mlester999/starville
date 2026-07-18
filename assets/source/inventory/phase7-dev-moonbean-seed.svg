@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none"><title>Moonbean Seed</title><desc>Moonbean Seed inventory artwork designed to remain readable at quickbar size.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><circle cx="80" cy="83.2" r="65.6" fill="#fff4c5" opacity=".17"/><path d="M80 33.6q44.8 12.8 36.8 57.6q-11.2 46.4-48 36.8q-41.6-19.2-19.2-62.4q12.8-32 30.4-32" fill="url(#surface)" stroke="#2c304b" stroke-width="7"/><path d="M112 33.6l3.136 8.064 8.064 3.136-8.064 3.136-3.136 8.064-3.136-8.064-8.064-3.136 8.064-3.136z" fill="#fff4c5" stroke="#e9d68d" stroke-width="2"/></g></svg>

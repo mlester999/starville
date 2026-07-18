@@ -4,8 +4,22 @@ export const WORLD_EDITOR_STORAGE_KEYS = {
   layersCollapsed: 'starville.world-editor.layers-collapsed',
   inspectorCollapsed: 'starville.world-editor.inspector-collapsed',
   validationExpanded: 'starville.world-editor.validation-expanded',
+  /** Device-local UI preference only — never sent to the API or database. */
+  layersWidth: 'starville.world-editor.layers-width',
+  /** Device-local UI preference only — never sent to the API or database. */
+  inspectorWidth: 'starville.world-editor.inspector-width',
   /** Device-local only: first-time Editor Guide completion (no secrets / identities). */
   guideCompleted: 'starville.worldEditorGuide.v1.completed',
+} as const;
+
+/** Desktop sidebar width tokens (px). Local UI only. */
+export const WORLD_EDITOR_PANEL_WIDTHS = {
+  layersDefault: 320,
+  layersMin: 260,
+  layersMax: 440,
+  inspectorDefault: 348,
+  inspectorMin: 280,
+  inspectorMax: 460,
 } as const;
 
 export const WORLD_EDITOR_GUIDE_TITLE = 'How to use the World Editor';
@@ -13,40 +27,101 @@ export const WORLD_EDITOR_GUIDE_TITLE = 'How to use the World Editor';
 export const WORLD_EDITOR_GUIDE_WARNING =
   'Editing or saving a draft does not affect normal players. The live world changes only after a validated version is explicitly published.';
 
-export const WORLD_EDITOR_GUIDE_STEPS = [
+/** Interactive first-use walkthrough steps (highlight targets are data-tour-id values). */
+export const WORLD_EDITOR_WALKTHROUGH_STEPS = [
   {
-    title: 'Choose a layer',
-    body: 'Objects: Place and edit buildings, decorations, shops, stations, and interaction objects. Collisions: Review blocking and walkable regions. Spawns: Manage safe player spawn locations. Exits: Configure transitions and destination spawns. Bounds: Review the playable map boundary.',
+    id: 'understand',
+    title: 'Understand the editor',
+    body: 'This is the active world draft. Changes here are private until separately published.',
+    target: 'map',
+    openLayers: false,
+    openInspector: false,
   },
   {
-    title: 'Find an approved asset',
-    body: 'Use Search Assets and Category to find an approved object. A Development Marker means the object works but still needs final production artwork.',
+    id: 'select',
+    title: 'Select an object',
+    body: 'Choose an object in Layers or click its marker on the map.',
+    target: 'layers',
+    openLayers: true,
+    openInspector: false,
   },
   {
-    title: 'Place or select an object',
-    body: 'Select an approved asset and use Place at center. Click an existing map object to select it. Turn on Move tool before pointer or touch dragging an existing object. Pan: hold the left mouse button on empty map space and drag (or Space+drag / middle mouse). Zoom with + and −. Fit shows the complete map; Reset returns to the default fitted view.',
+    id: 'inspect',
+    title: 'Inspect the object',
+    body: 'Review its position, asset, collision, interactions, and validation details in the Inspector.',
+    target: 'inspector',
+    openLayers: false,
+    openInspector: true,
   },
   {
-    title: 'Edit in Inspector',
-    body: 'Use Inspector to modify position, type, interaction, collision, layer, and destination settings.',
+    id: 'move',
+    title: 'Move an object',
+    body: 'Select Move, then drag or reposition the selected object using the supported controls.',
+    target: 'move-tool',
+    openLayers: false,
+    openInspector: false,
   },
   {
-    title: 'Save Draft',
-    body: 'Save Draft stores your edits but does not change the live world.',
+    id: 'overlays',
+    title: 'Use view overlays',
+    body: 'Grid shows coordinates. Collision shows blocked movement. Spawns mark player entry points. Exits mark world transitions.',
+    target: 'view-overlays',
+    openLayers: false,
+    openInspector: false,
   },
   {
-    title: 'Validate Draft',
-    body: 'Validate the current saved revision. Any edits made after validation require another save and validation.',
+    id: 'save',
+    title: 'Save the draft',
+    body: 'Saving stores your draft changes. It does not make them public.',
+    target: 'save-draft',
+    openLayers: false,
+    openInspector: false,
   },
   {
-    title: 'Draft Preview',
-    body: 'Draft Preview opens an isolated staff-only version after trusted validation passes.',
+    id: 'validate',
+    title: 'Validate',
+    body: 'Validation checks spawns, exits, collisions, references, and other blocking issues on the saved revision.',
+    target: 'validate-draft',
+    openLayers: false,
+    openInspector: false,
   },
   {
-    title: 'Publish',
-    body: 'Publishing happens through the world version workflow. Only an explicitly published version becomes available to normal players.',
+    id: 'test',
+    title: 'Preview and Game Test',
+    body: 'Draft Preview inspects the saved draft. Game Test launches the real Game Client in a private test session. Neither publishes the world.',
+    target: 'test-actions',
+    openLayers: false,
+    openInspector: false,
+  },
+  {
+    id: 'publish-boundary',
+    title: 'Publishing boundary',
+    body: 'Saving, validating, previewing, and Game Testing do not publish the world. Publication is a separate protected workflow.',
+    target: 'map',
+    openLayers: false,
+    openInspector: false,
   },
 ] as const;
+
+/** Compact checklist always available from Help. */
+export const WORLD_EDITOR_QUICK_START = [
+  'Select an object from Layers or the map.',
+  'Use Select to inspect it.',
+  'Use Move to reposition it.',
+  'Use Grid and Collision to verify placement.',
+  'Save Draft.',
+  'Validate Draft.',
+  'Open Draft Preview when validation passes.',
+  'Complete authenticator verification when Game Test requires it.',
+  'Open in Game Test.',
+  'Publish later through the separate publication workflow.',
+] as const;
+
+/** Kept for existing imports/tests; mirrors walkthrough titles and bodies. */
+export const WORLD_EDITOR_GUIDE_STEPS = WORLD_EDITOR_WALKTHROUGH_STEPS.map((step) => ({
+  title: step.title,
+  body: step.body,
+}));
 
 export const CANVAS_ZOOM_MIN = 0.5;
 export const CANVAS_ZOOM_MAX = 3;
@@ -155,6 +230,132 @@ export function draftPreviewAvailability(input: {
   return { canPreview: true, reason: null, message: null };
 }
 
+export type DraftEditorStatusTone = 'neutral' | 'success' | 'pending' | 'error' | 'warning';
+
+export type DraftEditorStatusKind =
+  | 'saved'
+  | 'unsaved'
+  | 'saving'
+  | 'save-failed'
+  | 'validating'
+  | 'validation-required'
+  | 'valid'
+  | 'validation-failed'
+  | 'preview-unavailable'
+  | 'stale-validation';
+
+export interface DraftEditorStatus {
+  readonly kind: DraftEditorStatusKind;
+  readonly label: string;
+  readonly message: string | null;
+  readonly tone: DraftEditorStatusTone;
+}
+
+/**
+ * Compact draft status for the command bar. Presentation only — does not change
+ * save/validation business rules.
+ */
+export function resolveDraftEditorStatus(input: {
+  readonly dirty: boolean;
+  readonly pending: boolean;
+  readonly operation: 'save' | 'validate' | null;
+  readonly actionOutcome: 'idle' | 'success' | 'error';
+  readonly actionMessage: string | null;
+  readonly localIssueCount: number;
+  readonly serverValidation: WorldValidationResult | null;
+  readonly preview: DraftPreviewAvailability;
+}): DraftEditorStatus {
+  if (input.pending && input.operation === 'save') {
+    return { kind: 'saving', label: 'Saving', message: null, tone: 'pending' };
+  }
+  if (input.pending && input.operation === 'validate') {
+    return { kind: 'validating', label: 'Validating', message: null, tone: 'pending' };
+  }
+  if (input.actionOutcome === 'error' && input.operation === 'save') {
+    return {
+      kind: 'save-failed',
+      label: 'Save failed',
+      message: input.actionMessage,
+      tone: 'error',
+    };
+  }
+  if (input.dirty) {
+    return {
+      kind: 'unsaved',
+      label: 'Unsaved changes',
+      message: 'Save Draft stores edits without changing the live world.',
+      tone: 'pending',
+    };
+  }
+  if (input.localIssueCount > 0) {
+    return {
+      kind: 'validation-required',
+      label: 'Validation required',
+      message: `Fix ${input.localIssueCount} local schema issue${input.localIssueCount === 1 ? '' : 's'} before saving.`,
+      tone: 'error',
+    };
+  }
+  if (input.serverValidation === null) {
+    return {
+      kind: 'validation-required',
+      label: 'Validation required',
+      message: 'Validate the current saved revision before preview or Game Test.',
+      tone: 'warning',
+    };
+  }
+  if (input.serverValidation.valid !== true) {
+    return {
+      kind: 'validation-failed',
+      label: 'Validation failed',
+      message: 'Trusted validation found blockers. Resolve them, then validate again.',
+      tone: 'error',
+    };
+  }
+  if (input.preview.reason === 'stale-validation') {
+    return {
+      kind: 'stale-validation',
+      label: 'Validation required',
+      message:
+        input.preview.message ??
+        'Changes were made after validation. Validate the current saved revision again.',
+      tone: 'warning',
+    };
+  }
+  if (input.preview.canPreview) {
+    return {
+      kind: 'valid',
+      label: 'Valid',
+      message: 'Trusted validation passed for this saved revision.',
+      tone: 'success',
+    };
+  }
+  if (input.preview.message !== null) {
+    return {
+      kind: 'preview-unavailable',
+      label: 'Preview unavailable',
+      message: input.preview.message,
+      tone: 'warning',
+    };
+  }
+  return { kind: 'saved', label: 'Saved', message: null, tone: 'success' };
+}
+
+export function clampLayersWidth(px: number): number {
+  if (!Number.isFinite(px)) return WORLD_EDITOR_PANEL_WIDTHS.layersDefault;
+  return Math.min(
+    WORLD_EDITOR_PANEL_WIDTHS.layersMax,
+    Math.max(WORLD_EDITOR_PANEL_WIDTHS.layersMin, Math.round(px)),
+  );
+}
+
+export function clampInspectorWidth(px: number): number {
+  if (!Number.isFinite(px)) return WORLD_EDITOR_PANEL_WIDTHS.inspectorDefault;
+  return Math.min(
+    WORLD_EDITOR_PANEL_WIDTHS.inspectorMax,
+    Math.max(WORLD_EDITOR_PANEL_WIDTHS.inspectorMin, Math.round(px)),
+  );
+}
+
 export function readLocalBoolean(key: string, fallback: boolean): boolean {
   if (typeof window === 'undefined') return fallback;
   try {
@@ -174,6 +375,188 @@ export function writeLocalBoolean(key: string, value: boolean): void {
   } catch {
     // Ignore quota / privacy mode failures.
   }
+}
+
+export function readLocalNumber(key: string, fallback: number): number {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+export function writeLocalNumber(key: string, value: number): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(key, String(value));
+  } catch {
+    // Ignore quota / privacy mode failures.
+  }
+}
+
+export function clearLocalPanelWidths(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.removeItem(WORLD_EDITOR_STORAGE_KEYS.layersWidth);
+    window.localStorage.removeItem(WORLD_EDITOR_STORAGE_KEYS.inspectorWidth);
+  } catch {
+    // Ignore storage failures.
+  }
+}
+
+export type GameTestReadinessId =
+  | 'draft-saved'
+  | 'draft-validated'
+  | 'permission'
+  | 'authenticator'
+  | 'service-status'
+  | 'revision';
+
+export type GameTestReadinessAction =
+  | { readonly kind: 'save' }
+  | { readonly kind: 'validate' }
+  | { readonly kind: 'verify-authenticator' }
+  | { readonly kind: 'setup-authenticator' }
+  | { readonly kind: 'refresh-status' }
+  | { readonly kind: 'none' };
+
+export interface GameTestReadinessItem {
+  readonly id: GameTestReadinessId;
+  readonly ready: boolean;
+  readonly label: string;
+  readonly detail: string;
+  readonly technicalDetail: string | null;
+  readonly action: GameTestReadinessAction;
+  readonly actionLabel: string | null;
+}
+
+/**
+ * Presentation-only readiness checklist. Does not replace server-side Game Test authorization.
+ */
+export function buildGameTestReadiness(input: {
+  readonly dirty: boolean;
+  readonly validated: boolean;
+  readonly canPreview: boolean;
+  readonly assuranceLevel: 'aal1' | 'aal2';
+  readonly authenticatorEnrolled: boolean;
+  readonly checksum: string | null;
+  readonly statusLoaded: boolean;
+}): {
+  readonly items: readonly GameTestReadinessItem[];
+  readonly canOpen: boolean;
+  readonly primaryBlocker: GameTestReadinessItem | null;
+} {
+  const items: GameTestReadinessItem[] = [
+    {
+      id: 'draft-saved',
+      ready: !input.dirty,
+      label: 'Draft saved',
+      detail: input.dirty
+        ? 'Save your latest changes first.'
+        : 'The current editor state matches the last saved revision.',
+      technicalDetail: null,
+      action: input.dirty ? { kind: 'save' } : { kind: 'none' },
+      actionLabel: input.dirty ? 'Save Draft' : null,
+    },
+    {
+      id: 'draft-validated',
+      ready: input.validated && !input.dirty,
+      label: 'Draft validated',
+      detail: input.dirty
+        ? 'Save, then validate the current revision.'
+        : input.validated
+          ? 'Trusted validation passed for this saved revision.'
+          : 'Validate the current saved revision.',
+      technicalDetail: null,
+      action: !input.dirty && !input.validated ? { kind: 'validate' } : { kind: 'none' },
+      actionLabel: !input.dirty && !input.validated ? 'Validate Draft' : null,
+    },
+    {
+      id: 'permission',
+      ready: input.canPreview,
+      label: 'Preview permission',
+      detail: input.canPreview
+        ? 'Your role can open private map previews.'
+        : 'Your admin role does not have permission to preview maps.',
+      technicalDetail: 'Requires maps.preview',
+      action: { kind: 'none' },
+      actionLabel: null,
+    },
+    {
+      id: 'authenticator',
+      ready: input.assuranceLevel === 'aal2',
+      label: 'Authenticator verification',
+      detail:
+        input.assuranceLevel === 'aal2'
+          ? 'Authenticator verified for this session.'
+          : input.authenticatorEnrolled
+            ? 'Verify with your authenticator to open Game Test. Your current admin session has not completed multi-factor authentication. This extra security step protects private world testing.'
+            : 'Set up an authenticator app to continue. Multi-factor authentication is required before private Game Test sessions can open.',
+      technicalDetail: 'Security level required: AAL2',
+      action:
+        input.assuranceLevel === 'aal2'
+          ? { kind: 'none' }
+          : input.authenticatorEnrolled
+            ? { kind: 'verify-authenticator' }
+            : { kind: 'setup-authenticator' },
+      actionLabel:
+        input.assuranceLevel === 'aal2'
+          ? null
+          : input.authenticatorEnrolled
+            ? 'Verify with Authenticator'
+            : 'Set Up Authenticator',
+    },
+    {
+      id: 'service-status',
+      ready: input.statusLoaded || input.assuranceLevel !== 'aal2' || !input.canPreview,
+      label: 'Game Test service status',
+      detail: input.statusLoaded
+        ? 'Game Test status is available for this revision.'
+        : input.assuranceLevel !== 'aal2' || !input.canPreview
+          ? 'Status loads after permission and authenticator requirements are met.'
+          : 'Game Test status could not be loaded. You can refresh after verification.',
+      technicalDetail: null,
+      action:
+        !input.statusLoaded && input.assuranceLevel === 'aal2' && input.canPreview
+          ? { kind: 'refresh-status' }
+          : { kind: 'none' },
+      actionLabel:
+        !input.statusLoaded && input.assuranceLevel === 'aal2' && input.canPreview
+          ? 'Refresh Status'
+          : null,
+    },
+    {
+      id: 'revision',
+      ready:
+        input.checksum !== null &&
+        /^[0-9a-f]{64}$/u.test(input.checksum) &&
+        input.validated &&
+        !input.dirty,
+      label: 'Current revision eligible',
+      detail:
+        input.checksum !== null && /^[0-9a-f]{64}$/u.test(input.checksum)
+          ? input.validated && !input.dirty
+            ? 'Exact validated revision checksum is ready.'
+            : 'Revision identity exists, but save and validation must still pass.'
+          : 'Reload to recover the trusted revision checksum after save and validation.',
+      technicalDetail: null,
+      action: { kind: 'none' },
+      actionLabel: null,
+    },
+  ];
+
+  // Status load failure must not block launch when other requirements pass (server rechecks).
+  const blocking = items.filter((item) => item.id !== 'service-status' && !item.ready);
+  const canOpen = blocking.length === 0;
+  return {
+    items,
+    canOpen,
+    primaryBlocker: blocking[0] ?? null,
+  };
 }
 
 export function isWorldEditorGuideCompleted(): boolean {

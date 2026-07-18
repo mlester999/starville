@@ -7,6 +7,7 @@ import { notFound, redirect } from 'next/navigation';
 import { z } from 'zod';
 
 import { WorldAssetEmptyState } from '../../../../../../components/world-asset-empty-state';
+import { WorldAssetBundledComparison } from '../../../../../../components/world-asset-bundled-comparison';
 import { WorldAssetVersionWorkspace } from '../../../../../../components/world-asset-version-workspace';
 import {
   loadAssetDetail,
@@ -17,6 +18,8 @@ import {
   assetManagerCapabilities,
   requireAssetManagerPermission,
 } from '../../../../../../lib/world-assets/authorization';
+import { bundledRuntimeSize } from '../../../../../../lib/world-assets/bundled-media';
+import { availableAdminAssetMediaPath } from '../../../../../../lib/world-assets/media';
 import {
   canonicalWorldAssetPath,
   canonicalWorldAssetVersionPath,
@@ -116,6 +119,7 @@ export default async function AssetVersionPage(props: {
       canPreviewDrafts: hasAdminPermission(context, 'maps.preview'),
     }),
   ]);
+  const bundledSizeBytes = await bundledRuntimeSize(detail.asset.slug);
   const activeVersion = activeAssetVersion(canonicalDetail);
   const latestCandidate = latestAssetCandidate(canonicalDetail);
   const selectedVersionUsage = versionUsage(detail.version.id, references);
@@ -174,6 +178,18 @@ export default async function AssetVersionPage(props: {
         saveRequestId={randomUUID()}
         selectedVersionUsage={selectedVersionUsage}
         sceneWorldDirectory={sceneWorldDirectory}
+      />
+      <WorldAssetBundledComparison
+        assetKey={detail.asset.slug}
+        bundledSizeBytes={bundledSizeBytes}
+        uploadedLabel={`Selected Version ${String(detail.version.versionNumber)}`}
+        uploadedMediaUrl={availableAdminAssetMediaPath(
+          detail.asset.id,
+          detail.version.id,
+          'source',
+          detail.version.sourceUrl,
+        )}
+        uploadedVersion={detail.version}
       />
     </main>
   );

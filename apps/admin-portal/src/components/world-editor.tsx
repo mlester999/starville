@@ -16,6 +16,7 @@ import {
   useRef,
   useState,
   useTransition,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
 
@@ -35,6 +36,7 @@ import type { WorldEditorAssetCandidate } from '../lib/world-assets/contracts';
 import { availableAdminAssetMediaPath } from '../lib/world-assets/media';
 import {
   resolveWorldObjectRendering,
+  worldObjectFriendlyLabel,
   WORLD_OBJECT_RENDER_MODES,
   type WorldObjectRenderMode,
 } from '../lib/worlds/asset-rendering';
@@ -56,17 +58,26 @@ import {
 } from '../lib/worlds/editor-state';
 import {
   CANVAS_PAN_DRAG_THRESHOLD_PX,
+  CANVAS_ZOOM_DEFAULT,
   CANVAS_ZOOM_MAX,
   CANVAS_ZOOM_MIN,
   CANVAS_ZOOM_STEP,
   clampCanvasPan,
   clampCanvasZoom,
+  clampInspectorWidth,
+  clampLayersWidth,
+  clearLocalPanelWidths,
   computeFitCanvasView,
   draftPreviewAvailability,
   isWorldEditorGuideCompleted,
   readLocalBoolean,
+  readLocalNumber,
+  resolveDraftEditorStatus,
+  WORLD_EDITOR_PANEL_WIDTHS,
   WORLD_EDITOR_STORAGE_KEYS,
+  WORLD_EDITOR_WALKTHROUGH_STEPS,
   writeLocalBoolean,
+  writeLocalNumber,
   zoomPercentage,
 } from '../lib/worlds/editor-usability';
 import {
@@ -109,6 +120,8 @@ interface WorldEditorProps {
   readonly initialAssetKey: string | null;
   readonly canOpenGameTest: boolean;
   readonly assuranceLevel: 'aal1' | 'aal2';
+  /** Server-derived: administrator has at least one verified authenticator factor. */
+  readonly authenticatorEnrolled: boolean;
   readonly gameTestEnvironment: string;
   readonly gameTestReopenUrl: string;
   readonly initialGameTestStatus: WorldGameTestStatus | null;
@@ -317,12 +330,17 @@ export function WorldEditor(props: WorldEditorProps) {
   const [layersCollapsed, setLayersCollapsed] = useState(false);
   const [inspectorCollapsed, setInspectorCollapsed] = useState(false);
   const [validationExpanded, setValidationExpanded] = useState(false);
-  const [canvasZoom, setCanvasZoom] = useState(1.45);
+  const [layersWidth, setLayersWidth] = useState<number>(WORLD_EDITOR_PANEL_WIDTHS.layersDefault);
+  const [inspectorWidth, setInspectorWidth] = useState<number>(
+    WORLD_EDITOR_PANEL_WIDTHS.inspectorDefault,
+  );
+  const [canvasZoom, setCanvasZoom] = useState(CANVAS_ZOOM_DEFAULT);
   const [canvasPan, setCanvasPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [moveToolActive, setMoveToolActive] = useState(false);
   const [canvasHelpOpen, setCanvasHelpOpen] = useState(false);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [guideWalkthrough, setGuideWalkthrough] = useState(true);
   const [changesOpen, setChangesOpen] = useState(false);
   const [objectListSearch, setObjectListSearch] = useState('');
   const guideTriggerRef = useRef<HTMLButtonElement>(null);
@@ -338,7 +356,16 @@ export function WorldEditor(props: WorldEditorProps) {
   const suppressSelectTimerRef = useRef(0);
   /** When true, layout changes do not auto-refit the map. */
   const userAdjustedView = useRef(false);
+  /** After the first successful Fit, preserve user zoom unless force is requested. */
+  const viewInitialized = useRef(false);
   const lastSuccessfulValidation = useRef(false);
+  const fitRetryTimer = useRef(0);
+  const panelResizeSession = useRef<{
+    side: 'layers' | 'inspector';
+    startX: number;
+    startWidth: number;
+  } | null>(null);
+  const panelWidthPersistTimer = useRef(0);
 
   useEffect(() => {
     canvasZoomRef.current = canvasZoom;
@@ -412,6 +439,20 @@ export function WorldEditor(props: WorldEditorProps) {
     validatedChecksum,
     currentChecksum: checksum,
   });
+  const draftStatus = useMemo(
+    () =>
+      resolveDraftEditorStatus({
+        dirty,
+        pending,
+        operation: pending ? operation : null,
+        actionOutcome: actionState.outcome,
+        actionMessage: actionState.outcome === 'idle' ? null : (actionState.message ?? null),
+        localIssueCount: issues.length,
+        serverValidation,
+        preview,
+      }),
+    [actionState, dirty, issues.length, operation, pending, preview, serverValidation],
+  );
 
   const approvedAssets = useMemo(
     () =>
@@ -499,23 +540,119 @@ export function WorldEditor(props: WorldEditorProps) {
     userAdjustedView.current = false;
   }, []);
 
+  const persistPanelWidths = useCallback((nextLayers: number, nextInspector: number) => {
+    if (panelWidthPersistTimer.current !== 0) {
+      window.clearTimeout(panelWidthPersistTimer.current);
+    }
+    panelWidthPersistTimer.current = window.setTimeout(() => {
+      panelWidthPersistTimer.current = 0;
+      writeLocalNumber(WORLD_EDITOR_STORAGE_KEYS.layersWidth, nextLayers);
+      writeLocalNumber(WORLD_EDITOR_STORAGE_KEYS.inspectorWidth, nextInspector);
+    }, 180);
+  }, []);
+
+  const resetPanelSizes = useCallback(() => {
+    const nextLayers = WORLD_EDITOR_PANEL_WIDTHS.layersDefault;
+    const nextInspector = WORLD_EDITOR_PANEL_WIDTHS.inspectorDefault;
+    setLayersWidth(nextLayers);
+    setInspectorWidth(nextInspector);
+    clearLocalPanelWidths();
+    userAdjustedView.current = false;
+    // Force fit after panel sizes settle.
+    window.requestAnimationFrame(() => {
+      window.requestAnimationFrame(() => {
+        userAdjustedView.current = false;
+      });
+    });
+  }, []);
+
+  const beginPanelResize = useCallback(
+    (side: 'layers' | 'inspector', clientX: number) => {
+      panelResizeSession.current = {
+        side,
+        startX: clientX,
+        startWidth: side === 'layers' ? layersWidth : inspectorWidth,
+      };
+    },
+    [inspectorWidth, layersWidth],
+  );
+
+  useEffect(() => {
+    function onPointerMove(event: PointerEvent): void {
+      const session = panelResizeSession.current;
+      if (session === null) return;
+      event.preventDefault();
+      const delta = event.clientX - session.startX;
+      if (session.side === 'layers') {
+        const next = clampLayersWidth(session.startWidth + delta);
+        setLayersWidth(next);
+        persistPanelWidths(next, inspectorWidth);
+      } else {
+        const next = clampInspectorWidth(session.startWidth - delta);
+        setInspectorWidth(next);
+        persistPanelWidths(layersWidth, next);
+      }
+      userAdjustedView.current = false;
+    }
+
+    function onPointerUp(): void {
+      if (panelResizeSession.current === null) return;
+      panelResizeSession.current = null;
+      userAdjustedView.current = false;
+    }
+
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', onPointerUp);
+    window.addEventListener('pointercancel', onPointerUp);
+    return () => {
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('pointerup', onPointerUp);
+      window.removeEventListener('pointercancel', onPointerUp);
+      if (panelWidthPersistTimer.current !== 0) {
+        window.clearTimeout(panelWidthPersistTimer.current);
+      }
+    };
+  }, [inspectorWidth, layersWidth, persistPanelWidths]);
+
   useEffect(() => {
     setLayersCollapsed(readLocalBoolean(WORLD_EDITOR_STORAGE_KEYS.layersCollapsed, false));
     setInspectorCollapsed(readLocalBoolean(WORLD_EDITOR_STORAGE_KEYS.inspectorCollapsed, false));
     setValidationExpanded(readLocalBoolean(WORLD_EDITOR_STORAGE_KEYS.validationExpanded, false));
-    // First-time users see the guide automatically; the button remains available forever.
-    if (!isWorldEditorGuideCompleted()) setGuideOpen(true);
+    setLayersWidth(
+      clampLayersWidth(
+        readLocalNumber(
+          WORLD_EDITOR_STORAGE_KEYS.layersWidth,
+          WORLD_EDITOR_PANEL_WIDTHS.layersDefault,
+        ),
+      ),
+    );
+    setInspectorWidth(
+      clampInspectorWidth(
+        readLocalNumber(
+          WORLD_EDITOR_STORAGE_KEYS.inspectorWidth,
+          WORLD_EDITOR_PANEL_WIDTHS.inspectorDefault,
+        ),
+      ),
+    );
+    // First-time users get the interactive walkthrough; Help remains available forever.
+    if (!isWorldEditorGuideCompleted()) {
+      setGuideWalkthrough(true);
+      setGuideOpen(true);
+    }
   }, []);
 
   const applyFitCanvas = useCallback(
-    (options?: { readonly force?: boolean }) => {
+    (options?: { readonly force?: boolean }): boolean => {
       const host = canvasHostRef.current;
-      if (host === null) return;
-      if (userAdjustedView.current && options?.force !== true) return;
+      if (host === null) return false;
+      // Preserve intentional user camera; only force-fit when requested or not yet initialized.
+      if (userAdjustedView.current && viewInitialized.current && options?.force !== true) {
+        return true;
+      }
       // Use layout box (client*) so clipped overflow min-heights cannot inflate the fit target.
       const hostWidth = host.clientWidth;
       const hostHeight = host.clientHeight;
-      if (hostWidth < 80 || hostHeight < 80) return;
+      if (hostWidth < 80 || hostHeight < 80) return false;
       const fitted = computeFitCanvasView({
         hostWidth,
         hostHeight,
@@ -526,6 +663,8 @@ export function WorldEditor(props: WorldEditorProps) {
       canvasPanRef.current = { x: fitted.panX, y: fitted.panY };
       setCanvasZoom(fitted.zoom);
       setCanvasPan({ x: fitted.panX, y: fitted.panY });
+      viewInitialized.current = true;
+      return true;
     },
     [manifest.width, manifest.height],
   );
@@ -588,7 +727,17 @@ export function WorldEditor(props: WorldEditorProps) {
     (options?: { readonly force?: boolean }) => {
       // Wait two frames so toolbar wrap / dock expand / panel collapse settle first.
       window.requestAnimationFrame(() => {
-        window.requestAnimationFrame(() => applyFitCanvas(options));
+        window.requestAnimationFrame(() => {
+          const ok = applyFitCanvas(options);
+          // Retry initial fit until the host has real dimensions.
+          if (!ok && !viewInitialized.current) {
+            if (fitRetryTimer.current !== 0) window.clearTimeout(fitRetryTimer.current);
+            fitRetryTimer.current = window.setTimeout(() => {
+              fitRetryTimer.current = 0;
+              applyFitCanvas({ force: true });
+            }, 80);
+          }
+        });
       });
     },
     [applyFitCanvas],
@@ -597,24 +746,59 @@ export function WorldEditor(props: WorldEditorProps) {
   useEffect(() => {
     const host = canvasHostRef.current;
     if (host === null) return;
+    // First mount / structural layout change: fit to the true workspace.
+    userAdjustedView.current = false;
     scheduleFitCanvas({ force: true });
+    let resizeFrame = 0;
     const observer = new ResizeObserver(() => {
-      scheduleFitCanvas();
+      if (resizeFrame !== 0) window.cancelAnimationFrame(resizeFrame);
+      resizeFrame = window.requestAnimationFrame(() => {
+        resizeFrame = 0;
+        // Auto-refit only before the user has taken over the camera, or when host was empty.
+        if (!viewInitialized.current || !userAdjustedView.current) {
+          scheduleFitCanvas({ force: !viewInitialized.current });
+        }
+      });
     });
     observer.observe(host);
     // Dock and page shell also change available canvas height.
     const page = host.closest('.world-editor-page');
     if (page instanceof HTMLElement) observer.observe(page);
-    return () => observer.disconnect();
-  }, [scheduleFitCanvas, layersCollapsed, inspectorCollapsed, validationExpanded, guideOpen]);
+    const validation = page?.querySelector('.world-validation-panel');
+    if (validation instanceof HTMLElement) observer.observe(validation);
+    return () => {
+      observer.disconnect();
+      if (resizeFrame !== 0) window.cancelAnimationFrame(resizeFrame);
+      if (fitRetryTimer.current !== 0) window.clearTimeout(fitRetryTimer.current);
+    };
+  }, [
+    scheduleFitCanvas,
+    layersCollapsed,
+    inspectorCollapsed,
+    validationExpanded,
+    guideOpen,
+    layersWidth,
+    inspectorWidth,
+  ]);
 
   useEffect(() => {
+    const errorCount = serverValidation?.errors.length ?? 0;
     const success = serverValidation?.valid === true && issues.length === 0 && !dirty;
+    // Collapse when the draft becomes clean after a successful validation.
     if (success && !lastSuccessfulValidation.current) {
       setValidationExpandedPersist(false);
     }
+    // Expand when trusted validation newly fails with blocking errors.
+    if (
+      serverValidation !== null &&
+      serverValidation.valid !== true &&
+      errorCount > 0 &&
+      lastSuccessfulValidation.current
+    ) {
+      setValidationExpandedPersist(true);
+    }
     lastSuccessfulValidation.current = success;
-  }, [serverValidation?.valid, issues.length, dirty, setValidationExpandedPersist]);
+  }, [serverValidation, issues.length, dirty, setValidationExpandedPersist]);
 
   useEffect(() => {
     function protectUnload(event: BeforeUnloadEvent): void {
@@ -1089,7 +1273,8 @@ export function WorldEditor(props: WorldEditorProps) {
   const selectedReferenceCount =
     selectedAssetPin?.referenceCount ?? selectedAssetCandidate?.asset.referenceCount ?? null;
   const selectedSupportedRotations = selectedAssetPin?.pinnedVersion.render.supportedRotations ??
-    selectedAssetCandidate?.activeVersion.render.supportedRotations ?? [0];
+    selectedAssetCandidate?.activeVersion.render.supportedRotations ??
+    selectedObjectRendering?.supportedRotations ?? [0];
   const selectedCollision =
     selection?.layer === 'collisions'
       ? manifest.collisions.find(({ id }) => id === selection.id)
@@ -1100,6 +1285,21 @@ export function WorldEditor(props: WorldEditorProps) {
       : undefined;
   const selectedExit =
     selection?.layer === 'exits' ? manifest.exits.find(({ id }) => id === selection.id) : undefined;
+  const activeToolLabel = placementPreviewObject
+    ? 'Placement'
+    : moveToolActive && editableDraft
+      ? 'Move'
+      : 'Select';
+  const selectedSummary =
+    selectedObject !== undefined
+      ? humanizeKey(selectedObject.id)
+      : selectedCollision !== undefined
+        ? humanizeKey(selectedCollision.id)
+        : selectedSpawn !== undefined
+          ? humanizeKey(selectedSpawn.id)
+          : selectedExit !== undefined
+            ? selectedExit.direction
+            : null;
 
   function layerItems(): readonly Readonly<{
     id: string;
@@ -1126,11 +1326,8 @@ export function WorldEditor(props: WorldEditorProps) {
           });
           return {
             id: item.id,
-            label:
-              rendering.pin?.friendlyName ??
-              rendering.candidate?.asset.friendlyName ??
-              humanizeKey(item.id),
-            detail: `${item.kind.replace(/_/gu, ' ')} · X ${item.x}, Y ${item.y} · ${rendering.status === 'asset' ? `Version ${rendering.renderedVersionNumber}` : `marker: ${rendering.reason.replaceAll('_', ' ')}`}`,
+            label: worldObjectFriendlyLabel(item, rendering),
+            detail: `${item.kind.replace(/_/gu, ' ')} · X ${item.x}, Y ${item.y} · ${rendering.sourceLabel}${rendering.renderedVersionNumber === null ? '' : ` V${String(rendering.renderedVersionNumber)}`}`,
             title: `${item.id} · ${item.assetId} · ${rendering.explanation}`,
           };
         })
@@ -1230,7 +1427,15 @@ export function WorldEditor(props: WorldEditorProps) {
   const layerSticky = (
     <div className="world-editor-panel__sticky-inner">
       <div className="world-editor-panel__title-row">
-        <h2 id="layers-title">Layers</h2>
+        <h2 id="layers-title">
+          Layers
+          <span
+            className="world-editor-assets__count"
+            aria-label={`${manifest.objects.length} objects`}
+          >
+            {manifest.objects.length}
+          </span>
+        </h2>
         <button
           aria-label="Collapse layers panel"
           className="button button--quiet world-editor-panel__collapse"
@@ -1851,13 +2056,14 @@ export function WorldEditor(props: WorldEditorProps) {
               className={`world-object-render-status world-object-render-status--${selectedObjectRendering?.status ?? 'marker'}`}
             >
               {renderModeLabel(renderMode)} ·{' '}
-              {selectedObjectRendering?.status === 'asset' ? 'managed asset' : 'fallback marker'} ·{' '}
+              {selectedObjectRendering?.sourceLabel ?? 'fallback marker'} ·{' '}
               {selectedObjectRendering?.reason.replaceAll('_', ' ') ?? 'unresolved'}
             </p>
             <p>{selectedObjectRendering?.explanation}</p>
             <p className="field-hint">
-              Only the protected processed-source route is eligible. Intake files, private storage
-              paths, and validated non-active versions are never selected by the canvas.
+              Uploaded art uses the protected processed-source route. Bundled defaults use the
+              protected manifest allowlist. Intake files, private paths, and non-active uploads are
+              never selected by the canvas.
             </p>
           </InspectorSection>
           <InspectorSection title="Next Safe Action">
@@ -2099,10 +2305,7 @@ export function WorldEditor(props: WorldEditorProps) {
       {!['metadata', 'bounds'].includes(layer) && selection === undefined ? (
         <div className="editor-empty-inspector">
           <p className="editor-empty-inspector__title">Nothing selected</p>
-          <p>
-            Select an object on the canvas or from the layer list to edit coordinates, assets,
-            collision, spawns, or exits.
-          </p>
+          <p>Select an object on the map or from the Layers panel to inspect and edit it.</p>
           <p className="field-hint">
             Choose an asset card, then place at map center, or click any rendered marker.
           </p>
@@ -2118,7 +2321,10 @@ export function WorldEditor(props: WorldEditorProps) {
       aria-labelledby="editor-title"
       data-world-editor-shell="true"
     >
-      <header className="world-editor-toolbar" aria-label="World editor toolbar">
+      <header
+        className="world-editor-toolbar world-editor-command-bar"
+        aria-label="World editor command bar"
+      >
         <div className="world-editor-toolbar__identity">
           <Link className="world-editor-back" href={`/worlds/${props.draft.map.id}`}>
             ← Back
@@ -2130,12 +2336,27 @@ export function WorldEditor(props: WorldEditorProps) {
               Version {currentVersionNumber} · revision {editVersion} · {manifest.name}
             </p>
           </div>
+          <div
+            className={`world-editor-draft-status world-editor-draft-status--${draftStatus.tone}`}
+            data-draft-status={draftStatus.kind}
+            role="status"
+            aria-live="polite"
+          >
+            <span className="world-editor-draft-status__label">{draftStatus.label}</span>
+            {draftStatus.message ? (
+              <span className="world-editor-draft-status__message">{draftStatus.message}</span>
+            ) : null}
+          </div>
           <button
             aria-expanded={guideOpen}
             aria-haspopup="dialog"
-            className="button button--secondary world-editor-guide-trigger"
+            aria-label="Open Editor Guide"
+            className="button button--quiet world-editor-guide-trigger"
             data-editor-guide-trigger="true"
-            onClick={() => setGuideOpen(true)}
+            onClick={() => {
+              setGuideWalkthrough(false);
+              setGuideOpen(true);
+            }}
             ref={guideTriggerRef}
             title="Open How to use the World Editor"
             type="button"
@@ -2143,166 +2364,180 @@ export function WorldEditor(props: WorldEditorProps) {
             <span aria-hidden="true" className="world-editor-guide-trigger__icon">
               ?
             </span>
-            Editor Guide
+            <span className="world-editor-guide-trigger__label">Help</span>
           </button>
-          <span
-            className={`state-chip ${dirty ? 'state-chip--pending' : 'state-chip--success'}`}
-            role="status"
-          >
-            {dirty ? 'Unsaved' : 'Saved'}
-          </span>
         </div>
 
-        <div className="world-editor-toolbar__actions">
-          <button
-            className="button button--quiet"
-            disabled={history.past.length === 0 || pending}
-            onClick={() => setHistory(undoWorldEditorManifest)}
-            title="Undo the last structured edit"
-            type="button"
+        <div className="world-editor-toolbar__actions" data-command-groups="true">
+          <div
+            className="world-editor-command-group"
+            data-command-group="history"
+            role="group"
+            aria-label="History"
           >
-            Undo
-          </button>
-          <button
-            className="button button--quiet"
-            disabled={history.future.length === 0 || pending}
-            onClick={() => setHistory(redoWorldEditorManifest)}
-            title="Redo the last undone edit"
-            type="button"
-          >
-            Redo
-          </button>
-          <button
-            className="button button--quiet"
-            disabled={!dirty || pending}
-            onClick={discardChanges}
-            type="button"
-          >
-            Discard changes
-          </button>
-          <button
-            aria-expanded={changesOpen}
-            className="button button--quiet"
-            disabled={!dirty}
-            onClick={() => setChangesOpen((value) => !value)}
-            type="button"
-          >
-            Review changes
-          </button>
-          <button
-            className="button button--primary"
-            disabled={!editableDraft || pending || issues.length > 0 || !dirty}
-            onClick={saveDraft}
-            title="Save Draft stores edits without changing the live world"
-            type="button"
-          >
-            {pending && operation === 'save' ? 'Saving…' : 'Save draft'}
-          </button>
-          <button
-            className="button button--secondary"
-            disabled={!editableDraft || pending || dirty || issues.length > 0}
-            onClick={validateDraft}
-            title="Validate Draft runs trusted checks on the current saved revision"
-            type="button"
-          >
-            {pending && operation === 'validate' ? 'Validating…' : 'Validate draft'}
-          </button>
-          {preview.canPreview ? (
-            <Link
-              className="button button--secondary"
-              href={`/worlds/${props.draft.map.id}/preview?version=${currentVersionId}`}
-              title="Draft Preview opens an isolated staff-only view after trusted validation"
+            <button
+              className="button button--quiet"
+              disabled={history.past.length === 0 || pending}
+              onClick={() => setHistory(undoWorldEditorManifest)}
+              title="Undo the last structured edit"
+              type="button"
             >
-              Draft preview
-            </Link>
-          ) : (
-            <span className="world-editor-preview-disabled">
-              <button
-                className="button button--quiet"
-                disabled
-                title={preview.message ?? 'Draft preview unavailable'}
-                type="button"
+              Undo
+            </button>
+            <button
+              className="button button--quiet"
+              disabled={history.future.length === 0 || pending}
+              onClick={() => setHistory(redoWorldEditorManifest)}
+              title="Redo the last undone edit"
+              type="button"
+            >
+              Redo
+            </button>
+          </div>
+
+          <span aria-hidden="true" className="world-editor-command-separator" />
+
+          <div
+            className="world-editor-command-group"
+            data-command-group="draft"
+            role="group"
+            aria-label="Draft"
+          >
+            <button
+              className="button button--primary"
+              data-tour-id="save-draft"
+              disabled={!editableDraft || pending || issues.length > 0 || !dirty}
+              onClick={saveDraft}
+              title={
+                !editableDraft
+                  ? 'Create or derive an editable draft before saving'
+                  : issues.length > 0
+                    ? 'Fix local schema issues before saving'
+                    : !dirty
+                      ? 'No unsaved changes to save'
+                      : 'Save Draft stores edits without changing the live world'
+              }
+              type="button"
+            >
+              {pending && operation === 'save' ? 'Saving…' : 'Save draft'}
+            </button>
+            <button
+              aria-expanded={changesOpen}
+              className="button button--quiet"
+              disabled={!dirty}
+              onClick={() => setChangesOpen((value) => !value)}
+              title={
+                dirty
+                  ? 'Review a local summary of unsaved structured changes'
+                  : 'No unsaved changes to review'
+              }
+              type="button"
+            >
+              Review changes
+            </button>
+            <button
+              className="button button--quiet world-editor-command-destructive"
+              disabled={!dirty || pending}
+              onClick={discardChanges}
+              title={
+                dirty
+                  ? 'Discard unsaved local edits and restore the last saved revision'
+                  : 'No unsaved changes to discard'
+              }
+              type="button"
+            >
+              Discard changes
+            </button>
+          </div>
+
+          <span aria-hidden="true" className="world-editor-command-separator" />
+
+          <div
+            className="world-editor-command-group"
+            data-command-group="validation"
+            role="group"
+            aria-label="Validation"
+          >
+            <button
+              className="button button--secondary"
+              data-tour-id="validate-draft"
+              disabled={!editableDraft || pending || dirty || issues.length > 0}
+              onClick={validateDraft}
+              title={
+                dirty
+                  ? 'Save the draft before running trusted validation'
+                  : issues.length > 0
+                    ? 'Fix local schema issues before validation'
+                    : 'Validate Draft runs trusted checks on the current saved revision'
+              }
+              type="button"
+            >
+              {pending && operation === 'validate' ? 'Validating…' : 'Validate draft'}
+            </button>
+            {preview.canPreview ? (
+              <Link
+                className="button button--secondary"
+                href={`/worlds/${props.draft.map.id}/preview?version=${currentVersionId}`}
+                title="Draft Preview opens an isolated staff-only view after trusted validation"
               >
                 Draft preview
-              </button>
-              {preview.message ? (
-                <small className="world-editor-preview-reason">{preview.message}</small>
-              ) : null}
-            </span>
-          )}
-          <WorldGameTestLauncher
-            assuranceLevel={props.assuranceLevel}
-            activePublishedVersionId={props.draft.map.activePublishedVersionId}
-            canPreview={props.canOpenGameTest}
-            checksum={checksum}
-            dirty={dirty}
-            editVersion={editVersion}
-            environment={props.gameTestEnvironment}
-            initialStatus={props.initialGameTestStatus}
-            mapId={props.draft.map.id}
-            mapDisplayName={props.draft.map.displayName}
-            reopenUrl={props.gameTestReopenUrl}
-            returnedSessionId={props.returnedGameTestSessionId}
-            returnPath={`/worlds/${props.draft.map.id}/editor?version=${currentVersionId}`}
-            validated={preview.canPreview}
-            versionId={currentVersionId}
-            versionNumber={currentVersionNumber}
-          />
-        </div>
+              </Link>
+            ) : (
+              <span className="world-editor-preview-disabled">
+                <button
+                  className="button button--quiet"
+                  disabled
+                  title={preview.message ?? 'Draft preview unavailable'}
+                  type="button"
+                >
+                  Draft preview
+                </button>
+                {preview.message ? (
+                  <small className="world-editor-preview-reason">{preview.message}</small>
+                ) : null}
+              </span>
+            )}
+          </div>
 
-        <div className="world-editor-toolbar__toggles" aria-label="Editor view toggles">
-          <label className="world-editor-render-mode">
-            <span>Object rendering</span>
-            <PremiumSelect
-              aria-label="Object rendering mode"
-              onChange={(value) => setRenderMode(value as WorldObjectRenderMode)}
-              options={WORLD_OBJECT_RENDER_MODES.map((mode) => ({
-                value: mode,
-                label: renderModeLabel(mode),
-              }))}
-              size="compact"
-              value={renderMode}
+          <span aria-hidden="true" className="world-editor-command-separator" />
+
+          <div
+            className="world-editor-command-group"
+            data-command-group="test"
+            role="group"
+            aria-label="Game Test"
+          >
+            <WorldGameTestLauncher
+              assuranceLevel={props.assuranceLevel}
+              authenticatorEnrolled={props.authenticatorEnrolled}
+              activePublishedVersionId={props.draft.map.activePublishedVersionId}
+              canPreview={props.canOpenGameTest}
+              checksum={checksum}
+              dirty={dirty}
+              editVersion={editVersion}
+              environment={props.gameTestEnvironment}
+              initialStatus={props.initialGameTestStatus}
+              mapId={props.draft.map.id}
+              mapDisplayName={props.draft.map.displayName}
+              onRequestSave={saveDraft}
+              onRequestValidate={validateDraft}
+              reopenUrl={props.gameTestReopenUrl}
+              returnedSessionId={props.returnedGameTestSessionId}
+              returnPath={`/worlds/${props.draft.map.id}/editor?version=${currentVersionId}`}
+              validated={preview.canPreview}
+              versionId={currentVersionId}
+              versionNumber={currentVersionNumber}
             />
-          </label>
-          <ToggleChip
-            disabled={!editableDraft}
-            label="Move tool"
-            pressed={moveToolActive && editableDraft}
-            title="Require an explicit mode before pointer or touch dragging changes an object"
-            onToggle={() => setMoveToolActive((value) => !value)}
-          />
-          <span className="world-editor-tool-status" role="status">
-            Selected tool:{' '}
-            {placementPreviewObject
-              ? 'Placement'
-              : moveToolActive && editableDraft
-                ? 'Move'
-                : 'Select'}
-          </span>
-          <ToggleChip
-            label="Grid"
-            pressed={showGrid}
-            title="Toggle the isometric grid overlay"
-            onToggle={() => setShowGrid((value) => !value)}
-          />
-          <ToggleChip
-            label="Collision"
-            pressed={showCollisions}
-            title="Toggle collision footprints on the map"
-            onToggle={() => setShowCollisions((value) => !value)}
-          />
-          <ToggleChip
-            label="Spawns"
-            pressed={showSpawns}
-            title="Toggle spawn point markers on the map"
-            onToggle={() => setShowSpawns((value) => !value)}
-          />
-          <ToggleChip
-            label="Exits"
-            pressed={showExits}
-            title="Toggle exit regions and transitions on the map"
-            onToggle={() => setShowExits((value) => !value)}
-          />
+          </div>
+
+          <button
+            className="button button--quiet world-editor-reset-panels"
+            onClick={resetPanelSizes}
+            title="Reset Layers and Inspector panel widths to defaults"
+            type="button"
+          >
+            Reset panel sizes
+          </button>
         </div>
 
         <div className="world-editor-mobile-actions" aria-label="Editor panels">
@@ -2330,11 +2565,14 @@ export function WorldEditor(props: WorldEditorProps) {
             aria-expanded={guideOpen}
             className="button button--secondary"
             data-editor-guide-trigger-mobile="true"
-            onClick={() => setGuideOpen(true)}
+            onClick={() => {
+              setGuideWalkthrough(false);
+              setGuideOpen(true);
+            }}
             title="Open How to use the World Editor"
             type="button"
           >
-            Editor Guide
+            Help
           </button>
         </div>
       </header>
@@ -2361,8 +2599,22 @@ export function WorldEditor(props: WorldEditorProps) {
 
       <WorldEditorGuide
         onClose={() => setGuideOpen(false)}
+        onStepChange={(stepIndex) => {
+          const step = WORLD_EDITOR_WALKTHROUGH_STEPS[stepIndex];
+          if (step === undefined) return;
+          if (step.openLayers) {
+            setLayersCollapsedPersist(false);
+            setMobilePanel('assets');
+            setLayer('objects');
+          }
+          if (step.openInspector) {
+            setInspectorCollapsedPersist(false);
+            setMobilePanel('inspector');
+          }
+        }}
         open={guideOpen}
         triggerRef={guideTriggerRef}
+        walkthroughMode={guideWalkthrough}
       />
 
       {actionState.outcome === 'idle' ? null : (
@@ -2378,6 +2630,13 @@ export function WorldEditor(props: WorldEditorProps) {
         className={`world-editor-layout ${layersCollapsed ? 'is-layers-collapsed' : ''} ${inspectorCollapsed ? 'is-inspector-collapsed' : ''}`}
         data-layers-collapsed={layersCollapsed ? 'true' : 'false'}
         data-inspector-collapsed={inspectorCollapsed ? 'true' : 'false'}
+        data-resizable-panels="true"
+        style={
+          {
+            '--world-editor-layers-width': `${layersWidth}px`,
+            '--world-editor-inspector-width': `${inspectorWidth}px`,
+          } as CSSProperties
+        }
       >
         {layersCollapsed ? (
           <button
@@ -2394,28 +2653,212 @@ export function WorldEditor(props: WorldEditorProps) {
             aria-labelledby="layers-title"
             data-editor-sidebar="assets"
             data-scrollable-panel="layers"
+            data-tour-id="layers"
           >
             {assetsPanel}
           </aside>
         )}
 
+        {!layersCollapsed ? (
+          <button
+            aria-label="Resize layers panel"
+            aria-orientation="vertical"
+            aria-valuemax={WORLD_EDITOR_PANEL_WIDTHS.layersMax}
+            aria-valuemin={WORLD_EDITOR_PANEL_WIDTHS.layersMin}
+            aria-valuenow={layersWidth}
+            className="world-editor-resize-handle world-editor-resize-handle--layers"
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              const delta = event.key === 'ArrowRight' ? 16 : -16;
+              const next = clampLayersWidth(layersWidth + delta);
+              setLayersWidth(next);
+              persistPanelWidths(next, inspectorWidth);
+              userAdjustedView.current = false;
+            }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              beginPanelResize('layers', event.clientX);
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            role="slider"
+            title="Drag to resize Layers panel"
+            type="button"
+          />
+        ) : null}
+
         <section
           className="world-editor-stage"
           aria-labelledby="stage-title"
           data-editor-stage="true"
+          data-tour-id="map"
         >
           <div className="world-editor-stage__heading">
             <div>
               <p className="eyebrow">Isometric workspace</p>
               <h2 id="stage-title">{manifest.name}</h2>
             </div>
-            <span className="world-editor-stage__size">
-              {manifest.width} × {manifest.height} world units · {manifest.objects.length} objects
-            </span>
+            <div className="world-editor-stage__meta" aria-live="polite">
+              <span className="world-editor-stage__size">
+                {manifest.width} × {manifest.height} · {manifest.objects.length} objects
+              </span>
+              <span className="world-editor-stage__meta-item">
+                Zoom {zoomPercentage(canvasZoom)}%
+              </span>
+              <span className="world-editor-stage__meta-item">Tool {activeToolLabel}</span>
+              {selectedSummary ? (
+                <span className="world-editor-stage__meta-item world-editor-stage__selection">
+                  Selected {selectedSummary}
+                </span>
+              ) : null}
+            </div>
           </div>
+
+          <div
+            className="world-editor-map-toolbar"
+            data-map-toolbar="true"
+            role="toolbar"
+            aria-label="Map view and tools"
+          >
+            <div
+              className="world-editor-map-toolbar__group"
+              data-tour-id="view-overlays"
+              role="group"
+              aria-label="View controls"
+            >
+              <span className="world-editor-map-toolbar__label">View</span>
+              <label className="world-editor-render-mode">
+                <span className="sr-only">Object rendering mode</span>
+                <PremiumSelect
+                  aria-label="Object rendering mode"
+                  onChange={(value) => setRenderMode(value as WorldObjectRenderMode)}
+                  options={WORLD_OBJECT_RENDER_MODES.map((mode) => ({
+                    value: mode,
+                    label: renderModeLabel(mode),
+                  }))}
+                  size="compact"
+                  value={renderMode}
+                />
+              </label>
+              <ToggleChip
+                label="Grid"
+                pressed={showGrid}
+                title="Toggle the isometric grid overlay"
+                onToggle={() => setShowGrid((value) => !value)}
+              />
+              <ToggleChip
+                label="Collision"
+                pressed={showCollisions}
+                title="Toggle collision footprints on the map"
+                onToggle={() => setShowCollisions((value) => !value)}
+              />
+              <ToggleChip
+                label="Spawns"
+                pressed={showSpawns}
+                title="Toggle spawn point markers on the map"
+                onToggle={() => setShowSpawns((value) => !value)}
+              />
+              <ToggleChip
+                label="Exits"
+                pressed={showExits}
+                title="Toggle exit regions and transitions on the map"
+                onToggle={() => setShowExits((value) => !value)}
+              />
+            </div>
+
+            <div className="world-editor-map-toolbar__group" role="group" aria-label="Edit tools">
+              <span className="world-editor-map-toolbar__label">Tools</span>
+              <ToggleChip
+                label="Select"
+                pressed={activeToolLabel === 'Select'}
+                title="Select objects on the map (default)"
+                onToggle={() => setMoveToolActive(false)}
+              />
+              <span data-tour-id="move-tool">
+                <ToggleChip
+                  disabled={!editableDraft}
+                  label="Move"
+                  pressed={moveToolActive && editableDraft}
+                  title="Require an explicit mode before pointer or touch dragging changes an object"
+                  onToggle={() => setMoveToolActive((value) => !value)}
+                />
+              </span>
+              <span className="world-editor-tool-status" role="status">
+                Selected tool: {activeToolLabel}
+              </span>
+            </div>
+
+            <div className="world-editor-map-toolbar__group" role="group" aria-label="Camera">
+              <span className="world-editor-map-toolbar__label">Camera</span>
+              <button
+                aria-label="Zoom out"
+                className="world-canvas-controls__button"
+                disabled={canvasZoom <= CANVAS_ZOOM_MIN}
+                onClick={() => {
+                  userAdjustedView.current = true;
+                  const next = clampCanvasZoom(canvasZoomRef.current - CANVAS_ZOOM_STEP);
+                  canvasZoomRef.current = next;
+                  setCanvasZoom(next);
+                  commitPan(canvasPanRef.current);
+                }}
+                title="Zoom out (−)"
+                type="button"
+              >
+                −
+              </button>
+              <span aria-live="polite" className="world-canvas-controls__zoom">
+                {zoomPercentage(canvasZoom)}%
+              </span>
+              <button
+                aria-label="Zoom in"
+                className="world-canvas-controls__button"
+                disabled={canvasZoom >= CANVAS_ZOOM_MAX}
+                onClick={() => {
+                  userAdjustedView.current = true;
+                  const next = clampCanvasZoom(canvasZoomRef.current + CANVAS_ZOOM_STEP);
+                  canvasZoomRef.current = next;
+                  setCanvasZoom(next);
+                  commitPan(canvasPanRef.current);
+                }}
+                title="Zoom in (+)"
+                type="button"
+              >
+                +
+              </button>
+              <button
+                aria-label="Fit map in view"
+                className="world-canvas-controls__button"
+                onClick={fitCanvasMap}
+                title="Fit map to the canvas (0)"
+                type="button"
+              >
+                Fit
+              </button>
+              <button
+                aria-label="Reset canvas view"
+                className="world-canvas-controls__button"
+                onClick={resetCanvasView}
+                title="Reset map view to the fitted default"
+                type="button"
+              >
+                Reset
+              </button>
+              <button
+                aria-expanded={canvasHelpOpen}
+                aria-label="Canvas controls help"
+                className="world-canvas-controls__button"
+                onClick={() => setCanvasHelpOpen((value) => !value)}
+                title="Canvas controls help"
+                type="button"
+              >
+                ?
+              </button>
+            </div>
+          </div>
+
           <div
             aria-describedby="world-canvas-pan-help"
-            aria-label={`Map canvas for ${manifest.name}. Hold left mouse button on empty space and drag to pan. Use plus and minus to zoom. Arrow keys pan when focused.`}
+            aria-label={`Map canvas for ${manifest.name}. Hold left mouse button on empty space and drag to pan. Use plus and minus to zoom. Arrow keys pan when focused. Selected tool: ${activeToolLabel}.${selectedSummary ? ` Selected object: ${selectedSummary}.` : ''}`}
             className={`world-editor-stage__canvas-wrap ${isPanning ? 'is-panning' : ''}`}
             data-canvas-host="true"
             data-pan-threshold={CANVAS_PAN_DRAG_THRESHOLD_PX}
@@ -2603,72 +3046,19 @@ export function WorldEditor(props: WorldEditorProps) {
               Hold the left mouse button on empty map space and drag to pan. Hold Space and drag, or
               use the middle mouse button. Zoom with plus and minus. Fit shows the complete map.
               Reset returns to the default fitted view. Arrow keys pan when the canvas is focused.
+              Camera controls live in the toolbar above the map.
             </p>
-            <div className="world-canvas-controls" role="toolbar" aria-label="Canvas navigation">
-              <button
-                aria-label="Zoom in"
-                className="world-canvas-controls__button"
-                disabled={canvasZoom >= CANVAS_ZOOM_MAX}
-                onClick={() => {
-                  userAdjustedView.current = true;
-                  const next = clampCanvasZoom(canvasZoomRef.current + CANVAS_ZOOM_STEP);
-                  canvasZoomRef.current = next;
-                  setCanvasZoom(next);
-                  commitPan(canvasPanRef.current);
-                }}
-                title="Zoom in (+)"
-                type="button"
+            {process.env.NODE_ENV === 'development' ? (
+              <p
+                className="world-editor-viewport-debug"
+                data-viewport-debug="true"
+                aria-hidden="true"
               >
-                +
-              </button>
-              <button
-                aria-label="Zoom out"
-                className="world-canvas-controls__button"
-                disabled={canvasZoom <= CANVAS_ZOOM_MIN}
-                onClick={() => {
-                  userAdjustedView.current = true;
-                  const next = clampCanvasZoom(canvasZoomRef.current - CANVAS_ZOOM_STEP);
-                  canvasZoomRef.current = next;
-                  setCanvasZoom(next);
-                  commitPan(canvasPanRef.current);
-                }}
-                title="Zoom out (−)"
-                type="button"
-              >
-                −
-              </button>
-              <span aria-live="polite" className="world-canvas-controls__zoom">
-                {zoomPercentage(canvasZoom)}%
-              </span>
-              <button
-                aria-label="Fit map in view"
-                className="world-canvas-controls__button"
-                onClick={fitCanvasMap}
-                title="Fit map to the canvas (0)"
-                type="button"
-              >
-                Fit
-              </button>
-              <button
-                aria-label="Reset canvas view"
-                className="world-canvas-controls__button"
-                onClick={resetCanvasView}
-                title="Reset map view to the fitted default"
-                type="button"
-              >
-                Reset
-              </button>
-              <button
-                aria-expanded={canvasHelpOpen}
-                aria-label="Canvas controls help"
-                className="world-canvas-controls__button"
-                onClick={() => setCanvasHelpOpen((value) => !value)}
-                title="Canvas controls"
-                type="button"
-              >
-                ?
-              </button>
-            </div>
+                {canvasHostRef.current
+                  ? `${canvasHostRef.current.clientWidth}×${canvasHostRef.current.clientHeight} · ${zoomPercentage(canvasZoom)}%`
+                  : `… · ${zoomPercentage(canvasZoom)}%`}
+              </p>
+            ) : null}
             {canvasHelpOpen ? (
               <div className="world-canvas-help" role="dialog" aria-label="Canvas controls">
                 <p>
@@ -2697,12 +3087,35 @@ export function WorldEditor(props: WorldEditorProps) {
               </div>
             ) : null}
           </div>
-          <p className="world-editor-stage__note">
-            Structured isometric data view — eligible active assets use protected processed media;
-            every other object keeps an explained marker fallback. Viewing, selection, render modes,
-            zooming, and panning do not mutate draft data.
-          </p>
         </section>
+
+        {!inspectorCollapsed ? (
+          <button
+            aria-label="Resize inspector panel"
+            aria-orientation="vertical"
+            aria-valuemax={WORLD_EDITOR_PANEL_WIDTHS.inspectorMax}
+            aria-valuemin={WORLD_EDITOR_PANEL_WIDTHS.inspectorMin}
+            aria-valuenow={inspectorWidth}
+            className="world-editor-resize-handle world-editor-resize-handle--inspector"
+            onKeyDown={(event) => {
+              if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+              event.preventDefault();
+              const delta = event.key === 'ArrowLeft' ? 16 : -16;
+              const next = clampInspectorWidth(inspectorWidth + delta);
+              setInspectorWidth(next);
+              persistPanelWidths(layersWidth, next);
+              userAdjustedView.current = false;
+            }}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              beginPanelResize('inspector', event.clientX);
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            role="slider"
+            title="Drag to resize Inspector panel"
+            type="button"
+          />
+        ) : null}
 
         {inspectorCollapsed ? (
           <button
@@ -2719,6 +3132,7 @@ export function WorldEditor(props: WorldEditorProps) {
             aria-labelledby="inspector-title"
             data-editor-sidebar="inspector"
             data-scrollable-panel="inspector"
+            data-tour-id="inspector"
           >
             {inspectorPanel}
           </aside>
@@ -2732,9 +3146,10 @@ export function WorldEditor(props: WorldEditorProps) {
         data-validation-expanded={validationExpanded ? 'true' : 'false'}
       >
         <div className="world-validation-panel__header">
-          <div>
-            <p className="eyebrow">Validation</p>
-            <h2 id="validation-title">Draft status</h2>
+          <div className="world-validation-panel__identity">
+            <h2 id="validation-title" className="world-validation-panel__title">
+              Validation
+            </h2>
           </div>
           <div className="world-validation-panel__chips">
             <span
@@ -2767,6 +3182,17 @@ export function WorldEditor(props: WorldEditorProps) {
             >
               {validationExpanded ? 'Collapse' : 'Expand'}
             </button>
+            {editableDraft && !dirty && issues.length === 0 ? (
+              <button
+                className="button button--quiet"
+                disabled={pending}
+                onClick={validateDraft}
+                title="Rerun trusted validation on the current saved revision"
+                type="button"
+              >
+                {pending && operation === 'validate' ? 'Validating…' : 'Rerun'}
+              </button>
+            ) : null}
           </div>
         </div>
         {validationExpanded ? (
@@ -2774,6 +3200,9 @@ export function WorldEditor(props: WorldEditorProps) {
             <p className="world-validation-panel__summary">
               Browser checks guide fields immediately. Only the trusted server validator can mark a
               saved draft as validated for preview.
+              {serverValidation?.checkedAt
+                ? ` Last trusted check: ${new Date(serverValidation.checkedAt).toLocaleString()}.`
+                : ''}
             </p>
             {issues.length > 0 ? (
               <ul className="validation-issues" role="alert">

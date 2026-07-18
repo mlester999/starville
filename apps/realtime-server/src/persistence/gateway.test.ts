@@ -115,4 +115,39 @@ describe('realtime avatar persistence boundary', () => {
       gateway.activateEmote('10000000-0000-4000-8000-000000000001', 'wave', 'emote-request-2'),
     ).rejects.toBeDefined();
   });
+
+  it('admits only the exact participant-bound home-visit projection', async () => {
+    const rpc = vi.fn(async () => ({
+      data: {
+        status: 'admitted',
+        realtimeSessionId: 'f1100000-0000-4000-8000-000000000301',
+        visitSessionId: 'f1100000-0000-4000-8000-000000000302',
+        participantId: 'f1100000-0000-4000-8000-000000000303',
+        homeId: 'f1100000-0000-4000-8000-000000000304',
+        lastEventNumber: '0',
+        snapshot: { participants: [] },
+      },
+      error: null,
+    }));
+    const gateway = createSupabaseRealtimePersistenceGateway({ rpc } as unknown as SupabaseClient);
+    await expect(
+      gateway.admitHomeVisit('a'.repeat(64), 'home-visit-connection', 'home-visit-request'),
+    ).resolves.toMatchObject({
+      status: 'admitted',
+      participantId: 'f1100000-0000-4000-8000-000000000303',
+    });
+    expect(rpc).toHaveBeenCalledWith('admit_player_home_visit_realtime_ticket', {
+      p_ticket_hash: 'a'.repeat(64),
+      p_connection_id: 'home-visit-connection',
+      p_request_id: 'home-visit-request',
+    });
+  });
+
+  it('maps removal and block revalidation to closed channel access', async () => {
+    const rpc = vi.fn(async () => ({ data: { status: 'home_visit_blocked' }, error: null }));
+    const gateway = createSupabaseRealtimePersistenceGateway({ rpc } as unknown as SupabaseClient);
+    await expect(gateway.revalidateHomeVisit('f1100000-0000-4000-8000-000000000301')).resolves.toBe(
+      'home_visit_blocked',
+    );
+  });
 });

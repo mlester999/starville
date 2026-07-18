@@ -9,11 +9,7 @@ import { PlayerRequestError } from '../app/player-client';
 import { loadProgression } from '../app/progression-client';
 import type { TrustedTokenAccess } from '../app/token-access-client';
 import { usePlayerPersistence } from '../app/use-player-persistence';
-import {
-  loadCurrentPublishedWorld,
-  transitionPublishedWorld,
-  type PublishedWorld,
-} from '../app/world-client';
+import { transitionPublishedWorld, type PublishedWorld } from '../app/world-client';
 import type {
   ExitTransitionRequest,
   GameRuntimeHandle,
@@ -39,6 +35,10 @@ import {
   type TrackedProgressionQuest,
 } from '../app/progression-projection';
 import { ProgressionPanel } from './ProgressionPanel';
+import { GuidedPlayerExperience } from './GuidedPlayerExperience';
+import { GameplayAssetOverrideProvider } from './GameplayAssetOverrides';
+import type { GameplayAssetOverride } from '@starville/asset-management';
+import { beginGameWorldReads } from '../app/game-world-bootstrap';
 
 interface GameWorldProps {
   readonly apiUrl: string;
@@ -135,6 +135,10 @@ function LoadedGameWorld({
   const [socialGraphOpen, setSocialGraphOpen] = useState(false);
   const [activityPanelOpen, setActivityPanelOpen] = useState(false);
   const [progressionOpen, setProgressionOpen] = useState(false);
+  const [playerGuideOpen, setPlayerGuideOpen] = useState(false);
+  const [guidedObjectiveActive, setGuidedObjectiveActive] = useState(false);
+  const [playerExperienceRefresh, setPlayerExperienceRefresh] = useState(0);
+  const cozyPanelWasOpen = useRef(false);
   const [playerLevel, setPlayerLevel] = useState<number>();
   const [trackedQuest, setTrackedQuest] = useState<TrackedProgressionQuest | null>(null);
   const [channelPopoverOpen, setChannelPopoverOpen] = useState(false);
@@ -168,6 +172,19 @@ function LoadedGameWorld({
       setTrackedQuest(trackedProgressionQuest(progression));
     },
     [],
+  );
+  const handleCozyOpenChange = useCallback((open: boolean) => {
+    const wasOpen = cozyPanelWasOpen.current;
+    cozyPanelWasOpen.current = open;
+    setCozyOpen(open);
+    if (wasOpen && !open) setPlayerExperienceRefresh((value) => value + 1);
+  }, []);
+  const handleProgressionWorkspaceChange = useCallback(
+    (next: Awaited<ReturnType<typeof loadProgression>>) => {
+      updateProgressionHud(next);
+      setPlayerExperienceRefresh((value) => value + 1);
+    },
+    [updateProgressionHud],
   );
 
   useEffect(() => {
@@ -206,6 +223,7 @@ function LoadedGameWorld({
     socialGraphOpen ||
     activityPanelOpen ||
     progressionOpen ||
+    playerGuideOpen ||
     leaving ||
     traveling;
   const inputBlocked = blockingModalOpen || chatInputActive || channelPopoverOpen;
@@ -618,7 +636,7 @@ function LoadedGameWorld({
           interaction={cozyInteraction}
           onAccessInvalid={onAccessInvalid}
           onInteractionClose={() => setCozyInteraction(null)}
-          onOpenChange={setCozyOpen}
+          onOpenChange={handleCozyOpenChange}
           externalInventoryRequest={inventoryRequest}
           externalDustRequest={dustHistoryRequest}
           onDustBalanceChange={setDustBalance}
@@ -639,12 +657,14 @@ function LoadedGameWorld({
               setLocalPlayerState(privateState);
               setSelectedRemotePresenceId(null);
               setInsidePersonalHome(true);
+              setPlayerExperienceRefresh((value) => value + 1);
             } else {
               personalHomeViewRef.current = undefined;
               const publicState = publicStateBeforeHome.current;
               runtime.current?.loadWorld(runtimeWorld(world), publicState);
               setLocalPlayerState(publicState);
               setInsidePersonalHome(false);
+              setPlayerExperienceRefresh((value) => value + 1);
             }
           }}
         />
@@ -748,7 +768,17 @@ function LoadedGameWorld({
             : { selfPresenceId: realtime.state.self.presenceId })}
         />
 
-        {trackedQuest === null ? null : (
+        <GuidedPlayerExperience
+          apiUrl={apiUrl}
+          disabled={blockingModalOpen || chatInputActive || traveling}
+          onObjectiveChange={setGuidedObjectiveActive}
+          onOpenChange={setPlayerGuideOpen}
+          onOpenInventory={() => setInventoryRequest((value) => value + 1)}
+          onOpenProgression={() => setProgressionOpen(true)}
+          refreshSignal={playerExperienceRefresh}
+        />
+
+        {trackedQuest === null || guidedObjectiveActive ? null : (
           <button
             className="progression-tracked-hud"
             disabled={blockingModalOpen || chatInputActive || traveling}
@@ -786,9 +816,12 @@ function LoadedGameWorld({
         <ProgressionPanel
           apiUrl={apiUrl}
           open={progressionOpen}
-          onClose={() => setProgressionOpen(false)}
+          onClose={() => {
+            setProgressionOpen(false);
+            setPlayerExperienceRefresh((value) => value + 1);
+          }}
           onLevelChange={setPlayerLevel}
-          onWorkspaceChange={updateProgressionHud}
+          onWorkspaceChange={handleProgressionWorkspaceChange}
         />
 
         {realtime.state.emotes.activations.length === 0 ? null : (
@@ -877,6 +910,7 @@ export function GameWorld(props: GameWorldProps) {
   const [world, setWorld] = useState<PublishedWorld>();
   const [loadError, setLoadError] = useState<{ readonly requestId?: string }>();
   const [retryVersion, setRetryVersion] = useState(0);
+  const [assetOverrides, setAssetOverrides] = useState<readonly GameplayAssetOverride[]>([]);
   const worldRef = useRef<PublishedWorld | undefined>(undefined);
   const onAccessInvalidRef = useRef(onAccessInvalid);
   worldRef.current = world;
@@ -884,8 +918,14 @@ export function GameWorld(props: GameWorldProps) {
 
   useEffect(() => {
     const controller = new AbortController();
+    const reads = beginGameWorldReads(apiUrl, controller.signal);
     setLoadError(undefined);
-    void loadCurrentPublishedWorld(apiUrl, controller.signal)
+    void reads.assetOverrides.then(setAssetOverrides).catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      setAssetOverrides([]);
+      if (accessInvalid(error)) onAccessInvalidRef.current();
+    });
+    void reads.world
       .then((nextWorld) => {
         setWorld(nextWorld);
         setLoadError(undefined);
@@ -945,5 +985,9 @@ export function GameWorld(props: GameWorldProps) {
     );
   }
 
-  return <LoadedGameWorld {...props} initialWorld={world} />;
+  return (
+    <GameplayAssetOverrideProvider overrides={assetOverrides}>
+      <LoadedGameWorld {...props} initialWorld={world} />
+    </GameplayAssetOverrideProvider>
+  );
 }

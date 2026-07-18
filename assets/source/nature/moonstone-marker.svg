@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" fill="none"><title>Moonstone Marker</title><desc>Moonstone Marker with a compact readable silhouette and soft upper-left light.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="99.84" cy="168.96" rx="65.28" ry="15.36" fill="#18231f" opacity=".22"/><path d="M32.64 140.16l24.96-71.04 67.2-24.96 38.4 53.76-15.36 57.6-86.4 9.6z" fill="url(#surface)" stroke="#2c304b" stroke-width="5"/><path d="M65.28 90.24q24.96-23.04 53.76-13.44" stroke="#fff4c5" stroke-width="7" opacity=".55"/></g></svg>

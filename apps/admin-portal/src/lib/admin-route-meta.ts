@@ -162,6 +162,17 @@ export const ADMIN_ROUTE_METADATA: readonly {
     },
   },
   {
+    path: '/operations/player-experience',
+    meta: {
+      title: 'Player Experience',
+      description:
+        'Onboarding adoption, Daily Rhythm readiness, semantic guidance, recovery, and aggregate telemetry.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
+    },
+  },
+  {
     path: '/operations/social/parties',
     meta: {
       title: 'Parties',

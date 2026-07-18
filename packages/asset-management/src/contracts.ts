@@ -83,6 +83,13 @@ export const ASSET_PRODUCTION_STATUSES = [
 ] as const;
 export const assetProductionStatusSchema = z.enum(ASSET_PRODUCTION_STATUSES);
 
+export const assetSourceStateSchema = z.enum([
+  'unavailable',
+  'bundled_default',
+  'uploaded_override',
+]);
+export type AssetSourceState = z.infer<typeof assetSourceStateSchema>;
+
 export const ASSET_VALIDATION_LEVELS = [
   'blocking_error',
   'warning',
@@ -216,6 +223,8 @@ export const worldAssetDeliverySchema = z
     assetKey: assetIdentifierSchema,
     versionId: assetUuidSchema,
     checksum: assetChecksumSchema,
+    /** Exact checked-in manifest identity for repository material; null for uploaded media. */
+    bundledManifestVersion: z.literal('1.0.0').nullable(),
     url: nullableDeliveryUrlSchema,
     mediaType: z.literal('image/webp').nullable(),
     width: z.number().int().positive().max(GLOBAL_ASSET_MAX_DIMENSION).nullable(),
@@ -248,6 +257,16 @@ export const worldAssetDeliverySchema = z
       context.addIssue({
         code: 'custom',
         message: 'Development markers cannot expose delivery files',
+      });
+    }
+    // A null identity is retained only for immutable pre-12B repository pins.
+    // Runtime resolution treats that legacy identity as unresolved/missing; newly
+    // projected bundled material is always bound to the current exact manifest.
+    if (!value.developmentMarker && value.bundledManifestVersion !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['bundledManifestVersion'],
+        message: 'Uploaded material cannot claim a bundled manifest identity',
       });
     }
     if (!value.developmentMarker && productionFields.some((field) => field === null)) {
@@ -294,9 +313,25 @@ export const assetSummarySchema = z
     lifecycleStatus: assetRecordLifecycleStatusSchema,
     productionStatus: assetProductionStatusSchema,
     activeVersionId: assetUuidSchema.nullable(),
+    bundledDefaultVersionId: assetUuidSchema.nullable(),
+    bundledManifestVersion: z
+      .string()
+      .regex(/^[0-9]+\.[0-9]+\.[0-9]+$/u)
+      .nullable(),
+    activeSourceState: assetSourceStateSchema,
+    canRestoreBundledDefault: z.boolean(),
     developmentMarkerReplacementKey: assetIdentifierSchema.nullable(),
     versionCount: z.number().int().nonnegative(),
+    uploadedVersionCount: z.number().int().nonnegative(),
+    invalidVersionCount: z.number().int().nonnegative(),
     referenceCount: z.number().int().nonnegative(),
+    referenceBreakdown: z
+      .object({
+        world: z.number().int().nonnegative(),
+        furniture: z.number().int().nonnegative(),
+        farming: z.number().int().nonnegative(),
+      })
+      .strict(),
     revision: z.number().int().positive(),
     thumbnailUrl: nullableAdminAssetMediaUrlSchema,
     createdAt: assetTimestampSchema,
@@ -489,6 +524,13 @@ export const assetDeprecationActionSchema = z
   .strict();
 export type AssetDeprecationAction = z.infer<typeof assetDeprecationActionSchema>;
 
+export const assetRestoreBundledDefaultActionSchema = assetDeprecationActionSchema
+  .extend({ typedConfirmation: z.literal('RESTORE BUNDLED DEFAULT') })
+  .strict();
+export type AssetRestoreBundledDefaultAction = z.infer<
+  typeof assetRestoreBundledDefaultActionSchema
+>;
+
 export const assetCreateVersionActionSchema = assetDeprecationActionSchema
   .extend({
     sourceVersionId: assetUuidSchema,
@@ -523,6 +565,7 @@ export const assetMutationResponseSchema = z
       'rejected',
       'approved',
       'activated',
+      'bundled_default_restored',
       'deprecated',
       'archived',
       'replayed',

@@ -1,3 +1,10 @@
+import {
+  bundledAssetVariant,
+  getBundledAsset,
+  resolveAssetSource,
+  type BundledAssetEntry,
+} from '@starville/asset-management';
+
 import type { WorldEditorAssetCandidate } from '../world-assets/contracts';
 import { adminAssetMediaPath, availableAdminAssetMediaPath } from '../world-assets/media';
 import type { AdminWorldManifest, WorldDraftAssetPin } from './contracts';
@@ -8,6 +15,9 @@ export type WorldObjectRenderMode = (typeof WORLD_OBJECT_RENDER_MODES)[number];
 export type WorldObjectRenderReason =
   | 'pinned_asset'
   | 'active_asset'
+  | 'bundled_default'
+  | 'bundled_fallback'
+  | 'safe_placeholder'
   | 'marker_mode'
   | 'collision_debug_mode'
   | 'unlisted_asset_key'
@@ -22,6 +32,9 @@ export type WorldObjectRenderReason =
 export interface WorldObjectRenderResolution {
   readonly status: 'asset' | 'marker';
   readonly reason: WorldObjectRenderReason;
+  readonly source:
+    'uploaded_pin' | 'uploaded_active' | 'bundled_default' | 'safe_placeholder' | 'marker';
+  readonly sourceLabel: string;
   readonly explanation: string;
   readonly nextSafeAction: string;
   readonly pin: WorldDraftAssetPin | null;
@@ -29,7 +42,13 @@ export interface WorldObjectRenderResolution {
   readonly replacementCandidate: WorldEditorAssetCandidate | null;
   readonly renderedVersionId: string | null;
   readonly renderedVersionNumber: number | null;
+  readonly renderedMediaId: string | null;
   readonly mediaUrl: string | null;
+  readonly bundledAsset: BundledAssetEntry | null;
+  readonly render: WorldDraftAssetPin['pinnedVersion']['render'] | null;
+  readonly supportedRotations: readonly (0 | 90 | 180 | 270)[];
+  readonly usesAuthoredRotation: boolean;
+  readonly bundledVariantId: string | null;
 }
 
 type MapObject = AdminWorldManifest['objects'][number];
@@ -38,13 +57,15 @@ function markerResolution(input: {
   reason: Exclude<WorldObjectRenderReason, 'pinned_asset' | 'active_asset'>;
   explanation: string;
   nextSafeAction: string;
-  pin?: WorldDraftAssetPin | null;
-  candidate?: WorldEditorAssetCandidate | null;
-  replacementCandidate?: WorldEditorAssetCandidate | null;
+  pin?: WorldDraftAssetPin | null | undefined;
+  candidate?: WorldEditorAssetCandidate | null | undefined;
+  replacementCandidate?: WorldEditorAssetCandidate | null | undefined;
 }): WorldObjectRenderResolution {
   return {
     status: 'marker',
     reason: input.reason,
+    source: 'marker',
+    sourceLabel: 'Fallback marker',
     explanation: input.explanation,
     nextSafeAction: input.nextSafeAction,
     pin: input.pin ?? null,
@@ -52,8 +73,148 @@ function markerResolution(input: {
     replacementCandidate: input.replacementCandidate ?? null,
     renderedVersionId: null,
     renderedVersionNumber: null,
+    renderedMediaId: null,
     mediaUrl: null,
+    bundledAsset: null,
+    render: null,
+    supportedRotations: [0],
+    usesAuthoredRotation: false,
+    bundledVariantId: null,
   };
+}
+
+function bundledRender(asset: BundledAssetEntry): WorldDraftAssetPin['pinnedVersion']['render'] {
+  return {
+    renderWidth: asset.width,
+    renderHeight: asset.height,
+    scale: asset.recommendedScale,
+    anchor: asset.anchor,
+    footAnchor: asset.footAnchor,
+    depthAnchor: asset.depthAnchor,
+    supportedRotations: asset.supportedRotations,
+    defaultRotation: asset.defaultRotation,
+  };
+}
+
+function bundledMedia(
+  asset: BundledAssetEntry,
+  rotation: 0 | 90 | 180 | 270,
+): Readonly<{
+  url: string;
+  mediaId: string;
+  variantId: string | null;
+  authoredRotation: boolean;
+}> {
+  const resolvedRotation = asset.supportedRotations.includes(rotation)
+    ? rotation
+    : asset.defaultRotation;
+  const variant = bundledAssetVariant(asset, { rotation: resolvedRotation });
+  const authoredRotation =
+    resolvedRotation === asset.defaultRotation || variant?.rotation === resolvedRotation;
+  const resolved = resolveAssetSource({
+    assetKey: asset.key,
+    context: 'admin_preview',
+    allowActiveOverride: false,
+    rotation: resolvedRotation,
+    mediaSurface: 'admin',
+  });
+  return {
+    url: resolved.url,
+    mediaId: resolved.cacheIdentity,
+    variantId: variant?.id ?? null,
+    authoredRotation,
+  };
+}
+
+function bundledResolution(input: {
+  readonly object: MapObject;
+  readonly asset: BundledAssetEntry;
+  readonly reason: 'bundled_default' | 'bundled_fallback' | 'safe_placeholder';
+  readonly explanation: string;
+  readonly nextSafeAction: string;
+  readonly failedMediaIds?: ReadonlySet<string> | undefined;
+  readonly pin?: WorldDraftAssetPin | null | undefined;
+  readonly candidate?: WorldEditorAssetCandidate | null | undefined;
+  readonly replacementCandidate?: WorldEditorAssetCandidate | null | undefined;
+}): WorldObjectRenderResolution {
+  const rotation = input.object.rotation ?? input.asset.defaultRotation;
+  const media = bundledMedia(input.asset, rotation);
+  if (input.failedMediaIds?.has(media.mediaId) === true) {
+    const placeholder = getBundledAsset('system.missing-asset');
+    if (input.asset.key !== 'system.missing-asset' && placeholder !== undefined) {
+      return bundledResolution({
+        ...input,
+        asset: placeholder,
+        reason: 'safe_placeholder',
+        explanation: `Bundled media for ${input.object.assetId} could not be loaded. The stable Starville missing-asset visual is shown without changing the object.`,
+        nextSafeAction:
+          'Repair the bundled file and rerun asset validation; object placement is unchanged.',
+      });
+    }
+    return markerResolution({
+      reason: 'media_load_failed',
+      explanation:
+        'The bundled safe placeholder could not be loaded, so a compact marker is shown.',
+      nextSafeAction: 'Repair the allowlisted bundled media files and rerun asset validation.',
+      pin: input.pin,
+      candidate: input.candidate,
+      replacementCandidate: input.replacementCandidate,
+    });
+  }
+  return {
+    status: 'asset',
+    reason: input.reason,
+    source: input.reason === 'safe_placeholder' ? 'safe_placeholder' : 'bundled_default',
+    sourceLabel:
+      input.reason === 'safe_placeholder' ? 'Safe missing-asset fallback' : 'Bundled Default',
+    explanation: input.explanation,
+    nextSafeAction: input.nextSafeAction,
+    pin: input.pin ?? null,
+    candidate: input.candidate ?? null,
+    replacementCandidate: input.replacementCandidate ?? null,
+    renderedVersionId: null,
+    renderedVersionNumber: null,
+    renderedMediaId: media.mediaId,
+    mediaUrl: media.url,
+    bundledAsset: input.asset,
+    render: bundledRender(input.asset),
+    supportedRotations: input.asset.supportedRotations,
+    usesAuthoredRotation: media.authoredRotation,
+    bundledVariantId: media.variantId,
+  };
+}
+
+function bundledOrPlaceholder(input: {
+  readonly object: MapObject;
+  readonly reason: 'bundled_default' | 'bundled_fallback';
+  readonly explanation: string;
+  readonly nextSafeAction: string;
+  readonly failedMediaIds?: ReadonlySet<string> | undefined;
+  readonly pin?: WorldDraftAssetPin | null | undefined;
+  readonly candidate?: WorldEditorAssetCandidate | null | undefined;
+  readonly replacementCandidate?: WorldEditorAssetCandidate | null | undefined;
+}): WorldObjectRenderResolution {
+  const asset = getBundledAsset(input.object.assetId);
+  if (asset !== undefined) return bundledResolution({ ...input, asset });
+  const placeholder = getBundledAsset('system.missing-asset');
+  if (placeholder !== undefined) {
+    return bundledResolution({
+      ...input,
+      asset: placeholder,
+      reason: 'safe_placeholder',
+      explanation: `No bundled or eligible uploaded media exists for ${input.object.assetId}. The stable Starville missing-asset visual is shown.`,
+      nextSafeAction:
+        'Add the stable key to the bundled manifest or activate an approved override.',
+    });
+  }
+  return markerResolution({
+    reason: 'active_version_unavailable',
+    explanation: input.explanation,
+    nextSafeAction: input.nextSafeAction,
+    pin: input.pin,
+    candidate: input.candidate,
+    replacementCandidate: input.replacementCandidate,
+  });
 }
 
 /**
@@ -114,11 +275,13 @@ export function resolveWorldObjectRendering(input: {
   if (pin !== null) {
     const pinned = pin.pinnedVersion;
     if (pin.productionStatus === 'development_marker' || pinned.sourceKind !== 'storage_raster') {
-      return markerResolution({
-        reason: 'development_marker',
-        explanation: `This world draft is pinned to Version ${pinned.versionNumber}, an explicit development marker without processed game artwork.`,
+      return bundledOrPlaceholder({
+        object: input.object,
+        reason: 'bundled_default',
+        explanation: `This exact world pin is repository-owned Version ${pinned.versionNumber}, so its stable key resolves to the bundled default without rewriting the pin.`,
         nextSafeAction:
-          'Keep the retained marker or explicitly replace it with an approved production asset in a draft.',
+          'Keep the bundled default or explicitly select an approved override in a draft.',
+        failedMediaIds: input.failedVersionIds,
         pin,
         candidate,
         replacementCandidate,
@@ -129,32 +292,38 @@ export function resolveWorldObjectRendering(input: {
       pinned.validationStatus !== 'valid' ||
       pinned.processingStatus !== 'completed'
     ) {
-      return markerResolution({
-        reason: 'unsafe_version_state',
-        explanation: `Pinned Version ${pinned.versionNumber} does not satisfy the historical active/deprecated, processed, and valid rendering policy.`,
-        nextSafeAction: 'Inspect the retained version; do not rewrite the pin implicitly.',
+      return bundledOrPlaceholder({
+        object: input.object,
+        reason: 'bundled_fallback',
+        explanation: `Pinned Version ${pinned.versionNumber} is not safe to render, so the bundled default is used without changing the retained pin.`,
+        nextSafeAction: 'Inspect the retained uploaded version and repair its lifecycle evidence.',
+        failedMediaIds: input.failedVersionIds,
         pin,
         candidate,
         replacementCandidate,
       });
     }
     if (!pinned.processedSourceAvailable) {
-      return markerResolution({
-        reason: 'processed_media_unavailable',
-        explanation: `Pinned Version ${pinned.versionNumber} has no eligible sanitized processed-source derivative.`,
-        nextSafeAction: 'Keep the historical marker or explicitly replace the binding in a draft.',
+      return bundledOrPlaceholder({
+        object: input.object,
+        reason: 'bundled_fallback',
+        explanation: `Pinned Version ${pinned.versionNumber} has no eligible processed derivative, so the bundled default is used without changing the retained pin.`,
+        nextSafeAction:
+          'Repair the immutable derivative or explicitly replace the binding in a draft.',
+        failedMediaIds: input.failedVersionIds,
         pin,
         candidate,
         replacementCandidate,
       });
     }
     if (input.failedVersionIds?.has(pinned.id) === true) {
-      return markerResolution({
-        reason: 'media_load_failed',
+      return bundledOrPlaceholder({
+        object: input.object,
+        reason: 'bundled_fallback',
         explanation:
-          'The protected pinned derivative could not be loaded, so this object fell back safely.',
-        nextSafeAction:
-          'Retry after checking the protected media route; the retained world pin was not changed.',
+          'The protected pinned derivative could not be loaded, so the bundled default is shown without changing the world pin.',
+        nextSafeAction: 'Retry or inspect the protected uploaded-media route.',
+        failedMediaIds: input.failedVersionIds,
         pin,
         candidate,
         replacementCandidate,
@@ -163,6 +332,8 @@ export function resolveWorldObjectRendering(input: {
     return {
       status: 'asset',
       reason: 'pinned_asset',
+      source: 'uploaded_pin',
+      sourceLabel: 'Exact uploaded pin',
       explanation: `Rendering immutable Version ${pinned.versionNumber}, the exact version pinned by this world draft. Later activation does not rewrite this reference.`,
       nextSafeAction: 'Inspect the rendered version or explicitly replace the binding in a draft.',
       pin,
@@ -170,44 +341,53 @@ export function resolveWorldObjectRendering(input: {
       replacementCandidate,
       renderedVersionId: pinned.id,
       renderedVersionNumber: pinned.versionNumber,
+      renderedMediaId: pinned.id,
       mediaUrl: adminAssetMediaPath(pin.assetId, pinned.id, 'source'),
+      bundledAsset: getBundledAsset(input.object.assetId) ?? null,
+      render: pinned.render,
+      supportedRotations: pinned.render.supportedRotations,
+      usesAuthoredRotation: false,
+      bundledVariantId: null,
     };
   }
 
   if (!input.allowUnpinnedActive) {
-    return markerResolution({
-      reason: 'pinned_version_unavailable',
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_default',
       explanation:
-        'No retained version pin is available, and this view does not permit active discovery.',
-      nextSafeAction: 'Reload the draft pin material or keep the marker; do not guess a version.',
+        'No exact uploaded pin is available in this stable view, so the stable key resolves to its bundled default. Active discovery was not consulted.',
+      nextSafeAction:
+        'Reload exact pin material if this view is expected to show an uploaded version.',
+      failedMediaIds: input.failedVersionIds,
       candidate,
       replacementCandidate,
     });
   }
   if (candidate === null) {
-    if (replacementCandidate !== null) {
-      return markerResolution({
-        reason: 'explicit_replacement_required',
-        explanation: `${replacementCandidate.asset.friendlyName} is an approved active replacement, but this object still references ${input.object.assetId}.`,
-        nextSafeAction:
-          'Use Replace asset on an editable draft after reviewing collision and interaction impact.',
-        replacementCandidate,
-      });
-    }
-    return markerResolution({
-      reason: 'active_version_unavailable',
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_default',
       explanation:
-        'No eligible active asset version is available in the authorized editor catalog.',
-      nextSafeAction: 'Keep the marker or activate an approved version through the asset workflow.',
+        replacementCandidate === null
+          ? 'No eligible active uploaded version is available, so the stable key resolves to its bundled default.'
+          : `${replacementCandidate.asset.friendlyName} is available as an explicit replacement, while this stable key continues to render its bundled default.`,
+      nextSafeAction:
+        replacementCandidate === null
+          ? 'Keep the bundled default or activate an approved same-key override.'
+          : 'Use Replace asset only if changing the stable key is intentional.',
+      failedMediaIds: input.failedVersionIds,
+      replacementCandidate,
     });
   }
   if (candidate.asset.productionStatus === 'development_marker') {
-    return markerResolution({
-      reason: 'development_marker',
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_default',
       explanation:
-        'This is an explicit repository-owned development marker and has no processed delivery file.',
-      nextSafeAction:
-        'Keep the marker or explicitly replace it with an approved production asset in a draft.',
+        'The active record is repository-owned, so its stable key resolves to the bundled default.',
+      nextSafeAction: 'Keep the bundled default or create an approved same-key uploaded version.',
+      failedMediaIds: input.failedVersionIds,
       candidate,
       replacementCandidate,
     });
@@ -219,12 +399,14 @@ export function resolveWorldObjectRendering(input: {
     candidate.activeVersion.validationStatus !== 'valid' ||
     candidate.activeVersion.processingStatus !== 'completed'
   ) {
-    return markerResolution({
-      reason: 'unsafe_version_state',
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_fallback',
       explanation:
-        'The active candidate does not satisfy the processed and valid rendering policy.',
+        'The active uploaded candidate is not safe to render, so the bundled default is used.',
       nextSafeAction:
-        'Review the asset lifecycle; validated non-active versions are never selected automatically.',
+        'Review the uploaded asset lifecycle; non-active versions are never selected.',
+      failedMediaIds: input.failedVersionIds,
       candidate,
       replacementCandidate,
     });
@@ -236,21 +418,25 @@ export function resolveWorldObjectRendering(input: {
     candidate.activeVersion.sourceUrl,
   );
   if (mediaUrl === null) {
-    return markerResolution({
-      reason: 'processed_media_unavailable',
-      explanation: 'The active version has no declared sanitized processed-source derivative.',
-      nextSafeAction: 'Keep the marker and repair the processing output in the asset workflow.',
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_fallback',
+      explanation:
+        'The active uploaded version has no declared processed derivative, so the bundled default is used.',
+      nextSafeAction: 'Repair the uploaded processing output in the asset workflow.',
+      failedMediaIds: input.failedVersionIds,
       candidate,
       replacementCandidate,
     });
   }
   if (input.failedVersionIds?.has(candidate.versionId) === true) {
-    return markerResolution({
-      reason: 'media_load_failed',
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_fallback',
       explanation:
-        'The protected processed derivative could not be loaded, so the canvas fell back safely.',
-      nextSafeAction:
-        'Retry after checking the protected media route; the world reference was not changed.',
+        'The protected uploaded derivative could not be loaded, so the bundled default is shown.',
+      nextSafeAction: 'Retry after checking the protected uploaded-media route.',
+      failedMediaIds: input.failedVersionIds,
       candidate,
       replacementCandidate,
     });
@@ -258,6 +444,8 @@ export function resolveWorldObjectRendering(input: {
   return {
     status: 'asset',
     reason: 'active_asset',
+    source: 'uploaded_active',
+    sourceLabel: 'Active uploaded override',
     explanation: `Using current active immutable Version ${candidate.activeVersion.versionNumber} for a newly introduced draft key. Saving the draft pins this exact version.`,
     nextSafeAction:
       'Save and validate the draft to retain this version, or explicitly replace the asset first.',
@@ -266,7 +454,13 @@ export function resolveWorldObjectRendering(input: {
     replacementCandidate,
     renderedVersionId: candidate.versionId,
     renderedVersionNumber: candidate.activeVersion.versionNumber,
+    renderedMediaId: candidate.versionId,
     mediaUrl,
+    bundledAsset: getBundledAsset(input.object.assetId) ?? null,
+    render: candidate.activeVersion.render,
+    supportedRotations: candidate.activeVersion.render.supportedRotations,
+    usesAuthoredRotation: false,
+    bundledVariantId: null,
   };
 }
 
@@ -311,7 +505,10 @@ export function worldObjectFriendlyLabel(
   object: MapObject,
   resolution: WorldObjectRenderResolution,
 ): string {
-  const friendlyName = resolution.pin?.friendlyName ?? resolution.candidate?.asset.friendlyName;
+  const friendlyName =
+    resolution.pin?.friendlyName ??
+    resolution.candidate?.asset.friendlyName ??
+    resolution.bundledAsset?.displayName;
   if (friendlyName !== undefined) return friendlyName;
   return object.assetId
     .replace(/^phase7[-_]/u, '')

@@ -9,7 +9,9 @@ import { WorldDraftPreview } from '../../../../../../components/world-draft-prev
 import { WorldGameTestLauncher } from '../../../../../../components/world-game-test-launcher';
 import { AdminApiError } from '../../../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../../../lib/auth/authorization';
+import { loadVerifiedTotpFactors } from '../../../../../../lib/auth/mfa';
 import { parseAdminPublicConfig } from '../../../../../../lib/public-config';
+import { createAdminServerClient } from '../../../../../../lib/supabase/server';
 import { compareWorldRevisions, loadWorldRevision } from '../../../../../../lib/worlds/api';
 import { loadWorldGameTestStatus } from '../../../../../../lib/worlds/game-test-api';
 
@@ -41,7 +43,7 @@ export default async function WorldRevisionPage(props: {
   try {
     const revision = await loadWorldRevision(parsed.data.mapId, parsed.data.versionId);
     const canPreview = hasAdminPermission(context, 'maps.preview');
-    const [comparison, gameTestStatus] = await Promise.all([
+    const [comparison, gameTestStatus, authenticatorFactors] = await Promise.all([
       revision.map.activePublishedVersionId !== null &&
       revision.map.activePublishedVersionId !== revision.version.id
         ? compareWorldRevisions(
@@ -55,6 +57,7 @@ export default async function WorldRevisionPage(props: {
             () => null,
           )
         : Promise.resolve(null),
+      loadVerifiedTotpFactors(await createAdminServerClient()).catch(() => []),
     ]);
     const previewable =
       ['validated', 'published', 'superseded'].includes(revision.version.lifecycleStatus) &&
@@ -134,6 +137,7 @@ export default async function WorldRevisionPage(props: {
           <WorldGameTestLauncher
             activePublishedVersionId={revision.map.activePublishedVersionId}
             assuranceLevel={context.assuranceLevel}
+            authenticatorEnrolled={authenticatorFactors.length > 0}
             canPreview={canPreview}
             checksum={revision.version.checksum}
             dirty={false}

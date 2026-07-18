@@ -20,6 +20,8 @@ export const howToPlayPage = defineDocumentationPage({
     'party',
     'Moonpetal',
     'DUST',
+    'Daily Rhythm',
+    'onboarding',
   ],
   related: ['getting-started', 'character-customization', 'game-status'],
   content: [
@@ -102,7 +104,7 @@ export const howToPlayPage = defineDocumentationPage({
             },
             {
               title: 'Practice movement',
-              text: 'Use WASD, hold Shift to jog, and approach the central notice board.',
+              text: 'Use WASD, hold Shift to jog, and follow the Guide toward Willow Guide.',
             },
             {
               title: 'Try an interaction',
@@ -117,6 +119,24 @@ export const howToPlayPage = defineDocumentationPage({
               text: 'Invite an eligible friend or nearby villager before preparing a cooperative activity.',
             },
           ],
+        },
+      ],
+    ),
+    contentSection(
+      'first-day',
+      'Your first day in Starville',
+      [
+        'The compact Starville Guide presents one objective at a time. The intended lifecycle is: Enter Starville → Learn the Basics → Find Your Home → Grow Something → Make Something → Trade Something → Improve Your Starvillian → Personalize Your Home → Connect Socially → Begin Your Daily Rhythm.',
+        'Follow stable world markers to Willow Guide, your personal-home entrance, one of eight garden tiles, the Cooking Hearth or Crafting Workbench, and the General Store. If a marker is unavailable, the same objective keeps an accessible text route and a safe recovery action; a missing marker never counts as completion.',
+        'Your starter inventory, 250 starter DUST, Willow Chair, recipes, XP, and Starville Beginnings quest progress come from the existing authoritative gameplay systems. The Guide coordinates those systems and does not issue a second set of rewards. Existing players keep recognized progress and do not receive starter grants again.',
+        'You can pause, minimize, or reduce guidance without losing verified progress. The home-visit lesson is optional and solo-safe: reviewing visibility and interaction modes is enough when no other player is online or live visits are paused.',
+      ],
+      [
+        {
+          type: 'callout',
+          tone: 'status',
+          title: 'Server evidence protects progress',
+          text: 'Crop, production, shop, XP, housing, quest, and daily completion advance only after the corresponding server-authoritative gameplay action succeeds.',
         },
       ],
     ),
@@ -273,10 +293,15 @@ export const howToPlayPage = defineDocumentationPage({
       ],
     ),
     contentSection('cozy', 'Use the current cozy foundations', [
-      'The personal cozy slice includes six farming plots. Select an eligible seed, plant in an open plot, water when required, wait for trusted server-time growth, and harvest the result. Refreshing or changing a device clock does not accelerate growth.',
+      'The personal cozy slice includes eight garden tiles. Prepare a tile, select an eligible seed, plant, water once to start growth, wait for trusted server time, and harvest the result. Moonbeans use the canonical five-minute duration in normal play. Refreshing or changing a device clock does not accelerate growth.',
       'Four cooking recipes and two basic crafting recipes use the current hearth and workbench foundations. The server checks ingredients, inventory capacity, and content availability, then consumes and grants the full recipe atomically. An invalid or full inventory leaves ingredients untouched.',
       'Inventory stores ordinary server-backed items, and the quickbar holds eight persistent assignments. One private starter-home instance supports owned furniture placement, movement, allowed rotation, and removal within validated boundaries. Some content uses clearly marked development art while production assets are prepared.',
-      'Animals, quests, businesses, broad housing expansion, deeper recipe catalogs, public marketplaces, and seasonal production are planned or deferred. The current slice proves the foundation without claiming every long-term cozy fantasy is already available.',
+      'Animals, businesses, broad housing expansion, deeper recipe catalogs, public marketplaces, and seasonal production are planned or deferred. The current slice includes the bounded Starville Beginnings questline without claiming every long-term cozy fantasy is already available.',
+    ]),
+    contentSection('daily-rhythm', 'Begin your Daily Rhythm', [
+      'Daily Rhythm uses one canonical UTC game day. The server lazily selects three unique objectives from eligible farming, cooking or crafting, General Store, progression, housing, and solo-safe social-readiness actions. Locked or paused gameplay actions are excluded, and no objective requires another player or premium spending.',
+      'Open the Guide to see progress and the exact reset time. Reconnect and refresh reread the same assignment for that UTC date; the browser cannot choose a date or submit its own objective. At 00:00 UTC, the next eligible set is created lazily when needed rather than scanning every player at midnight.',
+      'Daily Rhythm v1 is deliberately non-economic: each objective and the full-set completion mark grant 0 DUST, 0 XP, no item, no STAR, and no streak multiplier. Ordinary farming, production, shop, quest, and progression actions can still earn their existing canonical outcomes.',
     ]),
     contentSection('progression', 'Follow My Starville Journey', [
       'Player Level is your overall Starville progress. Skill Level is progress within one activity: Farming, Cooking, or Crafting. Valid server-confirmed actions award bounded XP; preview, failed, or repeated requests do not. The HUD shows Player Level, and My Journey shows exact totals, recent XP, skill progress, and the next visible unlock requirements.',

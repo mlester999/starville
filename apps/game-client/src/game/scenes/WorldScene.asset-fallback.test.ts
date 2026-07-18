@@ -29,6 +29,7 @@ const production: WorldAssetDelivery = {
   assetKey: 'cottage-amber',
   versionId: '11111111-1111-4111-8111-111111111111',
   checksum: 'a'.repeat(64),
+  bundledManifestVersion: null,
   url: 'https://assets.example.test/game-assets/starville/cottage-amber/v1/source.webp',
   mediaType: 'image/webp',
   width: 512,
@@ -181,5 +182,97 @@ describe('WorldScene production-asset fallback', () => {
       250,
       false,
     );
+  });
+
+  it('keeps the complete source map until destination critical textures settle, then swaps once', () => {
+    const onMapChanged = vi.fn();
+    const callbacks: GameRuntimeOptions['callbacks'] = {
+      onReady: vi.fn(),
+      onError: vi.fn(),
+      onStateChanged: vi.fn(),
+      onCheckpoint: vi.fn(),
+      onInteractionTarget: vi.fn(),
+      onInteractionOpen: vi.fn(),
+      onSettingsRequested: vi.fn(),
+      onExitRequested: vi.fn(),
+      onMapChanged,
+      onWorldAssetFallback: vi.fn(),
+      onRemotePlayerSelected: vi.fn(),
+      onActivityInteraction: vi.fn(),
+    };
+    const initialState = {
+      mapId: 'lantern-square' as const,
+      x: 12,
+      y: 7.5,
+      facingDirection: 'south' as const,
+    };
+    const scene = new WorldScene({
+      initialState,
+      initialWorld: {
+        manifest: lanternSquareManifest(),
+        versionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        checksum: 'b'.repeat(64),
+        assetDeliveries: [],
+      },
+      appearancePreset: 'moss',
+      reducedMotion: false,
+      collisionDebug: false,
+      audioSettings: { masterVolume: 0.8, muted: false },
+      callbacks,
+    });
+    const completeHandlers: Array<() => void> = [];
+    const clearMap = vi.fn();
+    const renderMap = vi.fn();
+    const destinationManifest = {
+      ...lanternSquareManifest(),
+      id: 'moonpetal-meadow' as const,
+      slug: 'moonpetal-meadow' as const,
+    };
+    const destination = {
+      manifest: destinationManifest,
+      versionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      checksum: 'd'.repeat(64),
+      assetDeliveries: [],
+    };
+    const destinationState = {
+      mapId: 'moonpetal-meadow' as const,
+      x: 3,
+      y: 4,
+      facingDirection: 'east' as const,
+    };
+    Object.assign(scene, {
+      clearMap,
+      renderMap,
+      configureCamera: vi.fn(),
+      refreshInteractionTarget: vi.fn(),
+      updatePlayer: vi.fn(),
+      time: { now: 500 },
+      textures: { exists: vi.fn(() => false) },
+      load: {
+        setCORS: vi.fn(),
+        image: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn((event: string, handler: () => void) => {
+          if (event === 'complete') completeHandlers.push(handler);
+        }),
+        isLoading: vi.fn(() => false),
+        start: vi.fn(),
+      },
+    });
+
+    scene.loadWorld(destination, destinationState);
+
+    expect(clearMap).not.toHaveBeenCalled();
+    expect(renderMap).not.toHaveBeenCalled();
+    expect(scene.getState()).toEqual(initialState);
+    expect(onMapChanged).not.toHaveBeenCalled();
+
+    for (const handler of completeHandlers) handler();
+
+    expect(clearMap).toHaveBeenCalledTimes(1);
+    expect(renderMap).toHaveBeenCalledTimes(1);
+    expect(scene.getState()).toEqual(destinationState);
+    expect(onMapChanged).toHaveBeenCalledWith(destination);
   });
 });

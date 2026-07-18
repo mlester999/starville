@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { homeVisitRealtimeTicketRequestSchema } from '@starville/housing';
 
 import { PublicApiError } from '../errors.js';
 import type { PlayerService } from '../player/contracts.js';
@@ -11,6 +12,7 @@ import {
 import type { LiveOperationsService } from '../live-operations/contracts.js';
 import type { RealtimeTicketService } from '../realtime/contracts.js';
 import { readTokenAccessCookie } from '../token-access/http.js';
+import type { GameplayAssetOverrideService } from '../player/asset-override-contracts.js';
 
 const PLAYER_API_PREFIX = '/api/v1/token-access/player';
 const BODY_LIMIT_BYTES = 4_096;
@@ -22,6 +24,7 @@ export interface RegisterPlayerRoutesOptions {
   readonly allowedOrigins: ReadonlySet<string>;
   readonly liveOperationsService?: LiveOperationsService;
   readonly realtimeTicketService?: RealtimeTicketService;
+  readonly assetOverrideService?: GameplayAssetOverrideService;
 }
 
 function stateView(profile: Awaited<ReturnType<PlayerService['saveState']>>) {
@@ -56,6 +59,27 @@ export function registerPlayerRoutes(
       requestId: request.id,
     };
   });
+
+  if (options.assetOverrideService !== undefined) {
+    const assetOverrideService = options.assetOverrideService;
+    app.post(
+      `${PLAYER_API_PREFIX}/asset-overrides`,
+      { bodyLimit: 8_192 },
+      async (request, reply) => {
+        assertTrustedBrowserMutation(request, allowedOrigins);
+        const walletAddress = await authorizePlayerRequest(
+          request,
+          reply,
+          tokenAccessService,
+          cookie,
+        );
+        await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+        const data = await assetOverrideService.load(walletAddress, request.body, request.id);
+        void reply.header('cache-control', 'private, no-store');
+        return { success: true, data, requestId: request.id };
+      },
+    );
+  }
 
   if (options.realtimeTicketService !== undefined) {
     const realtimeTicketService = options.realtimeTicketService;
@@ -100,6 +124,25 @@ export function registerPlayerRoutes(
       const data = await realtimeTicketService.issuePrivateHome({
         rawAccessToken: readTokenAccessCookie(request),
         homeId: body?.homeId,
+        requestId: request.id,
+      });
+      return { success: true, data, requestId: request.id };
+    });
+
+    app.post(`${PLAYER_API_PREFIX}/home-visit-realtime-ticket`, async (request, reply) => {
+      assertTrustedBrowserMutation(request, allowedOrigins);
+      const walletAddress = await authorizePlayerRequest(
+        request,
+        reply,
+        tokenAccessService,
+        cookie,
+      );
+      await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+      const body = homeVisitRealtimeTicketRequestSchema.safeParse(request.body);
+      if (!body.success) throw new PublicApiError(400, 'INVALID_HOME_VISIT_REQUEST');
+      const data = await realtimeTicketService.issueHomeVisit({
+        rawAccessToken: readTokenAccessCookie(request),
+        participantId: body.data.participantId,
         requestId: request.id,
       });
       return { success: true, data, requestId: request.id };

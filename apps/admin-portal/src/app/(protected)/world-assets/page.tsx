@@ -54,6 +54,9 @@ export default async function WorldAssetsPage(props: {
             <Link className="button button--secondary" href="/world-assets/guide">
               Guide &amp; templates
             </Link>
+            <Link className="button button--secondary" href="/world-assets/coverage">
+              Coverage
+            </Link>
             {capabilities.canReview ? (
               <Link className="button button--secondary" href="/world-assets/review">
                 Review queue

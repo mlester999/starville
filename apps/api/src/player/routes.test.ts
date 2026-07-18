@@ -9,6 +9,7 @@ import { PublicApiError } from '../errors.js';
 import type { PlayerService } from './contracts.js';
 import type { RuntimeTokenGateConfig, TokenAccessService } from '../token-access/contracts.js';
 import type { RealtimeTicketService } from '../realtime/contracts.js';
+import type { GameplayAssetOverrideService } from './asset-override-contracts.js';
 
 class SilentLogger implements ServiceLogger {
   child(_bindings: LogContext): ServiceLogger {
@@ -134,6 +135,7 @@ function createApp(
   service = tokenService(),
   players = playerService(),
   realtimeTicketService?: RealtimeTicketService,
+  assetOverrideService?: GameplayAssetOverrideService,
 ) {
   const app = buildApiApp({
     config: {
@@ -153,6 +155,7 @@ function createApp(
       cookieMaxAgeSeconds: 900,
       playerService: players,
       ...(realtimeTicketService === undefined ? {} : { realtimeTicketService }),
+      ...(assetOverrideService === undefined ? {} : { assetOverrideService }),
     },
   });
   apps.push(app);
@@ -164,6 +167,48 @@ afterEach(async () => {
 });
 
 describe('protected player routes', () => {
+  it('denies gameplay override discovery without a valid player access session', async () => {
+    const overrides: GameplayAssetOverrideService = {
+      load: vi.fn(),
+    };
+    const service = tokenService({
+      access: 'none',
+      network: 'solana:mainnet-beta',
+      symbol: 'STAR',
+      requiredAmount: '1000',
+    });
+    const response = await createApp(service, playerService(), undefined, overrides).inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/asset-overrides',
+      headers: { origin: 'http://localhost:3001' },
+      payload: { assetKeys: ['phase7-dev-moonbean'] },
+    });
+
+    expect(response.statusCode).toBe(401);
+    expect(overrides.load).not.toHaveBeenCalled();
+  });
+
+  it('returns a private no-store override projection only after active-player authorization', async () => {
+    const overrides: GameplayAssetOverrideService = {
+      load: vi.fn(async () => ({ status: 'loaded' as const, requestedKeyCount: 1, items: [] })),
+    };
+    const response = await createApp(tokenService(), playerService(), undefined, overrides).inject({
+      method: 'POST',
+      url: '/api/v1/token-access/player/asset-overrides',
+      headers: { origin: 'http://localhost:3001' },
+      payload: { assetKeys: ['phase7-dev-moonbean'] },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(overrides.load).toHaveBeenCalledWith(
+      grantedView.walletAddress,
+      { assetKeys: ['phase7-dev-moonbean'] },
+      expect.any(String),
+    );
+    expect(response.body).not.toContain('deliverySourcePath');
+  });
+
   it('derives wallet ownership only from the trusted access session', async () => {
     const players = playerService();
     const response = await createApp(tokenService(), players).inject({
@@ -228,6 +273,7 @@ describe('protected player routes', () => {
         homeId: '10000000-0000-4000-8000-000000000001',
         expiresAt: '2026-07-17T00:00:30.000Z',
       })),
+      issueHomeVisit: vi.fn(),
     };
     const app = createApp(tokenService(), playerService(), realtimeTicketService);
     const response = await app.inject({

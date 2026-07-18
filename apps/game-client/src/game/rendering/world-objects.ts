@@ -1,6 +1,10 @@
 import type Phaser from 'phaser';
 
-import type { WorldAssetDelivery } from '@starville/asset-management';
+import {
+  resolveWorldAssetDelivery,
+  type ResolvedAsset,
+  type WorldAssetDelivery,
+} from '@starville/asset-management';
 import {
   depthForFootPosition,
   projectWorld,
@@ -10,9 +14,8 @@ import {
 
 import { WORLD_COLORS } from './palette';
 import {
-  isProductionWorldAssetDelivery,
-  worldAssetRenderPlacement,
-  worldAssetTextureKey,
+  resolvedWorldAssetRenderPlacement,
+  resolvedWorldAssetTextureKey,
 } from './world-asset-textures';
 
 export interface RenderedWorldObject {
@@ -149,6 +152,50 @@ function drawObject(
   }
 }
 
+function resolvedVisual(
+  scene: Phaser.Scene,
+  object: Readonly<{
+    assetId: MapObject['assetId'];
+    rotation: MapObject['rotation'] | undefined;
+  }>,
+  delivery: WorldAssetDelivery | undefined,
+): ResolvedAsset | undefined {
+  const rotation = object.rotation ?? delivery?.defaultRotation ?? 0;
+  const selected = resolveWorldAssetDelivery({
+    assetKey: object.assetId,
+    context: 'published_world',
+    ...(delivery === undefined ? {} : { delivery }),
+    rotation,
+  });
+
+  /*
+   * The current upload contract exposes one immutable image, not directional
+   * frames. Never fake an isometric turn by rotating that flat image; use the
+   * authored bundled direction until uploaded variant delivery is supported.
+   */
+  const uploadCanRepresentDirection =
+    selected.source !== 'pinned_uploaded' || delivery?.defaultRotation === rotation;
+  if (
+    uploadCanRepresentDirection &&
+    scene.textures.exists(resolvedWorldAssetTextureKey(selected))
+  ) {
+    return selected;
+  }
+
+  const bundled = resolveWorldAssetDelivery({
+    assetKey: object.assetId,
+    context: 'published_world',
+    rotation,
+  });
+  if (scene.textures.exists(resolvedWorldAssetTextureKey(bundled))) return bundled;
+
+  const missing = resolveWorldAssetDelivery({
+    assetKey: 'system.missing-asset',
+    context: 'published_world',
+  });
+  return scene.textures.exists(resolvedWorldAssetTextureKey(missing)) ? missing : undefined;
+}
+
 export function renderWorldObjects(
   scene: Phaser.Scene,
   manifest: MapManifest,
@@ -166,22 +213,22 @@ export function renderWorldObjects(
   return manifest.objects.map((object) => {
     const screen = projectWorld(object, projection);
     const delivery = deliveriesByKey.get(object.assetId);
+    const resolved = resolvedVisual(
+      scene,
+      { assetId: object.assetId, rotation: object.rotation },
+      delivery,
+    );
     let visual: Phaser.GameObjects.GameObject;
     let depthOffset = 0;
 
-    if (
-      delivery !== undefined &&
-      isProductionWorldAssetDelivery(delivery) &&
-      scene.textures.exists(worldAssetTextureKey(delivery))
-    ) {
-      const placement = worldAssetRenderPlacement(delivery);
-      const image = scene.add.image(0, 0, worldAssetTextureKey(delivery));
+    if (resolved !== undefined) {
+      const placement = resolvedWorldAssetRenderPlacement(resolved);
+      const image = scene.add.image(0, 0, resolvedWorldAssetTextureKey(resolved));
       image.setOrigin(placement.originX, placement.originY);
       image.setDisplaySize(
-        delivery.renderWidth * delivery.scale,
-        delivery.renderHeight * delivery.scale,
+        resolved.render.renderWidth * resolved.render.scale,
+        resolved.render.renderHeight * resolved.render.scale,
       );
-      image.setAngle(object.rotation ?? delivery.defaultRotation);
       visual = image;
       depthOffset = placement.depthOffset;
     } else {

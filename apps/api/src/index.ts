@@ -43,6 +43,8 @@ import { createSupabaseAdminCooperativeActivityGateway } from './realtime/cooper
 import { createSupabaseEconomyGateway } from './economy/gateway.js';
 import { createSupabaseProgressionGateway } from './progression/gateway.js';
 import { createSupabaseHousingGateway } from './housing/gateway.js';
+import { createSupabaseHomeVisitGateway } from './home-visits/gateway.js';
+import { createSupabasePlayerExperienceGateway } from './player-experience/gateway.js';
 import { createSupabaseAvatarGateway } from './avatar/gateway.js';
 import { createAvatarService } from './avatar/service.js';
 import { createSupabaseAdminAvatarGateway } from './avatar/admin-gateway.js';
@@ -53,6 +55,8 @@ import {
 import { createCosmeticService } from './cosmetics/service.js';
 import { createSupabaseWorldGameTestGateway } from './world/game-test-gateway.js';
 import { createWorldGameTestService } from './world/game-test-service.js';
+import { createSupabaseGameplayAssetOverrideGateway } from './player/asset-override-gateway.js';
+import { createGameplayAssetOverrideService } from './player/asset-override-service.js';
 
 const config = loadApiConfig(process.env);
 const adminSecurity = loadAdminSecurityConfig(process.env);
@@ -95,6 +99,11 @@ const playerService = createPlayerService({
 const cozyGameplayService = createCozyGameplayService({
   gateway: createSupabaseCozyGameplayGateway(privilegedSupabase),
   logger,
+});
+const assetOverrideService = createGameplayAssetOverrideService({
+  gateway: createSupabaseGameplayAssetOverrideGateway(privilegedSupabase),
+  logger,
+  publicAssetUrl: (path) => assetStorage.publicUrl(path),
 });
 const adminCozyService = createAdminCozyService(privilegedSupabase);
 const tokenAccessService = createTokenAccessService({
@@ -177,6 +186,7 @@ const service = createApiService({
     avatarService,
     cosmeticService,
     cosmeticGateway,
+    assetOverrideService,
   },
   adminOperations: {
     service: adminOperationsService,
@@ -203,6 +213,8 @@ const service = createApiService({
   economy: { gateway: createSupabaseEconomyGateway(privilegedSupabase) },
   progression: { gateway: createSupabaseProgressionGateway(privilegedSupabase) },
   housing: { gateway: createSupabaseHousingGateway(privilegedSupabase) },
+  homeVisits: { gateway: createSupabaseHomeVisitGateway(privilegedSupabase) },
+  playerExperience: { gateway: createSupabasePlayerExperienceGateway(privilegedSupabase) },
   adminAvatar: { gateway: createSupabaseAdminAvatarGateway(privilegedSupabase) },
   adminCosmetics: { gateway: createSupabaseAdminCosmeticGateway(privilegedSupabase) },
   worldGameTest: {

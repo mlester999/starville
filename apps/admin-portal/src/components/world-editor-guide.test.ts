@@ -16,33 +16,40 @@ describe('world editor guide visibility', () => {
   it('always renders a permanent Editor Guide entry point in the toolbar and mobile actions', () => {
     expect(editor).toContain('data-editor-guide-trigger="true"');
     expect(editor).toContain('data-editor-guide-trigger-mobile="true"');
-    expect(editor).toContain('Editor Guide');
+    expect(editor).toContain('aria-label="Open Editor Guide"');
     expect(editor).toContain('WorldEditorGuide');
     expect(editor).toContain('setGuideOpen(true)');
     expect(editor).toContain('isWorldEditorGuideCompleted');
-    expect(editor).toContain('if (!isWorldEditorGuideCompleted()) setGuideOpen(true)');
+    expect(editor).toContain('if (!isWorldEditorGuideCompleted())');
+    expect(editor).toContain('setGuideWalkthrough(true)');
   });
 
-  it('presents the complete eight-step quick start and live-world warning', () => {
-    expect(WORLD_EDITOR_GUIDE_STEPS).toHaveLength(8);
+  it('presents the interactive walkthrough and persistent quick-start checklist', () => {
+    expect(WORLD_EDITOR_GUIDE_STEPS).toHaveLength(9);
     expect(WORLD_EDITOR_GUIDE_TITLE).toBe('How to use the World Editor');
     expect(WORLD_EDITOR_GUIDE_WARNING).toContain('does not affect normal players');
     expect(WORLD_EDITOR_GUIDE_WARNING).toContain('explicitly published');
     expect(WORLD_EDITOR_GUIDE_STEPS.map((step) => step.title)).toEqual([
-      'Choose a layer',
-      'Find an approved asset',
-      'Place or select an object',
-      'Edit in Inspector',
-      'Save Draft',
-      'Validate Draft',
-      'Draft Preview',
-      'Publish',
+      'Understand the editor',
+      'Select an object',
+      'Inspect the object',
+      'Move an object',
+      'Use view overlays',
+      'Save the draft',
+      'Validate',
+      'Preview and Game Test',
+      'Publishing boundary',
     ]);
-    expect(guide).toContain('WORLD_EDITOR_GUIDE_STEPS');
+    expect(guide).toContain('WORLD_EDITOR_WALKTHROUGH_STEPS');
+    expect(guide).toContain('WORLD_EDITOR_QUICK_START');
     expect(guide).toContain('WORLD_EDITOR_GUIDE_WARNING');
     expect(guide).toContain('Got it');
-    expect(guide).toContain('Reset Guide');
+    expect(guide).toContain('Restart Guide');
+    expect(guide).toContain('Skip');
+    expect(guide).toContain('Previous');
+    expect(guide).toContain('Next');
     expect(guide).toContain('data-world-editor-guide="true"');
+    expect(guide).toContain('data-tour-highlight');
   });
 
   it('stores only a harmless device-local completion preference', () => {
@@ -54,6 +61,7 @@ describe('world editor guide visibility', () => {
     expect(guide).toContain('triggerRef.current?.focus()');
     expect(guide).toContain("event.key === 'Escape'");
     expect(guide).toContain('focusTrapTarget');
+    expect(guide).toContain('Restart Guide');
   });
 
   it('styles a scrollable guide dialog with sticky footer actions', () => {
@@ -64,14 +72,12 @@ describe('world editor guide visibility', () => {
     expect(styles).toContain('.world-editor-guide__footer');
   });
 
-  it('documents map panning in the place-or-select guide step', () => {
-    const placeStep = WORLD_EDITOR_GUIDE_STEPS.find(
-      (step) => step.title === 'Place or select an object',
-    );
-    expect(placeStep?.body).toContain('hold the left mouse button');
-    expect(placeStep?.body).toContain('Space+drag');
-    expect(placeStep?.body).toContain('middle mouse');
-    expect(placeStep?.body).toContain('Fit shows the complete map');
+  it('documents map selection and pan affordances in help content', () => {
+    const selectStep = WORLD_EDITOR_GUIDE_STEPS.find((step) => step.title === 'Select an object');
+    expect(selectStep?.body).toContain('Layers');
+    expect(selectStep?.body).toContain('map');
+    expect(guide).toContain('hold left mouse on empty map space');
+    expect(guide).toContain('Fit shows the complete map');
   });
 
   it('keeps contextual tooltips on core editor actions', () => {
@@ -79,10 +85,8 @@ describe('world editor guide visibility', () => {
     expect(editor).toContain('title="Toggle collision footprints on the map"');
     expect(editor).toContain('title="Toggle spawn point markers on the map"');
     expect(editor).toContain('title="Toggle exit regions and transitions on the map"');
-    expect(editor).toContain('title="Save Draft stores edits without changing the live world"');
-    expect(editor).toContain(
-      'title="Validate Draft runs trusted checks on the current saved revision"',
-    );
+    expect(editor).toContain('Save Draft stores edits without changing the live world');
+    expect(editor).toContain('Validate Draft runs trusted checks on the current saved revision');
     expect(editor).toContain('title="Fit map to the canvas (0)"');
     expect(editor).toContain('title="Reset map view to the fitted default"');
     expect(editor).toContain('title="Open Layers and approved assets"');

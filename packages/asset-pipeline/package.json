@@ -1,0 +1,37 @@
+{
+  "name": "@starville/asset-pipeline",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src test --max-warnings=0",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "clean": "rimraf coverage .turbo",
+    "generate": "tsx src/cli.ts generate",
+    "validate": "tsx src/cli.ts validate",
+    "manifest": "tsx src/cli.ts manifest",
+    "thumbnails": "tsx src/cli.ts thumbnails",
+    "coverage": "tsx src/cli.ts coverage",
+    "check": "tsx src/cli.ts check"
+  },
+  "dependencies": {
+    "@starville/asset-management": "workspace:*",
+    "sharp": "0.34.5"
+  },
+  "devDependencies": {
+    "@starville/eslint-config": "workspace:*",
+    "@starville/typescript-config": "workspace:*",
+    "@types/node": "22.20.1",
+    "eslint": "9.39.4",
+    "prettier": "3.9.5",
+    "rimraf": "6.1.3",
+    "tsx": "4.23.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

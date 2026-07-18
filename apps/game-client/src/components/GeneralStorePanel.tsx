@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 import type { GeneralStoreTransaction, GeneralStoreWorkspace } from '../app/economy-client';
+import { BundledAssetImage } from './BundledAssetImage';
 
 type Entry = GeneralStoreWorkspace['entries'][number];
 type Direction = 'buy' | 'sell';
@@ -277,9 +278,11 @@ export function GeneralStorePanel({
                 const reason = unavailableReason(entry, direction);
                 return (
                   <article key={entry.entryId}>
-                    <div className="general-store__item-art" aria-hidden="true">
-                      ✦
-                    </div>
+                    <BundledAssetImage
+                      assetKey={entry.assetRef}
+                      alt={`${entry.itemName} shop art`}
+                      className="general-store__item-art"
+                    />
                     <div>
                       <small>{entry.itemCategory.replaceAll('_', ' ')}</small>
                       <h4>{entry.itemName}</h4>

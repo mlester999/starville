@@ -27,6 +27,11 @@ const identity = {
   assuranceLevel: 'aal2' as const,
   authenticationMethods: ['password', 'totp'],
 };
+const aal1Identity = {
+  ...identity,
+  assuranceLevel: 'aal1' as const,
+  authenticationMethods: ['password'],
+};
 const requestId = '33333333-3333-4333-8333-333333333333';
 const assetId = '44444444-4444-4444-8444-444444444444';
 const versionId = '55555555-5555-4555-8555-555555555555';
@@ -47,10 +52,17 @@ function rawAsset(id = assetId) {
     productionStatus: 'approved_production',
     activeVersionId: versionId,
     activeVersionNumber: 1,
+    bundledDefaultVersionId: null,
+    bundledManifestVersion: null,
+    activeSourceState: 'uploaded_override',
+    canRestoreBundledDefault: false,
     thumbnailUrl: 'https://assets.example.test/starville/willow-tree/v1/thumbnail.webp',
     developmentMarkerReplacementKey: null,
     recordVersion: 3,
     versionCount: 1,
+    uploadedVersionCount: 1,
+    invalidVersionCount: 0,
+    referenceBreakdown: { world: 0, furniture: 0, farming: 0 },
     referenceSummary: { published: 0, draft: 0, activeConfiguration: 0, total: 0 },
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -138,6 +150,7 @@ function gateway(): AdminAssetGateway {
     activationMaterial: vi.fn(),
     activateVersion: vi.fn(),
     deprecateAsset: vi.fn(),
+    restoreBundledDefault: vi.fn(),
     archiveAsset: vi.fn(),
     createVersion: vi.fn(),
     createVersionFromExisting: vi.fn(),
@@ -848,6 +861,136 @@ describe('administrator asset service', () => {
     const claims = vi.mocked(target.claimOperationIntent).mock.calls;
     expect(claims[0]?.[1]).toMatchObject({ p_operation: 'review_asset_version' });
     expect(claims[0]?.[1]['p_intent_fingerprint']).not.toBe(claims[1]?.[1]['p_intent_fingerprint']);
+  });
+
+  it('restores the bundled pointer through a bound intent without touching storage', async () => {
+    const target = gateway();
+    vi.mocked(target.getAsset).mockResolvedValueOnce({
+      status: 'loaded',
+      asset: {
+        ...rawAsset(),
+        bundledDefaultVersionId: sourceVersionId,
+        bundledManifestVersion: '1.0.0',
+        activeSourceState: 'uploaded_override',
+        canRestoreBundledDefault: true,
+      },
+      versions: [rawVersion()],
+      referenceSummary: rawAsset().referenceSummary,
+    });
+    vi.mocked(target.restoreBundledDefault).mockResolvedValueOnce({
+      status: 'bundled_default_restored',
+      asset: {
+        ...rawAsset(),
+        activeVersionId: sourceVersionId,
+        activeVersionNumber: 1,
+        bundledDefaultVersionId: sourceVersionId,
+        bundledManifestVersion: '1.0.0',
+        activeSourceState: 'bundled_default',
+        canRestoreBundledDefault: false,
+        recordVersion: 4,
+      },
+      version: {
+        ...rawVersion(sourceVersionId),
+        sourceKind: 'repository_procedural',
+        sourceMimeType: 'application/x-starville-procedural',
+      },
+    });
+    const files = storage();
+    const { value } = service(target, files);
+    const action = {
+      expectedAssetRevision: 3,
+      reason: 'Deactivate the reviewed upload and restore bundled repository material.',
+      idempotencyKey: requestId,
+      confirmed: true as const,
+      typedConfirmation: 'RESTORE BUNDLED DEFAULT' as const,
+    };
+
+    await expect(
+      value.restoreBundledDefault(identity, assetId, action, requestId),
+    ).resolves.toMatchObject({
+      status: 'bundled_default_restored',
+      asset: {
+        activeVersionId: sourceVersionId,
+        activeSourceState: 'bundled_default',
+        canRestoreBundledDefault: false,
+      },
+    });
+    expect(target.claimOperationIntent).toHaveBeenCalledWith(
+      identity,
+      expect.objectContaining({
+        p_asset_id: assetId,
+        p_version_id: sourceVersionId,
+        p_operation: 'restore_bundled_default',
+      }),
+    );
+    expect(target.restoreBundledDefault).toHaveBeenCalledWith(
+      identity,
+      expect.objectContaining({
+        p_asset_id: assetId,
+        p_expected_asset_revision: 3,
+        p_request_id: requestId,
+      }),
+    );
+    expect(files.readPrivate).not.toHaveBeenCalled();
+    expect(files.storePublicImmutable).not.toHaveBeenCalled();
+  });
+
+  it('rejects sensitive lifecycle service calls at AAL1 before persistence', async () => {
+    const target = gateway();
+    const { value } = service(target);
+    const common = {
+      reason: 'Perform this sensitive lifecycle operation after explicit review.',
+      idempotencyKey: requestId,
+      confirmed: true as const,
+    };
+
+    const attempts = [
+      value.reviewVersion(
+        aal1Identity,
+        assetId,
+        versionId,
+        { ...common, expectedEditVersion: 3, action: 'approve' },
+        requestId,
+      ),
+      value.activateVersion(
+        aal1Identity,
+        assetId,
+        versionId,
+        {
+          ...common,
+          expectedEditVersion: 3,
+          expectedAssetRevision: 3,
+          typedConfirmation: 'ACTIVATE ASSET',
+        },
+        requestId,
+      ),
+      value.deprecateAsset(
+        aal1Identity,
+        assetId,
+        { ...common, expectedAssetRevision: 3 },
+        requestId,
+      ),
+      value.archiveAsset(aal1Identity, assetId, { ...common, expectedAssetRevision: 3 }, requestId),
+      value.restoreBundledDefault(
+        aal1Identity,
+        assetId,
+        {
+          ...common,
+          expectedAssetRevision: 3,
+          typedConfirmation: 'RESTORE BUNDLED DEFAULT',
+        },
+        requestId,
+      ),
+    ];
+
+    for (const attempt of attempts) {
+      await expect(attempt).rejects.toMatchObject({ statusCode: 403, code: 'MFA_REQUIRED' });
+    }
+    expect(target.reviewVersion).not.toHaveBeenCalled();
+    expect(target.activationMaterial).not.toHaveBeenCalled();
+    expect(target.deprecateAsset).not.toHaveBeenCalled();
+    expect(target.archiveAsset).not.toHaveBeenCalled();
+    expect(target.restoreBundledDefault).not.toHaveBeenCalled();
   });
 
   it('rejects a mismatched activation target before private reads or public copies', async () => {

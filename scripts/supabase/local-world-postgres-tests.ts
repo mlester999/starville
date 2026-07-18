@@ -88,6 +88,13 @@ const migrationFiles = [
   '20260717141000_phase11e_housing_player_functions.sql',
   '20260717142000_phase11e_housing_admin_worker_functions.sql',
   '20260717143000_fix_phase11_hosted_database_lint.sql',
+  '20260718100000_phase11f_home_visits_schema.sql',
+  '20260718101000_phase11f_home_visit_player_functions.sql',
+  '20260718102000_phase11f_home_visit_admin_worker.sql',
+  '20260718110000_phase12a_player_experience_schema.sql',
+  '20260718111000_phase12a_player_experience_functions.sql',
+  '20260718112000_phase12a_player_experience_admin_worker.sql',
+  '20260718120000_phase12b_world_asset_bundled_lifecycle.sql',
 ] as const;
 
 interface CommandResult {
@@ -279,6 +286,14 @@ async function main(): Promise<void> {
     console.log(`[world-postgres] applied ${basename(prelude)}`);
 
     for (const migrationFile of migrationFiles) {
+      if (migrationFile === '20260718120000_phase12b_world_asset_bundled_lifecycle.sql') {
+        const collisionFixture = join(
+          fixtureDirectory,
+          'phase12b-pre-migration-asset-collision.sql',
+        );
+        await runCommand(psql, [...psqlBaseArguments, '--file', collisionFixture]);
+        console.log('[world-postgres] applied Phase 12B pre-migration collision fixture');
+      }
       const migrationPath = join(migrationDirectory, migrationFile);
       await readFile(migrationPath, 'utf8');
       await runCommand(psql, [
@@ -382,6 +397,86 @@ async function main(): Promise<void> {
       console.log(phase11eResult.stdout.trim());
     }
     console.log('[world-postgres] Phase 11E housing assertions passed');
+
+    const phase11fAssertions = join(fixtureDirectory, 'phase11f-postgres-execution.sql');
+    const phase11fResult = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--file',
+      phase11fAssertions,
+    ]);
+    if (phase11fResult.stdout.trim()) {
+      console.log(phase11fResult.stdout.trim());
+    }
+    console.log('[world-postgres] Phase 11F home-visit assertions passed');
+
+    const phase12aAssertions = join(fixtureDirectory, 'phase12a-postgres-execution.sql');
+    const phase12aResult = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--file',
+      phase12aAssertions,
+    ]);
+    if (phase12aResult.stdout.trim()) {
+      console.log(phase12aResult.stdout.trim());
+    }
+    console.log('[world-postgres] Phase 12A player-experience assertions passed');
+
+    const phase11fConcurrencySetup = join(fixtureDirectory, 'phase11f-postgres-concurrency.sql');
+    await runCommand(psql, [...psqlBaseArguments, '--file', phase11fConcurrencySetup]);
+    const phase11fSession = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--tuples-only',
+      '--no-align',
+      '--command',
+      "select id::text||'|'||configuration_revision::text from public.home_visit_sessions where status='open' and safe_metadata ? 'layoutRevisionId' order by started_at desc limit 1;",
+    ]);
+    const [phase11fSessionId, phase11fSessionRevision] = phase11fSession.stdout.trim().split('|');
+    if (phase11fSessionId === undefined || phase11fSessionRevision === undefined) {
+      throw new Error('The Phase 11F final-slot concurrency fixture is incomplete.');
+    }
+    const phase11fFinalSlotResults = await Promise.all([
+      runCommand(psql, [
+        ...psqlBaseArguments,
+        '--tuples-only',
+        '--no-align',
+        '--command',
+        `select public.join_player_home_visit('${'2'.repeat(30)}41','${phase11fSessionId}',null,${phase11fSessionRevision},'phase11f-race-final-slot-a','phase11f:race:final:a')->>'status';`,
+      ]),
+      runCommand(psql, [
+        ...psqlBaseArguments,
+        '--tuples-only',
+        '--no-align',
+        '--command',
+        `select public.join_player_home_visit('${'2'.repeat(30)}42','${phase11fSessionId}',null,${phase11fSessionRevision},'phase11f-race-final-slot-b','phase11f:race:final:b')->>'status';`,
+      ]),
+    ]);
+    const phase11fFinalSlotStatuses = phase11fFinalSlotResults
+      .map((result) => result.stdout.trim())
+      .sort();
+    if (
+      phase11fFinalSlotStatuses.filter((status) => status === 'joined').length !== 1 ||
+      !phase11fFinalSlotStatuses.some((status) =>
+        ['home_visit_conflict', 'home_visit_full'].includes(status),
+      )
+    ) {
+      throw new Error(
+        `Concurrent Phase 11F final-slot admission returned unexpected statuses: ${phase11fFinalSlotStatuses.join(', ')}`,
+      );
+    }
+    const phase11fFinalSlotVerification = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--tuples-only',
+      '--no-align',
+      '--command',
+      `select case when
+        (select current_visitor_count=10 from public.home_visit_sessions where id='${phase11fSessionId}')
+        and (select count(*)=10 from public.home_visit_participants where visit_session_id='${phase11fSessionId}' and role='visitor' and status='active')
+        and (select count(*)=1 from public.home_visit_participants where visit_session_id='${phase11fSessionId}' and player_profile_id in (select id from public.player_profiles where wallet_address in ('${'2'.repeat(30)}41','${'2'.repeat(30)}42')) and status='active')
+      then 'passed' else 'failed' end;`,
+    ]);
+    if (phase11fFinalSlotVerification.stdout.trim() !== 'passed') {
+      throw new Error('Concurrent Phase 11F final-slot admission violated capacity invariants.');
+    }
+    console.log('[world-postgres] concurrent Phase 11F final-slot admission assertions passed');
 
     const phase11LintRepairAssertions = join(
       fixtureDirectory,

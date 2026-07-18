@@ -1,8 +1,11 @@
 import { z } from 'zod';
 
-import { worldAssetDeliveriesSchema, type WorldAssetDelivery } from '@starville/asset-management';
+import {
+  getBundledAsset,
+  worldAssetDeliveriesSchema,
+  type WorldAssetDelivery,
+} from '@starville/asset-management';
 import { mapIdSchema, validateMapManifest } from '@starville/game-core';
-import { WORLD_ASSET_CATALOG } from '@starville/game-content';
 
 import { assertInternalStoragePath } from '../asset-management/storage.js';
 import type { ServiceLogger } from '../contracts.js';
@@ -61,7 +64,10 @@ export function projectWorldAssetDeliveries(
   for (const material of materials) {
     if (byKey.has(material.assetKey)) throw new Error('Duplicate pinned asset material');
     if (material.developmentMarker) {
-      if (WORLD_ASSET_CATALOG.get(material.assetKey)?.status !== 'approved') {
+      if (
+        material.bundledManifestVersion === '1.0.0' &&
+        getBundledAsset(material.assetKey) === undefined
+      ) {
         throw new Error('Unknown repository development marker');
       }
     }
@@ -73,6 +79,7 @@ export function projectWorldAssetDeliveries(
       assetKey: material.assetKey,
       versionId: material.versionId,
       checksum: material.checksumSha256,
+      bundledManifestVersion: material.bundledManifestVersion,
       url,
       mediaType: material.mediaType,
       width: material.width,

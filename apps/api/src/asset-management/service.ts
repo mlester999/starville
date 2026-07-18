@@ -13,6 +13,7 @@ import {
   assetDeprecationActionSchema,
   assetDraftUpdateSchema,
   assetReviewActionSchema,
+  assetRestoreBundledDefaultActionSchema,
   assetUploadMetadataSchema,
   assetUuidSchema,
   assetValidationResultSchema,
@@ -23,6 +24,7 @@ import {
 } from '@starville/asset-management';
 
 import { PublicApiError } from '../errors.js';
+import type { AdminDatabaseIdentity } from '../contracts.js';
 import type {
   AdminAssetService,
   AdminAssetServiceOptions,
@@ -271,6 +273,15 @@ function mapFailure(value: unknown): void {
     throw new PublicApiError(409, 'ASSET_VERSION_CONFLICT');
   }
   if (status === 'referenced') throw new PublicApiError(409, 'ASSET_REFERENCED');
+  if (status === 'bundled_default_missing') {
+    throw new PublicApiError(409, 'ASSET_BUNDLED_DEFAULT_MISSING');
+  }
+  if (status === 'override_not_available') {
+    throw new PublicApiError(409, 'ASSET_OVERRIDE_NOT_AVAILABLE');
+  }
+  if (status === 'already_bundled_default' || status === 'restore_not_allowed') {
+    throw new PublicApiError(409, 'ASSET_RESTORE_DEFAULT_NOT_ALLOWED');
+  }
   if (
     status === 'slug_conflict' ||
     status === 'state_conflict' ||
@@ -287,6 +298,12 @@ function mapFailure(value: unknown): void {
     status === 'version_not_activatable'
   ) {
     throw new PublicApiError(409, 'ASSET_STATE_CONFLICT');
+  }
+}
+
+function requireSensitiveAssetAal2(identity: AdminDatabaseIdentity): void {
+  if (identity.assuranceLevel !== 'aal2') {
+    throw new PublicApiError(403, 'MFA_REQUIRED');
   }
 }
 
@@ -730,6 +747,7 @@ export function createAdminAssetService(
     },
     async reviewVersion(identity, assetId, versionId, body, requestId) {
       const parsed = parseRequest(assetReviewActionSchema, body);
+      if (parsed.action === 'approve') requireSensitiveAssetAal2(identity);
       assertIdempotency(parsed.idempotencyKey, requestId);
       const safeAssetId = validId(assetId);
       const safeVersionId = validId(versionId);
@@ -764,6 +782,7 @@ export function createAdminAssetService(
     },
     async activateVersion(identity, assetId, versionId, body, requestId) {
       const parsed = parseRequest(assetActivationActionSchema, body);
+      requireSensitiveAssetAal2(identity);
       assertIdempotency(parsed.idempotencyKey, requestId);
       const safeAssetId = validId(assetId);
       const safeVersionId = validId(versionId);
@@ -834,6 +853,7 @@ export function createAdminAssetService(
     },
     async deprecateAsset(identity, assetId, body, requestId) {
       const parsed = parseRequest(assetDeprecationActionSchema, body);
+      requireSensitiveAssetAal2(identity);
       assertIdempotency(parsed.idempotencyKey, requestId);
       const safeAssetId = validId(assetId);
       return guarded(requestId, async () => {
@@ -847,8 +867,51 @@ export function createAdminAssetService(
         return parseTargetedMutation(result, safeAssetId);
       });
     },
+    async restoreBundledDefault(identity, assetId, body, requestId) {
+      const parsed = parseRequest(assetRestoreBundledDefaultActionSchema, body);
+      requireSensitiveAssetAal2(identity);
+      assertIdempotency(parsed.idempotencyKey, requestId);
+      const safeAssetId = validId(assetId);
+      return guarded(requestId, async () => {
+        const detailValue = await gateway.getAsset(identity, {
+          p_asset_id: safeAssetId,
+          p_request_id: requestId,
+          p_rate_limit: options.readRateLimit,
+        });
+        const detail = parseResult(detailValue, projectAssetDetail);
+        assertTarget(detail.asset.id, safeAssetId);
+        const bundledDefaultVersionId = detail.asset.bundledDefaultVersionId;
+        if (bundledDefaultVersionId === null) {
+          throw new PublicApiError(409, 'ASSET_BUNDLED_DEFAULT_MISSING');
+        }
+        const intent = await gateway.claimOperationIntent(identity, {
+          p_asset_id: safeAssetId,
+          p_version_id: bundledDefaultVersionId,
+          p_operation: 'restore_bundled_default',
+          p_request_id: requestId,
+          p_reason: parsed.reason,
+          p_intent_fingerprint: reviewIntentFingerprint([
+            'restore_bundled_default',
+            safeAssetId,
+            bundledDefaultVersionId,
+            parsed.expectedAssetRevision,
+            parsed.reason,
+          ]),
+        });
+        mapFailure(intent);
+        const result = await gateway.restoreBundledDefault(identity, {
+          p_asset_id: safeAssetId,
+          p_expected_asset_revision: parsed.expectedAssetRevision,
+          p_reason: parsed.reason,
+          p_request_id: requestId,
+          p_rate_limit: options.mutationRateLimit,
+        });
+        return parseTargetedMutation(result, safeAssetId);
+      });
+    },
     async archiveAsset(identity, assetId, body, requestId) {
       const parsed = parseRequest(assetDeprecationActionSchema, body);
+      requireSensitiveAssetAal2(identity);
       assertIdempotency(parsed.idempotencyKey, requestId);
       const safeAssetId = validId(assetId);
       return guarded(requestId, async () => {

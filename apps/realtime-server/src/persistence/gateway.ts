@@ -41,6 +41,7 @@ import {
   type SocialOfferItemInput,
   type publicPresenceSchema,
 } from '@starville/realtime';
+import { homeVisitParticipantSchema } from '@starville/housing';
 
 const channelSchema = z
   .object({
@@ -161,6 +162,56 @@ export interface PrivateHomeRealtimeEvents {
   readonly lastEventNumber: string;
   readonly events: readonly PrivateHomeRealtimeEvent[];
   readonly view: PlayableVerticalSlice;
+}
+
+const homeVisitAdmittedSchema = z
+  .object({
+    status: z.literal('admitted'),
+    realtimeSessionId: z.uuid(),
+    visitSessionId: z.uuid(),
+    participantId: z.uuid(),
+    homeId: z.uuid(),
+    lastEventNumber: z.string().regex(/^\d+$/u),
+    snapshot: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+const homeVisitDenialSchema = z
+  .object({
+    status: z.enum([
+      'invalid_ticket',
+      'invalid_session',
+      'access_revoked',
+      'player_suspended',
+      'rename_required',
+      'maintenance',
+      'home_visitor_not_found',
+      'home_visit_session_closing',
+      'home_visit_blocked',
+      'home_visit_reconnect_expired',
+      'closed',
+      'invalid_position',
+      'stale_sequence',
+    ]),
+  })
+  .strict();
+const homeVisitEventsSchema = z
+  .object({
+    status: z.literal('loaded'),
+    lastEventNumber: z.string().regex(/^\d+$/u),
+    events: z.array(z.record(z.string(), z.unknown())).max(100),
+    snapshot: z.record(z.string(), z.unknown()),
+  })
+  .strict();
+const homeVisitNoChangesSchema = z
+  .object({ status: z.literal('no_changes'), lastEventNumber: z.string().regex(/^\d+$/u) })
+  .strict();
+
+export type HomeVisitRealtimeAdmission = z.infer<typeof homeVisitAdmittedSchema>;
+export type HomeVisitRealtimeDenial = z.infer<typeof homeVisitDenialSchema>['status'];
+export interface HomeVisitRealtimeEvents {
+  readonly lastEventNumber: string;
+  readonly events: readonly Readonly<Record<string, unknown>>[];
+  readonly snapshot: Readonly<Record<string, unknown>>;
 }
 
 const socialOperationResultSchema = z
@@ -465,6 +516,33 @@ export interface RealtimePersistenceGateway {
   ): Promise<PrivateHomeRealtimeEvents | 'no_changes' | PrivateHomeRealtimeDenial>;
   revalidatePrivateHome(sessionId: string): Promise<'active' | PrivateHomeRealtimeDenial>;
   closePrivateHome(sessionId: string, reason: string, requestId: string): Promise<boolean>;
+  admitHomeVisit(
+    ticketHash: string,
+    connectionId: string,
+    requestId: string,
+  ): Promise<HomeVisitRealtimeAdmission | HomeVisitRealtimeDenial>;
+  homeVisitEvents(
+    sessionId: string,
+    afterEventNumber: string,
+    forceSnapshot: boolean,
+  ): Promise<HomeVisitRealtimeEvents | 'no_changes' | HomeVisitRealtimeDenial>;
+  checkpointHomeVisit(
+    sessionId: string,
+    movement: {
+      readonly x: number;
+      readonly y: number;
+      readonly facingDirection: string;
+      readonly sequence: number;
+    },
+  ): Promise<
+    | {
+        readonly status: 'checkpointed';
+        readonly participant: z.infer<typeof homeVisitParticipantSchema>;
+      }
+    | HomeVisitRealtimeDenial
+  >;
+  revalidateHomeVisit(sessionId: string): Promise<'active' | HomeVisitRealtimeDenial>;
+  closeHomeVisit(sessionId: string, reason: string, requestId: string): Promise<boolean>;
 }
 
 export class RealtimePersistenceError extends Error {
@@ -547,6 +625,65 @@ export function createSupabaseRealtimePersistenceGateway(
       return z.boolean().parse(
         await rpc(client, 'close_player_private_home_realtime_session', {
           p_session_id: sessionId,
+          p_reason: reason,
+          p_request_id: requestId,
+        }),
+      );
+    },
+
+    async admitHomeVisit(ticketHash, connectionId, requestId) {
+      const value = await rpc(client, 'admit_player_home_visit_realtime_ticket', {
+        p_ticket_hash: ticketHash,
+        p_connection_id: connectionId,
+        p_request_id: requestId,
+      });
+      const admitted = homeVisitAdmittedSchema.safeParse(value);
+      return admitted.success ? admitted.data : homeVisitDenialSchema.parse(value).status;
+    },
+
+    async homeVisitEvents(sessionId, afterEventNumber, forceSnapshot) {
+      const value = await rpc(client, 'get_player_home_visit_realtime_events', {
+        p_realtime_session_id: sessionId,
+        p_after_event_number: afterEventNumber,
+        p_force_snapshot: forceSnapshot,
+      });
+      const loaded = homeVisitEventsSchema.safeParse(value);
+      if (loaded.success) return loaded.data;
+      if (homeVisitNoChangesSchema.safeParse(value).success) return 'no_changes';
+      return homeVisitDenialSchema.parse(value).status;
+    },
+
+    async checkpointHomeVisit(sessionId, movement) {
+      const value = await rpc(client, 'checkpoint_player_home_visit_movement', {
+        p_realtime_session_id: sessionId,
+        p_position_x: movement.x,
+        p_position_y: movement.y,
+        p_facing_direction: movement.facingDirection,
+        p_sequence: movement.sequence,
+      });
+      const checkpointed = z
+        .object({ status: z.literal('checkpointed'), participant: homeVisitParticipantSchema })
+        .strict()
+        .safeParse(value);
+      return checkpointed.success ? checkpointed.data : homeVisitDenialSchema.parse(value).status;
+    },
+
+    async revalidateHomeVisit(sessionId) {
+      const value = z
+        .object({ status: z.string().min(1).max(64) })
+        .strict()
+        .parse(
+          await rpc(client, 'revalidate_player_home_visit_realtime_session', {
+            p_realtime_session_id: sessionId,
+          }),
+        ).status;
+      return value === 'active' ? value : homeVisitDenialSchema.parse({ status: value }).status;
+    },
+
+    async closeHomeVisit(sessionId, reason, requestId) {
+      return z.boolean().parse(
+        await rpc(client, 'close_player_home_visit_realtime_session', {
+          p_realtime_session_id: sessionId,
           p_reason: reason,
           p_request_id: requestId,
         }),

@@ -1,0 +1,108 @@
+export const ASSET_PIPELINE_VERSION = '1.0.0' as const;
+
+export const ASSET_OUTPUT_PATHS = Object.freeze({
+  manifest: 'assets/manifests/starville-bundled-v1.json',
+  coverage: 'assets/reports/starville-bundled-coverage.json',
+  sizes: 'assets/reports/starville-bundled-sizes.json',
+});
+
+export const ASSET_BUDGETS = Object.freeze({
+  sourceBytes: 256 * 1024,
+  terrainRuntimeBytes: 48 * 1024,
+  interfaceRuntimeBytes: 64 * 1024,
+  objectRuntimeBytes: 160 * 1024,
+  structureRuntimeBytes: 256 * 1024,
+  thumbnailBytes: 48 * 1024,
+  totalBytes: 16 * 1024 * 1024,
+  thumbnailDimension: 192,
+});
+
+// Static union of every asset identity declared by packages/game-core and
+// packages/game-content world manifests/catalogs. Keeping this explicit makes
+// world-reference drift a reviewable build failure without importing gameplay
+// packages into the asset build graph.
+export const CURRENT_WORLD_MANIFEST_ASSET_KEYS = Object.freeze([
+  'cottage-amber',
+  'cottage-sage',
+  'tree-pine',
+  'tree-maple',
+  'rock-moss',
+  'fence-willow',
+  'lamp-star',
+  'notice-board',
+  'flowers-moon',
+  'bush-round',
+  'moonstone-marker',
+  'brooklight-sign',
+  'orchard-road-sign',
+  'whisperpine-gate',
+  'closed-route-marker',
+  'phase7-farm-plot-marker',
+  'phase7-general-store-marker',
+  'phase7-cooking-hearth-marker',
+  'phase7-crafting-workbench-marker',
+  'phase7-home-entrance-marker',
+  'phase10b-wardrobe-mirror-marker',
+  'phase10b-wardrobe-furniture-marker',
+] as const);
+
+// Bounded repository-side contract used by gameplay, composer, and diagnostic
+// surfaces. Live uploaded overrides are deliberately absent because their
+// eligibility remains server-authoritative.
+export const REQUIRED_GAMEPLAY_ASSET_KEYS = Object.freeze([
+  ...CURRENT_WORLD_MANIFEST_ASSET_KEYS,
+  'system.missing-asset',
+  'world.terrain.grass.base',
+  'world.terrain.grass.clover',
+  'world.terrain.dirt',
+  'world.terrain.path.stone',
+  'world.terrain.plaza',
+  'world.terrain.water',
+  'world.terrain.bridge',
+  'world.terrain.soil.dry',
+  'world.terrain.soil.watered',
+  'world.station.cooking-hearth.active',
+  'world.station.cooking-hearth.ready',
+  'world.station.crafting-workbench.active',
+  'world.station.crafting-workbench.ready',
+  'farming.plot.empty',
+  'farming.plot.prepared',
+  'farming.plot.dry',
+  'farming.plot.watered',
+  'farming.plot.planted',
+  'farming.plot.selected',
+  'farming.plot.invalid',
+  'farming.crop.moonbean.stage-0',
+  'farming.crop.moonbean.stage-3',
+  'farming.crop.sunroot.stage-0',
+  'farming.crop.sunroot.stage-3',
+  'farming.crop.cloudberry.stage-0',
+  'farming.crop.cloudberry.stage-4',
+  'phase7-dev-willow-chair',
+  'phase7-dev-hearth-table',
+  'phase7-dev-moonwoven-rug',
+  'phase7-dev-lantern-floor-lamp',
+  'phase7-dev-meadow-shelf',
+  'phase7-dev-round-leaf-planter',
+  'ui.currency.dust',
+  'ui.category.inventory',
+  'ui.category.farming',
+  'ui.category.cooking',
+  'ui.category.crafting',
+  'ui.category.shop',
+  'ui.category.housing',
+  'ui.category.social',
+  'ui.quest.active',
+  'ui.objective.active',
+  'ui.direction',
+  'ui.interaction',
+  'ui.spawn',
+  'ui.exit',
+  'ui.warning',
+  'ui.validation.success',
+  'ui.validation.error',
+  'ui.social.home-visit',
+  'ui.social.photo-area',
+  'ui.social.guestbook',
+  'ui.social.appreciation',
+] as const);

@@ -21,6 +21,9 @@ describe('asset storage boundaries', () => {
     );
     expect(publicPaths.source).toBe('starville/willow-cottage/v3/source.webp');
     expect(publicPaths.preview).not.toBe(publicPaths.source);
+    expect(publicDerivativePaths('farming.crop.moonbean.stage-0', 2).source).toBe(
+      'starville/farming.crop.moonbean.stage-0/v2/source.webp',
+    );
   });
 
   it.each([

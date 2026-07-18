@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48" fill="none"><title>Willow Bridge Deck</title><desc>Willow Bridge Deck rendered on the canonical 96 by 48 isometric tile plane.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8bd77"/><stop offset="1" stop-color="#b87849"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b87849"/><stop offset="1" stop-color="#75503d"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff2bd" stop-opacity=".92"/><stop offset="1" stop-color="#f5df9a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><polygon points="48,2 94,24 48,46 2,24" fill="#b77c4e" stroke="#382b2a" stroke-width="2" opacity=".98"/><path d="M15.36 20.64l46.08 12M24 17.28l46.08 12M34.56 14.4l46.08 12" stroke="#75503d" stroke-width="2"/><path d="M12.48 23.04l35.52 9.6 35.52-9.6" stroke="#f5df9a" stroke-width="2.2"/></g></svg>

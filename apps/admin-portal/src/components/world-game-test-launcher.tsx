@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useRef, useState, useTransition } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 
 import {
   openWorldGameTestAction,
@@ -9,6 +11,7 @@ import {
   type WorldGameTestActionState,
 } from '../app/actions/world-game-test';
 import type { WorldGameTestStatus } from '../lib/worlds/game-test-api';
+import { buildGameTestReadiness } from '../lib/worlds/editor-usability';
 
 interface WorldGameTestLauncherProps {
   readonly mapId: string;
@@ -20,6 +23,8 @@ interface WorldGameTestLauncherProps {
   readonly validated: boolean;
   readonly canPreview: boolean;
   readonly assuranceLevel: 'aal1' | 'aal2';
+  /** True when the administrator has at least one verified TOTP factor. */
+  readonly authenticatorEnrolled: boolean;
   readonly mapDisplayName: string;
   readonly activePublishedVersionId: string | null;
   readonly environment: string;
@@ -27,6 +32,8 @@ interface WorldGameTestLauncherProps {
   readonly initialStatus: WorldGameTestStatus | null;
   readonly returnedSessionId: string | null;
   readonly returnPath: string;
+  readonly onRequestSave?: () => void;
+  readonly onRequestValidate?: () => void;
 }
 
 const CHECKS = [
@@ -67,30 +74,30 @@ function boundedSessionDuration(session: EvidenceSession, now: number): string {
   return minutes === 0 ? 'under 1 minute' : `${minutes} minute${minutes === 1 ? '' : 's'}`;
 }
 
-function availability(props: WorldGameTestLauncherProps): {
-  readonly code: 'READY' | 'UNSAVED_CHANGES' | 'NO_DRAFT' | 'PERMISSION_LOCKED' | 'STALE_REVISION';
-  readonly message: string;
-} {
-  if (!props.canPreview || props.assuranceLevel !== 'aal2') {
-    return {
-      code: 'PERMISSION_LOCKED',
-      message: 'Requires maps.preview and a current AAL2 session.',
-    };
-  }
-  if (props.dirty) {
-    return { code: 'UNSAVED_CHANGES', message: 'Save and validate this exact revision first.' };
-  }
-  if (!props.validated || props.checksum === null) {
-    return { code: 'NO_DRAFT', message: 'No trusted validated draft is ready for Game Test.' };
-  }
-  if (!/^[0-9a-f]{64}$/u.test(props.checksum)) {
-    return { code: 'STALE_REVISION', message: 'Reload to recover the trusted revision checksum.' };
-  }
-  return { code: 'READY', message: 'Exact validated revision is ready.' };
-}
-
 export function WorldGameTestLauncher(props: WorldGameTestLauncherProps) {
-  const ready = availability(props);
+  const router = useRouter();
+  const readiness = useMemo(
+    () =>
+      buildGameTestReadiness({
+        dirty: props.dirty,
+        validated: props.validated,
+        canPreview: props.canPreview,
+        assuranceLevel: props.assuranceLevel,
+        authenticatorEnrolled: props.authenticatorEnrolled,
+        checksum: props.checksum,
+        statusLoaded: props.initialStatus !== null,
+      }),
+    [
+      props.dirty,
+      props.validated,
+      props.canPreview,
+      props.assuranceLevel,
+      props.authenticatorEnrolled,
+      props.checksum,
+      props.initialStatus,
+    ],
+  );
+  const readyCode = readiness.canOpen ? 'READY' : (readiness.primaryBlocker?.id ?? 'BLOCKED');
   const returnedSession =
     props.returnedSessionId === null
       ? undefined
@@ -239,25 +246,103 @@ export function WorldGameTestLauncher(props: WorldGameTestLauncherProps) {
     });
   }
 
+  function runReadinessAction(action: (typeof readiness.items)[number]['action']): void {
+    if (action.kind === 'save') {
+      props.onRequestSave?.();
+      return;
+    }
+    if (action.kind === 'validate') {
+      props.onRequestValidate?.();
+      return;
+    }
+    if (action.kind === 'refresh-status') {
+      router.refresh();
+      return;
+    }
+  }
+
   return (
-    <div className="world-game-test-launcher" data-game-test-state={ready.code}>
+    <div
+      className="world-game-test-launcher"
+      data-game-test-state={readyCode}
+      data-tour-id="test-actions"
+    >
       <button
         aria-expanded={confirmationOpen}
         aria-haspopup="dialog"
-        className="button button--primary"
-        disabled={ready.code !== 'READY' || pending}
+        className={`button ${readiness.canOpen ? 'button--primary' : 'button--secondary'}`}
+        disabled={!readiness.canOpen || pending}
         onClick={(event) => {
           opener.current = event.currentTarget;
           setConfirmationOpen(true);
         }}
-        title={ready.message}
+        title={
+          readiness.canOpen
+            ? 'Open the exact validated revision in a private Game Test session'
+            : (readiness.primaryBlocker?.detail ?? 'Game Test is not ready')
+        }
         type="button"
       >
         {pending ? 'Opening…' : 'Open in Game Test'}
       </button>
-      <small aria-live="polite" className="world-game-test-launcher__status">
-        {ready.code}: {ready.message}
-      </small>
+
+      <section
+        aria-label="Game Test readiness"
+        className="world-game-test-readiness"
+        data-game-test-readiness="true"
+      >
+        <h3 className="world-game-test-readiness__title">Game Test readiness</h3>
+        <ul className="world-game-test-readiness__list">
+          {readiness.items.map((item) => (
+            <li
+              className={`world-game-test-readiness__item ${item.ready ? 'is-ready' : 'is-blocked'}`}
+              data-readiness-id={item.id}
+              data-ready={item.ready ? 'true' : 'false'}
+              key={item.id}
+            >
+              <span aria-hidden="true" className="world-game-test-readiness__icon">
+                {item.ready ? '✓' : '!'}
+              </span>
+              <div className="world-game-test-readiness__copy">
+                <strong>{item.label}</strong>
+                <p>{item.detail}</p>
+                {item.technicalDetail ? (
+                  <details className="world-game-test-readiness__technical">
+                    <summary>Technical details</summary>
+                    <p>{item.technicalDetail}</p>
+                  </details>
+                ) : null}
+                {item.action.kind === 'verify-authenticator' ||
+                item.action.kind === 'setup-authenticator' ? (
+                  <Link className="button button--quiet" href="/mfa-required">
+                    {item.actionLabel}
+                  </Link>
+                ) : null}
+                {item.actionLabel !== null &&
+                item.action.kind !== 'verify-authenticator' &&
+                item.action.kind !== 'setup-authenticator' &&
+                item.action.kind !== 'none' ? (
+                  <button
+                    className="button button--quiet"
+                    onClick={() => runReadinessAction(item.action)}
+                    type="button"
+                  >
+                    {item.actionLabel}
+                  </button>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ul>
+        <p aria-live="polite" className="world-game-test-launcher__status">
+          {readiness.canOpen
+            ? props.initialStatus === null
+              ? 'Exact validated revision is ready. Game Test status unavailable — refresh if needed.'
+              : 'Exact validated revision is ready for Game Test.'
+            : (readiness.primaryBlocker?.detail ?? 'Complete the readiness checklist to continue.')}
+        </p>
+      </section>
+
       <details className="world-game-test-status-summary">
         <summary>
           Game Test:{' '}

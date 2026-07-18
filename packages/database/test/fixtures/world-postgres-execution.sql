@@ -172,8 +172,30 @@ begin
           and asset.active_version_id is not null
         )
       from public.world_assets as asset
+      where asset.asset_key = any(array[
+        'brooklight-sign',
+        'bush-round',
+        'closed-route-marker',
+        'cottage-amber',
+        'cottage-sage',
+        'fence-willow',
+        'flowers-moon',
+        'lamp-star',
+        'moonstone-marker',
+        'notice-board',
+        'orchard-road-sign',
+        'phase7-cooking-hearth-marker',
+        'phase7-crafting-workbench-marker',
+        'phase7-farm-plot-marker',
+        'phase7-general-store-marker',
+        'phase7-home-entrance-marker',
+        'rock-moss',
+        'tree-maple',
+        'tree-pine',
+        'whisperpine-gate'
+      ]::text[])
     ),
-    'the world and Phase 7 seeds create the exact reviewed development-marker catalog'
+    'the world and Phase 7 seeds retain the exact reviewed development-marker subset'
   );
   perform pg_temp.assert_true(
     (select count(*) = 5 and bool_and(record_version = 2) from public.world_maps),
@@ -181,7 +203,34 @@ begin
   );
   perform pg_temp.assert_true(
     (select count(*) = 5 from public.world_audit_events where event_key = 'world.version_published')
-      and (select count(*) = 20 from public.world_audit_events where event_key = 'world.asset_registered'),
+      and (
+        select count(*) = 20
+        from public.world_audit_events as event
+        join public.world_assets as asset on asset.id = event.target_world_asset_id
+        where event.event_key = 'world.asset_registered'
+          and asset.asset_key = any(array[
+            'brooklight-sign',
+            'bush-round',
+            'closed-route-marker',
+            'cottage-amber',
+            'cottage-sage',
+            'fence-willow',
+            'flowers-moon',
+            'lamp-star',
+            'moonstone-marker',
+            'notice-board',
+            'orchard-road-sign',
+            'phase7-cooking-hearth-marker',
+            'phase7-crafting-workbench-marker',
+            'phase7-farm-plot-marker',
+            'phase7-general-store-marker',
+            'phase7-home-entrance-marker',
+            'rock-moss',
+            'tree-maple',
+            'tree-pine',
+            'whisperpine-gate'
+          ]::text[])
+      ),
     'replaying the idempotent seed does not duplicate initial audit events'
   );
   perform pg_temp.assert_true(
@@ -358,8 +407,8 @@ begin
     'destination spawns are outside every enabled exit trigger'
   );
   perform pg_temp.assert_true(
-    (select count(*) = 171 and count(distinct key) = 171 from public.admin_permissions where is_system),
-    'the current system permission catalog has one hundred seventy-one unique keys'
+    (select count(*) = 186 and count(distinct key) = 186 from public.admin_permissions where is_system),
+    'the current system permission catalog has one hundred eighty-six unique keys'
   );
   perform pg_temp.assert_true(
     not has_function_privilege(
@@ -1036,8 +1085,8 @@ begin
   );
   perform pg_temp.assert_status(result, 'loaded', 'the trusted asset catalog executes');
   perform pg_temp.assert_true(
-    (result ->> 'total')::integer = 20 and jsonb_array_length(result -> 'items') = 20,
-    'the administrator asset catalog returns all reviewed assets'
+    (result ->> 'total')::integer = 106 and jsonb_array_length(result -> 'items') = 100,
+    'the administrator asset catalog reports the complete bundled catalog with bounded pagination'
   );
 
   select profile.id, moderation.version

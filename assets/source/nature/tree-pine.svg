@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="320" viewBox="0 0 256 320" fill="none"><title>Whisper Pine</title><desc>A layered evergreen with a narrow trunk collision and soft canopy highlights.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a7c98b"/><stop offset="1" stop-color="#5d8b68"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5d8b68"/><stop offset="1" stop-color="#345c4c"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f3edbd" stop-opacity=".92"/><stop offset="1" stop-color="#d8d99a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="133.12" cy="281.6" rx="87.04" ry="25.6" fill="#18231f" opacity=".22"/><path d="M117.76 185.6l20.48 0 12.8 96h-46.08z" fill="#345c4c" stroke="#253832" stroke-width="5"/><path d="M128 25.6l-61.44 134.4h33.28l-51.2 96h158.72l-51.2-96h33.28z" fill="url(#surface)" stroke="#253832" stroke-width="5"/><path d="M92.16 86.4q30.72-35.2 64-12.8" stroke="#f3edbd" stroke-width="8" opacity=".5"/></g></svg>

@@ -85,6 +85,13 @@ export default async function OperationsPage() {
             </Link>
           </p>
         ) : null}
+        {hasAdminPermission(context, 'player_experience.inspect') ? (
+          <p>
+            <Link className="button button--secondary" href="/operations/player-experience">
+              Review Player Experience
+            </Link>
+          </p>
+        ) : null}
 
         <section aria-labelledby="metrics-title">
           <h2 id="metrics-title">Measured state</h2>

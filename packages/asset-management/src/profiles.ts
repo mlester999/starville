@@ -401,7 +401,7 @@ const profileEntries: readonly AssetTypeProfile[] = [
     recommendedWidth: 512,
     recommendedHeight: 512,
     requiredTransparency: true,
-    allowedCategories: ['interaction'],
+    allowedCategories: ['interaction', 'inventory', 'farming', 'recipe', 'furniture'],
     allowedInteractions: ASSET_INTERACTION_COMPATIBILITIES,
     previewMode: 'isometric',
     anchorRequired: true,

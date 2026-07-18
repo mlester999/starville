@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none"><title>Cooking Category</title><desc>Cooking Category icon using Starville&apos;s warm outline, moon-gold accent, and text-free silhouette.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><circle cx="64" cy="64" r="55.04" fill="#fff4c5" opacity=".12"/><path d="M29.44 60.16h69.12q-3.84 39.68-34.56 39.68t-34.56-39.68z" fill="url(#shade)" stroke="#2c304b" stroke-width="7"/><path d="M40.96 55.04q23.04-16.64 46.08 0M19.2 64h12.8m64 0h12.8" stroke="#2c304b" stroke-width="8"/><path d="M51.2 39.68q-6.4-11.52 0-20.48m23.04 20.48q6.4-11.52 0-20.48" stroke="#e9d68d" stroke-width="7"/></g></svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none"><title>Validation Passed</title><desc>Validation Passed icon using Starville&apos;s warm outline, moon-gold accent, and text-free silhouette.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><circle cx="64" cy="64" r="55.04" fill="#fff4c5" opacity=".12"/><circle cx="64" cy="64" r="42.24" fill="#7887b5" stroke="#2c304b" stroke-width="7"/><path d="M39.68 65.28l17.92 19.2 34.56-38.4" stroke="#fff4c5" stroke-width="10"/></g></svg>

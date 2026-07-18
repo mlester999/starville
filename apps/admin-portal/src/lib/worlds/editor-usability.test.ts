@@ -7,6 +7,8 @@ import {
   CANVAS_ZOOM_MIN,
   clampCanvasPan,
   clampCanvasZoom,
+  clampInspectorWidth,
+  clampLayersWidth,
   computeFitCanvasView,
   draftPreviewAvailability,
   exceedsPanDragThreshold,
@@ -15,10 +17,15 @@ import {
   FIT_PAD_X,
   mapCornersFitInHost,
   projectMapContentBounds,
+  buildGameTestReadiness,
+  resolveDraftEditorStatus,
   shouldShowInteractionLabel,
   shouldShowObjectLabel,
   WORLD_EDITOR_GUIDE_STEPS,
+  WORLD_EDITOR_PANEL_WIDTHS,
+  WORLD_EDITOR_QUICK_START,
   WORLD_EDITOR_STORAGE_KEYS,
+  WORLD_EDITOR_WALKTHROUGH_STEPS,
   zoomPercentage,
 } from './editor-usability';
 
@@ -98,6 +105,128 @@ describe('world editor usability helpers', () => {
     ).toBe('validation-failed');
   });
 
+  it('clamps resizable panel widths to safe local UI bounds', () => {
+    expect(clampLayersWidth(100)).toBe(WORLD_EDITOR_PANEL_WIDTHS.layersMin);
+    expect(clampLayersWidth(900)).toBe(WORLD_EDITOR_PANEL_WIDTHS.layersMax);
+    expect(clampLayersWidth(320)).toBe(320);
+    expect(clampInspectorWidth(100)).toBe(WORLD_EDITOR_PANEL_WIDTHS.inspectorMin);
+    expect(clampInspectorWidth(900)).toBe(WORLD_EDITOR_PANEL_WIDTHS.inspectorMax);
+    expect(clampInspectorWidth(348)).toBe(348);
+    expect(WORLD_EDITOR_STORAGE_KEYS.layersWidth).toContain('layers-width');
+    expect(WORLD_EDITOR_STORAGE_KEYS.inspectorWidth).toContain('inspector-width');
+  });
+
+  it('resolves compact draft status labels for command-bar presentation', () => {
+    const previewReady = draftPreviewAvailability({
+      dirty: false,
+      pending: false,
+      localIssueCount: 0,
+      serverValidation: validation(true),
+      validatedChecksum: 'abc',
+      currentChecksum: 'abc',
+    });
+
+    expect(
+      resolveDraftEditorStatus({
+        dirty: true,
+        pending: false,
+        operation: null,
+        actionOutcome: 'idle',
+        actionMessage: null,
+        localIssueCount: 0,
+        serverValidation: null,
+        preview: previewReady,
+      }).kind,
+    ).toBe('unsaved');
+
+    expect(
+      resolveDraftEditorStatus({
+        dirty: false,
+        pending: true,
+        operation: 'save',
+        actionOutcome: 'idle',
+        actionMessage: null,
+        localIssueCount: 0,
+        serverValidation: null,
+        preview: previewReady,
+      }).kind,
+    ).toBe('saving');
+
+    expect(
+      resolveDraftEditorStatus({
+        dirty: false,
+        pending: false,
+        operation: null,
+        actionOutcome: 'idle',
+        actionMessage: null,
+        localIssueCount: 0,
+        serverValidation: validation(true),
+        preview: previewReady,
+      }).kind,
+    ).toBe('valid');
+
+    const stalePreview = draftPreviewAvailability({
+      dirty: false,
+      pending: false,
+      localIssueCount: 0,
+      serverValidation: validation(true),
+      validatedChecksum: 'old',
+      currentChecksum: 'new',
+    });
+    expect(
+      resolveDraftEditorStatus({
+        dirty: false,
+        pending: false,
+        operation: null,
+        actionOutcome: 'idle',
+        actionMessage: null,
+        localIssueCount: 0,
+        serverValidation: validation(true),
+        preview: stalePreview,
+      }).message,
+    ).toContain('Changes were made after validation');
+  });
+
+  it('builds an actionable Game Test readiness checklist without bypassing AAL2', () => {
+    const blocked = buildGameTestReadiness({
+      dirty: true,
+      validated: false,
+      canPreview: false,
+      assuranceLevel: 'aal1',
+      authenticatorEnrolled: true,
+      checksum: null,
+      statusLoaded: false,
+    });
+    expect(blocked.canOpen).toBe(false);
+    expect(blocked.items.find((item) => item.id === 'draft-saved')?.ready).toBe(false);
+    expect(blocked.items.find((item) => item.id === 'permission')?.technicalDetail).toContain(
+      'maps.preview',
+    );
+    expect(blocked.items.find((item) => item.id === 'authenticator')?.action.kind).toBe(
+      'verify-authenticator',
+    );
+    expect(blocked.items.find((item) => item.id === 'authenticator')?.detail).toContain(
+      'multi-factor authentication',
+    );
+    expect(blocked.items.find((item) => item.id === 'authenticator')?.technicalDetail).toContain(
+      'AAL2',
+    );
+
+    const ready = buildGameTestReadiness({
+      dirty: false,
+      validated: true,
+      canPreview: true,
+      assuranceLevel: 'aal2',
+      authenticatorEnrolled: true,
+      checksum: 'a'.repeat(64),
+      statusLoaded: true,
+    });
+    expect(ready.canOpen).toBe(true);
+    expect(ready.primaryBlocker).toBeNull();
+    expect(WORLD_EDITOR_WALKTHROUGH_STEPS).toHaveLength(9);
+    expect(WORLD_EDITOR_QUICK_START.length).toBeGreaterThanOrEqual(8);
+  });
+
   it('fits map content so all projected corners stay inside the host with safe padding', () => {
     const bounds = projectMapContentBounds({ width: 24, height: 20 });
     expect(bounds.width).toBeGreaterThan(100);
@@ -173,10 +302,10 @@ describe('world editor usability helpers', () => {
     expect(exceedsPanDragThreshold(CANVAS_PAN_DRAG_THRESHOLD_PX - 1, 0)).toBe(false);
   });
 
-  it('exposes eight guide steps and a versioned device-local guide preference key', () => {
-    expect(WORLD_EDITOR_GUIDE_STEPS).toHaveLength(8);
-    expect(WORLD_EDITOR_GUIDE_STEPS[0]?.title).toBe('Choose a layer');
-    expect(WORLD_EDITOR_GUIDE_STEPS[7]?.title).toBe('Publish');
+  it('exposes nine walkthrough steps and a versioned device-local guide preference key', () => {
+    expect(WORLD_EDITOR_GUIDE_STEPS).toHaveLength(9);
+    expect(WORLD_EDITOR_GUIDE_STEPS[0]?.title).toBe('Understand the editor');
+    expect(WORLD_EDITOR_GUIDE_STEPS[8]?.title).toBe('Publishing boundary');
     expect(WORLD_EDITOR_STORAGE_KEYS.guideCompleted).toBe(
       'starville.worldEditorGuide.v1.completed',
     );

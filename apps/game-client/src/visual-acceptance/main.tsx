@@ -16,6 +16,7 @@ import { DEFAULT_GAME_SETTINGS, type GameSettings, type GameUiScale } from '../a
 import { COMPILED_AVATAR_STARTER_CATALOG, defaultAvatarSelection } from '../app/avatar-client';
 import { INITIAL_REALTIME_VIEW } from '../app/realtime-client';
 import { CharacterCustomization } from '../components/CharacterCustomization';
+import { AssetCoverageGameTest } from '../components/AssetCoverageGameTest';
 import { CooperativeActivityPanel } from '../components/CooperativeActivityPanel';
 import { CozyGameplay } from '../components/CozyGameplay';
 import { DustHistoryPanel, VillageSupplyShopPanel } from '../components/EconomyPanels';
@@ -46,7 +47,8 @@ type PreviewPanel =
   | 'cosmetics'
   | 'farming'
   | 'cooking'
-  | 'housing';
+  | 'housing'
+  | 'assets';
 
 const selfPresenceId = '10000000-0000-4000-8000-000000000001';
 const friendPresenceId = '10000000-0000-4000-8000-000000000002';
@@ -571,6 +573,7 @@ export function PreviewWorld({
     'cosmetics',
     'cooking',
     'housing',
+    'assets',
   ].includes(panel);
   const noop = () => undefined;
   return (
@@ -804,6 +807,7 @@ export function PreviewWorld({
             </section>
           </div>
         ) : null}
+        {panel === 'assets' ? <AssetCoverageGameTest onClose={noop} /> : null}
       </section>
     </main>
   );
@@ -811,7 +815,7 @@ export function PreviewWorld({
 
 const query = new URLSearchParams(window.location.search);
 const requested = query.get('panel');
-const panel: PreviewPanel = [
+const allowedPanels: readonly PreviewPanel[] = [
   'settings',
   'activities',
   'nearby',
@@ -827,7 +831,9 @@ const panel: PreviewPanel = [
   'cooking',
   'housing',
   ...AVATAR_VISUAL_ACCEPTANCE_PANELS,
-].includes(requested ?? '')
+  ...(import.meta.env.DEV ? (['assets'] as const) : []),
+];
+const panel: PreviewPanel = allowedPanels.includes((requested ?? '') as PreviewPanel)
   ? (requested as PreviewPanel)
   : 'default';
 if (panel === 'cosmetics') {

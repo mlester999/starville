@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { cropStageAssetKey, farmPlotAssetKey } from '@starville/asset-management';
 import type { PrivateHomeRealtimeEvent } from '@starville/cozy-gameplay';
 import type { WorldInteraction } from '@starville/game-core';
 
@@ -48,6 +49,7 @@ import { usePrivateHomeRealtime } from '../app/use-private-home-realtime';
 import { DustHistoryPanel } from './EconomyPanels';
 import { GeneralStorePanel } from './GeneralStorePanel';
 import { HousingWorkspacePanel } from './HousingWorkspacePanel';
+import { BundledAssetImage } from './BundledAssetImage';
 
 type CozyInteraction = Exclude<WorldInteraction, { readonly type: 'notice' }>;
 type CozyPanel =
@@ -182,6 +184,36 @@ function panelFor(interaction: CozyInteraction): CozyPanel {
 
 function itemName(items: ItemCatalog | undefined, slug: string): string {
   return items?.items.find((item) => item.slug === slug)?.name ?? slug.replaceAll('-', ' ');
+}
+
+function itemAssetRef(items: ItemCatalog | undefined, slug: string | null): string | null {
+  if (slug === null) return null;
+  return items?.items.find((item) => item.slug === slug)?.assetRef ?? null;
+}
+
+function legacyCropStageAssetKey(plot: FarmPlot): string | null {
+  if (plot.cropSlug === null) return null;
+  const stageCount = plot.cropSlug === 'cloudberry' ? 5 : 4;
+  const growthStage = Math.max(
+    1,
+    Math.min(stageCount, Math.ceil(plot.growthProgress * stageCount)),
+  );
+  return cropStageAssetKey(
+    plot.cropSlug,
+    growthStage,
+    stageCount,
+    plot.state === 'ready_to_harvest',
+  );
+}
+
+function workstationVisualKey(workspace: WorkstationWorkspace): string | null {
+  const prefix =
+    workspace.workstation.definition.type === 'cooking_hearth'
+      ? 'world.station.cooking-hearth'
+      : 'world.station.crafting-workbench';
+  if (workspace.workstation.queue.ready > 0) return `${prefix}.ready`;
+  if (workspace.workstation.queue.running > 0) return `${prefix}.active`;
+  return workspace.workstation.definition.assetRef;
 }
 
 function requestFailure(error: unknown): { readonly message: string } {
@@ -682,6 +714,13 @@ export function CozyGameplay({
             onClick={() => setSelectedSlot(assignment.slot)}
           >
             <kbd>{assignment.slot}</kbd>
+            {assignment.assignedItemSlug === null ? null : (
+              <BundledAssetImage
+                assetKey={itemAssetRef(state?.items, assignment.assignedItemSlug)}
+                alt=""
+                className="cozy-quickbar__art"
+              />
+            )}
             <span>
               {assignment.assignedItemSlug === null
                 ? 'Empty'
@@ -714,6 +753,11 @@ export function CozyGameplay({
                   className={selectedFarmingItem === slug ? 'is-selected' : undefined}
                   onClick={() => setSelectedFarmingItem(slug)}
                 >
+                  <BundledAssetImage
+                    assetKey={stack?.item.assetRef}
+                    alt=""
+                    className="cozy-farming-hotbar__art"
+                  />
                   <kbd>{shortcut}</kbd>
                   <span>{label}</span>
                   {slug === 'moonbean-seed' ? <small>{stack?.quantity ?? 0}</small> : null}
@@ -1021,6 +1065,7 @@ export function CozyGameplay({
             {state !== undefined && panel === 'home' ? (
               <HomePanel
                 apiUrl={apiUrl}
+                realtimeUrl={realtimeUrl}
                 state={state}
                 busy={busy}
                 selectedFarmingItem={selectedFarmingItem}
@@ -1170,6 +1215,13 @@ function InventoryPanel({
                 onClick={() => onSelectSlot(assignment.slot)}
               >
                 <kbd aria-hidden="true">{assignment.slot}</kbd>
+                {assignment.assignedItemSlug === null ? null : (
+                  <BundledAssetImage
+                    assetKey={itemAssetRef(state.items, assignment.assignedItemSlug)}
+                    alt=""
+                    className="cozy-quickbar-editor__art"
+                  />
+                )}
                 <span>
                   {assignment.assignedItemSlug === null
                     ? 'Empty'
@@ -1204,9 +1256,11 @@ function InventoryPanel({
 
           return (
             <article key={stack.id}>
-              <span className="cozy-dev-marker" aria-label="Item art placeholder">
-                ✦
-              </span>
+              <BundledAssetImage
+                assetKey={stack.item.assetRef}
+                alt={`${stack.item.name} inventory art`}
+                className="cozy-inventory-art"
+              />
               <strong>{stack.item.name}</strong>
               <span>Quantity: {stack.quantity}</span>
               <small>{categoryLabel(stack.item.category)}</small>
@@ -1274,10 +1328,18 @@ function FarmPanel({
     <div className="cozy-panel__body cozy-farm-grid">
       {plots.map((plot) => {
         const action = plotAction(plot);
+        const cropAssetKey = legacyCropStageAssetKey(plot);
+        const plotAssetKey = farmPlotAssetKey({
+          state: plot.state === 'needs_water' ? 'dry' : plot.state,
+          watered: plot.state === 'growing' || plot.state === 'ready_to_harvest',
+        });
         return (
           <article key={plot.id}>
             <span className={`cozy-plot cozy-plot--${plot.state}`} aria-hidden="true">
-              {plot.cropSlug === null ? '·' : '♧'}
+              <BundledAssetImage assetKey={plotAssetKey} alt="" className="cozy-plot__soil" />
+              {cropAssetKey === null ? null : (
+                <BundledAssetImage assetKey={cropAssetKey} alt="" className="cozy-plot__crop" />
+              )}
             </span>
             <strong>Garden plot {plot.slot}</strong>
             <span>{plot.state.replaceAll('_', ' ')}</span>
@@ -1382,6 +1444,12 @@ function WorkstationPanel({
   return (
     <div className="cozy-panel__body cozy-workstation">
       <section className="cozy-workstation__summary" aria-label="Workstation queue summary">
+        <BundledAssetImage
+          assetKey={workstationVisualKey(workspace)}
+          alt={`${workspace.workstation.definition.name} ${workspace.workstation.queue.ready > 0 ? 'ready' : workspace.workstation.queue.running > 0 ? 'active' : 'idle'} art`}
+          className="cozy-workstation__art"
+          eager
+        />
         <div>
           <p className="game-kicker">Owner-only workstation</p>
           <strong>{workspace.workstation.definition.name}</strong>
@@ -1438,6 +1506,11 @@ function WorkstationPanel({
                     setQuantity(1);
                   }}
                 >
+                  <BundledAssetImage
+                    assetKey={recipe.output.assetRef}
+                    alt=""
+                    className="cozy-workstation__recipe-art"
+                  />
                   <strong>{recipe.name}</strong>
                   <span>{recipe.unlocked ? recipe.output.itemName : recipe.lockedReason}</span>
                 </button>
@@ -1446,6 +1519,11 @@ function WorkstationPanel({
             </div>
             {selected === undefined ? null : (
               <article className="cozy-workstation__recipe-detail">
+                <BundledAssetImage
+                  assetKey={selected.output.assetRef}
+                  alt={`${selected.output.itemName} recipe art`}
+                  className="cozy-workstation__recipe-detail-art"
+                />
                 <p className="game-kicker">Immutable recipe v{selected.versionNumber}</p>
                 <h3>{selected.name}</h3>
                 <p>{selected.description}</p>
@@ -1530,6 +1608,11 @@ function WorkstationPanel({
             const remaining = Math.max(0, Math.ceil((completes - now) / 1_000));
             return (
               <article key={job.id} className={serverReady ? 'is-ready' : undefined}>
+                <BundledAssetImage
+                  assetKey={`phase7-dev-${job.output.itemSlug}`}
+                  alt=""
+                  className="cozy-workstation__job-art"
+                />
                 <div>
                   <strong>{job.recipeName}</strong>
                   <span>
@@ -1586,6 +1669,7 @@ function WorkstationPanel({
 
 function HomePanel({
   apiUrl,
+  realtimeUrl,
   state,
   busy,
   selectedFarmingItem,
@@ -1594,6 +1678,7 @@ function HomePanel({
   onFarmAction,
 }: {
   readonly apiUrl: string;
+  readonly realtimeUrl?: string | undefined;
   readonly state: CozyState;
   readonly busy: boolean;
   readonly selectedFarmingItem: 'starter-hoe' | 'starter-watering-can' | 'moonbean-seed' | null;
@@ -1664,16 +1749,34 @@ function HomePanel({
                               : tile.state === 'prepared'
                                 ? 'Select Moonbean seed'
                                 : 'Select hoe';
+                const plotAssetKey = farmPlotAssetKey({
+                  state: tile.state,
+                  watered: tile.crop?.wateredAt !== null && tile.crop?.wateredAt !== undefined,
+                });
+                const cropAssetKey =
+                  tile.crop === null
+                    ? null
+                    : cropStageAssetKey(
+                        tile.crop.snapshot.cropSlug,
+                        tile.crop.growthStage,
+                        tile.crop.snapshot.growthStageCount,
+                        tile.crop.state === 'mature',
+                      );
                 return (
                   <article key={tile.id} className={`cozy-home-farm__tile is-${tile.state}`}>
-                    <span aria-hidden="true">
-                      {tile.state === 'empty'
-                        ? '◇'
-                        : tile.state === 'prepared'
-                          ? '▦'
-                          : tile.state === 'mature'
-                            ? '✿'
-                            : '♧'}
+                    <span className="cozy-home-farm__art" aria-hidden="true">
+                      <BundledAssetImage
+                        assetKey={plotAssetKey}
+                        alt=""
+                        className="cozy-home-farm__soil"
+                      />
+                      {cropAssetKey === null ? null : (
+                        <BundledAssetImage
+                          assetKey={cropAssetKey}
+                          alt=""
+                          className="cozy-home-farm__crop"
+                        />
+                      )}
                     </span>
                     <strong>Garden {tile.slot}</strong>
                     <small>{tile.state.replaceAll('_', ' ')}</small>
@@ -1701,7 +1804,7 @@ function HomePanel({
               })}
             </div>
           </section>
-          <HousingWorkspacePanel apiUrl={apiUrl} />
+          <HousingWorkspacePanel apiUrl={apiUrl} realtimeUrl={realtimeUrl} />
         </>
       ) : null}
     </div>

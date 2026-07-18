@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="128" viewBox="0 0 192 128" fill="none"><title>Dry Planted Plot</title><desc>Dry Planted Plot on the canonical isometric home-garden footprint.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8d98d"/><stop offset="1" stop-color="#71a867"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#71a867"/><stop offset="1" stop-color="#3f6f53"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff3bd" stop-opacity=".92"/><stop offset="1" stop-color="#efd78b" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><path d="M19.2 69.12l76.8-34.56 76.8 34.56-76.8 34.56z" fill="#b67849" stroke="#283a32" stroke-width="5"/><path d="M48 65.28l19.2-6.4 15.36 6.4 19.2-7.68M105.6 75.52l13.44 5.12 15.36-6.4" stroke="#71432f" stroke-width="4"/><path d="M72.96 64v-16.64m0 7.68l-11.52-5.12m51.84 17.92v-16.64m0 7.68l11.52-5.12" stroke="#3f6f53" stroke-width="6"/></g></svg>

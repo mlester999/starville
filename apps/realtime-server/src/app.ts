@@ -9,6 +9,11 @@ import {
   privateHomeRealtimeServerMessageSchema,
   type PrivateHomeRealtimeServerMessage,
 } from '@starville/cozy-gameplay';
+import {
+  homeVisitRealtimeClientMessageSchema,
+  homeVisitRealtimeServerMessageSchema,
+  type HomeVisitRealtimeServerMessage,
+} from '@starville/housing';
 import { type MapManifest } from '@starville/game-core';
 import {
   type CooperativeActivityBootstrap,
@@ -52,6 +57,7 @@ import type {
   RealtimeDenial,
   RealtimePersistenceGateway,
   PrivateHomeRealtimeDenial,
+  HomeVisitRealtimeDenial,
   SocialOperationResult,
 } from './persistence/gateway.js';
 import { RoomRegistry } from './rooms/room-registry.js';
@@ -94,6 +100,23 @@ interface ActivePrivateHomeConnection {
   readonly requestId: string;
   readonly socket: WebSocket;
   readonly sessionId: string;
+  readonly homeId: string;
+  lastEventNumber: string;
+  lastSeenAt: number;
+  lastPolledAt: number;
+  lastRevalidatedAt: number;
+  windowStartedAt: number;
+  messagesInWindow: number;
+  closingReason?: string;
+}
+
+interface ActiveHomeVisitConnection {
+  readonly connectionId: string;
+  readonly requestId: string;
+  readonly socket: WebSocket;
+  readonly realtimeSessionId: string;
+  readonly visitSessionId: string;
+  readonly participantId: string;
   readonly homeId: string;
   lastEventNumber: string;
   lastSeenAt: number;
@@ -267,6 +290,7 @@ export function buildRealtimeApp({
   const channelAuthority = new ChannelAuthority([]);
   const activeByConnection = new Map<string, ActiveConnection>();
   const activePrivateHomeByConnection = new Map<string, ActivePrivateHomeConnection>();
+  const activeHomeVisitByConnection = new Map<string, ActiveHomeVisitConnection>();
   const connectionByPresence = new Map<string, ActiveConnection>();
   const socketByConnection = new Map<string, WebSocket>();
   const chatRates = new ChatRateAuthority(config.chatRateLimits);
@@ -290,6 +314,179 @@ export function buildRealtimeApp({
   function sendPrivateHome(socket: WebSocket, message: PrivateHomeRealtimeServerMessage): void {
     if (socket.readyState === socket.OPEN) {
       socket.send(JSON.stringify(privateHomeRealtimeServerMessageSchema.parse(message)));
+    }
+  }
+
+  function sendHomeVisit(socket: WebSocket, message: HomeVisitRealtimeServerMessage): void {
+    if (socket.readyState === socket.OPEN) {
+      socket.send(JSON.stringify(homeVisitRealtimeServerMessageSchema.parse(message)));
+    }
+  }
+
+  function homeVisitErrorCode(denial: HomeVisitRealtimeDenial) {
+    if (denial === 'invalid_ticket' || denial === 'invalid_session')
+      return 'INVALID_TICKET' as const;
+    if (denial === 'home_visit_blocked') return 'HOME_VISIT_BLOCKED' as const;
+    if (denial === 'home_visitor_not_found' || denial === 'home_visit_reconnect_expired')
+      return 'HOME_VISITOR_NOT_FOUND' as const;
+    if (denial === 'home_visit_session_closing' || denial === 'closed')
+      return 'HOME_VISIT_CLOSED' as const;
+    if (denial === 'invalid_position') return 'INVALID_POSITION' as const;
+    if (denial === 'stale_sequence') return 'STALE_SEQUENCE' as const;
+    if (denial === 'maintenance') return 'SERVICE_UNAVAILABLE' as const;
+    return 'ACCESS_REVOKED' as const;
+  }
+
+  async function finalizeHomeVisit(connection: ActiveHomeVisitConnection, reason: string) {
+    if (!activeHomeVisitByConnection.delete(connection.connectionId)) return;
+    await persistence
+      .closeHomeVisit(connection.realtimeSessionId, reason, connection.requestId)
+      .catch((error) => {
+        logger
+          .child({ connectionId: connection.connectionId })
+          .warn('realtime.home_visit.finalize_failed', { error, reason });
+        return false;
+      });
+  }
+
+  async function admitHomeVisit(
+    connectionId: string,
+    requestId: string,
+    socket: WebSocket,
+    ticket: string,
+  ) {
+    let result;
+    try {
+      result = await persistence.admitHomeVisit(
+        hashAccessSessionToken(ticket, config.ticketSecret),
+        connectionId,
+        requestId,
+      );
+    } catch (error) {
+      logger
+        .child({ connectionId, requestId })
+        .error('realtime.home_visit.admission_unavailable', { error });
+      sendHomeVisit(socket, { type: 'error', code: 'SERVICE_UNAVAILABLE', retryable: true });
+      socket.close(1013, 'Home-visit authorization unavailable');
+      return;
+    }
+    if (typeof result === 'string') {
+      sendHomeVisit(socket, {
+        type: 'error',
+        code: homeVisitErrorCode(result),
+        retryable: result === 'maintenance',
+      });
+      socket.close(result === 'maintenance' ? 1013 : 1008, 'Home-visit admission denied');
+      return;
+    }
+    const now = Date.now();
+    activeHomeVisitByConnection.set(connectionId, {
+      connectionId,
+      requestId,
+      socket,
+      realtimeSessionId: result.realtimeSessionId,
+      visitSessionId: result.visitSessionId,
+      participantId: result.participantId,
+      homeId: result.homeId,
+      lastEventNumber: result.lastEventNumber,
+      lastSeenAt: now,
+      lastPolledAt: now,
+      lastRevalidatedAt: now,
+      windowStartedAt: now,
+      messagesInWindow: 0,
+    });
+    sendHomeVisit(socket, {
+      type: 'authenticated',
+      realtimeSessionId: result.realtimeSessionId,
+      visitSessionId: result.visitSessionId,
+      participantId: result.participantId,
+      homeId: result.homeId,
+      lastEventNumber: result.lastEventNumber,
+      snapshot: result.snapshot,
+    });
+  }
+
+  async function refreshHomeVisit(connection: ActiveHomeVisitConnection, forceSnapshot: boolean) {
+    const result = await persistence.homeVisitEvents(
+      connection.realtimeSessionId,
+      connection.lastEventNumber,
+      forceSnapshot,
+    );
+    if (result === 'no_changes') return;
+    if (typeof result === 'string') {
+      connection.closingReason = result;
+      sendHomeVisit(connection.socket, {
+        type: 'error',
+        code: homeVisitErrorCode(result),
+        retryable: result === 'maintenance',
+      });
+      connection.socket.close(1008, 'Home-visit access changed');
+      return;
+    }
+    connection.lastEventNumber = result.lastEventNumber;
+    sendHomeVisit(connection.socket, {
+      type: 'snapshot',
+      lastEventNumber: result.lastEventNumber,
+      events: [...result.events],
+      snapshot: result.snapshot,
+    });
+  }
+
+  async function handleHomeVisitMessage(
+    connectionId: string,
+    requestId: string,
+    socket: WebSocket,
+    data: RawData,
+  ) {
+    let raw: unknown;
+    try {
+      raw = JSON.parse(data.toString());
+    } catch {
+      raw = undefined;
+    }
+    const parsed = homeVisitRealtimeClientMessageSchema.safeParse(raw);
+    if (!parsed.success) {
+      sendHomeVisit(socket, { type: 'error', code: 'INVALID_MESSAGE', retryable: false });
+      return;
+    }
+    const active = activeHomeVisitByConnection.get(connectionId);
+    if (active === undefined) {
+      if (parsed.data.type !== 'authenticate') {
+        sendHomeVisit(socket, { type: 'error', code: 'INVALID_TICKET', retryable: false });
+        return;
+      }
+      await admitHomeVisit(connectionId, requestId, socket, parsed.data.ticket);
+      return;
+    }
+    const now = Date.now();
+    if (now - active.windowStartedAt >= 1_000) {
+      active.windowStartedAt = now;
+      active.messagesInWindow = 0;
+    }
+    active.messagesInWindow += 1;
+    if (active.messagesInWindow > 20) {
+      sendHomeVisit(socket, { type: 'error', code: 'SERVICE_UNAVAILABLE', retryable: true });
+      return;
+    }
+    active.lastSeenAt = now;
+    if (parsed.data.type === 'authenticate') {
+      sendHomeVisit(socket, { type: 'error', code: 'INVALID_MESSAGE', retryable: false });
+    } else if (parsed.data.type === 'ping') {
+      sendHomeVisit(socket, { type: 'pong', nonce: parsed.data.nonce });
+    } else if (parsed.data.type === 'movement') {
+      const result = await persistence.checkpointHomeVisit(active.realtimeSessionId, parsed.data);
+      if (typeof result === 'string') {
+        sendHomeVisit(socket, {
+          type: 'error',
+          code: homeVisitErrorCode(result),
+          retryable: false,
+        });
+      } else {
+        sendHomeVisit(socket, { type: 'movement_ack', participant: result.participant });
+      }
+    } else {
+      active.lastEventNumber = parsed.data.afterEventNumber;
+      await refreshHomeVisit(active, parsed.data.forceSnapshot);
     }
   }
 
@@ -2217,7 +2414,10 @@ export function buildRealtimeApp({
     timestamp: new Date().toISOString(),
     connections: {
       active: connections.size,
-      admitted: activeByConnection.size + activePrivateHomeByConnection.size,
+      admitted:
+        activeByConnection.size +
+        activePrivateHomeByConnection.size +
+        activeHomeVisitByConnection.size,
       limit: connections.limit,
     },
     channels: [...channelsByWorld.values()].flat().length,
@@ -2331,6 +2531,47 @@ export function buildRealtimeApp({
         logger
           .child({ connectionId, requestId })
           .warn('realtime.private_home.connection_error', { error });
+      });
+    });
+
+    instance.get('/home-visit', { websocket: true }, (candidate, request) => {
+      const socket = normalizeWebSocket(
+        candidate as unknown as WebSocket | { readonly socket: WebSocket },
+      );
+      const registration = connections.register();
+      if (registration === undefined) {
+        socket.close(1013, 'Connection limit reached');
+        return;
+      }
+      const { connectionId } = registration;
+      const requestId = request.id;
+      socketByConnection.set(connectionId, socket);
+      let released = false;
+      const authTimer = setTimeout(() => {
+        if (!activeHomeVisitByConnection.has(connectionId)) {
+          sendHomeVisit(socket, { type: 'error', code: 'AUTHENTICATION_TIMEOUT', retryable: true });
+          socket.close(1008, 'Authentication timeout');
+        }
+      }, config.authenticationTimeoutMs);
+      socket.on(
+        'message',
+        (data: RawData) => void handleHomeVisitMessage(connectionId, requestId, socket, data),
+      );
+      socket.once('close', () => {
+        if (released) return;
+        released = true;
+        clearTimeout(authTimer);
+        socketByConnection.delete(connectionId);
+        const active = activeHomeVisitByConnection.get(connectionId);
+        if (active !== undefined)
+          void finalizeHomeVisit(active, active.closingReason ?? 'connection_lost');
+        connections.release(connectionId);
+        logger.child({ connectionId, requestId }).info('realtime.home_visit.closed');
+      });
+      socket.once('error', (error: Error) => {
+        logger
+          .child({ connectionId, requestId })
+          .warn('realtime.home_visit.connection_error', { error });
       });
     });
   });
@@ -2453,6 +2694,43 @@ export function buildRealtimeApp({
           });
       }
     }
+    for (const connection of activeHomeVisitByConnection.values()) {
+      if (now - connection.lastSeenAt > config.idleTimeoutMs) {
+        connection.closingReason = 'idle_timeout';
+        connection.socket.close(4002, 'Home-visit connection timed out');
+        continue;
+      }
+      if (now - connection.lastPolledAt >= 1_000) {
+        connection.lastPolledAt = now;
+        void refreshHomeVisit(connection, false).catch((error) => {
+          logger
+            .child({ connectionId: connection.connectionId })
+            .warn('realtime.home_visit.poll_failed', { error });
+        });
+      }
+      if (now - connection.lastRevalidatedAt >= config.revalidationIntervalMs) {
+        connection.lastRevalidatedAt = now;
+        void persistence
+          .revalidateHomeVisit(connection.realtimeSessionId)
+          .then((status) => {
+            if (status === 'active') return;
+            connection.closingReason = status;
+            sendHomeVisit(connection.socket, {
+              type: 'error',
+              code: homeVisitErrorCode(status),
+              retryable: status === 'maintenance',
+            });
+            connection.socket.close(1008, 'Home-visit access changed');
+          })
+          .catch((error) => {
+            logger
+              .child({ connectionId: connection.connectionId })
+              .warn('realtime.home_visit.revalidation_failed', { error });
+            connection.closingReason = 'authorization_failed';
+            connection.socket.close(1013, 'Home-visit authorization unavailable');
+          });
+      }
+    }
   }, 1_000);
   reconciliationTimer.unref();
 
@@ -2468,6 +2746,12 @@ export function buildRealtimeApp({
     for (const connection of activePrivateHomes) {
       connection.closingReason = 'server_shutdown';
       await finalizePrivateHome(connection, 'server_shutdown');
+      connection.socket.close(1012, 'Realtime server restarting');
+    }
+    const activeHomeVisits = [...activeHomeVisitByConnection.values()];
+    for (const connection of activeHomeVisits) {
+      connection.closingReason = 'server_shutdown';
+      await finalizeHomeVisit(connection, 'server_shutdown');
       connection.socket.close(1012, 'Realtime server restarting');
     }
     for (const socket of socketByConnection.values())

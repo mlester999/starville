@@ -26,7 +26,7 @@ import { PlayerRenderer } from '../rendering/player';
 import { RemotePlayerRenderer } from '../rendering/remote-player';
 import type { PublicPresence } from '@starville/realtime';
 import { SOCIAL_INTERACTION_DISTANCE, socialDistance } from '@starville/realtime';
-import { renderTerrain } from '../rendering/terrain';
+import { bundledTerrainAssetKeysForManifest, renderTerrain } from '../rendering/terrain';
 import { queueWorldAssetTextures } from '../rendering/world-asset-textures';
 import { renderWorldObjects, type RenderedWorldObject } from '../rendering/world-objects';
 import { fallbackResolvedAvatar, type ResolvedAvatarProfile } from '../../app/avatar-client';
@@ -35,6 +35,20 @@ const CHECKPOINT_INTERVAL_MS = 5_000;
 const STATE_REPORT_INTERVAL_MS = 100;
 const FAILED_TRANSITION_COOLDOWN_MS = 750;
 const ARRIVAL_REARM_DELAY_MS = 500;
+
+function currentAssetRotations(manifest: MapManifest) {
+  return manifest.objects.flatMap((object) =>
+    object.rotation === undefined ? [] : [{ assetKey: object.assetId, rotation: object.rotation }],
+  );
+}
+
+function currentTextureQueue(manifest: MapManifest) {
+  return {
+    assetKeys: manifest.assets,
+    assetRotations: currentAssetRotations(manifest),
+    terrainAssetKeys: bundledTerrainAssetKeysForManifest(manifest),
+  } as const;
+}
 
 function insideExit(position: PlayerStateUpdate, exit: MapExit): boolean {
   return (
@@ -62,7 +76,7 @@ export class WorldScene extends Phaser.Scene {
   private lastStateReportAt = 0;
   private wasMoving = false;
   private dirty = false;
-  private terrain: Phaser.GameObjects.Graphics | undefined;
+  private terrain: Phaser.GameObjects.Container | undefined;
   private worldObjects: readonly RenderedWorldObject[] = [];
   private interactionMarkers: Phaser.GameObjects.Graphics[] = [];
   private collisionDebug: CollisionDebugOverlay | undefined;
@@ -73,6 +87,7 @@ export class WorldScene extends Phaser.Scene {
   private activityInstance: CooperativeActivityInstanceSnapshot | null = null;
   private currentActivityObject: ActivityInteractionTarget | undefined;
   private normalWorldState: PlayerStateUpdate | undefined;
+  private mapLoadGeneration = 0;
   private activityMarkers: Array<{
     readonly marker: Phaser.GameObjects.Graphics;
     readonly label: Phaser.GameObjects.Text;
@@ -88,8 +103,11 @@ export class WorldScene extends Phaser.Scene {
   }
 
   public preload(): void {
-    queueWorldAssetTextures(this, this.world.assetDeliveries, (event) =>
-      this.options.callbacks.onWorldAssetFallback(event),
+    queueWorldAssetTextures(
+      this,
+      this.world.assetDeliveries,
+      (event) => this.options.callbacks.onWorldAssetFallback(event),
+      currentTextureQueue(this.manifest),
     );
   }
 
@@ -301,6 +319,35 @@ export class WorldScene extends Phaser.Scene {
       throw new Error('Destination state does not match the published map.');
     }
 
+    const loadGeneration = ++this.mapLoadGeneration;
+    const queuedTextures = queueWorldAssetTextures(
+      this,
+      world.assetDeliveries,
+      (event) => this.options.callbacks.onWorldAssetFallback(event),
+      currentTextureQueue(world.manifest),
+    );
+    const commit = (): void => {
+      if (loadGeneration !== this.mapLoadGeneration) return;
+      this.commitWorld(world, state);
+    };
+
+    if (queuedTextures === 0) {
+      commit();
+      return;
+    }
+
+    /*
+     * Keep the complete source map visible until all queued destination
+     * materials have either loaded or failed. The destination is then rendered
+     * once from the final texture set, avoiding procedural-to-WebP flicker.
+     */
+    this.transitionPending = true;
+    this.reportStoppedMovement();
+    this.load.once(Phaser.Loader.Events.COMPLETE, commit);
+    if (!this.load.isLoading()) this.load.start();
+  }
+
+  private commitWorld(world: RuntimeWorld, state: PlayerStateUpdate): void {
     this.clearMap();
     for (const remote of this.remotePlayers.values()) remote.destroy();
     this.remotePlayers.clear();
@@ -318,18 +365,7 @@ export class WorldScene extends Phaser.Scene {
     this.wasMoving = false;
     this.currentInteraction = undefined;
 
-    const queuedTextures = queueWorldAssetTextures(this, world.assetDeliveries, (event) =>
-      this.options.callbacks.onWorldAssetFallback(event),
-    );
     this.renderMap();
-    if (queuedTextures > 0) {
-      const expectedVersionId = world.versionId;
-      this.load.once(Phaser.Loader.Events.COMPLETE, () => {
-        if (this.world.versionId !== expectedVersionId) return;
-        this.refreshWorldObjects();
-      });
-      if (!this.load.isLoading()) this.load.start();
-    }
     this.player?.setProjection(this.projection);
     this.updatePlayer(false, this.time.now, false);
     this.configureCamera();
@@ -339,6 +375,7 @@ export class WorldScene extends Phaser.Scene {
 
   public cancelTransition(): void {
     if (!this.transitionPending) return;
+    this.mapLoadGeneration += 1;
     this.state = { ...this.lastOutsideExitState };
     this.transitionPending = false;
     this.exitArmed = false;
@@ -407,11 +444,6 @@ export class WorldScene extends Phaser.Scene {
     this.collisionDebug?.destroy();
     this.collisionDebug = undefined;
     this.clearActivityMarkers();
-  }
-
-  private refreshWorldObjects(): void {
-    for (const object of this.worldObjects) object.container.destroy(true);
-    this.worldObjects = renderWorldObjects(this, this.manifest, this.world.assetDeliveries);
   }
 
   private configureCamera(): void {

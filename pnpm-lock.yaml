@@ -131,6 +131,9 @@ importers:
       '@starville/platform-configuration':
         specifier: workspace:*
         version: link:../../packages/platform-configuration
+      '@starville/player-experience':
+        specifier: workspace:*
+        version: link:../../packages/player-experience
       '@starville/player-operations':
         specifier: workspace:*
         version: link:../../packages/player-operations
@@ -255,6 +258,9 @@ importers:
       '@starville/platform-configuration':
         specifier: workspace:*
         version: link:../../packages/platform-configuration
+      '@starville/player-experience':
+        specifier: workspace:*
+        version: link:../../packages/player-experience
       '@starville/player-operations':
         specifier: workspace:*
         version: link:../../packages/player-operations
@@ -370,6 +376,9 @@ importers:
       '@starville/platform-configuration':
         specifier: workspace:*
         version: link:../../packages/platform-configuration
+      '@starville/player-experience':
+        specifier: workspace:*
+        version: link:../../packages/player-experience
       '@starville/player-operations':
         specifier: workspace:*
         version: link:../../packages/player-operations
@@ -522,6 +531,9 @@ importers:
       '@starville/game-core':
         specifier: workspace:*
         version: link:../../packages/game-core
+      '@starville/housing':
+        specifier: workspace:*
+        version: link:../../packages/housing
       '@starville/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -688,6 +700,43 @@ importers:
       rimraf:
         specifier: 6.1.3
         version: 6.1.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.1.4(@types/node@22.20.1)(esbuild@0.28.1)(tsx@4.23.0))
+
+  packages/asset-pipeline:
+    dependencies:
+      '@starville/asset-management':
+        specifier: workspace:*
+        version: link:../asset-management
+      sharp:
+        specifier: 0.34.5
+        version: 0.34.5
+    devDependencies:
+      '@starville/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@starville/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      '@types/node':
+        specifier: 22.20.1
+        version: 22.20.1
+      eslint:
+        specifier: 9.39.4
+        version: 9.39.4
+      prettier:
+        specifier: 3.9.5
+        version: 3.9.5
+      rimraf:
+        specifier: 6.1.3
+        version: 6.1.3
+      tsx:
+        specifier: 4.23.0
+        version: 4.23.0
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -1109,6 +1158,31 @@ importers:
         version: 9.39.4
       rimraf:
         specifier: 6.1.3
+        version: 6.1.3
+      typescript:
+        specifier: 5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: 4.1.10
+        version: 4.1.10(@types/node@22.20.1)(jsdom@29.1.1(@noble/hashes@1.8.0))(vite@8.1.4(@types/node@22.20.1)(esbuild@0.28.1)(tsx@4.23.0))
+
+  packages/player-experience:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@starville/eslint-config':
+        specifier: workspace:*
+        version: link:../eslint-config
+      '@starville/typescript-config':
+        specifier: workspace:*
+        version: link:../typescript-config
+      eslint:
+        specifier: 9.39.4
+        version: 9.39.4
+      rimraf:
+        specifier: ^6.1.3
         version: 6.1.3
       typescript:
         specifier: 5.9.3

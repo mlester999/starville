@@ -134,9 +134,16 @@ function managedTreeCandidate(): WorldEditorAssetCandidate {
       lifecycleStatus: 'active',
       productionStatus: 'approved_production',
       activeVersionId: TREE_VERSION_ID,
+      bundledDefaultVersionId: '77777777-7777-4777-8777-777777777777',
+      bundledManifestVersion: '1.0.0',
+      activeSourceState: 'uploaded_override',
+      canRestoreBundledDefault: true,
       developmentMarkerReplacementKey: null,
       versionCount: 2,
+      uploadedVersionCount: 1,
+      invalidVersionCount: 0,
       referenceCount: 4,
+      referenceBreakdown: { world: 4, furniture: 0, farming: 0 },
       revision: 2,
       thumbnailUrl: `/api/v1/admin/world-assets/${TREE_ASSET_ID}/versions/${TREE_VERSION_ID}/thumbnail`,
       createdAt: timestamp,
@@ -227,7 +234,7 @@ function managedTreePin(): WorldDraftAssetPin {
 }
 
 describe('WorldManifestCanvas', () => {
-  it('renders cardinal rotation as a non-mutating object transform', () => {
+  it('does not distort bundled art when a manifest carries an unsupported rotation', () => {
     const initial = baseManifest();
     const first = initial.objects[0];
     if (first === undefined) throw new Error('Canvas fixture object is missing');
@@ -245,7 +252,9 @@ describe('WorldManifestCanvas', () => {
       }),
     );
 
-    expect(markup).toContain('rotate(90)');
+    expect(markup).toContain('data-render-source="bundled_default"');
+    expect(markup).toContain('data-authored-rotation="true"');
+    expect(markup).toContain('rotate(0)');
     expect(JSON.stringify(rotated)).toBe(before);
   });
 
@@ -356,7 +365,7 @@ describe('WorldManifestCanvas', () => {
     expect(quiet).toContain('data-show-label="false"');
     expect(selected).toContain('data-show-label="true"');
     expect(selected).toContain('world-canvas__selection-glow');
-    expect(selected).toContain('Cottage Amber');
+    expect(selected).toContain('Amber Cottage');
   });
 
   it('honors collision, spawn, exit, and grid toggles', () => {
@@ -440,10 +449,47 @@ describe('WorldManifestCanvas', () => {
     expect(markup).not.toContain('/original');
     expect(markup).toContain('data-render-status="asset"');
     expect(markup).toContain('data-render-reason="pinned_asset"');
-    expect(markup).toContain('aria-label="Tree Pine, tree, managed asset"');
+    expect(markup).toContain('aria-label="Tree Pine, tree, Exact uploaded pin"');
     expect(markup).toContain('role="button"');
     expect(markup).toContain('tabindex="0"');
     expect(markup).toContain('data-world-canvas-label="true"');
+  });
+
+  it('exposes bundled source indicators and authored directional media without moving the object', () => {
+    const manifest = baseManifest({
+      assets: ['fence-willow'],
+      objects: [
+        {
+          id: 'fence-east',
+          assetId: 'fence-willow',
+          kind: 'fence',
+          x: 8,
+          y: 7,
+          scale: 1,
+          rotation: 90,
+        },
+      ],
+    });
+    const before = JSON.stringify(manifest.objects[0]);
+    const markup = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        allowUnpinnedActive: true,
+        showGrid: true,
+        showCollisions: true,
+        showSpawns: true,
+        showExits: true,
+      }),
+    );
+
+    expect(markup).toContain('data-render-reason="bundled_default"');
+    expect(markup).toContain('data-render-source="bundled_default"');
+    expect(markup).toContain('data-bundled-asset="true"');
+    expect(markup).toContain('data-authored-rotation="true"');
+    expect(markup).toContain('href="/api/bundled-assets/fence-willow/source?rotation=90"');
+    expect(markup).toContain('BUNDLED');
+    expect(markup).toContain('rotate(0)');
+    expect(JSON.stringify(manifest.objects[0])).toBe(before);
   });
 
   it('keeps explicit marker and collision-debug fallbacks deterministic', () => {

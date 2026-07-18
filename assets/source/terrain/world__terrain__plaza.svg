@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" viewBox="0 0 96 48" fill="none"><title>Lantern Plaza Stone</title><desc>Lantern Plaza Stone rendered on the canonical 96 by 48 isometric tile plane.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b7c2b6"/><stop offset="1" stop-color="#818e8f"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#818e8f"/><stop offset="1" stop-color="#58636a"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f4e8b4" stop-opacity=".92"/><stop offset="1" stop-color="#d6c28e" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><polygon points="48,2 94,24 48,46 2,24" fill="#c7c5b6" stroke="#30363b" stroke-width="2" opacity=".98"/><path d="M48 3.84v40.32M24.96 12.96l46.08 22.08M71.04 12.96l-46.08 22.08" stroke="#818e8f" stroke-width="1.2" opacity=".9"/><path d="M39.36 24l8.64-2.4 8.64 2.4-8.64 2.4z" fill="#d6c28e" opacity=".8"/></g></svg>

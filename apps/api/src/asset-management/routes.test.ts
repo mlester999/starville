@@ -28,9 +28,17 @@ const assetId = '33333333-3333-4333-8333-333333333333';
 const versionId = '44444444-4444-4444-8444-444444444444';
 const requestId = '55555555-5555-4555-8555-555555555555';
 
-function authGateway(permissionKeys: readonly AdminPermissionKey[]): AdminAuthGateway {
+function authGateway(
+  permissionKeys: readonly AdminPermissionKey[],
+  assuranceLevel: 'aal1' | 'aal2' = 'aal2',
+): AdminAuthGateway {
+  const verifiedIdentity = {
+    ...identity,
+    assuranceLevel,
+    authenticationMethods: assuranceLevel === 'aal2' ? ['password', 'totp'] : ['password'],
+  };
   return {
-    verifyBearer: vi.fn(async () => identity),
+    verifyBearer: vi.fn(async () => verifiedIdentity),
     loadAuthorization: vi.fn(async () => ({
       outcome: 'authorized' as const,
       context: {
@@ -42,8 +50,8 @@ function authGateway(permissionKeys: readonly AdminPermissionKey[]): AdminAuthGa
         permissionKeys: [...permissionKeys],
         adminSessionId: identity.authSessionId,
         sessionExpiresAt: '2026-07-13T06:00:00.000Z',
-        mfaRequired: true,
-        assuranceLevel: 'aal2' as const,
+        mfaRequired: assuranceLevel === 'aal2',
+        assuranceLevel,
         lastLoginAt: '2026-07-13T03:00:00.000Z',
       },
     })),
@@ -70,6 +78,7 @@ function assetService(): AdminAssetService {
     reviewVersion: vi.fn(async () => ({ status: 'approved' })),
     activateVersion: vi.fn(async () => ({ status: 'activated' })),
     deprecateAsset: vi.fn(async () => ({ status: 'deprecated' })),
+    restoreBundledDefault: vi.fn(async () => ({ status: 'bundled_default_restored' })),
     archiveAsset: vi.fn(async () => ({ status: 'archived' })),
     createVersion: vi.fn(async () => ({ status: 'validated' })),
     createVersionFromExisting: vi.fn(async () => ({ status: 'created' })),
@@ -86,6 +95,7 @@ function app(
   permissions: readonly AdminPermissionKey[],
   service = assetService(),
   remoteWritesApproved = true,
+  assuranceLevel: 'aal1' | 'aal2' = 'aal2',
 ) {
   const value = buildApiApp({
     config: {
@@ -96,7 +106,7 @@ function app(
       trustedProxyCidrs: [],
     },
     logger: new SilentLogger(),
-    adminAuthGateway: authGateway(permissions),
+    adminAuthGateway: authGateway(permissions, assuranceLevel),
     adminSessionTtlMinutes: 60,
     adminAssets: { service, remoteWritesApproved },
   });
@@ -625,5 +635,118 @@ describe('administrator asset routes', () => {
     });
     expect(allowed.statusCode).toBe(200);
     expect(allowedService.archiveAsset).toHaveBeenCalledWith(identity, assetId, payload, requestId);
+  });
+
+  it('requires AAL2 for approval, activation, deprecation, archival, and bundled restore', async () => {
+    const service = assetService();
+    const headers = {
+      authorization: 'Bearer verified',
+      origin: 'http://localhost:3002',
+      'x-request-id': requestId,
+    };
+    const action = {
+      expectedAssetRevision: 4,
+      reason: 'Perform this sensitive asset lifecycle change after explicit review.',
+      idempotencyKey: requestId,
+      confirmed: true,
+    } as const;
+
+    const approval = await app(['assets.review', 'assets.approve'], service, true, 'aal1').inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions/${versionId}/review`,
+      headers,
+      payload: {
+        action: 'approve',
+        expectedEditVersion: 3,
+        reason: action.reason,
+        idempotencyKey: requestId,
+        confirmed: true,
+      },
+    });
+    const activation = await app(['assets.activate'], service, true, 'aal1').inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/versions/${versionId}/activate`,
+      headers,
+      payload: {
+        ...action,
+        expectedEditVersion: 3,
+        typedConfirmation: 'ACTIVATE ASSET',
+      },
+    });
+    const deprecation = await app(['assets.deprecate'], service, true, 'aal1').inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/deprecate`,
+      headers,
+      payload: action,
+    });
+    const archival = await app(['assets.deprecate'], service, true, 'aal1').inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/archive`,
+      headers,
+      payload: action,
+    });
+    const restore = await app(
+      ['assets.activate', 'assets.deprecate'],
+      service,
+      true,
+      'aal1',
+    ).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/restore-bundled-default`,
+      headers,
+      payload: { ...action, typedConfirmation: 'RESTORE BUNDLED DEFAULT' },
+    });
+
+    for (const result of [approval, activation, deprecation, archival, restore]) {
+      expect(result.statusCode).toBe(403);
+      expect(result.json()).toMatchObject({ error: { code: 'MFA_REQUIRED' } });
+    }
+    expect(service.reviewVersion).not.toHaveBeenCalled();
+    expect(service.activateVersion).not.toHaveBeenCalled();
+    expect(service.deprecateAsset).not.toHaveBeenCalled();
+    expect(service.archiveAsset).not.toHaveBeenCalled();
+    expect(service.restoreBundledDefault).not.toHaveBeenCalled();
+  });
+
+  it('routes bundled restore through both lifecycle permissions and typed confirmation', async () => {
+    const payload = {
+      expectedAssetRevision: 4,
+      reason: 'Deactivate the uploaded override and restore bundled repository material.',
+      idempotencyKey: requestId,
+      confirmed: true,
+      typedConfirmation: 'RESTORE BUNDLED DEFAULT',
+    } as const;
+    const deniedService = assetService();
+    const denied = await app(['assets.activate'], deniedService).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/restore-bundled-default`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+      },
+      payload,
+    });
+    expect(denied.statusCode).toBe(403);
+    expect(deniedService.restoreBundledDefault).not.toHaveBeenCalled();
+
+    const allowedService = assetService();
+    const allowed = await app(['assets.activate', 'assets.deprecate'], allowedService).inject({
+      method: 'POST',
+      url: `/api/v1/admin/world-assets/${assetId}/restore-bundled-default`,
+      headers: {
+        authorization: 'Bearer verified',
+        origin: 'http://localhost:3002',
+        'x-request-id': requestId,
+      },
+      payload,
+    });
+    expect(allowed.statusCode).toBe(200);
+    expect(allowedService.restoreBundledDefault).toHaveBeenCalledWith(
+      identity,
+      assetId,
+      payload,
+      requestId,
+    );
   });
 });

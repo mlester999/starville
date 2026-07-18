@@ -38,9 +38,10 @@ export interface ExitTransitionRequest {
 }
 
 /**
- * Sanitized, non-fatal runtime signal for an immutable production texture that
- * could not be loaded. Delivery URLs, checksums, loader internals, and network
- * errors are intentionally excluded from this browser-observable boundary.
+ * Sanitized, non-fatal runtime signal for an immutable uploaded or bundled
+ * texture that could not be loaded. `versionId` is either an uploaded version
+ * UUID or `bundled-manifest:<semver>`. Delivery URLs, checksums, loader
+ * internals, and network errors are intentionally excluded from this boundary.
  */
 export interface WorldAssetFallbackEvent {
   readonly code: 'WORLD_ASSET_LOAD_FAILED';

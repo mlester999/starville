@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="208" viewBox="0 0 192 208" fill="none"><title>Lantern Floor Lamp rotation-90</title><desc>Lantern Floor Lamp with four authored isometric directions and a stable placement base.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8bd77"/><stop offset="1" stop-color="#b87849"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b87849"/><stop offset="1" stop-color="#75503d"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff2bd" stop-opacity=".92"/><stop offset="1" stop-color="#f5df9a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="99.84" cy="183.04" rx="65.28" ry="16.64" fill="#18231f" opacity=".22"/><g transform="translate(192 0) scale(-1 1)"><path d="M96 170.56V74.88" stroke="#382b2a" stroke-width="10"/><path d="M61.44 79.04l34.56-45.76 34.56 45.76z" fill="#fff2bd" stroke="#382b2a" stroke-width="6"/><ellipse cx="96" cy="174.72" rx="38.4" ry="14.56" fill="#75503d"/></g></g></svg>

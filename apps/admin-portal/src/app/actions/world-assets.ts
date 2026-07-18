@@ -8,6 +8,7 @@ import {
   applyAssetVersionOperation,
   createAssetVersionFromExisting,
   loadAssetVersionDetail,
+  restoreAssetBundledDefault,
   saveAssetVersionDraft,
 } from '../../lib/world-assets/api';
 import {
@@ -15,6 +16,7 @@ import {
   type AssetManagerPermission,
 } from '../../lib/world-assets/authorization';
 import { assetDraftConfigurationSchema } from '../../lib/world-assets/contracts';
+import { parseBundledDefaultRestoreForm } from '../../lib/world-assets/bundled-restore';
 
 export interface WorldAssetActionState {
   readonly outcome: 'idle' | 'success' | 'error';
@@ -438,6 +440,65 @@ export async function createWorldAssetVersionFromExistingAction(
       errorKind: errorKindForError(error),
       message: messageForError(error),
       requestId,
+    };
+  }
+}
+
+export async function restoreWorldAssetBundledDefaultAction(
+  _previous: WorldAssetActionState,
+  formData: FormData,
+): Promise<WorldAssetActionState> {
+  await requireAssetManagerPermission('assets.activate');
+  await requireAssetManagerPermission('assets.deprecate');
+  const parsed = parseBundledDefaultRestoreForm(formData);
+  if (!parsed.success) {
+    return {
+      outcome: 'error',
+      errorKind: 'incomplete',
+      message:
+        'Provide the current asset revision, a reason of at least 12 characters, and type RESTORE BUNDLED DEFAULT exactly.',
+    };
+  }
+
+  const { assetId, ...action } = parsed.data;
+  try {
+    const result = await restoreAssetBundledDefault(assetId, action);
+    revalidatePath('/world-assets');
+    revalidatePath('/world-assets/review');
+    revalidatePath('/world-assets/audit');
+    revalidatePath('/world-assets/coverage');
+    revalidatePath(`/world-assets/${assetId}`);
+    if (result.version !== null) {
+      revalidatePath(`/world-assets/${assetId}/versions/${result.version.id}`);
+    }
+    return {
+      outcome: 'success',
+      message:
+        result.status === 'replayed'
+          ? 'This restore request was already completed. No duplicate lifecycle transition was created.'
+          : 'Bundled Default restored. The uploaded active pointer was deprecated; pinned worlds, draft pins, immutable history, and published maps were not rewritten.',
+      requestId: action.idempotencyKey,
+    };
+  } catch (error) {
+    const mfaRequired = error instanceof AdminApiError && error.code === 'MFA_REQUIRED';
+    const requestConflict =
+      error instanceof AdminApiError && error.code === 'ASSET_REQUEST_CONFLICT';
+    const revisionConflict = error instanceof AdminApiError && error.status === 409;
+    return {
+      outcome: 'error',
+      errorKind: requestConflict
+        ? 'request_conflict'
+        : revisionConflict
+          ? 'revision_conflict'
+          : errorKindForError(error),
+      message: mfaRequired
+        ? 'A current AAL2 administrator session is required. Complete multi-factor authentication, then start a new restore request.'
+        : requestConflict
+          ? 'This request identifier was already bound to different restore intent. Refresh before retrying.'
+          : revisionConflict
+            ? 'The asset revision changed before restore. Refresh and compare the current active source again.'
+            : messageForError(error),
+      requestId: action.idempotencyKey,
     };
   }
 }

@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 
-import { assetSlugSchema, assetUuidSchema } from '@starville/asset-management';
+import { assetIdentifierSchema, assetUuidSchema } from '@starville/asset-management';
 
 export const ASSET_INTAKE_BUCKET = 'asset-intake';
 export const GAME_ASSET_DELIVERY_BUCKET = 'game-assets';
@@ -58,12 +58,12 @@ export function privateDerivativePaths(assetId: string, versionId: string) {
   });
 }
 
-export function publicDerivativePaths(slug: string, versionNumber: number) {
-  const safeSlug = assetSlugSchema.parse(slug);
+export function publicDerivativePaths(stableKey: string, versionNumber: number) {
+  const safeStableKey = assetIdentifierSchema.parse(stableKey);
   if (!Number.isInteger(versionNumber) || versionNumber < 1 || versionNumber > 2_147_483_647) {
     throw new AssetStorageError('INVALID_STORAGE_PATH');
   }
-  const prefix = `${ASSET_GAME_ID}/${safeSlug}/v${String(versionNumber)}`;
+  const prefix = `${ASSET_GAME_ID}/${safeStableKey}/v${String(versionNumber)}`;
   return Object.freeze({
     source: `${prefix}/source.webp`,
     preview: `${prefix}/preview.webp`,

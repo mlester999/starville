@@ -28,6 +28,8 @@ export interface CreateApiServiceOptions {
   readonly economy?: BuildApiAppOptions['economy'];
   readonly progression?: BuildApiAppOptions['progression'];
   readonly housing?: BuildApiAppOptions['housing'];
+  readonly homeVisits?: BuildApiAppOptions['homeVisits'];
+  readonly playerExperience?: BuildApiAppOptions['playerExperience'];
   readonly adminAvatar?: BuildApiAppOptions['adminAvatar'];
   readonly adminCosmetics?: BuildApiAppOptions['adminCosmetics'];
   readonly worldGameTest?: BuildApiAppOptions['worldGameTest'];
@@ -53,6 +55,8 @@ export function createApiService({
   economy,
   progression,
   housing,
+  homeVisits,
+  playerExperience,
   adminAvatar,
   adminCosmetics,
   worldGameTest,
@@ -77,6 +81,8 @@ export function createApiService({
     ...(economy === undefined ? {} : { economy }),
     ...(progression === undefined ? {} : { progression }),
     ...(housing === undefined ? {} : { housing }),
+    ...(homeVisits === undefined ? {} : { homeVisits }),
+    ...(playerExperience === undefined ? {} : { playerExperience }),
     ...(adminAvatar === undefined ? {} : { adminAvatar }),
     ...(adminCosmetics === undefined ? {} : { adminCosmetics }),
     ...(worldGameTest === undefined ? {} : { worldGameTest }),

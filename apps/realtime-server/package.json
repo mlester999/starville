@@ -25,6 +25,7 @@
     "@starville/cozy-gameplay": "workspace:*",
     "@starville/config": "workspace:*",
     "@starville/game-core": "workspace:*",
+    "@starville/housing": "workspace:*",
     "@starville/logger": "workspace:*",
     "@starville/realtime": "workspace:*",
     "@starville/shared-types": "workspace:*",

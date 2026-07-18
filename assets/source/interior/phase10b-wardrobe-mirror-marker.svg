@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="224" height="272" viewBox="0 0 224 272" fill="none"><title>Wardrobe Mirror</title><desc>Wardrobe Mirror for the existing non-economic wardrobe interaction boundary.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a7c98b"/><stop offset="1" stop-color="#5d8b68"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5d8b68"/><stop offset="1" stop-color="#345c4c"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f3edbd" stop-opacity=".92"/><stop offset="1" stop-color="#d8d99a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="116.48" cy="239.36" rx="76.16" ry="21.76" fill="#18231f" opacity=".22"/><g><path d="M69.44 209.44V68q42.56-43.52 85.12 0v141.44z" fill="#a7c98b" stroke="#253832" stroke-width="8"/><path d="M85.12 179.52V81.6q26.88-27.2 53.76 0v97.92z" fill="#f3edbd" opacity=".6"/><path d="M96.32 100.64l26.88-19.04" stroke="#ffffff" stroke-width="7" opacity=".7"/><path d="M53.76 228.48h116.48" stroke="#345c4c" stroke-width="13"/></g></g></svg>

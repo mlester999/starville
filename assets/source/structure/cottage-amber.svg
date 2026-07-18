@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="384" height="384" viewBox="0 0 384 384" fill="none"><title>Amber Cottage</title><desc>A warm isometric cottage with a deep roof, lit windows, and readable doorway.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8bd77"/><stop offset="1" stop-color="#b87849"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b87849"/><stop offset="1" stop-color="#75503d"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff2bd" stop-opacity=".92"/><stop offset="1" stop-color="#f5df9a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="199.68" cy="337.92" rx="130.56" ry="30.72" fill="#18231f" opacity=".22"/>
+    <path d="M76.8 176.64L192 103.68l115.2 72.96v130.56l-115.2 65.28-115.2-65.28z" fill="url(#surface)" stroke="#382b2a" stroke-width="5"/>
+    <path d="M49.92 180.48L192 69.12l142.08 111.36-38.4 30.72-103.68-72.96-103.68 72.96z" fill="#75503d" stroke="#382b2a" stroke-width="5"/>
+    <path d="M188.16 264.96l46.08 21.12v61.44l-46.08 19.2z" fill="#382b2a" opacity=".86"/>
+    <path d="M107.52 226.56l38.4 19.2v34.56l-38.4-19.2zM249.6 230.4l38.4-19.2v38.4l-38.4 19.2z" fill="#fff2bd" stroke="#75503d" stroke-width="3"/>
+    </g></svg>

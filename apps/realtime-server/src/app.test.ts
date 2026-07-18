@@ -5,6 +5,7 @@ import {
   type CooperativeActivityBootstrap,
 } from '@starville/cooperative-activities';
 import { getWorldManifest } from '@starville/game-content';
+import { homeVisitGameTestFixture } from '@starville/housing';
 import { buildRealtimeApp } from './app.js';
 import { ConnectionRegistry } from './connections/connection-registry.js';
 import type { LogContext, ServiceLogger } from './contracts.js';
@@ -227,6 +228,11 @@ function persistence(
     privateHomeEvents: vi.fn().mockResolvedValue('no_changes'),
     revalidatePrivateHome: vi.fn().mockResolvedValue('active'),
     closePrivateHome: vi.fn().mockResolvedValue(true),
+    admitHomeVisit: vi.fn().mockResolvedValue('invalid_ticket'),
+    homeVisitEvents: vi.fn().mockResolvedValue('no_changes'),
+    checkpointHomeVisit: vi.fn().mockResolvedValue('closed'),
+    revalidateHomeVisit: vi.fn().mockResolvedValue('active'),
+    closeHomeVisit: vi.fn().mockResolvedValue(true),
     ...overrides,
   };
 }
@@ -1536,6 +1542,114 @@ describe('real-time service foundation', () => {
       expect.stringMatching(/^[0-9a-f]{64}$/u),
       expect.any(String),
       expect.any(String),
+    );
+  });
+
+  it('fails closed on an unauthorized isolated home-visit channel', async () => {
+    const gateway = persistence({ admitHomeVisit: vi.fn().mockResolvedValue('invalid_ticket') });
+    const service = createRealtimeService({
+      config,
+      logger: new SilentLogger(),
+      persistence: gateway,
+    });
+    closeTasks.push(async () => service.stop());
+    const address = await service.start();
+    const socket = new WebSocket(`${address.replace('http', 'ws')}/home-visit`, {
+      headers: { origin: config.allowedOrigins[0] },
+    });
+    closeTasks.push(async () => socket.close());
+    const messages: Array<Record<string, unknown>> = [];
+    socket.on('message', (data) => messages.push(JSON.parse(data.toString())));
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+    socket.send(JSON.stringify({ type: 'authenticate', ticket: 'v'.repeat(43) }));
+    await vi.waitFor(() =>
+      expect(messages).toContainEqual(
+        expect.objectContaining({ type: 'error', code: 'INVALID_TICKET' }),
+      ),
+    );
+    expect(gateway.admit).not.toHaveBeenCalled();
+    expect(gateway.admitPrivateHome).not.toHaveBeenCalled();
+    expect(gateway.admitHomeVisit).toHaveBeenCalledWith(
+      expect.stringMatching(/^[0-9a-f]{64}$/u),
+      expect.any(String),
+      expect.any(String),
+    );
+  });
+
+  it('admits a participant, checkpoints movement, and returns home-isolated snapshots', async () => {
+    const participant = homeVisitGameTestFixture.participants[1];
+    const session = homeVisitGameTestFixture.hostSession;
+    const home = homeVisitGameTestFixture.ownedHome;
+    if (participant === undefined || session === null || home === null)
+      throw new Error('Phase 11F fixture incomplete');
+    const movedParticipant = {
+      ...participant,
+      x: 4,
+      y: 3,
+      movementSequence: '1',
+      stateVersion: participant.stateVersion + 1,
+    };
+    const gateway = persistence({
+      admitHomeVisit: vi.fn().mockResolvedValue({
+        status: 'admitted',
+        realtimeSessionId: 'f1100000-0000-4000-8000-000000000301',
+        visitSessionId: session.id,
+        participantId: participant.id,
+        homeId: home.id,
+        lastEventNumber: '0',
+        snapshot: { session, participants: homeVisitGameTestFixture.participants },
+      }),
+      checkpointHomeVisit: vi
+        .fn()
+        .mockResolvedValue({ status: 'checkpointed', participant: movedParticipant }),
+      homeVisitEvents: vi.fn().mockResolvedValue({
+        lastEventNumber: '1',
+        events: [{ eventNumber: '1', eventKey: 'home_visitor_moved' }],
+        snapshot: { session, participants: [movedParticipant] },
+      }),
+    });
+    const service = createRealtimeService({
+      config,
+      logger: new SilentLogger(),
+      persistence: gateway,
+    });
+    closeTasks.push(async () => service.stop());
+    const address = await service.start();
+    const socket = new WebSocket(`${address.replace('http', 'ws')}/home-visit`, {
+      headers: { origin: config.allowedOrigins[0] },
+    });
+    closeTasks.push(async () => socket.close());
+    const messages: Array<Record<string, unknown>> = [];
+    socket.on('message', (data) => messages.push(JSON.parse(data.toString())));
+    await new Promise<void>((resolve, reject) => {
+      socket.once('open', resolve);
+      socket.once('error', reject);
+    });
+    socket.send(JSON.stringify({ type: 'authenticate', ticket: 'w'.repeat(43) }));
+    await vi.waitFor(() =>
+      expect(messages.some((message) => message['type'] === 'authenticated')).toBe(true),
+    );
+    socket.send(
+      JSON.stringify({ type: 'movement', x: 4, y: 3, facingDirection: 'east', sequence: 1 }),
+    );
+    await vi.waitFor(() =>
+      expect(messages.some((message) => message['type'] === 'movement_ack')).toBe(true),
+    );
+    socket.send(JSON.stringify({ type: 'sync', afterEventNumber: '0', forceSnapshot: true }));
+    await vi.waitFor(() =>
+      expect(messages.some((message) => message['type'] === 'snapshot')).toBe(true),
+    );
+    expect(gateway.checkpointHomeVisit).toHaveBeenCalledWith(
+      'f1100000-0000-4000-8000-000000000301',
+      expect.objectContaining({ sequence: 1, x: 4, y: 3, facingDirection: 'east' }),
+    );
+    expect(gateway.homeVisitEvents).toHaveBeenCalledWith(
+      'f1100000-0000-4000-8000-000000000301',
+      '0',
+      true,
     );
   });
 });

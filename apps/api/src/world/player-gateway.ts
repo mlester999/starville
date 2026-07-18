@@ -87,6 +87,7 @@ export const pinnedAssetMaterialSchema = z
     assetKey: assetIdentifierSchema,
     versionId: z.uuid(),
     checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    bundledManifestVersion: z.literal('1.0.0').nullable(),
     mediaType: z.literal('image/webp').nullable(),
     width: z.number().int().positive().max(4096).nullable(),
     height: z.number().int().positive().max(4096).nullable(),
@@ -117,7 +118,9 @@ export const pinnedAssetMaterialSchema = z
     if (value.developmentMarker) {
       if (
         value.delivery !== null ||
-        value.fallback !== 'repository_procedural' ||
+        (value.bundledManifestVersion === '1.0.0'
+          ? value.fallback !== 'repository_procedural'
+          : value.fallback !== null) ||
         [value.mediaType, value.width, value.height, value.renderWidth, value.renderHeight].some(
           (field) => field !== null,
         )
@@ -125,6 +128,7 @@ export const pinnedAssetMaterialSchema = z
         context.addIssue({ code: 'custom', message: 'Invalid development asset material' });
       }
     } else if (
+      value.bundledManifestVersion !== null ||
       value.delivery === null ||
       value.fallback !== null ||
       [value.mediaType, value.width, value.height, value.renderWidth, value.renderHeight].some(

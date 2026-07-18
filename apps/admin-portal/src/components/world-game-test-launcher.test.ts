@@ -14,23 +14,24 @@ const revisionPage = readFileSync(
 );
 
 describe('administrator Open in Game Test workflow', () => {
-  it('shows explicit readiness reasons and opens only an exact validated saved revision', () => {
-    for (const state of [
-      'READY',
-      'UNSAVED_CHANGES',
-      'NO_DRAFT',
-      'PERMISSION_LOCKED',
-      'STALE_REVISION',
-    ]) {
-      expect(launcher).toContain(state);
-    }
+  it('shows explicit readiness checklist reasons and opens only an exact validated saved revision', () => {
+    expect(launcher).toContain('buildGameTestReadiness');
+    expect(launcher).toContain('data-game-test-readiness');
+    expect(launcher).toContain('Game Test readiness');
+    expect(launcher).toContain('verify-authenticator');
+    expect(launcher).toContain('setup-authenticator');
+    expect(launcher).toContain('authenticatorEnrolled');
+    expect(launcher).toContain('/mfa-required');
+    expect(launcher).toContain('item.actionLabel');
     expect(editor).toContain('<WorldGameTestLauncher');
     expect(editor).toContain('validated={preview.canPreview}');
+    expect(editor).toContain('authenticatorEnrolled={props.authenticatorEnrolled}');
     expect(launcher).toContain('expectedEditVersion: props.editVersion');
     expect(launcher).toContain('expectedChecksum: props.checksum');
     expect(launcher).toContain('test_outdated');
     expect(launcher).toContain('Active or unexchanged sessions');
     expect(launcher).toContain('Reopen current cookie session');
+    expect(launcher).not.toContain('Game Test requires a current AAL2 session.');
   });
 
   it('keeps the opaque grant in the URL fragment and constrains the return path', () => {

@@ -60,6 +60,7 @@ export default async function SocialInteractionsPage({
         <Link href="/operations/social/friends">Friends</Link>
         <Link href="/operations/social/parties">Parties</Link>
         <Link href="/operations/social/audit">Social graph audit</Link>
+        <Link href="/operations/social/home-visits">Live home visits</Link>
       </nav>
 
       <form className="chat-report-filters" method="get">

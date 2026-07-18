@@ -2,6 +2,7 @@ import type {
   AssetCreateVersionAction,
   AssetCreateVersionUploadMetadata,
   AssetDraftUpdate,
+  AssetRestoreBundledDefaultAction,
   AssetUploadMetadata,
   AssetVersionAction,
 } from '@starville/asset-management';
@@ -81,6 +82,10 @@ export interface AdminAssetGateway {
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
   deprecateAsset(
+    identity: AdminDatabaseIdentity,
+    input: Readonly<Record<string, unknown>>,
+  ): Promise<unknown>;
+  restoreBundledDefault(
     identity: AdminDatabaseIdentity,
     input: Readonly<Record<string, unknown>>,
   ): Promise<unknown>;
@@ -180,6 +185,12 @@ export interface AdminAssetService {
     identity: AdminDatabaseIdentity,
     assetId: unknown,
     body: unknown,
+    requestId: string,
+  ): Promise<unknown>;
+  restoreBundledDefault(
+    identity: AdminDatabaseIdentity,
+    assetId: unknown,
+    body: AssetRestoreBundledDefaultAction,
     requestId: string,
   ): Promise<unknown>;
   archiveAsset(

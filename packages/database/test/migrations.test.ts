@@ -443,12 +443,35 @@ describe('Phase 2 administrator migrations', () => {
     new URL('20260717140000_phase11e_housing_schema.sql', migrationDirectory),
     'utf8',
   );
+  const phase11fSchemaSql = readFileSync(
+    new URL('20260718100000_phase11f_home_visits_schema.sql', migrationDirectory),
+    'utf8',
+  );
+  const phase12aSchemaSql = readFileSync(
+    new URL('20260718110000_phase12a_player_experience_schema.sql', migrationDirectory),
+    'utf8',
+  );
+  const phase12aFunctionsSql = readFileSync(
+    new URL('20260718111000_phase12a_player_experience_functions.sql', migrationDirectory),
+    'utf8',
+  );
+  const phase12aAdminWorkerSql = readFileSync(
+    new URL('20260718112000_phase12a_player_experience_admin_worker.sql', migrationDirectory),
+    'utf8',
+  );
   const allSql = `${schemaSql}\n${catalogSql}\n${authorizationSql}`;
 
   it('parses every migration with the hosted PostgreSQL major version grammar', async () => {
     const parser = new Parser({ version: 17 });
 
-    for (const sql of [schemaSql, catalogSql, authorizationSql]) {
+    for (const sql of [
+      schemaSql,
+      catalogSql,
+      authorizationSql,
+      phase12aSchemaSql,
+      phase12aFunctionsSql,
+      phase12aAdminWorkerSql,
+    ]) {
       const result = await parser.parse(sql);
       expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
     }
@@ -614,6 +637,18 @@ describe('Phase 2 administrator migrations', () => {
       phase11eSchemaSql.indexOf('with mapping(role_key,permission_key)'),
       phase11eSchemaSql.indexOf('alter table public.cozy_gameplay_rate_limits'),
     );
+    const phase11fMappingBlock = phase11fSchemaSql.slice(
+      phase11fSchemaSql.indexOf('with mapping(role_key,permission_key)'),
+      phase11fSchemaSql.indexOf(
+        'insert into public.admin_role_permissions(role_id,permission_id)\nselect role.id,permission.id from public.admin_roles role cross join',
+      ),
+    );
+    const phase12aMappingBlock = phase12aSchemaSql.slice(
+      phase12aSchemaSql.indexOf('with mapping(role_key,permission_key)'),
+      phase12aSchemaSql.indexOf(
+        'insert into public.admin_role_permissions(role_id,permission_id)\nselect role.id,permission.id from public.admin_roles role cross join',
+      ),
+    );
     const mappingBlock = `${catalogSql.slice(
       catalogSql.indexOf('with mapping(role_key, permission_key)'),
     )}\n${phase5MappingBlock}\n${phase6MappingBlock}\n${consolidationMappingBlock}\n${liveOperationsMappingBlock}\n${cozyHousingSql.slice(
@@ -658,7 +693,7 @@ describe('Phase 2 administrator migrations', () => {
     )}\n${cosmeticSchemaSql.slice(
       cosmeticSchemaSql.indexOf('with mapping(role_key, permission_key)'),
       cosmeticSchemaSql.indexOf('create table public.cosmetic_acquisition_sources'),
-    )}\n${phase10cMappingBlock}\n${phase11MappingBlock}\n${phase11ContentManagementMappingBlock}\n${phase11bMappingBlock}\n${phase11cMappingBlock}\n${phase11dMappingBlock}\n${phase11eMappingBlock}`;
+    )}\n${phase10cMappingBlock}\n${phase11MappingBlock}\n${phase11ContentManagementMappingBlock}\n${phase11bMappingBlock}\n${phase11cMappingBlock}\n${phase11dMappingBlock}\n${phase11eMappingBlock}\n${phase11fMappingBlock}\n${phase12aMappingBlock}`;
     const seeded = new Map<string, string[]>();
 
     for (const match of mappingBlock.matchAll(/\('([^']+)',\s*'([^']+)'\)/g)) {
@@ -3031,5 +3066,183 @@ describe('Phase 11 hosted database lint repair migration', () => {
     expect(sql).toContain(
       'grant execute on function public.save_player_home_layout(text,uuid,integer,integer,integer,integer,integer,jsonb,uuid,text,text)',
     );
+  });
+});
+
+describe('Phase 12A player-experience migration chain', () => {
+  const migrationDirectory = new URL(
+    '../../../infrastructure/supabase/migrations/',
+    import.meta.url,
+  );
+  const schemaSql = readFileSync(
+    new URL('20260718110000_phase12a_player_experience_schema.sql', migrationDirectory),
+    'utf8',
+  );
+  const playerSql = readFileSync(
+    new URL('20260718111000_phase12a_player_experience_functions.sql', migrationDirectory),
+    'utf8',
+  );
+  const operationsSql = readFileSync(
+    new URL('20260718112000_phase12a_player_experience_admin_worker.sql', migrationDirectory),
+    'utf8',
+  );
+
+  it('uses forward-only PostgreSQL 17 migrations and no duplicate gameplay authority', async () => {
+    const parser = new Parser({ version: 17 });
+    for (const sql of [schemaSql, playerSql, operationsSql]) {
+      expect((await parser.parse(sql)).stmts?.length ?? 0).toBeGreaterThan(0);
+      expect(sql).not.toMatch(/drop\s+(?:table|schema)|truncate/iu);
+    }
+    expect(schemaSql).not.toContain('create table public.player_dust_accounts');
+    expect(schemaSql).not.toContain('create table public.player_inventory_stacks');
+    expect(schemaSql).not.toContain('create table public.player_quest_instances');
+  });
+
+  it('pins immutable onboarding and daily definitions to version authority', () => {
+    expect(schemaSql).toContain(
+      'policy_version_id uuid not null references public.player_experience_daily_policy_versions',
+    );
+    expect(schemaSql).toContain('player_experience_onboarding_steps_immutable');
+    expect(schemaSql).toContain('player_experience_daily_objectives_immutable');
+    expect(schemaSql).toContain('PLAYER_EXPERIENCE_VERSION_CHILD_IMMUTABLE');
+    expect(playerSql).toContain('definition.policy_version_id=policy.id');
+  });
+
+  it('keeps daily refresh server-time-only and management successor-only', () => {
+    expect(playerSql).toContain('public.refresh_player_daily_objectives');
+    expect(playerSql).not.toMatch(/refresh_player_daily_objectives[\s\S]+p_game_day/iu);
+    expect(operationsSql).toContain('public.create_admin_player_experience_daily_policy_successor');
+    expect(operationsSql).toContain("p_assurance_level<>'aal2'");
+    expect(operationsSql).toContain("'activePolicyUnchanged',true");
+    expect(operationsSql).not.toContain('complete_everything');
+  });
+
+  it('forces RLS and exposes no browser-executable Phase 12A RPC', () => {
+    expect(schemaSql).toContain("execute format('alter table public.%I force row level security'");
+    expect(`${playerSql}\n${operationsSql}`).not.toMatch(
+      /grant execute[^;]+to (?:public|anon|authenticated)/iu,
+    );
+    expect(playerSql).toContain(
+      'grant execute on function public.refresh_player_daily_objectives(text,integer,text,text) to service_role',
+    );
+  });
+});
+
+describe('Phase 12B bundled world-asset lifecycle migration', () => {
+  const sql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260718120000_phase12b_world_asset_bundled_lifecycle.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const collisionFixture = readFileSync(
+    new URL('./fixtures/phase12b-pre-migration-asset-collision.sql', import.meta.url),
+    'utf8',
+  );
+
+  it('parses with PostgreSQL 17 and seeds the complete bounded bundled catalog', async () => {
+    const result = await new Parser({ version: 17 }).parse(sql);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    expect(sql.match(/"key":"[a-z0-9._-]+"/gu)).toHaveLength(106);
+    expect(sql).toContain("'PHASE12B_BUNDLED_VERSION_CONFLICT'");
+    expect(sql).not.toMatch(/drop\s+(?:table|schema)|truncate/iu);
+  });
+
+  it('reuses exact repository identities but appends after colliding storage history', async () => {
+    const result = await new Parser({ version: 17 }).parse(collisionFixture);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    expect(sql).toContain("candidate.source_kind = 'repository_procedural'");
+    expect(sql).toContain("candidate.detected_mime_type = 'application/x-starville-procedural'");
+    expect(sql).toContain('select coalesce(max(existing.version_number), 0) + 1');
+    expect(sql).toContain('where catalog.world_asset_version_id is null');
+    expect(collisionFixture).toContain("'ui.warning'");
+    expect(collisionFixture).toContain("'legacy_storage_raster'");
+  });
+
+  it('keeps bundled metadata immutable behind forced RLS and narrow service RPC grants', () => {
+    expect(sql).toContain('create table public.world_asset_bundled_catalog');
+    expect(sql).toContain(
+      'alter table public.world_asset_bundled_catalog force row level security',
+    );
+    expect(sql).toContain('revoke all on table public.world_asset_bundled_catalog');
+    expect(sql).toContain('ASSET_BUNDLED_CATALOG_IMMUTABLE');
+    expect(sql).toContain('ASSET_BUNDLED_DEFAULT_PROTECTED');
+    expect(sql).not.toMatch(/grant execute[^;]+to (?:public|anon|authenticated)/iu);
+  });
+
+  it('protects restore with AAL2, both permissions, locking, revision, rate, replay, and audit', () => {
+    expect(sql).toContain(
+      'create or replace function public.restore_admin_game_asset_bundled_default',
+    );
+    expect(sql).toContain("if p_assurance_level <> 'aal2'");
+    expect(sql).toContain("p_assurance_level, 'assets.activate'");
+    expect(sql).toContain("p_assurance_level, 'assets.deprecate'");
+    expect(sql).toContain("'asset-activation:' || p_asset_id::text");
+    expect(sql).toContain('asset.record_version <> p_expected_asset_revision');
+    expect(sql).toContain("'deprecation_write', p_user_id::text");
+    expect(sql).toContain("private.world_asset_replay(p_user_id, 'restore_bundled_default'");
+    expect(sql).toContain("'asset.bundled_default.restored'");
+    expect(sql).toContain("'worldMapVersionAssetRowsUpdated', 0");
+  });
+
+  it('never rewrites immutable world asset pins and explicitly hardens sensitive AAL2 permissions', () => {
+    expect(sql).not.toMatch(
+      /(?:insert\s+into|update|delete\s+from)\s+public\.world_map_version_assets/iu,
+    );
+    expect(sql).toContain(
+      "p_permission_key in ('assets.approve', 'assets.activate', 'assets.deprecate')",
+    );
+    expect(sql).toContain("'override_not_available'");
+    expect(sql).toContain("'bundled_default_missing'");
+  });
+
+  it('exposes bounded recommendation-only reconciliation for the worker', () => {
+    expect(sql).toContain(
+      'create or replace function public.reconcile_world_asset_bundled_lifecycle',
+    );
+    expect(sql).toContain('pg_try_advisory_xact_lock(');
+    expect(sql).toContain("'world-asset-bundled-reconciliation'");
+    expect(sql).toContain('p_limit not between 1 and 500');
+    expect(sql).toContain("'automaticActionCount', 0");
+    expect(sql).toContain("'publishedPinMutationCount', 0");
+    expect(sql).toContain("'recommendationsOnly', true");
+    expect(sql).toContain(
+      'grant execute on function public.reconcile_world_asset_bundled_lifecycle(integer, text, text)',
+    );
+    expect(sql).toContain("'ACTIVE_OVERRIDE_DERIVATIVES_INCOMPLETE'");
+    expect(sql).toContain("'ACTIVE_OVERRIDE_THUMBNAIL_MISSING'");
+    expect(sql).toContain("'ACTIVE_OVERRIDE_VALIDATION_INVALID'");
+    expect(sql).toContain("'APPROVED_OVERRIDE_VALIDATION_INVALID'");
+    expect(sql).toContain("'DEPRECATED_OVERRIDE_ROLLBACK_INVALID'");
+    expect(sql).toContain("'BUNDLED_CATALOG_MEDIA_METADATA_INVALID'");
+  });
+
+  it('projects one bounded player batch of eligible Starville overrides without browser grants', () => {
+    expect(sql).toContain('create or replace function public.get_player_gameplay_asset_overrides');
+    expect(sql).toContain('cardinality(p_asset_keys) not between 1 and 96');
+    expect(sql).toContain("asset.game_key = 'starville'");
+    expect(sql).toContain("asset.asset_source_state = 'uploaded_override'");
+    expect(sql).toContain("version.lifecycle_status = 'active'");
+    expect(sql).toContain("version.automated_validation_status = 'valid'");
+    expect(sql).toContain('catalog.replacement_allowed');
+    expect(sql).toContain("'bundledManifestVersion', null");
+    expect(sql).toContain(
+      'grant execute on function public.get_player_gameplay_asset_overrides(text, text[], text, integer)',
+    );
+    expect(sql).not.toMatch(
+      /grant execute on function public\.get_player_gameplay_asset_overrides[^;]+to (?:public|anon|authenticated)/iu,
+    );
+  });
+
+  it('adds manifest-bound repository pins and one-query coverage summary evidence', () => {
+    expect(sql).toContain('create or replace function private.world_asset_deliveries_for_version');
+    expect(sql).toContain("'bundledManifestVersion'");
+    expect(sql).toContain("'uploadedVersionCount'");
+    expect(sql).toContain("'invalidVersionCount'");
+    expect(sql).toContain("'referenceBreakdown'");
+    expect(sql).toContain("'world'");
+    expect(sql).toContain("'furniture'");
+    expect(sql).toContain("'farming'");
   });
 });

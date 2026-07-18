@@ -95,6 +95,7 @@ describe('published world client boundary', () => {
       assetKey: 'moonpetal-cottage',
       versionId: '55555555-5555-4555-8555-555555555555',
       checksum: 'c'.repeat(64),
+      bundledManifestVersion: null,
       url: 'https://assets.example.test/storage/v1/object/public/game-assets/starville/moonpetal-cottage/v1/source.webp',
       mediaType: 'image/webp',
       width: 1024,

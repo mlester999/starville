@@ -79,6 +79,14 @@ function HowToPlay() {
       'Select quickbar slots using number keys 1–8. Your selected tool appears in the highlighted slot.',
     ],
     [
+      'Follow Your Guide',
+      'Open the compact Starville Guide for one verified objective, an accessible route hint, Journey progress, and recovery.',
+    ],
+    [
+      'Begin Your Daily Rhythm',
+      'Complete three eligible server-assigned objectives before the 00:00 UTC reset. Daily v1 has no DUST or XP reward.',
+    ],
+    [
       'Meet Other Villagers',
       'Walk close to another player and open Nearby to inspect them, send a friend request, offer a gift, or request a trade.',
     ],

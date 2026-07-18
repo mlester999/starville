@@ -14,6 +14,7 @@ describe('world editor shell and presentation', () => {
   it('implements a three-panel viewport shell with docked validation', () => {
     expect(editor).toContain('data-world-editor-shell="true"');
     expect(editor).toContain('world-editor-toolbar');
+    expect(editor).toContain('world-editor-command-bar');
     expect(editor).toContain('world-editor-layout');
     expect(editor).toContain('world-editor-layers');
     expect(editor).toContain('world-editor-stage');
@@ -23,24 +24,37 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('world-editor-drawer');
     expect(editor).toContain("mobilePanel === 'assets'");
     expect(editor).toContain("mobilePanel === 'inspector'");
+    expect(editor).toContain('data-resizable-panels="true"');
+    expect(editor).toContain('--world-editor-layers-width');
+    expect(editor).toContain('--world-editor-inspector-width');
   });
 
-  it('keeps toolbar actions and view toggles without raw checkbox-only controls', () => {
+  it('groups command-bar actions and keeps view tools above the map', () => {
     expect(editor).toContain('Save draft');
     expect(editor).toContain('Validate draft');
     expect(editor).toContain('Draft preview');
     expect(editor).toContain('Undo');
     expect(editor).toContain('Redo');
+    expect(editor).toContain('data-command-group="history"');
+    expect(editor).toContain('data-command-group="draft"');
+    expect(editor).toContain('data-command-group="validation"');
+    expect(editor).toContain('data-command-group="test"');
+    expect(editor).toContain('world-editor-command-destructive');
+    expect(editor).toContain('Reset panel sizes');
+    expect(editor).toContain('resetPanelSizes');
     expect(editor).toContain('world-editor-toggle');
-    expect(editor).toContain('label="Move tool"');
+    expect(editor).toContain('label="Move"');
+    expect(editor).toContain('label="Select"');
     expect(editor).toContain('Selected tool:');
     expect(editor).toContain('label="Grid"');
     expect(editor).toContain('label="Collision"');
     expect(editor).toContain('label="Spawns"');
     expect(editor).toContain('label="Exits"');
-    expect(editor).toContain('Editor Guide');
+    expect(editor).toContain('data-map-toolbar="true"');
     expect(editor).toContain('data-editor-guide-trigger="true"');
     expect(editor).toContain('WorldEditorGuide');
+    expect(editor).toContain('resolveDraftEditorStatus');
+    expect(editor).toContain('data-draft-status');
   });
 
   it('provides a searchable asset palette with cards and development badges', () => {
@@ -60,6 +74,9 @@ describe('world editor shell and presentation', () => {
 
   it('keeps property inspector empty state and structured fields', () => {
     expect(editor).toContain('Nothing selected');
+    expect(editor).toContain(
+      'Select an object on the map or from the Layers panel to inspect and edit it.',
+    );
     expect(editor).toContain('World Y / depth base');
     expect(editor).toContain('Facing direction');
     expect(editor).toContain('Destination map ID');
@@ -112,10 +129,16 @@ describe('world editor shell and presentation', () => {
     expect(styles).not.toContain('.editor-scroll-region__fade');
   });
 
-  it('supports panel collapse, content-aware fit, canvas zoom/pan, and preview reasons', () => {
+  it('supports panel collapse, resizable widths, content-aware fit, canvas zoom/pan, and preview reasons', () => {
     expect(editor).toContain('setLayersCollapsedPersist');
     expect(editor).toContain('setInspectorCollapsedPersist');
-    expect(editor).toContain('world-canvas-controls');
+    expect(editor).toContain('beginPanelResize');
+    expect(editor).toContain('clampLayersWidth');
+    expect(editor).toContain('clampInspectorWidth');
+    expect(editor).toContain('clearLocalPanelWidths');
+    expect(editor).toContain('writeLocalNumber');
+    expect(editor).toContain('aria-label="Resize layers panel"');
+    expect(editor).toContain('aria-label="Resize inspector panel"');
     expect(editor).toContain('aria-label="Zoom in"');
     expect(editor).toContain('aria-label="Zoom out"');
     expect(editor).toContain('aria-label="Fit map in view"');
@@ -124,6 +147,8 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('computeFitCanvasView');
     expect(editor).toContain('applyFitCanvas');
     expect(editor).toContain('scheduleFitCanvas');
+    expect(editor).toContain('CANVAS_ZOOM_DEFAULT');
+    expect(editor).toContain('viewInitialized');
     expect(editor).toContain('host.clientWidth');
     expect(editor).toContain('host.clientHeight');
     expect(editor).toContain('userAdjustedView');
@@ -132,6 +157,11 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('validatedChecksum');
     expect(editor).toContain('canvasZoom');
     expect(editor).toContain('canvasPan');
+    expect(editor).toContain('layersWidth');
+    expect(editor).toContain('inspectorWidth');
+    // Single camera-control group lives in the map toolbar (no floating overlay).
+    expect(editor).toContain('data-map-toolbar="true"');
+    expect(editor).not.toContain('Canvas navigation overlay');
     expect(editor).toContain('useState(false)'); // validation starts collapsed by default
   });
 
@@ -174,7 +204,7 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('editableDraft');
     expect(editor).toContain('Read-only validated world version');
     expect(styles).toContain("[data-mobile-panel='inspector'] .world-editor-drawer__panel");
-    expect(styles).toContain('max-height: min(72dvh, 38rem)');
+    expect(styles).toContain('height: 100%');
   });
 
   it('keeps the validation dock as a layout sibling so Fit uses the unobstructed canvas host', () => {
@@ -192,12 +222,18 @@ describe('world editor shell and presentation', () => {
 
   it('styles the editor shell and canvas so the workspace is not a blank black void', () => {
     expect(styles).toContain('.world-editor-page');
+    expect(styles).toContain('.portal-content:has(.world-editor-page)');
     expect(styles).toContain('.world-editor-layout');
+    expect(styles).toContain('--world-editor-layers-width');
+    expect(styles).toContain('--world-editor-inspector-width');
+    expect(styles).toContain('.world-editor-resize-handle');
     expect(styles).toContain('.world-editor-stage__canvas-wrap');
+    expect(styles).toContain('.world-editor-map-toolbar');
+    expect(styles).toContain('.world-editor-draft-status');
     expect(styles).toContain('.world-canvas');
-    expect(styles).toContain('height: calc(100dvh - 8.4rem)');
     expect(styles).toContain('.asset-palette');
     expect(styles).toContain('.world-validation-panel');
+    expect(styles).toContain('.world-validation-panel.is-expanded');
     expect(styles).toContain('.world-canvas-controls');
     expect(styles).toContain('@media (max-width: 1100px)');
     expect(styles).toContain('@media (max-width: 820px)');

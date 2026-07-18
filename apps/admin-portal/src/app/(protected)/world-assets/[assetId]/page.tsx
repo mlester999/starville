@@ -6,6 +6,8 @@ import { notFound } from 'next/navigation';
 import { z } from 'zod';
 
 import { WorldAssetEmptyState } from '../../../../components/world-asset-empty-state';
+import { WorldAssetBundledComparison } from '../../../../components/world-asset-bundled-comparison';
+import { WorldAssetBundledRestore } from '../../../../components/world-asset-bundled-restore';
 import { WorldAssetNewVersionUpload } from '../../../../components/world-asset-new-version-upload';
 import { PlaceholderReplacementDisplay } from '../../../../components/world-asset-placeholder-selector';
 import { WorldAssetReferenceList } from '../../../../components/world-asset-reference-list';
@@ -21,6 +23,7 @@ import {
   assetManagerCapabilities,
   requireAssetManagerPermission,
 } from '../../../../lib/world-assets/authorization';
+import { bundledRuntimeSize } from '../../../../lib/world-assets/bundled-media';
 import { toPlaceholderMarkerOptions } from '../../../../lib/world-assets/placeholder-markers';
 import {
   assetCategoryLabel,
@@ -86,6 +89,7 @@ export default async function WorldAssetDetailPage(props: {
       loadAssetReferences(assetId.data, 1, 100, requestId),
     ]);
     const { asset } = detail;
+    const bundledSizeBytes = await bundledRuntimeSize(asset.slug);
     const activeVersion = activeAssetVersion(detail);
     const latestCandidate = latestAssetCandidate(detail);
     const activeUsage =
@@ -518,6 +522,46 @@ export default async function WorldAssetDetailPage(props: {
               </table>
             </div>
           </section>
+        ) : null}
+
+        <WorldAssetBundledComparison
+          assetKey={asset.slug}
+          bundledSizeBytes={bundledSizeBytes}
+          uploadedLabel={
+            activeVersion === null
+              ? 'No active upload'
+              : `Active Version ${String(activeVersion.versionNumber)}`
+          }
+          uploadedMediaUrl={
+            activeVersion === null
+              ? null
+              : availableAdminAssetMediaPath(
+                  asset.id,
+                  activeVersion.id,
+                  'source',
+                  activeVersion.sourceUrl,
+                )
+          }
+          uploadedVersion={activeVersion}
+        />
+
+        {asset.canRestoreBundledDefault &&
+        asset.bundledManifestVersion !== null &&
+        capabilities.canActivate &&
+        capabilities.canDeprecate ? (
+          <WorldAssetBundledRestore
+            assetId={asset.id}
+            assetRevision={asset.revision}
+            bundledManifestVersion={asset.bundledManifestVersion}
+            currentActiveLabel={
+              activeVersion === null
+                ? 'No active uploaded version'
+                : `Uploaded Version ${String(activeVersion.versionNumber)}`
+            }
+            friendlyName={asset.friendlyName}
+            referenceSummary={references}
+            requestId={randomUUID()}
+          />
         ) : null}
 
         <div className="detail-grid world-asset-detail-grid">

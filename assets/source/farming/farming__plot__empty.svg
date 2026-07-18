@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="128" viewBox="0 0 192 128" fill="none"><title>Empty Farm Plot</title><desc>Empty Farm Plot on the canonical isometric home-garden footprint.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8d98d"/><stop offset="1" stop-color="#71a867"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#71a867"/><stop offset="1" stop-color="#3f6f53"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff3bd" stop-opacity=".92"/><stop offset="1" stop-color="#efd78b" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><path d="M19.2 69.12l76.8-34.56 76.8 34.56-76.8 34.56z" fill="#b8d98d" stroke="#283a32" stroke-width="5"/><path d="M44.16 69.12l51.84-23.04 51.84 23.04-51.84 23.04z" fill="#b4865a" stroke="#3f6f53" stroke-width="3" opacity=".76"/><path d="M36.48 65.28l3 -7 3 7m113.28 2.56l3 -7 3 7" stroke="#fff3bd" stroke-width="3"/></g></svg>

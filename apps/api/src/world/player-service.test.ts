@@ -12,6 +12,7 @@ import type {
   PublishedWorldView,
   WorldTransitionView,
 } from './player-contracts.js';
+import { pinnedAssetMaterialSchema } from './player-gateway.js';
 import { createPlayerWorldService } from './player-service.js';
 
 class SilentLogger implements ServiceLogger {
@@ -35,6 +36,7 @@ function pinnedAssets(manifest: MapManifest): readonly PinnedWorldAssetMaterial[
     assetKey,
     versionId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
     checksumSha256: 'c'.repeat(64),
+    bundledManifestVersion: '1.0.0',
     mediaType: null,
     width: null,
     height: null,
@@ -61,6 +63,7 @@ function publicAssets(materials: readonly PinnedWorldAssetMaterial[]) {
     assetKey: material.assetKey,
     versionId: material.versionId,
     checksum: material.checksumSha256,
+    bundledManifestVersion: material.bundledManifestVersion,
     url: null,
     mediaType: null,
     width: null,
@@ -191,6 +194,31 @@ describe('player world service', () => {
     expect(target.loadCurrent).toHaveBeenCalledWith('server-derived-wallet', 'world-current', 180);
   });
 
+  it('preserves unresolved legacy repository pins so the client can render missing safely', async () => {
+    const legacy = {
+      ...lanternMaterials[0]!,
+      bundledManifestVersion: null,
+      fallback: null,
+    };
+    expect(pinnedAssetMaterialSchema.safeParse(legacy).success).toBe(true);
+
+    const target = gateway();
+    vi.mocked(target.loadCurrent).mockResolvedValueOnce({
+      ...lanternWorld,
+      assetDeliveries: [legacy, ...lanternMaterials.slice(1)],
+    });
+    const loaded = await service(target).value.loadCurrent('wallet', 'legacy-repository-pin');
+
+    expect(loaded.assetDeliveries[0]).toEqual(
+      expect.objectContaining({
+        assetKey: legacy.assetKey,
+        bundledManifestVersion: null,
+        developmentMarker: true,
+        url: null,
+      }),
+    );
+  });
+
   it('fails closed when persistence returns a mismatched or malformed publication', async () => {
     const target = gateway();
     vi.mocked(target.loadCurrent).mockResolvedValueOnce({
@@ -212,6 +240,7 @@ describe('player world service', () => {
       renderWidth: 512,
       renderHeight: 512,
       developmentMarker: false,
+      bundledManifestVersion: null,
       delivery: {
         bucket: 'game-assets' as const,
         objectPath: `starville/${lanternMaterials[0]!.assetKey}/v2/source.webp`,
@@ -259,6 +288,7 @@ describe('player world service', () => {
           renderWidth: 512,
           renderHeight: 512,
           developmentMarker: false,
+          bundledManifestVersion: null,
           delivery: {
             bucket: 'game-assets',
             objectPath: 'starville/different-asset/v1/source.webp',

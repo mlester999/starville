@@ -5,5 +5,10 @@
     "moduleResolution": "Bundler",
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "vitest.config.ts"]
+  "include": [
+    "vite.config.ts",
+    "vite-bundled-assets.ts",
+    "vite-bundled-assets.test.ts",
+    "vitest.config.ts"
+  ]
 }

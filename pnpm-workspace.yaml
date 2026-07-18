@@ -27,7 +27,7 @@ minimumReleaseAgeExclude:
 
 allowBuilds:
   '@reown/appkit': true
-  bigint-buffer: true
+  bigint-buffer: false
   bufferutil: false
   esbuild: true
   sharp: true

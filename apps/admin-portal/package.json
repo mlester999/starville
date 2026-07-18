@@ -31,6 +31,7 @@
     "@starville/logger": "workspace:*",
     "@starville/player-operations": "workspace:*",
     "@starville/platform-configuration": "workspace:*",
+    "@starville/player-experience": "workspace:*",
     "@starville/progression": "workspace:*",
     "@starville/progression-simulation": "workspace:*",
     "@starville/realtime": "workspace:*",

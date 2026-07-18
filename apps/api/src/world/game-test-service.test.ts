@@ -37,6 +37,7 @@ function materials() {
     assetKey,
     versionId: `00000000-0000-4000-8000-${String(index + 1).padStart(12, '0')}`,
     checksumSha256: 'c'.repeat(64),
+    bundledManifestVersion: '1.0.0',
     mediaType: null,
     width: null,
     height: null,

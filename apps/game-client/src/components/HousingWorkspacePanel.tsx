@@ -30,8 +30,10 @@ import {
   validateHousingLayout,
 } from '../app/housing-client';
 import { PlayerRequestError } from '../app/player-client';
+import { BundledAssetImage } from './BundledAssetImage';
+import { HomeVisitsPanel } from './HomeVisitsPanel';
 
-type HousingTab = 'decorate' | 'storage' | 'upgrades' | 'history' | 'game_test';
+type HousingTab = 'decorate' | 'storage' | 'upgrades' | 'history' | 'visits' | 'game_test';
 const errorMessages: Readonly<Record<string, string>> = {
   HOUSING_CONFLICT: 'Your home changed elsewhere. The latest saved layout has been restored.',
   HOUSING_LAYOUT_INVALID: 'The server found a placement that needs attention before saving.',
@@ -76,7 +78,17 @@ function draftPlacement(
   };
 }
 
-export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) {
+function furnitureAssetRef(workspace: HousingWorkspace, furnitureKey: string): string | null {
+  return (
+    workspace.ownedPlaceables.find((entry) => entry.furniture.key === furnitureKey)?.furniture
+      .worldAssetRef ?? null
+  );
+}
+
+export function HousingWorkspacePanel({
+  apiUrl,
+  realtimeUrl,
+}: Readonly<{ apiUrl: string; realtimeUrl?: string | undefined }>) {
   const [workspace, setWorkspace] = useState<HousingWorkspace>();
   const [draft, setDraft] = useState<HousingLocalDraft>();
   const [tab, setTab] = useState<HousingTab>('decorate');
@@ -349,6 +361,7 @@ export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) 
             ['storage', 'Storage'],
             ['upgrades', 'Upgrades'],
             ['history', 'Layout history'],
+            ['visits', 'Live visits'],
             ['game_test', 'Game Test'],
           ] as const
         ).map(([key, label]) => (
@@ -413,6 +426,11 @@ export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) 
             </div>
             {placeables.map((entry) => (
               <article key={entry.inventoryStackId}>
+                <BundledAssetImage
+                  assetKey={entry.furniture.worldAssetRef}
+                  alt={`${entry.furniture.displayName} preview`}
+                  className="housing-palette__thumbnail"
+                />
                 <div>
                   <strong>{entry.furniture.displayName}</strong>
                   <small>
@@ -494,6 +512,10 @@ export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) 
                     ) ?? -1;
                   const placement =
                     placementIndex < 0 ? undefined : draft?.placements[placementIndex];
+                  const placementAssetRef =
+                    placement === undefined
+                      ? null
+                      : furnitureAssetRef(workspace, placement.furnitureKey);
                   const selected = selectedCell.x === cell.x && selectedCell.y === cell.y;
                   return (
                     <button
@@ -506,7 +528,18 @@ export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) 
                         setSelectedPlacementIndex(placementIndex < 0 ? null : placementIndex);
                       }}
                     >
-                      <span>{placement === undefined ? '·' : '✦'}</span>
+                      <span>
+                        {placement === undefined ? (
+                          '·'
+                        ) : (
+                          <BundledAssetImage
+                            assetKey={placementAssetRef}
+                            alt=""
+                            className="housing-grid__furniture"
+                            rotation={placement.rotation}
+                          />
+                        )}
+                      </span>
                       <small>
                         {cell.x},{cell.y}
                       </small>
@@ -522,6 +555,12 @@ export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) 
               </p>
             ) : (
               <aside className="housing-selection" aria-label="Selected furniture inspector">
+                <BundledAssetImage
+                  assetKey={furnitureAssetRef(workspace, selectedPlacement.furnitureKey)}
+                  alt={`${selectedPlacement.furnitureKey.replaceAll('-', ' ')} placement preview`}
+                  className="housing-selection__preview"
+                  rotation={selectedPlacement.rotation}
+                />
                 <strong>{selectedPlacement.furnitureKey.replaceAll('-', ' ')}</strong>
                 <span>
                   Coordinates {selectedPlacement.x}, {selectedPlacement.y}
@@ -781,6 +820,7 @@ export function HousingWorkspacePanel({ apiUrl }: Readonly<{ apiUrl: string }>) 
           )}
         </div>
       ) : null}
+      {tab === 'visits' ? <HomeVisitsPanel apiUrl={apiUrl} realtimeUrl={realtimeUrl} /> : null}
       {tab === 'game_test' ? (
         <div className="housing-game-test">
           <strong>Game Test Housing</strong>

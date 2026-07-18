@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="208" viewBox="0 0 192 208" fill="none"><title>Moonwoven Rug rotation-180</title><desc>Moonwoven Rug with four authored isometric directions and a stable placement base.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="99.84" cy="183.04" rx="65.28" ry="16.64" fill="#18231f" opacity=".22"/><g><path d="M26.88 131.04l69.12-45.76 69.12 45.76-69.12 45.76z" fill="url(#surface)" stroke="#2c304b" stroke-width="5"/><path d="M59.52 131.04l36.48-22.88 36.48 22.88-36.48 22.88z" fill="#e9d68d" opacity=".72"/><path d="M74.88 83.2l23.04-10.4" stroke="#e9d68d" stroke-width="6"/></g></g></svg>

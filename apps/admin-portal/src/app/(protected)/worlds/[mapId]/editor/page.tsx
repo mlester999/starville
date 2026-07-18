@@ -8,8 +8,10 @@ import { hasAdminPermission } from '@starville/admin-auth';
 import { WorldEditor } from '../../../../../components/world-editor';
 import { AdminApiError } from '../../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../../lib/auth/authorization';
+import { loadVerifiedTotpFactors } from '../../../../../lib/auth/mfa';
 import { loadWorldEditorAssetCandidates } from '../../../../../lib/world-assets/api';
 import { parseAdminPublicConfig } from '../../../../../lib/public-config';
+import { createAdminServerClient } from '../../../../../lib/supabase/server';
 import { loadWorldDraft } from '../../../../../lib/worlds/api';
 import { loadWorldGameTestStatus } from '../../../../../lib/worlds/game-test-api';
 
@@ -38,7 +40,7 @@ export default async function WorldEditorPage(props: {
   const publicConfig = parseAdminPublicConfig(process.env);
 
   try {
-    const [draft, assets, gameTestStatus] = await Promise.all([
+    const [draft, assets, gameTestStatus, authenticatorFactors] = await Promise.all([
       loadWorldDraft(mapId, version.data),
       loadWorldEditorAssetCandidates({
         page: 1,
@@ -51,6 +53,7 @@ export default async function WorldEditorPage(props: {
       canOpenGameTest && context.assuranceLevel === 'aal2'
         ? loadWorldGameTestStatus(mapId, version.data, randomUUID()).catch(() => null)
         : Promise.resolve(null),
+      loadVerifiedTotpFactors(await createAdminServerClient()).catch(() => []),
     ]);
     if (!['draft', 'validated'].includes(draft.version.lifecycleStatus)) notFound();
 
@@ -66,6 +69,7 @@ export default async function WorldEditorPage(props: {
         draft={draft}
         canOpenGameTest={canOpenGameTest}
         assuranceLevel={context.assuranceLevel}
+        authenticatorEnrolled={authenticatorFactors.length > 0}
         gameTestEnvironment={publicConfig.environment}
         gameTestReopenUrl={new URL('/preview/world', publicConfig.gameUrl).toString()}
         initialGameTestStatus={gameTestStatus}

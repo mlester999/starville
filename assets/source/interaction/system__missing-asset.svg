@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" fill="none"><title>Missing Asset</title><desc>A safe Starville diagnostic crate used when no eligible visual source can load.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e49a82"/><stop offset="1" stop-color="#ba5b67"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ba5b67"/><stop offset="1" stop-color="#704056"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff0b0" stop-opacity=".92"/><stop offset="1" stop-color="#f3d27d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="99.84" cy="168.96" rx="65.28" ry="15.36" fill="#18231f" opacity=".22"/><path d="M38.4 86.4l57.6-34.56 57.6 34.56v65.28l-57.6 32.64-57.6-32.64z" fill="url(#shade)" stroke="#342d3d" stroke-width="7"/><path d="M38.4 86.4l57.6 34.56 57.6-34.56M96 120.96v63.36" stroke="#342d3d" stroke-width="7"/><path d="M96 69.12q23.04-24.96 42.24 0q3.84 19.2-23.04 32.64v11.52m0 19.2v2" stroke="#fff0b0" stroke-width="9"/></g></svg>

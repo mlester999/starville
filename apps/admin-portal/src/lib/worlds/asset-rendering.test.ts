@@ -23,9 +23,16 @@ function candidate(overrides: Partial<WorldEditorAssetCandidate> = {}): WorldEdi
       lifecycleStatus: 'active',
       productionStatus: 'approved_production',
       activeVersionId: VERSION_ID,
+      bundledDefaultVersionId: '77777777-7777-4777-8777-777777777777',
+      bundledManifestVersion: '1.0.0',
+      activeSourceState: 'uploaded_override',
+      canRestoreBundledDefault: true,
       developmentMarkerReplacementKey: null,
       versionCount: 2,
+      uploadedVersionCount: 1,
+      invalidVersionCount: 0,
       referenceCount: 4,
+      referenceBreakdown: { world: 4, furniture: 0, farming: 0 },
       revision: 3,
       thumbnailUrl: `/api/v1/admin/world-assets/${ASSET_ID}/versions/${VERSION_ID}/thumbnail`,
       createdAt: timestamp,
@@ -182,10 +189,12 @@ describe('world object asset rendering', () => {
     });
   });
 
-  it('does not guess an active version when a stable view has no retained pin', () => {
+  it('uses the bundled default without guessing an active version in a stable view', () => {
     const result = resolve([candidate()], { allowUnpinnedActive: false });
-    expect(result.status).toBe('marker');
-    expect(result.reason).toBe('pinned_version_unavailable');
+    expect(result.status).toBe('asset');
+    expect(result.reason).toBe('bundled_default');
+    expect(result.source).toBe('bundled_default');
+    expect(result.mediaUrl).toBe('/api/bundled-assets/tree-pine/source');
   });
 
   it('does not auto-render a production replacement for a development marker reference', () => {
@@ -198,12 +207,12 @@ describe('world object asset rendering', () => {
       },
     });
     const result = resolve([replacement]);
-    expect(result.status).toBe('marker');
-    expect(result.reason).toBe('explicit_replacement_required');
+    expect(result.status).toBe('asset');
+    expect(result.reason).toBe('bundled_default');
     expect(result.replacementCandidate?.asset.id).toBe(ASSET_ID);
   });
 
-  it('keeps repository development markers as explicit fallbacks', () => {
+  it('resolves repository development-marker records to canonical bundled artwork', () => {
     const marker = candidate({
       asset: {
         ...candidate().asset,
@@ -218,8 +227,9 @@ describe('world object asset rendering', () => {
       },
     });
     const result = resolve([marker]);
-    expect(result.status).toBe('marker');
-    expect(result.reason).toBe('development_marker');
+    expect(result.status).toBe('asset');
+    expect(result.reason).toBe('bundled_default');
+    expect(result.bundledAsset?.key).toBe('tree-pine');
   });
 
   it('falls back for missing media, failed loading, unsafe lifecycle, and unlisted keys', () => {
@@ -229,9 +239,9 @@ describe('world object asset rendering', () => {
           activeVersion: { ...candidate().activeVersion, sourceUrl: null },
         }),
       ]).reason,
-    ).toBe('processed_media_unavailable');
+    ).toBe('bundled_fallback');
     expect(resolve([candidate()], { failedVersionIds: new Set([VERSION_ID]) }).reason).toBe(
-      'media_load_failed',
+      'bundled_fallback',
     );
     expect(
       resolve([
@@ -242,10 +252,31 @@ describe('world object asset rendering', () => {
           },
         }),
       ]).reason,
-    ).toBe('unsafe_version_state');
+    ).toBe('bundled_fallback');
     expect(resolve([candidate()], { manifestAssetKeys: new Set() }).reason).toBe(
       'unlisted_asset_key',
     );
+  });
+
+  it('uses authored bundled rotation variants without CSS rotation', () => {
+    const result = resolve([], {
+      object: { ...object, assetId: 'fence-willow', kind: 'fence', rotation: 90 },
+      manifestAssetKeys: new Set(['fence-willow']),
+    });
+    expect(result.source).toBe('bundled_default');
+    expect(result.usesAuthoredRotation).toBe(true);
+    expect(result.bundledVariantId).toBe('rotation-90');
+    expect(result.mediaUrl).toBe('/api/bundled-assets/fence-willow/source?rotation=90');
+  });
+
+  it('uses the stable bundled missing visual for an unknown allowlisted manifest key', () => {
+    const result = resolve([], {
+      object: { ...object, assetId: 'world.unknown.fixture' },
+      manifestAssetKeys: new Set(['world.unknown.fixture']),
+    });
+    expect(result.source).toBe('safe_placeholder');
+    expect(result.bundledAsset?.key).toBe('system.missing-asset');
+    expect(result.mediaUrl).toBe('/api/bundled-assets/system.missing-asset/source');
   });
 
   it('supports explicit marker and collision-debug modes without changing resolution data', () => {

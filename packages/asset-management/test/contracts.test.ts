@@ -63,6 +63,7 @@ describe('asset management foundation contracts', () => {
       assetKey: 'willow-chair',
       versionId: '00000000-0000-4000-8000-000000000001',
       checksum: 'a'.repeat(64),
+      bundledManifestVersion: null,
       url: 'https://assets.example.test/game-assets/starville/willow-chair/v1/source.webp',
       mediaType: 'image/webp',
       width: 512,
@@ -92,6 +93,7 @@ describe('asset management foundation contracts', () => {
         assetKey: 'phase7-farm-plot-marker',
         versionId: '00000000-0000-4000-8000-000000000002',
         checksum: 'b'.repeat(64),
+        bundledManifestVersion: '1.0.0',
         url: null,
         mediaType: null,
         width: null,
@@ -113,7 +115,54 @@ describe('asset management foundation contracts', () => {
     ).toBe(true);
   });
 
+  it('accepts unresolved legacy repository pins without letting uploads claim a manifest', () => {
+    const common = {
+      assetKey: 'phase7-farm-plot-marker',
+      versionId: '00000000-0000-4000-8000-000000000002',
+      checksum: 'b'.repeat(64),
+      scale: 1,
+      anchorX: 0.5,
+      anchorY: 1,
+      footAnchorX: 0.5,
+      footAnchorY: 1,
+      depthAnchorX: 0.5,
+      depthAnchorY: 1,
+      collision: { shape: 'none', blocking: false },
+      supportedRotations: [0],
+      defaultRotation: 0,
+    } as const;
+    expect(
+      worldAssetDeliverySchema.safeParse({
+        ...common,
+        bundledManifestVersion: null,
+        url: null,
+        mediaType: null,
+        width: null,
+        height: null,
+        renderWidth: null,
+        renderHeight: null,
+        developmentMarker: true,
+      }).success,
+    ).toBe(true);
+    expect(
+      worldAssetDeliverySchema.safeParse({
+        ...common,
+        bundledManifestVersion: '1.0.0',
+        url: 'https://assets.example.test/starville/phase7-farm-plot-marker/v2/source.webp',
+        mediaType: 'image/webp',
+        width: 128,
+        height: 128,
+        renderWidth: 128,
+        renderHeight: 128,
+        developmentMarker: false,
+      }).success,
+    ).toBe(false);
+  });
+
   it('recognizes archived as a terminal asset mutation lifecycle', () => {
     expect(assetMutationResponseSchema.shape.status.parse('archived')).toBe('archived');
+    expect(assetMutationResponseSchema.shape.status.parse('bundled_default_restored')).toBe(
+      'bundled_default_restored',
+    );
   });
 });

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" fill="none"><title>Guestbook</title><desc>Guestbook icon using Starville&apos;s warm outline, moon-gold accent, and text-free silhouette.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><circle cx="64" cy="64" r="55.04" fill="#fff4c5" opacity=".12"/><path d="M21.76 38.4q21.76-11.52 42.24 7.68q21.76-19.2 42.24-7.68v62.72q-21.76-11.52-42.24 7.68q-21.76-19.2-42.24-7.68z" fill="url(#surface)" stroke="#2c304b" stroke-width="7"/><path d="M64 46.08v55.04M30.72 57.6l21.76 5.12m-21.76 12.8l21.76 5.12" stroke="#4e5686" stroke-width="5"/></g></svg>

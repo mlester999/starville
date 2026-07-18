@@ -2,6 +2,7 @@ import WebSocket from 'ws';
 import { randomUUID } from 'node:crypto';
 
 import { getWorldManifest } from '@starville/game-content';
+import { homeVisitGameTestFixture } from '@starville/housing';
 import {
   MOONPETAL_HARVEST_HELP,
   type CooperativeActivityBootstrap,
@@ -119,6 +120,18 @@ interface ScenarioResult {
   readonly activityCleanupRuns: number;
   readonly leakedTemporaryItems: number;
   readonly leakedActiveActivityInstances: number;
+  readonly homeVisitVisitors: number;
+  readonly homeVisitMovementUpdates: number;
+  readonly homeVisitMovementAcknowledgements: number;
+  readonly homeVisitSnapshotMessages: number;
+  readonly homeVisitEmoteEvents: number;
+  readonly homeVisitReconnects: number;
+  readonly homeVisitCloseCheckpoints: number;
+  readonly homeVisitDroppedMovementUpdates: number;
+  readonly homeVisitDuplicateMovementAcknowledgements: number;
+  readonly homeVisitMessagesPerSecond: number;
+  readonly averageHomeVisitUpdateLatencyMs: number;
+  readonly maximumHomeVisitUpdateLatencyMs: number;
 }
 
 function waitFor(socket: WebSocket, type: string): Promise<Record<string, unknown>> {
@@ -385,6 +398,19 @@ async function runScenario(
       0,
     );
   };
+  const homeVisitVisitors =
+    players === 10 ? 1 : players === 20 ? 5 : players === 40 && channelCount === 1 ? 10 : 0;
+  const homeVisitParticipants = homeVisitGameTestFixture.participants.slice(
+    0,
+    homeVisitVisitors + 1,
+  );
+  const homeVisitParticipantByRealtimeSession = new Map<
+    string,
+    (typeof homeVisitParticipants)[number]
+  >();
+  let homeVisitAdmissionIndex = 0;
+  let homeVisitForcedAdmissionIndex: number | undefined;
+  let homeVisitCloseCheckpoints = 0;
   const persistence: RealtimePersistenceGateway = {
     async admit(_ticketHash, _connectionId) {
       const index = admitted++ % players;
@@ -426,6 +452,64 @@ async function runScenario(
       return 'active';
     },
     async closePrivateHome() {
+      return true;
+    },
+    async admitHomeVisit() {
+      const participantIndex = homeVisitForcedAdmissionIndex ?? homeVisitAdmissionIndex;
+      homeVisitForcedAdmissionIndex = undefined;
+      homeVisitAdmissionIndex += 1;
+      const participant = homeVisitParticipants[participantIndex];
+      const session = homeVisitGameTestFixture.hostSession;
+      const home = homeVisitGameTestFixture.ownedHome;
+      if (participant === undefined || session === null || home === null) return 'invalid_ticket';
+      const realtimeSessionId = `f11f0000-0000-4000-9000-${String(homeVisitAdmissionIndex).padStart(12, '0')}`;
+      homeVisitParticipantByRealtimeSession.set(realtimeSessionId, participant);
+      return {
+        status: 'admitted',
+        realtimeSessionId,
+        visitSessionId: session.id,
+        participantId: participant.id,
+        homeId: home.id,
+        lastEventNumber: '0',
+        snapshot: { session, participants: homeVisitParticipants },
+      };
+    },
+    async homeVisitEvents() {
+      const session = homeVisitGameTestFixture.hostSession;
+      if (session === null) return 'closed';
+      return {
+        status: 'loaded',
+        lastEventNumber: String(homeVisitVisitors),
+        events: homeVisitParticipants.slice(1).map((participant, index) => ({
+          eventNumber: String(index + 1),
+          eventKey: 'home_visitor_emote',
+          actorParticipantId: participant.id,
+          payload: { emoteKey: 'wave' },
+          createdAt: new Date().toISOString(),
+        })),
+        snapshot: { session, participants: homeVisitParticipants },
+      };
+    },
+    async checkpointHomeVisit(sessionId, movement) {
+      const participant = homeVisitParticipantByRealtimeSession.get(sessionId);
+      if (participant === undefined) return 'closed';
+      const moved = {
+        ...participant,
+        x: movement.x,
+        y: movement.y,
+        facingDirection: movement.facingDirection as typeof participant.facingDirection,
+        movementSequence: String(movement.sequence),
+        socialState: 'moving' as const,
+        stateVersion: participant.stateVersion + 1,
+      };
+      homeVisitParticipantByRealtimeSession.set(sessionId, moved);
+      return { status: 'checkpointed', participant: moved };
+    },
+    async revalidateHomeVisit() {
+      return 'active';
+    },
+    async closeHomeVisit() {
+      homeVisitCloseCheckpoints += 1;
       return true;
     },
     async checkpoint() {
@@ -1325,7 +1409,7 @@ async function runScenario(
       host: '127.0.0.1',
       port: 0,
       allowedOrigins: ['http://localhost:3001'],
-      connectionLimit: Math.max(players + reconnects + 5, 50),
+      connectionLimit: Math.max(players + reconnects + homeVisitVisitors + 10, 50),
       ticketSecret: 'load-test-ticket-secret-at-least-thirty-two',
       authenticationTimeoutMs: 5_000,
       checkpointIntervalMs: 15_000,
@@ -1337,7 +1421,9 @@ async function runScenario(
   });
   const address = await service.start();
   const url = address.replace(/^http/u, 'ws') + '/connect';
+  const homeVisitUrl = address.replace(/^http/u, 'ws') + '/home-visit';
   const sockets: WebSocket[] = [];
+  const homeVisitSockets: WebSocket[] = [];
   const socketPresences: string[] = [];
   const latencies: number[] = [];
   const chatLatencies: number[] = [];
@@ -1405,6 +1491,14 @@ async function runScenario(
   let receivedSocialGraphEvents = 0;
   let rateLimitedSocialGraphRequests = 0;
   let activityErrorResponses = 0;
+  let homeVisitReceivedMessages = 0;
+  let homeVisitMovementAcknowledgements = 0;
+  let homeVisitDuplicateMovementAcknowledgements = 0;
+  let homeVisitSnapshotMessages = 0;
+  let homeVisitEmoteEvents = 0;
+  let homeVisitReconnects = 0;
+  const homeVisitAcknowledgedParticipants = new Set<string>();
+  const homeVisitUpdateLatencies: number[] = [];
   const socialRequestStartedAt = new Map<string, number>();
   const settlementStartedAt = new Map<string, number>();
   const startedAt = performance.now();
@@ -1425,6 +1519,109 @@ async function runScenario(
       const admittedPayload = await admittedMessage;
       const admittedSelf = admittedPayload['self'] as Record<string, unknown>;
       socketPresences.push(String(admittedSelf['presenceId']));
+    }
+
+    const connectHomeVisitParticipant = async (): Promise<WebSocket> => {
+      const socket = new WebSocket(homeVisitUrl, { origin: 'http://localhost:3001' });
+      homeVisitSockets.push(socket);
+      socket.on('message', (data) => {
+        const message = JSON.parse(data.toString()) as Record<string, unknown>;
+        homeVisitReceivedMessages += 1;
+        if (message['type'] === 'movement_ack') {
+          homeVisitMovementAcknowledgements += 1;
+          const participant = message['participant'] as Record<string, unknown>;
+          const participantId = String(participant['id']);
+          if (homeVisitAcknowledgedParticipants.has(participantId)) {
+            homeVisitDuplicateMovementAcknowledgements += 1;
+          }
+          homeVisitAcknowledgedParticipants.add(participantId);
+        }
+        if (message['type'] === 'snapshot') {
+          homeVisitSnapshotMessages += 1;
+          const events = message['events'];
+          if (Array.isArray(events)) {
+            homeVisitEmoteEvents += events.filter(
+              (event) =>
+                typeof event === 'object' &&
+                event !== null &&
+                (event as Record<string, unknown>)['eventKey'] === 'home_visitor_emote',
+            ).length;
+          }
+        }
+      });
+      await new Promise<void>((resolve, reject) => {
+        socket.once('open', resolve);
+        socket.once('error', reject);
+      });
+      const authenticated = waitFor(socket, 'authenticated');
+      socket.send(JSON.stringify({ type: 'authenticate', ticket: 'h'.repeat(43) }));
+      await authenticated;
+      return socket;
+    };
+    const closeHomeVisitSocket = async (socket: WebSocket): Promise<void> => {
+      if (socket.readyState === socket.CLOSED) return;
+      const closed = new Promise<void>((resolve) => socket.once('close', () => resolve()));
+      socket.close(1000, 'bounded load transition');
+      await closed;
+    };
+
+    if (homeVisitVisitors > 0) {
+      for (let index = 0; index <= homeVisitVisitors; index += 1) {
+        await connectHomeVisitParticipant();
+      }
+      await Promise.all(
+        homeVisitSockets.slice(1, homeVisitVisitors + 1).map(async (socket, index) => {
+          const participant = homeVisitParticipants[index + 1];
+          if (participant === undefined) throw new Error('Home-visit load participant missing.');
+          const started = performance.now();
+          const acknowledgement = waitFor(socket, 'movement_ack');
+          socket.send(
+            JSON.stringify({
+              type: 'movement',
+              x: participant.x + 0.25,
+              y: participant.y,
+              facingDirection: 'east',
+              sequence: 1,
+            }),
+          );
+          await acknowledgement;
+          homeVisitUpdateLatencies.push(performance.now() - started);
+        }),
+      );
+      await Promise.all(
+        homeVisitSockets.slice(0, homeVisitVisitors + 1).map(async (socket) => {
+          const snapshot = waitFor(socket, 'snapshot');
+          socket.send(JSON.stringify({ type: 'sync', afterEventNumber: '0', forceSnapshot: true }));
+          await snapshot;
+        }),
+      );
+
+      const visitorSocket = homeVisitSockets[1];
+      if (visitorSocket !== undefined) {
+        await closeHomeVisitSocket(visitorSocket);
+        homeVisitForcedAdmissionIndex = 1;
+        await connectHomeVisitParticipant();
+        homeVisitReconnects += 1;
+      }
+      const ownerSocket = homeVisitSockets[0];
+      if (ownerSocket !== undefined) {
+        await closeHomeVisitSocket(ownerSocket);
+        homeVisitForcedAdmissionIndex = 0;
+        await connectHomeVisitParticipant();
+        homeVisitReconnects += 1;
+      }
+      await waitForCondition(
+        () => homeVisitCloseCheckpoints >= 2,
+        'Home-visit disconnect checkpoints were not persisted.',
+      );
+      if (
+        homeVisitMovementAcknowledgements !== homeVisitVisitors ||
+        homeVisitDuplicateMovementAcknowledgements !== 0 ||
+        homeVisitSnapshotMessages !== homeVisitVisitors + 1 ||
+        homeVisitEmoteEvents !== homeVisitVisitors * (homeVisitVisitors + 1)
+      ) {
+        throw new Error('Bounded home-visit movement or event delivery was incomplete.');
+      }
     }
 
     const sentAtBySequence = new Map<number, number>();
@@ -2207,6 +2404,11 @@ async function runScenario(
     }
   } finally {
     for (const socket of sockets) socket.close(1000);
+    for (const socket of homeVisitSockets) {
+      if (socket.readyState === socket.OPEN || socket.readyState === socket.CONNECTING) {
+        socket.close(1000, 'bounded load complete');
+      }
+    }
     await service.stop();
   }
 
@@ -2371,6 +2573,32 @@ async function runScenario(
     activityCleanupRuns,
     leakedTemporaryItems,
     leakedActiveActivityInstances,
+    homeVisitVisitors,
+    homeVisitMovementUpdates: homeVisitVisitors,
+    homeVisitMovementAcknowledgements,
+    homeVisitSnapshotMessages,
+    homeVisitEmoteEvents,
+    homeVisitReconnects,
+    homeVisitCloseCheckpoints,
+    homeVisitDroppedMovementUpdates: Math.max(
+      0,
+      homeVisitVisitors - homeVisitMovementAcknowledgements,
+    ),
+    homeVisitDuplicateMovementAcknowledgements,
+    homeVisitMessagesPerSecond:
+      homeVisitVisitors === 0
+        ? 0
+        : Number((homeVisitReceivedMessages / (durationMs / 1_000)).toFixed(2)),
+    averageHomeVisitUpdateLatencyMs:
+      homeVisitUpdateLatencies.length === 0
+        ? 0
+        : Math.round(
+            (homeVisitUpdateLatencies.reduce((total, latency) => total + latency, 0) /
+              homeVisitUpdateLatencies.length) *
+              1_000,
+          ) / 1_000,
+    maximumHomeVisitUpdateLatencyMs:
+      Math.round(Math.max(0, ...homeVisitUpdateLatencies) * 1_000) / 1_000,
   };
 }
 

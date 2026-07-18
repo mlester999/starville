@@ -9,6 +9,7 @@ export interface PinnedWorldAssetMaterial {
   readonly assetKey: string;
   readonly versionId: string;
   readonly checksumSha256: string;
+  readonly bundledManifestVersion: '1.0.0' | null;
   readonly mediaType: 'image/webp' | null;
   readonly width: number | null;
   readonly height: number | null;

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="352" height="288" viewBox="0 0 352 288" fill="none"><title>Whisperpine Gate</title><desc>A tall woodland gate with lantern finials and a clear passage opening.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a7c98b"/><stop offset="1" stop-color="#5d8b68"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5d8b68"/><stop offset="1" stop-color="#345c4c"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f3edbd" stop-opacity=".92"/><stop offset="1" stop-color="#d8d99a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="183.04" cy="253.44" rx="119.68" ry="23.04" fill="#18231f" opacity=".22"/><g><path d="M63.36 236.16V57.6m225.28 135.36V57.6" stroke="#253832" stroke-width="14"/><path d="M63.36 129.6l225.28 51.84M63.36 184.32l225.28 51.84" stroke="#5d8b68" stroke-width="12"/><path d="M63.36 72q112.64-69.12 225.28 0" stroke="#a7c98b" stroke-width="12"/></g></g></svg>

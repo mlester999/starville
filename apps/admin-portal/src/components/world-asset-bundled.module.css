@@ -1,0 +1,154 @@
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.75rem;
+}
+
+.summaryCard {
+  display: grid;
+  gap: 0.2rem;
+  min-height: 88px;
+  padding: 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--border-color, #7fa68f) 38%, transparent);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel-bg, #17392f) 88%, transparent);
+}
+
+.summaryCard strong {
+  font-size: 1.45rem;
+}
+
+.summaryCard span,
+.summaryCard small {
+  color: var(--text-muted, #b8c9c0);
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 1rem;
+}
+
+.previewMode {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.previewPair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+}
+
+.previewFrame {
+  position: relative;
+  display: grid;
+  min-height: 180px;
+  place-items: center;
+  overflow: hidden;
+  padding: 1.5rem 0.6rem 0.7rem;
+  border: 1px solid rgba(128, 166, 143, 0.34);
+  border-radius: 14px;
+  background: #f5efdf;
+}
+
+.previewFrame[data-backdrop='transparent'] {
+  background-color: #f5f2e9;
+  background-image:
+    linear-gradient(45deg, rgba(24, 61, 49, 0.12) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(24, 61, 49, 0.12) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(24, 61, 49, 0.12) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(24, 61, 49, 0.12) 75%);
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+  background-size: 16px 16px;
+}
+
+.previewFrame[data-backdrop='dark'] {
+  background: #102a23;
+}
+
+.previewFrame[data-backdrop='isometric'] {
+  background-color: #23483a;
+  background-image:
+    linear-gradient(
+      30deg,
+      rgba(129, 215, 173, 0.14) 12%,
+      transparent 12.5%,
+      transparent 87%,
+      rgba(129, 215, 173, 0.14) 87.5%
+    ),
+    linear-gradient(
+      150deg,
+      rgba(129, 215, 173, 0.14) 12%,
+      transparent 12.5%,
+      transparent 87%,
+      rgba(129, 215, 173, 0.14) 87.5%
+    );
+  background-size: 48px 24px;
+}
+
+.previewFrame img {
+  width: min(100%, 150px);
+  height: 140px;
+  object-fit: contain;
+}
+
+.previewFrame span {
+  position: absolute;
+  top: 0.45rem;
+  left: 0.55rem;
+  padding: 0.15rem 0.4rem;
+  border-radius: 999px;
+  background: rgba(9, 27, 22, 0.82);
+  color: #f7efd9;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.coverageTable code {
+  display: block;
+  max-width: 28rem;
+  overflow-wrap: anywhere;
+}
+
+.coverageTable small {
+  display: block;
+  margin-top: 0.2rem;
+}
+
+.statusReady,
+.statusWarning,
+.statusMissing {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.statusReady {
+  background: rgba(129, 215, 173, 0.18);
+  color: #81d7ad;
+}
+
+.statusWarning {
+  background: rgba(226, 184, 92, 0.18);
+  color: #e2b85c;
+}
+
+.statusMissing {
+  background: rgba(224, 116, 108, 0.18);
+  color: #f0a6a0;
+}
+
+@media (max-width: 620px) {
+  .previewPair {
+    grid-template-columns: 1fr;
+  }
+}

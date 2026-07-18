@@ -7,7 +7,6 @@ import type { WorldEditorAssetCandidate } from '../lib/world-assets/contracts';
 import type { AssetSceneRenderOverride } from '../lib/world-assets/scene-preview-model';
 import {
   resolveWorldObjectRendering,
-  worldAssetCanvasMetrics,
   worldAssetCanvasMetricsForRender,
   worldObjectFriendlyLabel,
   type WorldObjectRenderMode,
@@ -171,27 +170,6 @@ function objectIsPhase7(object: AdminWorldManifest['objects'][number]): boolean 
   );
 }
 
-function managedDepthOffset(
-  object: AdminWorldManifest['objects'][number],
-  pins: readonly WorldDraftAssetPin[],
-  candidates: readonly WorldEditorAssetCandidate[],
-  scenePreviewOverride: AssetSceneRenderOverride | undefined,
-): number {
-  if (scenePreviewOverride?.targetObjectId === object.id) {
-    return depthOffsetForAnchors(
-      scenePreviewOverride.configuration.render.footAnchor.y,
-      scenePreviewOverride.configuration.render.depthAnchor.y,
-    );
-  }
-  const pin = pins.find((item) => item.assetKey === object.assetId);
-  const render =
-    pin?.pinnedVersion.render ??
-    candidates.find((item) => item.assetKey === object.assetId)?.activeVersion.render;
-  return render === undefined
-    ? 0
-    : depthOffsetForAnchors(render.footAnchor.y, render.depthAnchor.y);
-}
-
 function WorldManifestCanvasView({
   manifest,
   selection,
@@ -287,9 +265,17 @@ function WorldManifestCanvasView({
     if (renderingModel.error !== null) throw renderingModel.error;
     const view = projection(manifest);
     const sortedTerrain = [...manifest.terrain].sort((left, right) => left.order - right.order);
-    const objectDepth = (object: AdminWorldManifest['objects'][number]) =>
-      depthForFootPosition(object.x, object.y, object.id) +
-      managedDepthOffset(object, assetPins, assetCandidates, scenePreviewOverride);
+    const objectDepth = (object: AdminWorldManifest['objects'][number]) => {
+      const render =
+        scenePreviewOverride?.targetObjectId === object.id
+          ? scenePreviewOverride.configuration.render
+          : renderingModel.byObjectId.get(object.id)?.render;
+      const offset =
+        render === undefined || render === null
+          ? 0
+          : depthOffsetForAnchors(render.footAnchor.y, render.depthAnchor.y);
+      return depthForFootPosition(object.x, object.y, object.id) + offset;
+    };
     const sortedObjects = [...manifest.objects].sort(
       (left, right) => objectDepth(left) - objectDepth(right) || left.id.localeCompare(right.id),
     );
@@ -553,31 +539,21 @@ function WorldManifestCanvasView({
             }
             const previewOverride =
               scenePreviewOverride?.targetObjectId === object.id ? scenePreviewOverride : null;
-            const renderSource =
-              previewOverride === null && rendering.status === 'asset'
-                ? (rendering.pin ?? rendering.candidate)
-                : null;
             const assetMetrics =
               previewOverride !== null
                 ? worldAssetCanvasMetricsForRender(previewOverride.configuration.render)
-                : renderSource === null
+                : rendering.render === null
                   ? null
-                  : worldAssetCanvasMetrics(renderSource);
-            const renderConfiguration =
-              previewOverride?.configuration.render ??
-              (renderSource === null
-                ? null
-                : 'pinnedVersion' in renderSource
-                  ? renderSource.pinnedVersion.render
-                  : renderSource.activeVersion.render);
+                  : worldAssetCanvasMetricsForRender(rendering.render);
+            const renderConfiguration = previewOverride?.configuration.render ?? rendering.render;
             const renderAssetId =
               previewOverride?.assetId ??
-              (renderSource === null
-                ? null
-                : 'pinnedVersion' in renderSource
-                  ? renderSource.assetId
-                  : renderSource.asset.id);
+              rendering.pin?.assetId ??
+              rendering.candidate?.asset.id ??
+              rendering.bundledAsset?.key ??
+              null;
             const renderedVersionId = previewOverride?.version.id ?? rendering.renderedVersionId;
+            const renderedMediaId = previewOverride?.version.id ?? rendering.renderedMediaId;
             const previewMediaFailed =
               previewOverride !== null && failedVersionIds.has(previewOverride.version.id);
             const mediaUrl = previewMediaFailed
@@ -587,13 +563,14 @@ function WorldManifestCanvasView({
               previewOverride === null ? rendering.status : mediaUrl === null ? 'marker' : 'asset';
             const assetLoading =
               renderStatus === 'asset' &&
-              renderedVersionId !== null &&
-              !loadedVersionIds.has(renderedVersionId) &&
-              !failedVersionIds.has(renderedVersionId);
+              renderedMediaId !== null &&
+              !loadedVersionIds.has(renderedMediaId) &&
+              !failedVersionIds.has(renderedMediaId);
             const phase7 =
               previewOverride?.mediaUrl === null ||
-              objectIsPhase7(object) ||
-              rendering.candidate?.asset.productionStatus === 'development_marker';
+              (rendering.status === 'marker' &&
+                (objectIsPhase7(object) ||
+                  rendering.candidate?.asset.productionStatus === 'development_marker'));
             const friendlyLabel =
               previewOverride?.friendlyName ?? worldObjectFriendlyLabel(object, rendering);
             const renderExplanation =
@@ -609,7 +586,7 @@ function WorldManifestCanvasView({
             });
             return (
               <g
-                aria-label={`${friendlyLabel}, ${object.kind.replaceAll('_', ' ')}, ${renderStatus === 'asset' ? 'managed asset' : 'fallback marker'}`}
+                aria-label={`${friendlyLabel}, ${object.kind.replaceAll('_', ' ')}, ${previewOverride === null ? rendering.sourceLabel : 'candidate scene preview'}`}
                 aria-pressed={onSelect ? isSelected : undefined}
                 className={`world-canvas__object ${isSelected ? 'is-selected' : ''} ${isHovered ? 'is-hovered' : ''} ${phase7 ? 'is-phase7' : ''}`}
                 data-object-id={object.id}
@@ -620,6 +597,13 @@ function WorldManifestCanvasView({
                     : `scene_preview_${previewOverride.presentation}`
                 }
                 data-render-status={renderStatus}
+                data-render-source={previewOverride === null ? rendering.source : 'scene_preview'}
+                data-bundled-asset={
+                  previewOverride === null && rendering.bundledAsset !== null ? 'true' : 'false'
+                }
+                data-authored-rotation={
+                  previewOverride === null && rendering.usesAuthoredRotation ? 'true' : 'false'
+                }
                 data-show-label={showLabel ? 'true' : 'false'}
                 data-world-canvas-interactive="true"
                 key={object.id}
@@ -696,7 +680,7 @@ function WorldManifestCanvasView({
                 role={onSelect ? 'button' : undefined}
                 style={{ cursor: onSelect ? 'pointer' : undefined }}
                 tabIndex={onSelect ? 0 : undefined}
-                transform={`translate(${point.x} ${point.y}) scale(${object.scale}) rotate(${object.rotation ?? 0})`}
+                transform={`translate(${point.x} ${point.y}) scale(${object.scale}) rotate(${previewOverride === null && rendering.bundledAsset !== null ? 0 : (object.rotation ?? 0)})`}
               >
                 <title>{`${friendlyLabel} · ${object.id} · ${renderExplanation}`}</title>
                 <ellipse cx={0} cy={6} fill="rgba(10, 24, 20, 0.35)" rx={16} ry={7} />
@@ -715,9 +699,9 @@ function WorldManifestCanvasView({
                     </text>
                   </g>
                 ) : null}
-                {(renderSource !== null || previewOverride !== null) &&
+                {(rendering.status === 'asset' || previewOverride !== null) &&
                 mediaUrl !== null &&
-                renderedVersionId !== null &&
+                renderedMediaId !== null &&
                 assetMetrics !== null &&
                 renderConfiguration !== null &&
                 renderAssetId !== null ? (
@@ -727,20 +711,21 @@ function WorldManifestCanvasView({
                     data-depth-anchor-x={renderConfiguration.depthAnchor.x}
                     data-depth-anchor-y={renderConfiguration.depthAnchor.y}
                     data-media-state={assetLoading ? 'loading' : 'loaded'}
-                    data-rendered-version-id={renderedVersionId}
+                    data-rendered-media-id={renderedMediaId}
+                    data-rendered-version-id={renderedVersionId ?? undefined}
                     height={assetMetrics.height}
                     href={mediaUrl}
                     onError={() => {
                       setLocalFailedVersionIds((current) => {
-                        if (current.has(renderedVersionId)) return current;
-                        return new Set([...current, renderedVersionId]);
+                        if (current.has(renderedMediaId)) return current;
+                        return new Set([...current, renderedMediaId]);
                       });
-                      onAssetMediaError?.(renderedVersionId);
+                      onAssetMediaError?.(renderedMediaId);
                     }}
                     onLoad={() => {
                       setLoadedVersionIds((current) => {
-                        if (current.has(renderedVersionId)) return current;
-                        return new Set([...current, renderedVersionId]);
+                        if (current.has(renderedMediaId)) return current;
+                        return new Set([...current, renderedMediaId]);
                       });
                     }}
                     preserveAspectRatio="xMidYMid meet"
@@ -779,6 +764,21 @@ function WorldManifestCanvasView({
                     y={phase7 ? -4 : -8}
                   >
                     {meta.glyph}
+                  </text>
+                ) : null}
+                {previewOverride === null &&
+                (rendering.source === 'bundled_default' ||
+                  rendering.source === 'safe_placeholder') ? (
+                  <text
+                    className="world-canvas__object-badge world-canvas__object-source-badge"
+                    fill={rendering.source === 'safe_placeholder' ? '#f0a6a0' : '#81d7ad'}
+                    fontSize={6.5}
+                    fontWeight={700}
+                    textAnchor="middle"
+                    x={0}
+                    y={18}
+                  >
+                    {rendering.source === 'safe_placeholder' ? 'MISSING' : 'BUNDLED'}
                   </text>
                 ) : null}
                 {showSceneAnchors &&

@@ -20,6 +20,12 @@ import { ProgressionMaintenanceJob } from './jobs/progression-maintenance-job.js
 import { createProgressionMaintenanceGateway } from './jobs/progression-maintenance-persistence.js';
 import { HousingMaintenanceJob } from './jobs/housing-maintenance-job.js';
 import { createHousingMaintenanceGateway } from './jobs/housing-maintenance-persistence.js';
+import { HomeVisitMaintenanceJob } from './jobs/home-visit-maintenance-job.js';
+import { createHomeVisitMaintenanceGateway } from './jobs/home-visit-maintenance-persistence.js';
+import { PlayerExperienceReconciliationJob } from './jobs/player-experience-reconciliation-job.js';
+import { createPlayerExperienceReconciliationGateway } from './jobs/player-experience-reconciliation-persistence.js';
+import { WorldAssetReconciliationJob } from './jobs/world-asset-reconciliation-job.js';
+import { createWorldAssetReconciliationGateway } from './jobs/world-asset-reconciliation-persistence.js';
 
 const config = loadWorkerConfig(process.env);
 const supabaseConfig = loadPrivateSupabaseConfig(process.env);
@@ -45,6 +51,11 @@ const runtime = createWorkerRuntime({
     new CraftingReconciliationJob(createCraftingReconciliationGateway(privilegedSupabase)),
     new ProgressionMaintenanceJob(createProgressionMaintenanceGateway(privilegedSupabase)),
     new HousingMaintenanceJob(createHousingMaintenanceGateway(privilegedSupabase)),
+    new HomeVisitMaintenanceJob(createHomeVisitMaintenanceGateway(privilegedSupabase)),
+    new PlayerExperienceReconciliationJob(
+      createPlayerExperienceReconciliationGateway(privilegedSupabase),
+    ),
+    new WorldAssetReconciliationJob(createWorldAssetReconciliationGateway(privilegedSupabase)),
   ],
 });
 

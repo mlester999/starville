@@ -5,11 +5,12 @@ import {
   GLOBAL_ASSET_INTAKE_MAX_BYTES,
   assetCreateVersionActionSchema,
   assetCreateVersionUploadMetadataSchema,
+  assetRestoreBundledDefaultActionSchema,
   assetUploadMetadataSchema,
 } from '@starville/asset-management';
 
 import { authorizeAdminRequest } from '../admin-authorization.js';
-import type { AdminAuthGateway, ServiceLogger } from '../contracts.js';
+import type { AdminAuthGateway, AdminDatabaseIdentity, ServiceLogger } from '../contracts.js';
 import { PublicApiError } from '../errors.js';
 import type {
   AdminAssetService,
@@ -34,6 +35,12 @@ function assertTrustedOrigin(request: FastifyRequest, allowedOrigins: ReadonlySe
   const origin = request.headers.origin;
   if (origin === undefined || !allowedOrigins.has(origin)) {
     throw new PublicApiError(403, 'ORIGIN_NOT_ALLOWED');
+  }
+}
+
+function assertSensitiveAssetAal2(identity: AdminDatabaseIdentity): void {
+  if (identity.assuranceLevel !== 'aal2') {
+    throw new PublicApiError(403, 'MFA_REQUIRED');
   }
 }
 
@@ -345,6 +352,7 @@ export function registerAdminAssetRoutes(
         request,
         action === 'approve' ? ['assets.review', 'assets.approve'] : 'assets.review',
       );
+      if (action === 'approve') assertSensitiveAssetAal2(identity);
       return response(
         await options.service.reviewVersion(
           identity,
@@ -365,6 +373,7 @@ export function registerAdminAssetRoutes(
       assertTrustedOrigin(request, options.allowedOrigins);
       disableResponseCaching(reply);
       const identity = await authorize(request, 'assets.activate');
+      assertSensitiveAssetAal2(identity);
       return response(
         await options.service.activateVersion(
           identity,
@@ -385,11 +394,32 @@ export function registerAdminAssetRoutes(
       assertTrustedOrigin(request, options.allowedOrigins);
       disableResponseCaching(reply);
       const identity = await authorize(request, 'assets.deprecate');
+      assertSensitiveAssetAal2(identity);
       return response(
         await options.service.deprecateAsset(
           identity,
           parameter(request, 'assetId'),
           request.body,
+          request.id,
+        ),
+        request.id,
+      );
+    },
+  );
+
+  app.post(
+    '/api/v1/admin/world-assets/:assetId/restore-bundled-default',
+    { bodyLimit: 8 * 1024 },
+    async (request, reply) => {
+      assertTrustedOrigin(request, options.allowedOrigins);
+      disableResponseCaching(reply);
+      const identity = await authorize(request, ['assets.activate', 'assets.deprecate']);
+      assertSensitiveAssetAal2(identity);
+      return response(
+        await options.service.restoreBundledDefault(
+          identity,
+          parameter(request, 'assetId'),
+          assetRestoreBundledDefaultActionSchema.parse(request.body),
           request.id,
         ),
         request.id,
@@ -404,6 +434,7 @@ export function registerAdminAssetRoutes(
       assertTrustedOrigin(request, options.allowedOrigins);
       disableResponseCaching(reply);
       const identity = await authorize(request, 'assets.deprecate');
+      assertSensitiveAssetAal2(identity);
       return response(
         await options.service.archiveAsset(
           identity,

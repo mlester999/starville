@@ -4,14 +4,18 @@ Starville is a premium 2D isometric cozy multiplayer life-simulation game platfo
 contains the public website, player client, administrator portal, authoritative API, dedicated
 real-time service, background worker, shared packages, and Supabase infrastructure.
 
-The active implementation scope is **Phase 11E: server-authoritative personal housing, Decoration
-Mode, furniture placement, immutable layout revisions, private storage, and home upgrades**. Phases
-1–11D remain intact. Phase 11E reuses the canonical personal home, inventory, DUST, progression,
-World Asset, authorization, private-realtime, and worker foundations. Its implementation and clean
-local migration-chain execution are complete; hosted migration validation and signed-in owner
-acceptance remain pending. No hosted
-player/home/layout/furniture/inventory/storage/DUST/progression, world, asset, or platform
-configuration was changed.
+The active implementation scope is **Phase 12B: visual asset production, the bundled default asset
+pack, stable-key resolution, world-art integration, World Composer coverage, and optional protected
+Admin overrides**. The repository now owns an original deterministic technical-baseline pack, so
+normal gameplay does not require an uploaded asset. Exact immutable world pins remain authoritative;
+eligible owner uploads are optional versioned replacements, and restoring the bundled default
+preserves upload and audit history. The complete local asset and monorepo validation gates pass;
+hosted validation and owner visual acceptance remain separate and pending. No hosted asset, world,
+player, economy, Auth, or platform data was changed.
+
+Phase 12A remains locally complete with hosted migration validation and signed-in owner acceptance
+pending. Its core gameplay integration, guided onboarding, starter quest, Daily Rhythm, world
+guidance, unified feedback, recovery, and Player Experience operations remain intact.
 
 Phases 1–10A remain intact. Phase 10C: World Composer remains the immutable world-draft, Game Test,
 review, publication, and rollback foundation reused by the current phase.
@@ -172,6 +176,12 @@ pnpm typecheck       # run strict TypeScript checks
 pnpm test            # run deterministic Vitest suites
 pnpm build           # build all six deployable applications
 pnpm clean           # remove generated build/cache output
+pnpm assets:generate # deterministically generate bundled SVG, WebP, thumbnails, and reports
+pnpm assets:validate # validate the manifest, files, alpha, dimensions, paths, and budgets
+pnpm assets:manifest # rebuild the checked-in runtime manifest
+pnpm assets:thumbnails # rebuild bounded WebP thumbnails
+pnpm assets:coverage # rebuild canonical coverage and size reports
+pnpm assets:check    # fail if checked-in bundled outputs drift from deterministic generation
 ```
 
 Turborepo orders dependency tasks, labels each workspace's output, and caches deterministic results.
@@ -244,6 +254,7 @@ packages/
   game-core/            Renderer-agnostic map, movement, collision, depth, and player contracts
   game-content/         Five-map manifests, approved assets, and world-management contracts
   asset-management/     Asset profiles, lifecycle, configuration, and safe delivery contracts
+  asset-pipeline/       Deterministic bundled SVG/WebP generation, reports, and validation
   player-operations/    Strict moderation, directory, audit, and operations contracts
   cozy-gameplay/        Strict Phase 7 DUST, inventory, farm, shop, recipe, and home contracts
   realtime/             Strict Phase 8 presence, movement, chat, safety, and moderation contracts
@@ -265,6 +276,11 @@ infrastructure/
   deployment/           Future provider boundary
   monitoring/           Future observability boundary
   supabase/             Canonical CLI configuration, migrations, and database/RLS tests
+assets/
+  source/               Editable deterministic SVG sources by semantic category
+  starville/bundled/v1/ Versioned runtime WebP files and protected Admin thumbnails
+  manifests/            Canonical checked-in bundled manifest output
+  reports/              Coverage, hash, and file-size evidence
 docs/                   Product specification and focused architecture records
 ```
 
@@ -441,8 +457,8 @@ The following remain **not started by design** in Phase 9A:
   staking, burning, deposits, withdrawals, conversions, or treasury operations;
 - global cross-world chat, direct messages, guilds, clans, visits, leaderboards, or private social
   profiles;
-- final production artwork, automated art generation, automatic asset/map approval or publication,
-  realtime collaborative editing, or arbitrary new map-identity creation;
+- final production artwork, automatic asset/map approval or publication, realtime collaborative
+  editing, or arbitrary new map-identity creation;
 - administrator invitation/management UI, role editing, permission editing, session-listing UI, or a
   global administrator audit browser;
 - production Supabase setup, production deployment, and monitoring-provider configuration.
@@ -451,6 +467,15 @@ The administrator permission catalog reserves stable keys for future systems but
 their pages, APIs, or business operations have been implemented.
 
 ## Architecture references
+
+- [Phase 12B visual-asset architecture](docs/architecture/phase-12b-visual-assets.md)
+- [Phase 12B bundled defaults and performance budgets](docs/assets/phase-12b-bundled-defaults.md)
+- [Starville isometric asset guide](docs/assets/starville-isometric-asset-guide.md)
+- [Phase 12B asset trust boundaries](docs/security/phase-12b-asset-trust-boundaries.md)
+- [Phase 12B local validation report](docs/deployment/phase-12b-local-validation-report.md)
+- [Phase 12B final local report](docs/deployment/phase-12b-final-report.md)
+- [Phase 12B owner acceptance checklist](docs/deployment/phase-12b-owner-acceptance.md)
+- [Phase 12B roadmap and reconciliation](docs/roadmap/phase-12b-reconciliation.md)
 
 - [Phase 1 architecture](docs/architecture/phase-1-foundation.md)
 - [Trust boundaries](docs/security/phase-1-trust-boundaries.md)
@@ -574,6 +599,9 @@ their pages, APIs, or business operations have been implemented.
 - [Phase 11E housing trust boundaries](docs/security/phase-11e-housing-trust-boundaries.md)
 - [Phase 11E DUST sink](docs/economy/phase-11e-housing-dust-sink.md)
 - [Phase 11E deferred owner acceptance](docs/deployment/phase-11e-owner-acceptance.md)
+- [Phase 11F live home visits architecture](docs/architecture/phase-11f-live-home-visits.md)
+- [Phase 11F bounded local load report](docs/deployment/phase-11f-local-load-report.md)
+- [Phase 11F deferred owner acceptance](docs/deployment/phase-11f-owner-acceptance.md)
 - [First Super Administrator bootstrap](docs/admin/admin-bootstrap.md)
 - [Roles and permissions](docs/admin/roles-and-permissions.md)
 - [Administrator authorization security](docs/security/admin-authorization.md)

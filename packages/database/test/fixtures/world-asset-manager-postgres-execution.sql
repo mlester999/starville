@@ -152,6 +152,62 @@ $$;
 
 do $$
 declare
+  phase6_asset public.world_assets%rowtype;
+  phase6_catalog public.world_asset_bundled_catalog%rowtype;
+  phase6_version public.world_asset_versions%rowtype;
+  collision_asset public.world_assets%rowtype;
+  collision_catalog public.world_asset_bundled_catalog%rowtype;
+  collision_version public.world_asset_versions%rowtype;
+begin
+  select * into strict phase6_asset
+  from public.world_assets where asset_key = 'tree-pine';
+  select * into strict phase6_catalog
+  from public.world_asset_bundled_catalog where asset_key = 'tree-pine';
+  select * into strict phase6_version
+  from public.world_asset_versions where id = phase6_catalog.world_asset_version_id;
+
+  perform pg_temp.assert_asset_true(
+    phase6_version.version_number = 1
+      and phase6_version.source_kind = 'repository_procedural'
+      and phase6_asset.bundled_default_version_id = phase6_version.id
+      and phase6_asset.active_version_id = phase6_version.id
+      and exists (
+        select 1
+        from public.world_map_version_assets as pin
+        where pin.world_asset_id = phase6_asset.id
+          and pin.world_asset_version_id = phase6_version.id
+      ),
+    'an exact Phase 6 repository v1 is reused as the manifest-bound default without rewriting pins'
+  );
+
+  select * into strict collision_asset
+  from public.world_assets where asset_key = 'ui.warning';
+  select * into strict collision_catalog
+  from public.world_asset_bundled_catalog where asset_key = 'ui.warning';
+  select * into strict collision_version
+  from public.world_asset_versions where id = collision_catalog.world_asset_version_id;
+
+  perform pg_temp.assert_asset_true(
+    collision_asset.active_version_id = '12b00000-0000-4000-8000-000000000002'
+      and collision_asset.bundled_default_version_id = collision_version.id
+      and collision_version.id <> collision_asset.active_version_id
+      and collision_version.version_number = 2
+      and collision_version.source_kind = 'repository_procedural'
+      and exists (
+        select 1
+        from public.world_asset_versions as legacy
+        where legacy.id = collision_asset.active_version_id
+          and legacy.world_asset_id = collision_asset.id
+          and legacy.version_number = 1
+          and legacy.source_kind = 'legacy_storage_raster'
+      ),
+    'a colliding storage-backed v1 remains active while a distinct repository v2 becomes the bundled default'
+  );
+end;
+$$;
+
+do $$
+declare
   super_user_id constant uuid := 'a5000000-0000-4000-8000-000000000001';
   super_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000002';
   super_admin_session_id constant uuid := 'a5000000-0000-4000-8000-000000000003';
@@ -836,6 +892,7 @@ begin
         select 1 from jsonb_array_elements(result -> 'assetDeliveries') delivery
         where delivery ->> 'assetKey' = 'cottage-amber'
           and (delivery ->> 'developmentMarker')::boolean
+          and delivery ->> 'bundledManifestVersion' = '1.0.0'
           and delivery ->> 'fallback' = 'repository_procedural'
           and delivery -> 'delivery' = 'null'::jsonb
       ),
@@ -1208,6 +1265,186 @@ $$;
 
 do $$
 declare
+  super_user_id constant uuid := 'a5000000-0000-4000-8000-000000000001';
+  wallet constant text := 'A7777777777777777777777777777777';
+  asset public.world_assets%rowtype;
+  bundled_version_id uuid;
+  override_version_id uuid := gen_random_uuid();
+  unapproved_version_id uuid := gen_random_uuid();
+  override_checksum text := encode(extensions.digest(
+    convert_to('phase12b-fixture:moonbean:active-override', 'UTF8'), 'sha256'
+  ), 'hex');
+  result jsonb;
+  invalid_key_denied boolean := false;
+  foreign_key_denied boolean := false;
+begin
+  perform pg_temp.assert_asset_true(
+    not has_function_privilege(
+      'authenticated',
+      'public.get_player_gameplay_asset_overrides(text,text[],text,integer)',
+      'execute'
+    ),
+    'gameplay override metadata has no direct browser-executable database route'
+  );
+
+  begin
+    select * into strict asset
+    from public.world_assets where asset_key = 'phase7-dev-moonbean';
+    bundled_version_id := asset.bundled_default_version_id;
+    perform set_config('starville.asset_lifecycle_transition', 'true', true);
+    update public.world_asset_versions
+    set lifecycle_status = 'deprecated', edit_version = edit_version + 1
+    where id = bundled_version_id;
+    insert into public.world_asset_versions (
+      id, world_asset_id, version_number, lifecycle_status, source_kind,
+      checksum_sha256, detected_mime_type,
+      source_width, source_height, source_size_bytes,
+      processed_source_width, processed_source_height, processed_source_size_bytes,
+      processed_preview_width, processed_preview_height, processed_preview_size_bytes,
+      processed_thumbnail_width, processed_thumbnail_height, processed_thumbnail_size_bytes,
+      processed_source_path, processed_preview_path, processed_thumbnail_path,
+      delivery_source_path, delivery_preview_path, delivery_thumbnail_path,
+      render_width, render_height, automated_validation_status, validation_results,
+      created_by_admin_id, approved_by_admin_id, reviewed_at, approved_at, activated_at
+    ) values (
+      override_version_id, asset.id, 2, 'active', 'storage_raster',
+      override_checksum, 'image/webp', 256, 256, 2048,
+      256, 256, 2048, 192, 192, 1024, 96, 96, 512,
+      'starville/' || asset.id::text || '/' || override_version_id::text || '/processed/source.webp',
+      'starville/' || asset.id::text || '/' || override_version_id::text || '/processed/preview.webp',
+      'starville/' || asset.id::text || '/' || override_version_id::text || '/processed/thumbnail.webp',
+      'starville/phase7-dev-moonbean/v2/source.webp',
+      'starville/phase7-dev-moonbean/v2/preview.webp',
+      'starville/phase7-dev-moonbean/v2/thumbnail.webp',
+      128, 128, 'valid',
+      '{"valid":true,"checkedAt":"2026-07-18T08:00:00.000Z","issues":[]}'::jsonb,
+      super_user_id, super_user_id, now(), now(), now()
+    );
+    update public.world_assets
+    set active_version_id = override_version_id,
+        lifecycle_status = 'active', production_status = 'approved_production',
+        content_hash = override_checksum, source_type = 'storage_raster',
+        media_type = 'image/webp', width = 256, height = 256,
+        file_size_bytes = 2048, approval_status = 'approved',
+        record_version = record_version + 1
+    where id = asset.id;
+    perform set_config('starville.asset_lifecycle_transition', 'false', true);
+
+    result := public.get_player_gameplay_asset_overrides(
+      wallet, array['phase7-dev-moonbean'], 'asset-fixture-override-approved', 1000
+    );
+    perform pg_temp.assert_asset_true(
+      result ->> 'status' = 'loaded'
+        and (result ->> 'overrideCount')::integer = 1
+        and result #>> '{items,0,assetKey}' = 'phase7-dev-moonbean'
+        and result #>> '{items,0,versionId}' = override_version_id::text
+        and result #>> '{items,0,bundledManifestVersion}' is null
+        and result #>> '{items,0,deliverySourcePath}' =
+          'starville/phase7-dev-moonbean/v2/source.webp'
+        and (result #>> '{items,0,replacementAllowed}')::boolean,
+      'only the approved active immutable upload is projected for the requested stable key'
+    );
+
+    perform set_config('starville.asset_lifecycle_transition', 'true', true);
+    insert into public.world_asset_versions (
+      id, world_asset_id, version_number, lifecycle_status, source_kind,
+      checksum_sha256, detected_mime_type,
+      source_width, source_height, source_size_bytes,
+      processed_source_width, processed_source_height, processed_source_size_bytes,
+      processed_preview_width, processed_preview_height, processed_preview_size_bytes,
+      processed_thumbnail_width, processed_thumbnail_height, processed_thumbnail_size_bytes,
+      processed_source_path, processed_preview_path, processed_thumbnail_path,
+      delivery_source_path, delivery_preview_path, delivery_thumbnail_path,
+      render_width, render_height, automated_validation_status, validation_results,
+      created_by_admin_id, reviewed_at, activated_at
+    ) values (
+      unapproved_version_id, asset.id, 3, 'active', 'storage_raster',
+      encode(extensions.digest(
+        convert_to('phase12b-fixture:moonbean:unapproved-override', 'UTF8'), 'sha256'
+      ), 'hex'),
+      'image/webp', 256, 256, 2048,
+      256, 256, 2048, 192, 192, 1024, 96, 96, 512,
+      'starville/' || asset.id::text || '/' || unapproved_version_id::text || '/processed/source.webp',
+      'starville/' || asset.id::text || '/' || unapproved_version_id::text || '/processed/preview.webp',
+      'starville/' || asset.id::text || '/' || unapproved_version_id::text || '/processed/thumbnail.webp',
+      'starville/phase7-dev-moonbean/v3/source.webp',
+      'starville/phase7-dev-moonbean/v3/preview.webp',
+      'starville/phase7-dev-moonbean/v3/thumbnail.webp',
+      128, 128, 'valid',
+      '{"valid":true,"checkedAt":"2026-07-18T08:00:00.000Z","issues":[]}'::jsonb,
+      super_user_id, now(), now()
+    );
+    update public.world_assets
+    set active_version_id = unapproved_version_id,
+        record_version = record_version + 1
+    where id = asset.id;
+    perform set_config('starville.asset_lifecycle_transition', 'false', true);
+
+    result := public.get_player_gameplay_asset_overrides(
+      wallet, array['phase7-dev-moonbean'], 'asset-fixture-override-unapproved', 1000
+    );
+    perform pg_temp.assert_asset_true(
+      result ->> 'status' = 'loaded'
+        and (result ->> 'requestedKeyCount')::integer = 1
+        and (result ->> 'overrideCount')::integer = 0
+        and result -> 'items' = '[]'::jsonb,
+      'an active-looking upload without approval evidence is excluded for bundled fallback'
+    );
+
+    perform set_config('starville.asset_lifecycle_transition', 'true', true);
+    update public.world_assets
+    set lifecycle_status = 'deprecated', production_status = 'deprecated',
+        record_version = record_version + 1
+    where id = asset.id;
+    perform set_config('starville.asset_lifecycle_transition', 'false', true);
+    result := public.get_player_gameplay_asset_overrides(
+      wallet, array['phase7-dev-moonbean'], 'asset-fixture-override-inactive', 1000
+    );
+    perform pg_temp.assert_asset_true(
+      (result ->> 'overrideCount')::integer = 0,
+      'an inactive uploaded version is omitted so the client keeps bundled material'
+    );
+
+    begin
+      perform public.get_player_gameplay_asset_overrides(
+        wallet, array['../secret'], 'asset-fixture-override-malformed', 1000
+      );
+    exception when invalid_parameter_value then
+      invalid_key_denied := sqlerrm = 'INVALID_GAMEPLAY_ASSET_KEYS';
+    end;
+    begin
+      perform public.get_player_gameplay_asset_overrides(
+        wallet, array['tree-pine'], 'asset-fixture-override-foreign', 1000
+      );
+    exception when invalid_parameter_value then
+      foreign_key_denied := sqlerrm = 'INVALID_GAMEPLAY_ASSET_KEYS';
+    end;
+    perform pg_temp.assert_asset_true(
+      invalid_key_denied and foreign_key_denied,
+      'malformed and world-only stable keys are rejected before override discovery'
+    );
+
+    select current_asset.* into strict asset
+    from public.world_assets as current_asset where current_asset.id = asset.id;
+    result := private.world_asset_json(asset);
+    perform pg_temp.assert_asset_true(
+      (result ->> 'uploadedVersionCount')::integer = 2
+        and (result ->> 'invalidVersionCount')::integer = 0
+        and jsonb_typeof(result -> 'referenceBreakdown') = 'object'
+        and result #>> '{referenceBreakdown,world}' is not null
+        and result #>> '{referenceBreakdown,furniture}' is not null
+        and result #>> '{referenceBreakdown,farming}' is not null,
+      'each asset summary includes bounded upload, invalid-version, and reference coverage evidence'
+    );
+    raise sqlstate 'ZX001' using message = 'rollback gameplay override projection fixture';
+  exception when sqlstate 'ZX001' then
+    null;
+  end;
+end;
+$$;
+
+do $$
+declare
   notice_asset_id uuid;
   notice_version_one_id uuid;
   notice_version_two_id uuid := gen_random_uuid();
@@ -1379,6 +1616,250 @@ begin
     ),
     'intent conflict is audited without changing lifecycle or world references'
   );
+end;
+$$;
+
+do $$
+declare
+  super_user_id constant uuid := 'a5000000-0000-4000-8000-000000000001';
+  super_auth_session_id constant uuid := 'a5000000-0000-4000-8000-000000000002';
+  asset_id uuid;
+  bundled_version_id uuid;
+  override_version_id uuid := gen_random_uuid();
+  asset_revision integer;
+  override_checksum text := encode(extensions.digest(
+    convert_to('phase12b-fixture:cottage-sage:override', 'UTF8'), 'sha256'
+  ), 'hex');
+  pins_before jsonb;
+  pins_after jsonb;
+  result jsonb;
+  aal1_denials integer := 0;
+  pointer_protected boolean := false;
+  permission_key text;
+begin
+  perform pg_temp.assert_asset_true(
+    (select count(*) = 106 from public.world_asset_bundled_catalog)
+      and (select count(*) = 106 from public.world_assets
+        where bundled_default_version_id is not null)
+      and not exists (
+        select 1
+        from public.world_asset_bundled_catalog as catalog
+        join public.world_assets as asset on asset.id = catalog.world_asset_id
+        join public.world_asset_versions as version
+          on version.id = catalog.world_asset_version_id
+        where asset.bundled_default_version_id <> catalog.world_asset_version_id
+          or version.source_kind <> 'repository_procedural'
+          or version.detected_mime_type <> 'application/x-starville-procedural'
+          or version.checksum_sha256 <> encode(extensions.digest(
+            convert_to('starville-procedural:v1:' || catalog.asset_key, 'UTF8'), 'sha256'
+          ), 'hex')
+      ),
+    'all bundled keys have one exact immutable repository pointer without assuming version one'
+  );
+  perform pg_temp.assert_asset_true(
+    (select relrowsecurity and relforcerowsecurity
+      from pg_class where oid = 'public.world_asset_bundled_catalog'::regclass)
+      and not has_table_privilege(
+        'authenticated', 'public.world_asset_bundled_catalog', 'select'
+      ),
+    'the bundled catalog is forced-RLS and has no direct browser read grant'
+  );
+  result := public.reconcile_world_asset_bundled_lifecycle(
+    25, null, 'asset-fixture-bundled-reconcile'
+  );
+  perform pg_temp.assert_asset_true(
+    result ->> 'status' = 'reconciled'
+      and (result ->> 'scannedAssetCount')::integer = 25
+      and (result ->> 'hasMore')::boolean
+      and result ->> 'nextCursor' is not null
+      and (result ->> 'automaticActionCount')::integer = 0
+      and (result ->> 'publishedPinMutationCount')::integer = 0
+      and (result ->> 'recommendationsOnly')::boolean,
+    'worker reconciliation is bounded, paginated, and recommendations-only'
+  );
+
+  foreach permission_key in array array[
+    'assets.approve', 'assets.activate', 'assets.deprecate'
+  ] loop
+    begin
+      perform private.assert_verified_admin_permission(
+        super_user_id, super_auth_session_id, 'aal1', permission_key
+      );
+    exception when insufficient_privilege then
+      if sqlerrm = 'MFA_REQUIRED' then aal1_denials := aal1_denials + 1; end if;
+    end;
+  end loop;
+  perform pg_temp.assert_asset_true(
+    aal1_denials = 3,
+    'approval, activation, deprecation, and archival permission paths require AAL2'
+  );
+
+  begin
+    select asset.id, asset.bundled_default_version_id, asset.record_version
+      into strict asset_id, bundled_version_id, asset_revision
+    from public.world_assets as asset where asset.asset_key = 'cottage-sage';
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'mapVersionId', reference.world_map_version_id,
+      'assetVersionId', reference.world_asset_version_id
+    ) order by reference.world_map_version_id), '[]'::jsonb)
+      into pins_before
+    from public.world_map_version_assets as reference
+    where reference.world_asset_id = asset_id;
+
+    perform set_config('starville.asset_lifecycle_transition', 'true', true);
+    update public.world_asset_versions
+    set lifecycle_status = 'deprecated', edit_version = edit_version + 1
+    where id = bundled_version_id;
+    insert into public.world_asset_versions (
+      id, world_asset_id, version_number, lifecycle_status, source_kind,
+      checksum_sha256, detected_mime_type,
+      source_width, source_height, source_size_bytes,
+      processed_source_width, processed_source_height, processed_source_size_bytes,
+      processed_preview_width, processed_preview_height, processed_preview_size_bytes,
+      processed_thumbnail_width, processed_thumbnail_height, processed_thumbnail_size_bytes,
+      processed_source_path, processed_preview_path, processed_thumbnail_path,
+      delivery_source_path, delivery_preview_path, delivery_thumbnail_path,
+      render_width, render_height, automated_validation_status, validation_results,
+      reviewed_at, approved_at, activated_at
+    ) values (
+      override_version_id, asset_id, 2, 'active', 'storage_raster',
+      override_checksum, 'image/webp', 384, 384, 2048,
+      384, 384, 2048, 256, 256, 1024, 128, 128, 512,
+      'starville/' || asset_id::text || '/' || override_version_id::text || '/processed/source.webp',
+      'starville/' || asset_id::text || '/' || override_version_id::text || '/processed/preview.webp',
+      'starville/' || asset_id::text || '/' || override_version_id::text || '/processed/thumbnail.webp',
+      'starville/cottage-sage/v2/source.webp',
+      'starville/cottage-sage/v2/preview.webp',
+      'starville/cottage-sage/v2/thumbnail.webp',
+      384, 384, 'valid',
+      '{"valid":true,"checkedAt":"2026-07-18T08:00:00.000Z","issues":[]}'::jsonb,
+      now(), now(), now()
+    );
+    update public.world_assets
+    set active_version_id = override_version_id,
+        lifecycle_status = 'active', production_status = 'approved_production',
+        content_hash = override_checksum, source_type = 'storage_raster',
+        media_type = 'image/webp', width = 384, height = 384,
+        file_size_bytes = 2048, approval_status = 'approved',
+        deprecated_at = null, record_version = record_version + 1
+    where id = asset_id
+    returning record_version into asset_revision;
+    perform set_config('starville.asset_lifecycle_transition', 'false', true);
+
+    update public.cozy_item_definitions
+    set asset_ref = 'cottage-sage', asset_readiness = 'approved'
+    where slug = 'willow-timber';
+    perform pg_temp.assert_asset_true(
+      exists (
+        select 1 from public.world_asset_references
+        where world_asset_id = asset_id
+          and world_asset_version_id = override_version_id
+          and reference_type = 'item_definition'
+          and reference_key = 'willow-timber'
+      ),
+      'mutable content references initially follow the uploaded override'
+    );
+
+    begin
+      perform public.restore_admin_game_asset_bundled_default(
+        super_user_id, super_auth_session_id, 'aal1', asset_id, asset_revision,
+        'Restore must reject a password-only administrator session.',
+        'asset-fixture-restore-aal1', 1000
+      );
+    exception when insufficient_privilege then
+      aal1_denials := aal1_denials + case when sqlerrm = 'MFA_REQUIRED' then 1 else 0 end;
+    end;
+    perform pg_temp.assert_asset_true(aal1_denials = 4, 'restore explicitly requires AAL2');
+
+    result := public.claim_admin_game_asset_operation_intent(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, bundled_version_id,
+      'restore_bundled_default', 'asset-fixture-restore-default',
+      'Deactivate the uploaded cottage override and restore bundled material.',
+      repeat('c', 64)
+    );
+    perform pg_temp.assert_asset_status(result, 'claimed', 'restore intent is bound before mutation');
+
+    result := public.restore_admin_game_asset_bundled_default(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, asset_revision,
+      'Deactivate the uploaded cottage override and restore bundled material.',
+      'asset-fixture-restore-default', 1000
+    );
+    perform pg_temp.assert_asset_status(
+      result, 'bundled_default_restored',
+      'an AAL2 restore deactivates the upload and reactivates bundled material'
+    );
+    perform pg_temp.assert_asset_true(
+      (select active_version_id = bundled_version_id
+          and bundled_default_version_id = bundled_version_id
+          and asset_source_state = 'bundled_default'
+          and record_version = asset_revision + 1
+        from public.world_assets where id = asset_id)
+      and (select lifecycle_status = 'active'
+        from public.world_asset_versions where id = bundled_version_id)
+      and (select lifecycle_status = 'deprecated'
+        from public.world_asset_versions where id = override_version_id)
+      and exists (
+        select 1 from public.world_asset_references
+        where world_asset_id = asset_id
+          and world_asset_version_id = bundled_version_id
+          and reference_type = 'item_definition'
+          and reference_key = 'willow-timber'
+      )
+      and not exists (
+        select 1 from public.world_asset_references
+        where world_asset_id = asset_id
+          and world_asset_version_id = override_version_id
+          and reference_type = 'item_definition'
+          and reference_key = 'willow-timber'
+      ),
+      'restore preserves history and resynchronizes only mutable content references'
+    );
+
+    select coalesce(jsonb_agg(jsonb_build_object(
+      'mapVersionId', reference.world_map_version_id,
+      'assetVersionId', reference.world_asset_version_id
+    ) order by reference.world_map_version_id), '[]'::jsonb)
+      into pins_after
+    from public.world_map_version_assets as reference
+    where reference.world_asset_id = asset_id;
+    perform pg_temp.assert_asset_true(
+      pins_after = pins_before
+        and exists (
+          select 1 from public.world_asset_audit_events
+          where request_id = 'asset-fixture-restore-default'
+            and event_key = 'asset.bundled_default.restored'
+            and metadata ->> 'worldMapVersionAssetRowsUpdated' = '0'
+        ),
+      'restore audits success without rewriting any immutable world revision pin'
+    );
+
+    result := public.restore_admin_game_asset_bundled_default(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, asset_revision,
+      'Deactivate the uploaded cottage override and restore bundled material.',
+      'asset-fixture-restore-default', 1000
+    );
+    perform pg_temp.assert_asset_status(result, 'replayed', 'exact restore retries replay safely');
+    result := public.restore_admin_game_asset_bundled_default(
+      super_user_id, super_auth_session_id, 'aal2', asset_id, asset_revision,
+      'A changed reason must not reuse the successful restore request identifier.',
+      'asset-fixture-restore-default', 1000
+    );
+    perform pg_temp.assert_asset_status(
+      result, 'request_conflict', 'changed restore intent cannot reuse a request identifier'
+    );
+
+    begin
+      update public.world_assets set bundled_default_version_id = null where id = asset_id;
+    exception when insufficient_privilege then
+      pointer_protected := sqlerrm = 'ASSET_BUNDLED_DEFAULT_PROTECTED';
+    end;
+    perform pg_temp.assert_asset_true(
+      pointer_protected, 'the stable bundled-default pointer cannot be changed directly'
+    );
+    raise sqlstate 'ZX001' using message = 'rollback Phase 12B restore fixture';
+  exception when sqlstate 'ZX001' then
+    null;
+  end;
 end;
 $$;
 

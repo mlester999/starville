@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="192" viewBox="0 0 160 192" fill="none"><title>Cloudberry Stage 1</title><desc>Cloudberry growth stage 1 of 5 with a stable soil contact point.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#b8c7df"/><stop offset="1" stop-color="#7887b5"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#7887b5"/><stop offset="1" stop-color="#4e5686"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff4c5" stop-opacity=".92"/><stop offset="1" stop-color="#e9d68d" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="83.2" cy="168.96" rx="54.4" ry="15.36" fill="#18231f" opacity=".22"/><path d="M80 167.04V119.04" stroke="#4e5686" stroke-width="9"/><path d="M80 126.72q-40-24.96-41.6-59.52q43.2-3.84 48 42.24q25.6-51.84 49.6-23.04q-3.2 42.24-54.4 59.52" fill="#b8c7df" stroke="#2c304b" stroke-width="5"/><path d="M115.2 111.04l2.24 5.76 5.76 2.24-5.76 2.24-2.24 5.76-2.24-5.76-5.76-2.24 5.76-2.24z" fill="#fff4c5" stroke="#e9d68d" stroke-width="2"/></g></svg>

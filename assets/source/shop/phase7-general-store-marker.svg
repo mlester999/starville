@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="448" height="416" viewBox="0 0 448 416" fill="none"><title>General Store</title><desc>A welcoming isometric village shop with a readable awning, sign, and entrance.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8bd77"/><stop offset="1" stop-color="#b87849"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b87849"/><stop offset="1" stop-color="#75503d"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff2bd" stop-opacity=".92"/><stop offset="1" stop-color="#f5df9a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="232.96" cy="366.08" rx="152.32" ry="33.28" fill="#18231f" opacity=".22"/>
+    <path d="M89.6 191.36L224 112.32l134.4 79.04v141.44l-134.4 70.72-134.4-70.72z" fill="url(#surface)" stroke="#382b2a" stroke-width="5"/>
+    <path d="M58.24 195.52L224 74.88l165.76 120.64-44.8 33.28-120.96-79.04-120.96 79.04z" fill="#75503d" stroke="#382b2a" stroke-width="5"/>
+    <path d="M219.52 287.04l53.76 22.88v66.56l-53.76 20.8z" fill="#382b2a" opacity=".86"/>
+    <path d="M125.44 245.44l44.8 20.8v37.44l-44.8-20.8zM291.2 249.6l44.8-20.8v41.6l-44.8 20.8z" fill="#fff2bd" stroke="#75503d" stroke-width="3"/>
+    <path d="M80.64 232.96l143.36 66.56 143.36-66.56v43.68l-143.36 66.56-143.36-66.56z" fill="#f5df9a" stroke="#382b2a" stroke-width="4"/><path d="M120.96 251.68v43.68m67.2-14.56v43.68m71.68-79.04v43.68m67.2-79.04v43.68" stroke="#75503d" stroke-width="7" opacity=".7"/><path d="M192.64 137.28h62.72v43.68h-62.72z" fill="#fff2bd" stroke="#382b2a" stroke-width="4"/><path d="M224 147.264l3.261 8.387 8.387 3.261-8.387 3.261-3.261 8.387-3.261-8.387-8.387-3.261 8.387-3.261z" fill="#fff2bd" stroke="#f5df9a" stroke-width="2"/><path d="M206.08 324.48l35.84 14.56v41.6l-35.84 14.56z" fill="#75503d" stroke="#382b2a" stroke-width="3"/><circle cx="230.72" cy="359.84" r="4" fill="#f5df9a"/><path d="M188.16 391.04l35.84 10.4 35.84-10.4" stroke="#f5df9a" stroke-width="5"/></g></svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none"><title>Garden Twine</title><desc>Garden Twine inventory artwork designed to remain readable at quickbar size.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a7c98b"/><stop offset="1" stop-color="#5d8b68"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5d8b68"/><stop offset="1" stop-color="#345c4c"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f3edbd" stop-opacity=".92"/><stop offset="1" stop-color="#d8d99a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><circle cx="80" cy="83.2" r="65.6" fill="#f3edbd" opacity=".17"/><path d="M43.2 112l25.6-68.8 57.6 19.2-12.8 68.8z" fill="url(#surface)" stroke="#253832" stroke-width="7"/><path d="M62.4 83.2l41.6 12.8" stroke="#d8d99a" stroke-width="7"/></g></svg>

@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" fill="none"><title>Willow Starter Hoe</title><desc>Willow Starter Hoe inventory artwork designed to remain readable at quickbar size.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8bd77"/><stop offset="1" stop-color="#b87849"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b87849"/><stop offset="1" stop-color="#75503d"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff2bd" stop-opacity=".92"/><stop offset="1" stop-color="#f5df9a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><circle cx="80" cy="83.2" r="65.6" fill="#fff2bd" opacity=".17"/><path d="M57.6 128l48-92.8m-20.8 12.8l46.4 22.4" stroke="#382b2a" stroke-width="14"/><path d="M88 43.2l40 19.2" stroke="#e8bd77" stroke-width="8"/></g></svg>

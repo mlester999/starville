@@ -67,6 +67,8 @@ export function createSupabaseAdminAssetGateway(client: SupabaseClient): AdminAs
     activateVersion: (identity, input) =>
       call('activate_admin_game_asset_version', identity, input),
     deprecateAsset: (identity, input) => call('deprecate_admin_game_asset', identity, input),
+    restoreBundledDefault: (identity, input) =>
+      call('restore_admin_game_asset_bundled_default', identity, input),
     archiveAsset: (identity, input) => call('archive_admin_game_asset', identity, input),
     createVersion: (identity, input) =>
       call('create_admin_game_asset_version_upload_v2', identity, input),

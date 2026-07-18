@@ -63,6 +63,11 @@ import type { ProgressionGateway } from './progression/gateway.js';
 import { registerProgressionRoutes } from './routes/progression.js';
 import type { HousingGateway } from './housing/gateway.js';
 import { registerHousingRoutes } from './routes/housing.js';
+import type { HomeVisitGateway } from './home-visits/gateway.js';
+import { registerHomeVisitRoutes } from './routes/home-visits.js';
+import type { PlayerExperienceGateway } from './player-experience/gateway.js';
+import { registerPlayerExperienceRoutes } from './routes/player-experience.js';
+import type { GameplayAssetOverrideService } from './player/asset-override-contracts.js';
 
 export interface ApiTokenAccessOptions {
   readonly service: TokenAccessService;
@@ -76,6 +81,7 @@ export interface ApiTokenAccessOptions {
   readonly avatarService?: AvatarService;
   readonly cosmeticService?: CosmeticService;
   readonly cosmeticGateway?: CosmeticGateway;
+  readonly assetOverrideService?: GameplayAssetOverrideService;
 }
 
 export interface BuildApiAppOptions {
@@ -107,6 +113,8 @@ export interface BuildApiAppOptions {
   readonly economy?: { readonly gateway: EconomyGateway };
   readonly progression?: { readonly gateway: ProgressionGateway };
   readonly housing?: { readonly gateway: HousingGateway };
+  readonly homeVisits?: { readonly gateway: HomeVisitGateway };
+  readonly playerExperience?: { readonly gateway: PlayerExperienceGateway };
   readonly adminAvatar?: { readonly gateway: AdminAvatarGateway };
   readonly adminCosmetics?: { readonly gateway: AdminCosmeticGateway };
   readonly worldGameTest?: {
@@ -128,6 +136,8 @@ const MODULE_PATHS: readonly [string, PlatformModuleKey][] = [
   ['/api/v1/token-access/player/economy', 'offchain_economy'],
   ['/api/v1/token-access/player/progression', 'cozy_gameplay'],
   ['/api/v1/token-access/player/housing', 'cozy_gameplay'],
+  ['/api/v1/token-access/player/home-visits', 'cozy_gameplay'],
+  ['/api/v1/token-access/player/experience', 'cozy_gameplay'],
   ['/api/v1/admin/live-operations', 'operations'],
   ['/api/v1/admin/realtime', 'operations'],
   ['/api/v1/admin/multiplayer-chat', 'operations'],
@@ -138,6 +148,8 @@ const MODULE_PATHS: readonly [string, PlatformModuleKey][] = [
   ['/api/v1/admin/economy', 'offchain_economy'],
   ['/api/v1/admin/progression', 'content_management'],
   ['/api/v1/admin/housing', 'content_management'],
+  ['/api/v1/admin/home-visits', 'operations'],
+  ['/api/v1/admin/player-experience', 'operations'],
   ['/api/v1/admin/players', 'players'],
   ['/api/v1/admin/token-gate', 'blockchain'],
   ['/api/v1/admin/worlds', 'world_management'],
@@ -166,6 +178,8 @@ export function buildApiApp({
   economy,
   progression,
   housing,
+  homeVisits,
+  playerExperience,
   adminAvatar,
   adminCosmetics,
   worldGameTest,
@@ -418,6 +432,9 @@ export function buildApiApp({
         ...(tokenAccess.realtimeTicketService === undefined
           ? {}
           : { realtimeTicketService: tokenAccess.realtimeTicketService }),
+        ...(tokenAccess.assetOverrideService === undefined
+          ? {}
+          : { assetOverrideService: tokenAccess.assetOverrideService }),
         ...(liveOperations === undefined ? {} : { liveOperationsService: liveOperations.service }),
       });
       if (tokenAccess.avatarService !== undefined) {
@@ -507,6 +524,34 @@ export function buildApiApp({
       if (housing !== undefined) {
         registerHousingRoutes(app, {
           gateway: housing.gateway,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          adminGateway: adminAuthGateway,
+          logger,
+          allowedOrigins,
+        });
+      }
+      if (homeVisits !== undefined) {
+        registerHomeVisitRoutes(app, {
+          gateway: homeVisits.gateway,
+          playerService: tokenAccess.playerService,
+          tokenAccessService: tokenAccess.service,
+          cookie: {
+            secure: tokenAccess.cookieSecure,
+            maxAgeSeconds: tokenAccess.cookieMaxAgeSeconds,
+          },
+          adminGateway: adminAuthGateway,
+          logger,
+          allowedOrigins,
+        });
+      }
+      if (playerExperience !== undefined) {
+        registerPlayerExperienceRoutes(app, {
+          gateway: playerExperience.gateway,
           playerService: tokenAccess.playerService,
           tokenAccessService: tokenAccess.service,
           cookie: {

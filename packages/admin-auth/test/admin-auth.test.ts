@@ -36,7 +36,7 @@ const authorized = {
 describe('admin authorization catalog', () => {
   it('contains the required stable roles and permission catalog', () => {
     expect(ADMIN_ROLE_KEYS).toHaveLength(12);
-    expect(ADMIN_PERMISSION_KEYS).toHaveLength(171);
+    expect(ADMIN_PERMISSION_KEYS).toHaveLength(186);
     expect(INITIAL_ROLE_PERMISSIONS.super_admin).toEqual(ADMIN_PERMISSION_KEYS);
   });
 
@@ -54,6 +54,70 @@ describe('admin authorization catalog', () => {
     );
     expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('live_operations.manage');
     expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('announcements.manage');
+  });
+
+  it('keeps Phase 11F home-visit operations role-scoped', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'home_visits.manage',
+        'home_visits.policies.manage',
+        'home_visits.guestbooks.moderate',
+        'home_visits.reconciliation.manage',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining([
+        'home_visits.inspect',
+        'home_visits.manage',
+        'home_visits.live_ops.manage',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain(
+      'home_visits.guestbooks.moderate',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).toEqual(
+      expect.arrayContaining([
+        'home_visits.inspect',
+        'home_visits.guestbooks.moderate',
+        'home_visits.reports.inspect',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.customer_support).toEqual(
+      expect.arrayContaining([
+        'home_visits.inspect',
+        'home_visits.policies.inspect',
+        'home_visits.reports.inspect',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.content_manager).not.toContain('home_visits.inspect');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('home_visits.telemetry.inspect');
+  });
+
+  it('keeps Phase 12A inspection, support, policy, and reconciliation authority narrow', () => {
+    expect(INITIAL_ROLE_PERMISSIONS.game_administrator).toEqual(
+      expect.arrayContaining([
+        'player_experience.inspect',
+        'player_experience.support',
+        'player_experience.policy.manage',
+        'player_experience.reconciliation.manage',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).toEqual(
+      expect.arrayContaining([
+        'player_experience.inspect',
+        'player_experience.policy.manage',
+        'player_experience.reconciliation.manage',
+      ]),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.live_operations_manager).not.toContain(
+      'player_experience.support',
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.customer_support).toEqual(
+      expect.arrayContaining(['player_experience.inspect', 'player_experience.support']),
+    );
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).toContain('player_experience.inspect');
+    expect(INITIAL_ROLE_PERMISSIONS.read_only_analyst).not.toContain('player_experience.support');
+    expect(INITIAL_ROLE_PERMISSIONS.moderator).not.toContain('player_experience.inspect');
   });
 
   it('keeps farming inspection, content, reward, and live-operations authority narrow', () => {

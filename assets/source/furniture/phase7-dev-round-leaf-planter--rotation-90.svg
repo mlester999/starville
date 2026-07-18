@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="208" viewBox="0 0 192 208" fill="none"><title>Round-leaf Planter rotation-90</title><desc>Round-leaf Planter with four authored isometric directions and a stable placement base.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#a7c98b"/><stop offset="1" stop-color="#5d8b68"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#5d8b68"/><stop offset="1" stop-color="#345c4c"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#f3edbd" stop-opacity=".92"/><stop offset="1" stop-color="#d8d99a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="99.84" cy="183.04" rx="65.28" ry="16.64" fill="#18231f" opacity=".22"/><g transform="translate(192 0) scale(-1 1)"><path d="M61.44 118.56h69.12l-13.44 58.24h-42.24z" fill="url(#shade)" stroke="#253832" stroke-width="6"/><path d="M96 120.64q-46.08-20.8-30.72-60.32q36.48 0 36.48 35.36q11.52-52 44.16-37.44q11.52 41.6-49.92 62.4" fill="#a7c98b" stroke="#253832" stroke-width="5"/></g></g></svg>

@@ -29,6 +29,25 @@ export type PrivateHomeRealtimeTicketPersistenceResult =
         | 'plot_world_mismatch';
     };
 
+export type HomeVisitRealtimeTicketPersistenceResult =
+  | {
+      readonly status: 'issued';
+      readonly participantId: string;
+      readonly sessionId: string;
+      readonly homeId: string;
+      readonly expiresAt: string;
+    }
+  | {
+      readonly status:
+        | 'access_revoked'
+        | 'player_suspended'
+        | 'rename_required'
+        | 'maintenance'
+        | 'home_visitor_not_found'
+        | 'home_visit_session_closing'
+        | 'home_visit_blocked';
+    };
+
 export interface RealtimeTicketGateway {
   issue(input: {
     readonly accessSessionTokenHash: string;
@@ -42,6 +61,12 @@ export interface RealtimeTicketGateway {
     readonly homeId: string;
     readonly requestId: string;
   }): Promise<PrivateHomeRealtimeTicketPersistenceResult>;
+  issueHomeVisit(input: {
+    readonly accessSessionTokenHash: string;
+    readonly ticketHash: string;
+    readonly participantId: string;
+    readonly requestId: string;
+  }): Promise<HomeVisitRealtimeTicketPersistenceResult>;
 }
 
 export interface RealtimeTicketService {
@@ -55,4 +80,15 @@ export interface RealtimeTicketService {
     readonly homeId: unknown;
     readonly requestId: string;
   }): Promise<PrivateHomeRealtimeTicket>;
+  issueHomeVisit(input: {
+    readonly rawAccessToken: string | undefined;
+    readonly participantId: unknown;
+    readonly requestId: string;
+  }): Promise<{
+    readonly ticket: string;
+    readonly participantId: string;
+    readonly visitSessionId: string;
+    readonly homeId: string;
+    readonly expiresAt: string;
+  }>;
 }

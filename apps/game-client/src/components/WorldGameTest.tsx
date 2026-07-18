@@ -19,6 +19,8 @@ import { WORLD_ASSET_FALLBACK_EVENT_NAME } from '../game/contracts';
 import { GameCanvas } from './GameCanvas';
 import { GeneralStoreGameTest } from './GeneralStoreGameTest';
 import { ProgressionGameTest } from './ProgressionGameTest';
+import { PlayerExperienceGameTest } from './PlayerExperienceGameTest';
+import { AssetCoverageGameTest } from './AssetCoverageGameTest';
 
 interface WorldGameTestProps {
   readonly apiUrl: string;
@@ -71,6 +73,8 @@ function LoadedWorldGameTest(props: {
   const [dialogue, setDialogue] = useState<InteractionDialogue | null>(null);
   const [generalStoreOpen, setGeneralStoreOpen] = useState(false);
   const [progressionOpen, setProgressionOpen] = useState(false);
+  const [playerExperienceOpen, setPlayerExperienceOpen] = useState(false);
+  const [assetCoverageOpen, setAssetCoverageOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [fallbacks, setFallbacks] = useState<readonly WorldAssetFallbackEvent[]>([]);
   const [localState, setLocalState] = useState<PlayerStateUpdate>(props.projection.playerState);
@@ -178,13 +182,25 @@ function LoadedWorldGameTest(props: {
           <button type="button" onClick={() => setProgressionOpen(true)}>
             Preview progression
           </button>
+          <button type="button" onClick={() => setPlayerExperienceOpen(true)}>
+            Preview onboarding
+          </button>
+          <button type="button" onClick={() => setAssetCoverageOpen(true)}>
+            Visual asset coverage
+          </button>
         </div>
         <GameCanvas
           appearancePreset={props.projection.previewIdentity.appearancePreset}
           audioSettings={{ masterVolume: 0.6, muted: false }}
           initialState={props.projection.playerState}
           initialWorld={runtimeWorld(props.projection)}
-          inputBlocked={dialogue !== null || generalStoreOpen || progressionOpen}
+          inputBlocked={
+            dialogue !== null ||
+            generalStoreOpen ||
+            progressionOpen ||
+            playerExperienceOpen ||
+            assetCoverageOpen
+          }
           onCheckpoint={() => undefined}
           onError={setRuntimeError}
           onExitRequested={() => {
@@ -247,6 +263,12 @@ function LoadedWorldGameTest(props: {
           />
         ) : null}
         {progressionOpen ? <ProgressionGameTest onClose={() => setProgressionOpen(false)} /> : null}
+        {playerExperienceOpen ? (
+          <PlayerExperienceGameTest onClose={() => setPlayerExperienceOpen(false)} />
+        ) : null}
+        {assetCoverageOpen ? (
+          <AssetCoverageGameTest onClose={() => setAssetCoverageOpen(false)} />
+        ) : null}
         {debugOpen ? (
           <aside className="world-game-test-debug" aria-label="Game Test debug panel">
             <h2>Revision debug</h2>

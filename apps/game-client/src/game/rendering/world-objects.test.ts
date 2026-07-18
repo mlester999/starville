@@ -11,10 +11,10 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import type { WorldAssetDelivery } from '@starville/asset-management';
+import { resolveWorldAssetDelivery, type WorldAssetDelivery } from '@starville/asset-management';
 import { lanternSquareManifest } from '@starville/game-core';
 
-import { worldAssetTextureKey } from './world-asset-textures';
+import { resolvedWorldAssetTextureKey, worldAssetTextureKey } from './world-asset-textures';
 import { renderWorldObjects } from './world-objects';
 
 function delivery(
@@ -26,6 +26,7 @@ function delivery(
     assetKey,
     versionId,
     checksum: 'a'.repeat(64),
+    bundledManifestVersion: null,
     url: `https://assets.example.test/game-assets/starville/${assetKey}/${versionId}/source.webp`,
     mediaType: 'image/webp',
     width: 512,
@@ -62,23 +63,25 @@ function chainableGameObject(kind: 'graphics' | 'image') {
 describe('production world-object rendering', () => {
   it('renders every object when one production texture succeeds and another falls back', () => {
     const baseManifest = lanternSquareManifest();
-    const objects = baseManifest.objects
-      .slice(0, 3)
-      .map((object, index) => (index === 0 ? { ...object, rotation: 90 as const } : object));
+    const objects = baseManifest.objects.slice(0, 3);
     const manifest = { ...baseManifest, objects };
-    const successful = delivery(objects[0]!.assetId, '11111111-1111-4111-8111-111111111111', {
-      supportedRotations: [0, 90],
-    });
+    const successful = delivery(objects[0]!.assetId, '11111111-1111-4111-8111-111111111111');
     const failed = delivery(objects[1]!.assetId, '22222222-2222-4222-8222-222222222222');
     const successfulKey = worldAssetTextureKey(successful);
     const failedKey = worldAssetTextureKey(failed);
+    const failedFallbackKey = resolvedWorldAssetTextureKey(
+      resolveWorldAssetDelivery({
+        assetKey: failed.assetKey,
+        context: 'published_world',
+      }),
+    );
     const images: object[] = [];
     const graphics: object[] = [];
     const children: object[] = [];
     const containers: object[] = [];
     const scene = {
       textures: {
-        exists: vi.fn((key: string) => key === successfulKey),
+        exists: vi.fn((key: string) => [successfulKey, failedFallbackKey].includes(key)),
       },
       add: {
         image: vi.fn(() => {
@@ -106,13 +109,13 @@ describe('production world-object rendering', () => {
     expect(containers).toHaveLength(objects.length);
     expect(children.map((child) => Reflect.get(child, 'kind'))).toEqual([
       'image',
-      'graphics',
+      'image',
       'graphics',
     ]);
     expect(scene.textures.exists).toHaveBeenCalledWith(successfulKey);
     expect(scene.textures.exists).toHaveBeenCalledWith(failedKey);
-    expect(images).toHaveLength(1);
-    expect(graphics).toHaveLength(2);
+    expect(images).toHaveLength(2);
+    expect(graphics).toHaveLength(1);
     expect(Reflect.get(images[0]!, 'setOrigin')).toHaveBeenCalledWith(
       successful.footAnchorX,
       successful.footAnchorY,
@@ -121,6 +124,63 @@ describe('production world-object rendering', () => {
       successful.anchorX,
       successful.anchorY,
     );
-    expect(Reflect.get(images[0]!, 'setAngle')).toHaveBeenCalledWith(90);
+    expect(Reflect.get(images[0]!, 'setAngle')).not.toHaveBeenCalled();
+    expect(Reflect.get(images[1]!, 'setAngle')).not.toHaveBeenCalled();
+  });
+
+  it('selects an authored bundled quarter-turn instead of rotating an uploaded flat image', () => {
+    const baseManifest = lanternSquareManifest();
+    const baseFence = baseManifest.objects.find((object) => object.assetId === 'fence-willow');
+    expect(baseFence).toBeDefined();
+    const fence = { ...baseFence!, rotation: 90 as const };
+    const manifest = { ...baseManifest, objects: [fence] };
+    const uploaded = delivery(fence.assetId, '33333333-3333-4333-8333-333333333333', {
+      supportedRotations: [0, 90],
+    });
+    const authored = resolveWorldAssetDelivery({
+      assetKey: fence.assetId,
+      context: 'published_world',
+      rotation: 90,
+    });
+    const authoredKey = resolvedWorldAssetTextureKey(authored);
+    const image = chainableGameObject('image');
+    const scene = {
+      textures: { exists: vi.fn((key: string) => key === authoredKey) },
+      add: {
+        image: vi.fn(() => image),
+        graphics: vi.fn(() => chainableGameObject('graphics')),
+        container: vi.fn(() => chainableGameObject('graphics')),
+      },
+    };
+
+    renderWorldObjects(scene as never, manifest, [uploaded]);
+
+    expect(scene.add.image).toHaveBeenCalledWith(0, 0, authoredKey);
+    expect(authored.url).toContain('fence-willow--rotation-90.webp');
+    expect(Reflect.get(image, 'setAngle')).not.toHaveBeenCalled();
+  });
+
+  it('renders the stable missing material before using procedural drawing', () => {
+    const baseManifest = lanternSquareManifest();
+    const object = baseManifest.objects[0]!;
+    const manifest = { ...baseManifest, objects: [object] };
+    const missing = resolveWorldAssetDelivery({
+      assetKey: 'system.missing-asset',
+      context: 'published_world',
+    });
+    const missingKey = resolvedWorldAssetTextureKey(missing);
+    const scene = {
+      textures: { exists: vi.fn((key: string) => key === missingKey) },
+      add: {
+        image: vi.fn(() => chainableGameObject('image')),
+        graphics: vi.fn(() => chainableGameObject('graphics')),
+        container: vi.fn(() => chainableGameObject('graphics')),
+      },
+    };
+
+    renderWorldObjects(scene as never, manifest);
+
+    expect(scene.add.image).toHaveBeenCalledWith(0, 0, missingKey);
+    expect(scene.add.graphics).not.toHaveBeenCalled();
   });
 });

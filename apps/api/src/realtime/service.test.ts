@@ -9,7 +9,7 @@ describe('realtime ticket service', () => {
       expiresAt: '2026-07-15T00:00:30.000Z',
     });
     const service = createRealtimeTicketService({
-      gateway: { issue, issuePrivateHome: vi.fn() },
+      gateway: { issue, issuePrivateHome: vi.fn(), issueHomeVisit: vi.fn() },
       accessTokenSecret: 'access-secret-at-least-thirty-two-characters',
       ticketSecret: 'ticket-secret-at-least-thirty-two-characters',
       createTicket: () => 'a'.repeat(43),
@@ -32,7 +32,11 @@ describe('realtime ticket service', () => {
   it('maps revoked and suspended admission safely', async () => {
     const create = (status: 'access_revoked' | 'player_suspended') =>
       createRealtimeTicketService({
-        gateway: { issue: vi.fn().mockResolvedValue({ status }), issuePrivateHome: vi.fn() },
+        gateway: {
+          issue: vi.fn().mockResolvedValue({ status }),
+          issuePrivateHome: vi.fn(),
+          issueHomeVisit: vi.fn(),
+        },
         accessTokenSecret: 'access-secret-at-least-thirty-two-characters',
         ticketSecret: 'ticket-secret-at-least-thirty-two-characters',
         createTicket: () => 'a'.repeat(43),
@@ -52,7 +56,7 @@ describe('realtime ticket service', () => {
       expiresAt: '2026-07-17T00:00:30.000Z',
     });
     const service = createRealtimeTicketService({
-      gateway: { issue: vi.fn(), issuePrivateHome },
+      gateway: { issue: vi.fn(), issuePrivateHome, issueHomeVisit: vi.fn() },
       accessTokenSecret: 'access-secret-at-least-thirty-two-characters',
       ticketSecret: 'ticket-secret-at-least-thirty-two-characters',
       createTicket: () => 'c'.repeat(43),
@@ -77,5 +81,40 @@ describe('realtime ticket service', () => {
     });
     expect(JSON.stringify(issuePrivateHome.mock.calls)).not.toContain('c'.repeat(43));
     expect(JSON.stringify(issuePrivateHome.mock.calls)).not.toContain('d'.repeat(43));
+  });
+
+  it('issues a participant-bound one-use home-visit ticket without storing raw credentials', async () => {
+    const issueHomeVisit = vi.fn().mockResolvedValue({
+      status: 'issued',
+      participantId: 'f1100000-0000-4000-8000-000000000011',
+      sessionId: 'f1100000-0000-4000-8000-000000000012',
+      homeId: 'f1100000-0000-4000-8000-000000000013',
+      expiresAt: '2026-07-18T00:00:30.000Z',
+    });
+    const service = createRealtimeTicketService({
+      gateway: { issue: vi.fn(), issuePrivateHome: vi.fn(), issueHomeVisit },
+      accessTokenSecret: 'access-secret-at-least-thirty-two-characters',
+      ticketSecret: 'ticket-secret-at-least-thirty-two-characters',
+      createTicket: () => 'e'.repeat(43),
+    });
+    await expect(
+      service.issueHomeVisit({
+        rawAccessToken: 'f'.repeat(43),
+        participantId: 'f1100000-0000-4000-8000-000000000011',
+        requestId: 'home-visit-ticket-1',
+      }),
+    ).resolves.toMatchObject({
+      ticket: 'e'.repeat(43),
+      participantId: 'f1100000-0000-4000-8000-000000000011',
+      visitSessionId: 'f1100000-0000-4000-8000-000000000012',
+    });
+    expect(issueHomeVisit).toHaveBeenCalledWith({
+      accessSessionTokenHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      ticketHash: expect.stringMatching(/^[0-9a-f]{64}$/u),
+      participantId: 'f1100000-0000-4000-8000-000000000011',
+      requestId: 'home-visit-ticket-1',
+    });
+    expect(JSON.stringify(issueHomeVisit.mock.calls)).not.toContain('e'.repeat(43));
+    expect(JSON.stringify(issueHomeVisit.mock.calls)).not.toContain('f'.repeat(43));
   });
 });

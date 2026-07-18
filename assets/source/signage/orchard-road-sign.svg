@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="224" height="224" viewBox="0 0 224 224" fill="none"><title>Orchard Road Sign</title><desc>Orchard Road Sign with readable sign geometry and no baked interface text.</desc><defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e8bd77"/><stop offset="1" stop-color="#b87849"/></linearGradient>
+    <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#b87849"/><stop offset="1" stop-color="#75503d"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="#fff2bd" stop-opacity=".92"/><stop offset="1" stop-color="#f5df9a" stop-opacity="0"/></radialGradient>
+  </defs><g stroke-linecap="round" stroke-linejoin="round"><ellipse cx="116.48" cy="197.12" rx="76.16" ry="17.92" fill="#18231f" opacity=".22"/><path d="M78.4 185.92V114.24m67.2 71.68V114.24" stroke="#382b2a" stroke-width="12"/><path d="M38.08 53.76h147.84v76.16h-147.84z" fill="url(#surface)" stroke="#382b2a" stroke-width="6"/><path d="M56 76.16h80.64l22.4 15.68-.1 15.68" stroke="#f5df9a" stroke-width="8"/></g></svg>
