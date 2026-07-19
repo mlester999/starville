@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   STARVILLE_BUNDLED_ASSETS,
+  STARVILLE_BUNDLED_MANIFEST_VERSION,
+  getBundledManifest,
   resolveAssetSource,
   type AssetRotation,
   type BundledAssetEntry,
+  type BundledManifestVersion,
 } from '@starville/asset-management';
 
 import { BundledAssetImage } from './BundledAssetImage';
@@ -18,17 +21,21 @@ const STAGE_HEIGHT = 200;
 const HALF_TILE_WIDTH = 24;
 const HALF_TILE_HEIGHT = 12;
 
-const GALLERIES: Readonly<Record<Gallery, readonly BundledAssetEntry[]>> = {
-  terrain: STARVILLE_BUNDLED_ASSETS.filter((asset) => asset.category === 'terrain'),
-  world: STARVILLE_BUNDLED_ASSETS.filter((asset) =>
-    ['nature', 'structure', 'boundary', 'lighting', 'signage', 'shop'].includes(asset.category),
-  ),
-  farming: STARVILLE_BUNDLED_ASSETS.filter((asset) => ['farming', 'crop'].includes(asset.category)),
-  housing: STARVILLE_BUNDLED_ASSETS.filter((asset) => asset.assetType === 'furniture'),
-  markers: STARVILLE_BUNDLED_ASSETS.filter(
-    (asset) => asset.key.startsWith('ui.') || asset.category === 'interaction',
-  ),
-};
+function galleriesFor(
+  bundledAssets: readonly BundledAssetEntry[],
+): Readonly<Record<Gallery, readonly BundledAssetEntry[]>> {
+  return {
+    terrain: bundledAssets.filter((asset) => asset.category === 'terrain'),
+    world: bundledAssets.filter((asset) =>
+      ['nature', 'structure', 'boundary', 'lighting', 'signage', 'shop'].includes(asset.category),
+    ),
+    farming: bundledAssets.filter((asset) => ['farming', 'crop'].includes(asset.category)),
+    housing: bundledAssets.filter((asset) => asset.assetType === 'furniture'),
+    markers: bundledAssets.filter(
+      (asset) => asset.key.startsWith('ui.') || asset.category === 'interaction',
+    ),
+  };
+}
 
 function collisionLabel(asset: BundledAssetEntry): string {
   if (asset.collision.shape === 'none') return 'non-blocking';
@@ -165,7 +172,12 @@ function AssetGeometry({ asset }: Readonly<{ asset: BundledAssetEntry }>) {
 function AssetCard({
   asset,
   rotation = 0,
-}: Readonly<{ asset: BundledAssetEntry; rotation?: AssetRotation }>) {
+  manifestVersion,
+}: Readonly<{
+  asset: BundledAssetEntry;
+  rotation?: AssetRotation;
+  manifestVersion: BundledManifestVersion;
+}>) {
   return (
     <article className="asset-coverage-card">
       <div className="asset-coverage-card__stage">
@@ -173,6 +185,7 @@ function AssetCard({
           assetKey={asset.key}
           alt={`${asset.displayName}${rotation === 0 ? '' : ` at ${rotation} degrees`}`}
           context="game_test"
+          bundledManifestVersion={manifestVersion}
           rotation={rotation}
         />
         <AssetGeometry asset={asset} />
@@ -192,10 +205,20 @@ function AssetCard({
   );
 }
 
-function FixtureStates() {
+function FixtureStates({
+  bundledAssets,
+  manifestVersion,
+}: {
+  readonly bundledAssets: readonly BundledAssetEntry[];
+  readonly manifestVersion: BundledManifestVersion;
+}) {
   const uploadedFixture = useMemo(() => {
-    const base = STARVILLE_BUNDLED_ASSETS.find((asset) => asset.key === 'lamp-star')!;
-    const bundledFixture = resolveAssetSource({ assetKey: base.key, context: 'game_test' });
+    const base = bundledAssets.find((asset) => asset.key === 'lamp-star')!;
+    const bundledFixture = resolveAssetSource({
+      assetKey: base.key,
+      context: 'game_test',
+      preferredBundledManifestVersion: manifestVersion,
+    });
     return resolveAssetSource({
       assetKey: base.key,
       context: 'game_test',
@@ -222,7 +245,7 @@ function FixtureStates() {
         },
       },
     });
-  }, []);
+  }, [bundledAssets, manifestVersion]);
 
   return (
     <section className="asset-coverage-fixtures" aria-labelledby="asset-fixtures-title">
@@ -233,6 +256,7 @@ function FixtureStates() {
             assetKey="phase7-general-store-marker"
             alt="Bundled General Store fixture"
             context="game_test"
+            bundledManifestVersion={manifestVersion}
           />
           <strong>Bundled default state</strong>
           <span className="asset-coverage-source">bundled_default</span>
@@ -253,6 +277,7 @@ function FixtureStates() {
             assetKey="game-test.intentionally-missing"
             alt="Missing-asset fixture"
             context="game_test"
+            bundledManifestVersion={manifestVersion}
           />
           <strong>Missing stable key</strong>
           <span className="asset-coverage-source">missing_placeholder</span>
@@ -268,11 +293,22 @@ function FixtureStates() {
         </article>
       </div>
       <div className="asset-depth-fixture" aria-label="Depth sorting fixture, back to front">
-        <BundledAssetImage assetKey="tree-maple" alt="Back depth: maple tree" context="game_test" />
-        <BundledAssetImage assetKey="lamp-star" alt="Middle depth: lantern" context="game_test" />
+        <BundledAssetImage
+          assetKey="tree-maple"
+          alt="Back depth: maple tree"
+          bundledManifestVersion={manifestVersion}
+          context="game_test"
+        />
+        <BundledAssetImage
+          assetKey="lamp-star"
+          alt="Middle depth: lantern"
+          bundledManifestVersion={manifestVersion}
+          context="game_test"
+        />
         <BundledAssetImage
           assetKey="flowers-moon"
           alt="Front depth: moonbell flowers"
+          bundledManifestVersion={manifestVersion}
           context="game_test"
         />
         <span>Back → middle → front depth order</span>
@@ -281,9 +317,17 @@ function FixtureStates() {
   );
 }
 
-export function AssetCoverageGameTest({ onClose }: Readonly<{ onClose: () => void }>) {
+export function AssetCoverageGameTest({
+  onClose,
+  manifestVersion = STARVILLE_BUNDLED_MANIFEST_VERSION,
+}: Readonly<{ onClose: () => void; manifestVersion?: BundledManifestVersion }>) {
   const [gallery, setGallery] = useState<Gallery>('terrain');
-  const assets = GALLERIES[gallery];
+  const bundledAssets =
+    manifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION
+      ? STARVILLE_BUNDLED_ASSETS
+      : getBundledManifest(manifestVersion).assets;
+  const galleries = useMemo(() => galleriesFor(bundledAssets), [bundledAssets]);
+  const assets = galleries[gallery];
   const dialogRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -350,17 +394,17 @@ export function AssetCoverageGameTest({ onClose }: Readonly<{ onClose: () => voi
           </button>
         </header>
 
-        <FixtureStates />
+        <FixtureStates bundledAssets={bundledAssets} manifestVersion={manifestVersion} />
 
         <nav aria-label="Asset coverage galleries">
-          {(Object.keys(GALLERIES) as Gallery[]).map((key) => (
+          {(Object.keys(galleries) as Gallery[]).map((key) => (
             <button
               key={key}
               type="button"
               aria-current={gallery === key ? 'page' : undefined}
               onClick={() => setGallery(key)}
             >
-              {key} ({GALLERIES[key].length})
+              {key} ({galleries[key].length})
             </button>
           ))}
         </nav>
@@ -372,14 +416,19 @@ export function AssetCoverageGameTest({ onClose }: Readonly<{ onClose: () => voi
           >
             {assets.flatMap((asset) =>
               asset.supportedRotations.map((rotation) => (
-                <AssetCard key={`${asset.key}:${rotation}`} asset={asset} rotation={rotation} />
+                <AssetCard
+                  key={`${asset.key}:${rotation}`}
+                  asset={asset}
+                  manifestVersion={manifestVersion}
+                  rotation={rotation}
+                />
               )),
             )}
           </div>
         ) : (
           <div className="asset-coverage-grid" aria-label={`${gallery} bundled assets`}>
             {assets.map((asset) => (
-              <AssetCard key={asset.key} asset={asset} />
+              <AssetCard key={asset.key} asset={asset} manifestVersion={manifestVersion} />
             ))}
           </div>
         )}

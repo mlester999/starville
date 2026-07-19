@@ -3,7 +3,7 @@
 import { PLAYER_FOOT_RADIUS, moveWithCollisions, type Point } from '@starville/game-core';
 import { useState, type KeyboardEvent } from 'react';
 
-import type { WorldPreview } from '../lib/worlds/contracts';
+import type { WorldDraftAssetPin, WorldPreview } from '../lib/worlds/contracts';
 import { WorldManifestCanvas } from './world-manifest-canvas';
 
 function spawnPosition(preview: WorldPreview): Point {
@@ -30,7 +30,14 @@ function exitAt(preview: WorldPreview, position: Point): string | undefined {
   )?.direction;
 }
 
-export function WorldDraftPreview({ preview }: { readonly preview: WorldPreview }) {
+export function WorldDraftPreview({
+  preview,
+  assetPins,
+}: {
+  readonly preview: WorldPreview;
+  /** Exact retained pins from the independently authorized read of this same revision. */
+  readonly assetPins?: readonly WorldDraftAssetPin[];
+}) {
   const initialPosition = spawnPosition(preview);
   const [position, setPosition] = useState(initialPosition);
   const [showGrid, setShowGrid] = useState(false);
@@ -71,6 +78,18 @@ export function WorldDraftPreview({ preview }: { readonly preview: WorldPreview 
       exit === undefined
         ? `Preview position ${next.x.toFixed(1)}, ${next.y.toFixed(1)}.`
         : `${exit} exit reached. Preview exits are inert and do not update player state.`,
+    );
+  }
+
+  if (assetPins === undefined) {
+    return (
+      <section className="empty-state" data-preview-pin-status="unavailable" role="status">
+        <h2>Exact asset rendering unavailable</h2>
+        <p>
+          This read model does not include the immutable asset-version pins required for renderer
+          parity. The Admin canvas is withheld instead of substituting current or bundled artwork.
+        </p>
+      </section>
     );
   }
 
@@ -117,6 +136,7 @@ export function WorldDraftPreview({ preview }: { readonly preview: WorldPreview 
         tabIndex={0}
       >
         <WorldManifestCanvas
+          assetPins={assetPins}
           manifest={preview.manifest}
           playerPosition={position}
           showCollisions={showCollisions}

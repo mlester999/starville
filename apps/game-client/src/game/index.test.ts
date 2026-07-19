@@ -63,6 +63,12 @@ describe('game runtime handle', () => {
 
     expect(first.getState()).toEqual(options.initialState);
     expect(() => first.setInputBlocked(true)).not.toThrow();
+    expect(() =>
+      first.setTouchMovementInput({ up: true, down: false, left: false, right: false }),
+    ).not.toThrow();
+    expect(() => first.setVisualSettings({ quality: 'low' })).not.toThrow();
+    expect(() => first.setChatBubbleMessages([])).not.toThrow();
+    expect(() => first.setReducedMotion(true)).not.toThrow();
     expect(() => first.interact()).not.toThrow();
     expect(() => first.cancelTransition()).not.toThrow();
 

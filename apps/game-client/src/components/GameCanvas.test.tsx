@@ -22,7 +22,11 @@ beforeEach(() => {
   root = createRoot(container);
   Object.defineProperty(window, 'matchMedia', {
     configurable: true,
-    value: vi.fn(() => ({ matches: false })),
+    value: vi.fn(() => ({
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    })),
   });
 });
 
@@ -37,11 +41,15 @@ describe('GameCanvas lifecycle', () => {
   it('mounts Phaser once, forwards blocking, and destroys it with a final checkpoint', async () => {
     const handle: GameRuntimeHandle = {
       setInputBlocked: vi.fn(),
+      setTouchMovementInput: vi.fn(),
       setAudioSettings: vi.fn(),
       setRemotePresences: vi.fn(),
       setLocalAvatarProfile: vi.fn(),
       setRemoteAvatarProfiles: vi.fn(),
       setRemotePlayerNamesVisible: vi.fn(),
+      setVisualSettings: vi.fn(),
+      setChatBubbleMessages: vi.fn(),
+      setReducedMotion: vi.fn(),
       setSelectedRemotePresence: vi.fn(),
       setActivityInstance: vi.fn(),
       interact: vi.fn(),
@@ -57,6 +65,7 @@ describe('GameCanvas lifecycle', () => {
     };
     startGame.mockReturnValue(handle);
     const onFinalState = vi.fn();
+    const clock = { now: () => Date.parse('2026-07-18T04:00:00.000Z') };
     const common = {
       initialState: {
         mapId: 'lantern-square' as const,
@@ -83,18 +92,68 @@ describe('GameCanvas lifecycle', () => {
       onMapChanged: vi.fn(),
       onRuntimeCreated: vi.fn(),
       audioSettings: { masterVolume: 0.8, muted: false },
+      clock,
     };
 
     await act(async () => {
       root.render(<GameCanvas {...common} inputBlocked={false} />);
       await Promise.resolve();
     });
+
+    const moveUp = container.querySelector<HTMLButtonElement>('button[aria-label="Move up"]');
+    expect(moveUp).not.toBeNull();
+    const pointerDown = new Event('pointerdown', { bubbles: true, cancelable: true });
+    Object.defineProperty(pointerDown, 'pointerId', { value: 7 });
+    await act(async () => moveUp!.dispatchEvent(pointerDown));
+    expect(handle.setTouchMovementInput).toHaveBeenLastCalledWith({
+      up: true,
+      down: false,
+      left: false,
+      right: false,
+    });
+    const pointerUp = new Event('pointerup', { bubbles: true, cancelable: true });
+    Object.defineProperty(pointerUp, 'pointerId', { value: 7 });
+    await act(async () => moveUp!.dispatchEvent(pointerUp));
+    expect(handle.setTouchMovementInput).toHaveBeenLastCalledWith({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    });
+    const heldPointer = new Event('pointerdown', { bubbles: true, cancelable: true });
+    Object.defineProperty(heldPointer, 'pointerId', { value: 8 });
+    await act(async () => moveUp!.dispatchEvent(heldPointer));
+    await act(async () => window.dispatchEvent(new Event('blur')));
+    expect(handle.setTouchMovementInput).toHaveBeenLastCalledWith({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    });
+    await act(async () =>
+      moveUp!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: ' ' })),
+    );
+    expect(handle.setTouchMovementInput).toHaveBeenLastCalledWith({
+      up: true,
+      down: false,
+      left: false,
+      right: false,
+    });
+    await act(async () => window.dispatchEvent(new Event('blur')));
+    expect(handle.setTouchMovementInput).toHaveBeenLastCalledWith({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    });
+
     await act(async () => {
       root.render(
         <GameCanvas
           {...common}
           avatarProfile={fallbackResolvedAvatar('river', '22222222-2222-4222-8222-222222222222')}
           inputBlocked
+          reducedMotion
           remoteAvatarProfiles={{
             remote: fallbackResolvedAvatar('moonberry', '33333333-3333-4333-8333-333333333333'),
           }}
@@ -105,16 +164,32 @@ describe('GameCanvas lifecycle', () => {
 
     expect(startGame).toHaveBeenCalledTimes(1);
     expect(handle.setInputBlocked).toHaveBeenCalledWith(true);
+    expect(handle.setTouchMovementInput).toHaveBeenLastCalledWith({
+      up: false,
+      down: false,
+      left: false,
+      right: false,
+    });
+    expect(
+      [...container.querySelectorAll<HTMLButtonElement>('.game-touch-movement button')].every(
+        (button) => button.disabled,
+      ),
+    ).toBe(true);
     expect(handle.setLocalAvatarProfile).toHaveBeenCalledTimes(1);
     expect(handle.setRemoteAvatarProfiles).toHaveBeenLastCalledWith(
       expect.objectContaining({
         remote: expect.objectContaining({ legacyFallbackPreset: 'moonberry' }),
       }),
     );
+    expect(handle.setVisualSettings).toHaveBeenCalled();
+    expect(handle.setChatBubbleMessages).toHaveBeenCalledWith([]);
+    expect(handle.setReducedMotion).toHaveBeenCalledWith(true);
 
     const observedFallback = vi.fn();
     window.addEventListener(WORLD_ASSET_FALLBACK_EVENT_NAME, observedFallback);
     const runtimeOptions = startGame.mock.calls[0]![1] as GameRuntimeOptions;
+    expect(runtimeOptions.clock).toBe(clock);
+    expect(runtimeOptions.avatarRendererMode).toBe('published_v1');
     runtimeOptions.callbacks.onStateChanged(common.initialState, 'stopped');
     expect(common.onStateChanged).toHaveBeenCalledWith(common.initialState, 'stopped');
     runtimeOptions.callbacks.onWorldAssetFallback({

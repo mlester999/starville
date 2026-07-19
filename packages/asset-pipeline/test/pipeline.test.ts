@@ -4,12 +4,17 @@ import path from 'node:path';
 
 import {
   STARVILLE_BUNDLED_ASSET_MANIFEST,
+  STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
   bundledAssetManifestSchema,
 } from '@starville/asset-management';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { ASSET_OUTPUT_PATHS, CURRENT_WORLD_MANIFEST_ASSET_KEYS } from '../src/constants';
+import {
+  ASSET_OUTPUT_PATHS,
+  CURRENT_WORLD_MANIFEST_ASSET_KEYS,
+  PHASE12D_ASSET_OUTPUT_PATHS,
+} from '../src/constants';
 import { runAssetPipelineCli } from '../src/cli';
 import { resolveAssetFilesystemPath, sha256, writeFileIfChanged } from '../src/files';
 import {
@@ -19,7 +24,7 @@ import {
   renderRuntimeAssetBytes,
 } from '../src/pipeline';
 import { renderBundledAssetSvg } from '../src/svg';
-import { validateBundledAssets } from '../src/validation';
+import { validateBundledAssets, validateBundledAssetVisualPolicy } from '../src/validation';
 
 const temporaryRoots: string[] = [];
 
@@ -38,6 +43,16 @@ const fixtureManifest = bundledAssetManifestSchema.parse({
   ...STARVILLE_BUNDLED_ASSET_MANIFEST,
   assets: [missingAsset],
 });
+const candidateMissingAsset = STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST.assets.find(
+  ({ key }) => key === 'system.missing-asset',
+);
+if (candidateMissingAsset === undefined) {
+  throw new Error('Phase 12D candidate missing asset fixture is unavailable');
+}
+const candidateFixtureManifest = bundledAssetManifestSchema.parse({
+  ...STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
+  assets: [candidateMissingAsset],
+});
 
 afterEach(async () => {
   await Promise.all(
@@ -46,6 +61,17 @@ afterEach(async () => {
 });
 
 describe('deterministic bundled asset pipeline', () => {
+  it('enforces the shared renderer projection and world-asset performance policy', () => {
+    expect(validateBundledAssetVisualPolicy(fixtureManifest)).toEqual([]);
+    const projectionDrift = {
+      ...fixtureManifest,
+      projection: { ...fixtureManifest.projection, tileWidth: 64 },
+    } as unknown as typeof fixtureManifest;
+    expect(validateBundledAssetVisualPolicy(projectionDrift)).toEqual([
+      expect.objectContaining({ code: 'VISUAL_PROJECTION_POLICY', path: 'projection' }),
+    ]);
+  });
+
   it('renders deterministic, editable SVG without embedded or remote content', () => {
     const first = renderBundledAssetSvg({ asset: missingAsset });
     const second = renderBundledAssetSvg({ asset: missingAsset });
@@ -88,6 +114,27 @@ describe('deterministic bundled asset pipeline', () => {
     const second = await generateAll(root, fixtureManifest);
     expect(second.written).toBe(0);
     expect(second.unchanged).toBe(6);
+  });
+
+  it('generates the candidate into additive v2 roots with explicit non-final provenance', async () => {
+    const root = await temporaryRoot();
+    const generated = await generateAll(root, candidateFixtureManifest);
+    const source = resolveAssetFilesystemPath(root, candidateMissingAsset.sourcePath);
+    const runtime = resolveAssetFilesystemPath(root, candidateMissingAsset.runtimePath);
+    const manifest = resolveAssetFilesystemPath(root, PHASE12D_ASSET_OUTPUT_PATHS.manifest);
+
+    expect(generated.written).toBe(6);
+    expect(candidateMissingAsset.sourcePath).toMatch(/^assets\/source-v2\//u);
+    expect(candidateMissingAsset.runtimePath).toMatch(/^\/assets\/starville\/bundled\/v2\//u);
+    await expect(readFile(source, 'utf8')).resolves.toContain('Phase 12D production candidate');
+    await expect(readFile(runtime)).resolves.toBeInstanceOf(Buffer);
+    await expect(readFile(manifest, 'utf8')).resolves.toContain(
+      '"qualityStatus": "production_candidate"',
+    );
+    const validation = await validateBundledAssets(root, candidateFixtureManifest, {
+      enforceGameplayCatalogReferences: false,
+    });
+    expect(validation.issues).toEqual([]);
   });
 
   it('rejects unsafe paths, opaque wrong-size outputs, and orphaned generated files', async () => {

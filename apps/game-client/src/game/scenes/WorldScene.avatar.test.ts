@@ -9,6 +9,9 @@ const remoteInstances = vi.hoisted(
       readonly setAppearance: ReturnType<typeof vi.fn>;
       readonly setSelected: ReturnType<typeof vi.fn>;
       readonly setNameplateVisible: ReturnType<typeof vi.fn>;
+      readonly setVisualSettings: ReturnType<typeof vi.fn>;
+      readonly setChatBubble: ReturnType<typeof vi.fn>;
+      readonly setReducedMotion: ReturnType<typeof vi.fn>;
     }>,
 );
 
@@ -30,6 +33,9 @@ vi.mock('../rendering/remote-player', () => ({
         setAppearance: vi.fn(),
         setSelected: vi.fn(),
         setNameplateVisible: vi.fn(),
+        setVisualSettings: vi.fn(),
+        setChatBubble: vi.fn(),
+        setReducedMotion: vi.fn(),
       };
       remoteInstances.push(this.record);
     }
@@ -47,6 +53,15 @@ vi.mock('../rendering/remote-player', () => ({
     }
     public setNameplateVisible(...args: unknown[]) {
       this.record.setNameplateVisible(...args);
+    }
+    public setVisualSettings(...args: unknown[]) {
+      this.record.setVisualSettings(...args);
+    }
+    public setChatBubble(...args: unknown[]) {
+      this.record.setChatBubble(...args);
+    }
+    public setReducedMotion(...args: unknown[]) {
+      this.record.setReducedMotion(...args);
     }
   },
 }));
@@ -107,6 +122,23 @@ const options: GameRuntimeOptions = {
 };
 
 describe('WorldScene avatar presence boundary', () => {
+  it('moves through the normal collision pipeline from touch input when no keyboard exists', () => {
+    const scene = new WorldScene(options);
+    const player = { update: vi.fn() };
+    Reflect.set(scene, 'player', player);
+    const before = scene.getState();
+    scene.setTouchMovementInput({ up: true, down: false, left: false, right: false });
+
+    scene.update(1_000, 250);
+
+    expect(scene.getState()).not.toEqual(before);
+    expect(player.update).toHaveBeenCalled();
+    expect(options.callbacks.onStateChanged).toHaveBeenCalledWith(
+      expect.objectContaining({ mapId: before.mapId }),
+      'moving',
+    );
+  });
+
   it('builds the current ID set only from the active world and releases stale renderers', () => {
     remoteInstances.length = 0;
     const scene = new WorldScene(options);
@@ -128,5 +160,16 @@ describe('WorldScene avatar presence boundary', () => {
     scene.setRemoteAvatarProfiles({ [visible.presenceId]: profile });
     expect(remoteInstances).toHaveLength(1);
     expect(remoteInstances[0]?.setAppearance).toHaveBeenLastCalledWith(profile);
+  });
+
+  it('resolves low quality to shadow-free settings for existing remote villagers', () => {
+    remoteInstances.length = 0;
+    const scene = new WorldScene(options);
+    const visible = presence('10000000-0000-4000-8000-000000000004');
+    scene.setRemotePresences([visible]);
+    scene.setVisualSettings({ quality: 'low', shadows: true });
+    expect(remoteInstances[0]?.setVisualSettings).toHaveBeenLastCalledWith(
+      expect.objectContaining({ quality: 'low', shadows: false }),
+    );
   });
 });

@@ -7,7 +7,10 @@ import {
   lanternSquareManifest,
   rawLanternSquareManifest,
   sanitizeInteractionText,
+  terrainAssetDependencyKeys,
   validateMapManifest,
+  worldAssetDependencyKeys,
+  normalizeMapManifestAssetDependencies,
 } from '../src/index';
 
 describe('Lantern Square manifest', () => {
@@ -95,6 +98,21 @@ describe('Lantern Square manifest', () => {
         LANTERN_SQUARE_ASSET_IDS,
       ),
     ).toThrow();
+  });
+
+  it('derives terrain asset dependencies without changing backward-compatible parsing', () => {
+    const parsed = validateMapManifest(rawLanternSquareManifest, LANTERN_SQUARE_ASSET_IDS);
+    const terrainDependencies = terrainAssetDependencyKeys(parsed);
+    const normalized = normalizeMapManifestAssetDependencies(rawLanternSquareManifest);
+
+    expect(parsed.assets).toEqual(rawLanternSquareManifest.assets);
+    expect(terrainDependencies.length).toBeGreaterThan(0);
+    expect(terrainDependencies.every((key) => key.startsWith('world.terrain.'))).toBe(true);
+    expect(worldAssetDependencyKeys(parsed)).toEqual([
+      ...parsed.assets,
+      ...terrainDependencies.filter((key) => !parsed.assets.includes(key)),
+    ]);
+    expect(normalized.assets).toEqual(worldAssetDependencyKeys(parsed));
   });
 });
 

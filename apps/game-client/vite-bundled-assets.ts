@@ -5,35 +5,71 @@ import path from 'node:path';
 import {
   STARVILLE_BUNDLED_ASSETS,
   STARVILLE_BUNDLED_MANIFEST_VERSION,
+  STARVILLE_PHASE12D_CANDIDATE_ASSETS,
+  STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+  type BundledManifestVersion,
 } from '../../packages/asset-management/src/bundled-assets';
 import type { Plugin } from 'vite';
 
-const BUNDLED_URL_PREFIX = '/assets/starville/bundled/v1/';
-const bundledRootCandidates = [
-  path.resolve(process.cwd(), 'assets/starville/bundled/v1'),
-  path.resolve(process.cwd(), '../../assets/starville/bundled/v1'),
+type BundledRuntime = Readonly<{
+  manifestVersion: BundledManifestVersion;
+  urlPrefix: string;
+  root: string | null;
+  manifestPaths: ReadonlySet<string>;
+}>;
+
+function runtimeRoot(relative: string): string | null {
+  const candidates = [
+    path.resolve(process.cwd(), relative),
+    path.resolve(process.cwd(), '../../', relative),
+  ];
+  const candidate = candidates.find((value) => existsSync(value));
+  return candidate === undefined ? null : realpathSync(candidate);
+}
+
+function manifestPaths(
+  assets: typeof STARVILLE_BUNDLED_ASSETS | typeof STARVILLE_PHASE12D_CANDIDATE_ASSETS,
+): ReadonlySet<string> {
+  return new Set(
+    assets.flatMap((asset) => [
+      asset.runtimePath,
+      asset.thumbnailPath,
+      ...asset.variants.map((variant) => variant.runtimePath),
+    ]),
+  );
+}
+
+const BUNDLED_RUNTIMES: readonly BundledRuntime[] = [
+  {
+    manifestVersion: STARVILLE_BUNDLED_MANIFEST_VERSION,
+    urlPrefix: '/assets/starville/bundled/v1/',
+    root: runtimeRoot('assets/starville/bundled/v1'),
+    manifestPaths: manifestPaths(STARVILLE_BUNDLED_ASSETS),
+  },
+  {
+    manifestVersion: STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+    urlPrefix: '/assets/starville/bundled/v2/',
+    root: runtimeRoot('assets/starville/bundled/v2'),
+    manifestPaths: manifestPaths(STARVILLE_PHASE12D_CANDIDATE_ASSETS),
+  },
 ];
-const bundledRootCandidate = bundledRootCandidates.find((candidate) => existsSync(candidate));
-if (bundledRootCandidate === undefined) {
+
+if (BUNDLED_RUNTIMES[0]?.root === null) {
   throw new Error('Starville bundled runtime directory is missing. Run pnpm assets:generate.');
 }
-const bundledRoot = realpathSync(bundledRootCandidate);
 
-function relativeBundledPath(manifestPath: string): string {
-  if (!manifestPath.startsWith(BUNDLED_URL_PREFIX) || !manifestPath.endsWith('.webp')) {
+function relativeBundledPath(runtime: BundledRuntime, manifestPath: string): string {
+  if (!manifestPath.startsWith(runtime.urlPrefix) || !manifestPath.endsWith('.webp')) {
     throw new Error(`Invalid bundled runtime manifest path: ${manifestPath}`);
   }
-  return manifestPath.slice(BUNDLED_URL_PREFIX.length);
+  return manifestPath.slice(runtime.urlPrefix.length);
 }
 
-const allowlistedManifestPaths = new Set(
-  STARVILLE_BUNDLED_ASSETS.flatMap((asset) => [
-    asset.runtimePath,
-    asset.thumbnailPath,
-    ...asset.variants.map((variant) => variant.runtimePath),
-  ]),
+const runtimeByManifestPath = new Map(
+  BUNDLED_RUNTIMES.flatMap((runtime) =>
+    [...runtime.manifestPaths].map((manifestPath) => [manifestPath, runtime] as const),
+  ),
 );
-const allowlistedRelativePaths = [...allowlistedManifestPaths].map(relativeBundledPath).sort();
 
 /**
  * Resolves both paths through the filesystem so an allowlisted path cannot be
@@ -55,7 +91,9 @@ export function realFileInsideBundledRoot(candidate: string, root: string): stri
   }
 }
 
-function parsedAllowlistedRequest(requestUrl: string): URL | null {
+function parsedAllowlistedRequest(
+  requestUrl: string,
+): Readonly<{ request: URL; runtime: BundledRuntime }> | null {
   let request: URL;
   try {
     request = new URL(requestUrl, 'http://starville.local');
@@ -68,36 +106,51 @@ function parsedAllowlistedRequest(requestUrl: string): URL | null {
   } catch {
     return null;
   }
-  if (!allowlistedManifestPaths.has(pathname)) return null;
+  const runtime = runtimeByManifestPath.get(pathname);
+  if (runtime === undefined) return null;
   const parameters = [...request.searchParams.entries()];
   if (
     parameters.length !== 1 ||
     parameters[0]?.[0] !== 'manifest' ||
-    parameters[0]?.[1] !== STARVILLE_BUNDLED_MANIFEST_VERSION
+    parameters[0]?.[1] !== runtime.manifestVersion
   ) {
     return null;
   }
-  return request;
+  return { request, runtime };
 }
 
 export function bundledAssetFileForRequest(requestUrl: string): string | null {
-  const request = parsedAllowlistedRequest(requestUrl);
-  if (request === null) return null;
-  const relative = request.pathname.slice(BUNDLED_URL_PREFIX.length);
-  return realFileInsideBundledRoot(path.resolve(bundledRoot, relative), bundledRoot);
+  const parsed = parsedAllowlistedRequest(requestUrl);
+  if (parsed === null || parsed.runtime.root === null) return null;
+  const relative = parsed.request.pathname.slice(parsed.runtime.urlPrefix.length);
+  return realFileInsideBundledRoot(
+    path.resolve(parsed.runtime.root, relative),
+    parsed.runtime.root,
+  );
 }
 
 export function isBundledAssetRoute(requestUrl: string): boolean {
-  return requestUrl.split('?', 1)[0]?.startsWith(BUNDLED_URL_PREFIX) === true;
+  const pathname = requestUrl.split('?', 1)[0] ?? '';
+  return BUNDLED_RUNTIMES.some(({ urlPrefix }) => pathname.startsWith(urlPrefix));
 }
 
-function bundledBuildFiles(): readonly Readonly<{ file: string; relative: string }>[] {
-  return allowlistedRelativePaths.map((relative) => {
-    const file = realFileInsideBundledRoot(path.resolve(bundledRoot, relative), bundledRoot);
-    if (file === null) {
-      throw new Error(`Bundled manifest file is missing or escapes its runtime root: ${relative}`);
+function bundledBuildFiles(): readonly Readonly<{ file: string; outputPath: string }>[] {
+  return BUNDLED_RUNTIMES.flatMap((runtime) => {
+    if (runtime.root === null) {
+      throw new Error(
+        `Starville bundled ${runtime.manifestVersion} runtime directory is missing. Run pnpm assets:generate.`,
+      );
     }
-    return { file, relative };
+    return [...runtime.manifestPaths].sort().map((manifestPath) => {
+      const relative = relativeBundledPath(runtime, manifestPath);
+      const file = realFileInsideBundledRoot(path.resolve(runtime.root!, relative), runtime.root!);
+      if (file === null) {
+        throw new Error(
+          `Bundled manifest file is missing or escapes its runtime root: ${relative}`,
+        );
+      }
+      return { file, outputPath: manifestPath.slice(1) };
+    });
   });
 }
 
@@ -139,10 +192,10 @@ export function starvilleBundledAssetsPlugin(): Plugin[] {
       name: 'starville-bundled-assets-build',
       apply: 'build',
       async buildStart() {
-        for (const { file, relative } of bundledBuildFiles()) {
+        for (const { file, outputPath } of bundledBuildFiles()) {
           this.emitFile({
             type: 'asset',
-            fileName: `assets/starville/bundled/v1/${relative}`,
+            fileName: outputPath,
             source: await readFile(file),
           });
         }

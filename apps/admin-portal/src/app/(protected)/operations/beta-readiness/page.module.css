@@ -1,0 +1,302 @@
+.page {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.header {
+  align-items: flex-start;
+}
+
+.boundary,
+.repository,
+.panel,
+.gate {
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  background:
+    radial-gradient(
+      circle at 92% 8%,
+      color-mix(in srgb, var(--admin-forest) 10%, transparent),
+      transparent 34%
+    ),
+    var(--admin-surface);
+  padding: 1.15rem;
+}
+
+.boundary,
+.sectionHeading,
+.gate > header,
+.rollbackGrid header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.boundary h2,
+.sectionHeading h2,
+.panel h2,
+.gate h3,
+.deploymentGrid h3,
+.rollbackGrid h3 {
+  margin-top: 0;
+}
+
+.boundary p,
+.panel > p,
+.gate > p,
+.deploymentGrid p,
+.rollbackGrid p {
+  color: var(--admin-text-muted);
+}
+
+.status,
+.checkState {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  background: var(--admin-surface-solid);
+  color: var(--admin-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 0.42rem 0.65rem;
+  text-align: center;
+}
+
+.status[data-status='local-evidence-ready'],
+.status[data-status='accepted'],
+.status[data-status='production-ready'],
+.checkState[data-state='recorded'],
+.checkState[data-state='ready'] {
+  border-color: color-mix(in srgb, #2c9b64 64%, var(--admin-line));
+  background: color-mix(in srgb, #2c9b64 14%, var(--admin-surface-solid));
+}
+
+.status[data-status='hosted-validation-pending'],
+.status[data-status='owner-review-pending'],
+.checkState[data-state='pending'] {
+  border-color: color-mix(in srgb, #d89c38 64%, var(--admin-line));
+  background: color-mix(in srgb, #d89c38 14%, var(--admin-surface-solid));
+}
+
+.status[data-status='blocked'],
+.checkState[data-state='blocked'] {
+  border-color: color-mix(in srgb, #c05252 68%, var(--admin-line));
+  background: color-mix(in srgb, #c05252 14%, var(--admin-surface-solid));
+}
+
+.repository {
+  display: grid;
+  gap: 1rem;
+}
+
+.sectionHeading > span {
+  color: var(--admin-text-muted);
+  font-size: 0.82rem;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.facts div {
+  min-width: 0;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+
+.facts dt,
+.gateFacts dt {
+  color: var(--admin-text-muted);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.facts dd,
+.gateFacts dd {
+  overflow-wrap: anywhere;
+  margin: 0.28rem 0 0;
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  margin-bottom: 1rem;
+}
+
+.gateGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.gate {
+  min-width: 0;
+  border-left-width: 4px;
+}
+
+.gate[data-status='blocked'] {
+  border-left-color: #c05252;
+}
+
+.gate[data-status='hosted-validation-pending'],
+.gate[data-status='owner-review-pending'] {
+  border-left-color: #d89c38;
+}
+
+.gateFacts {
+  display: grid;
+  gap: 0;
+  margin: 1rem 0 0;
+}
+
+.gateFacts > div {
+  border-top: 1px solid var(--admin-line);
+  padding: 0.75rem 0;
+}
+
+.sourceList,
+.checkList,
+.ownerList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sourceList li,
+.checkList li,
+.ownerList li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.sourceList li {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  border-radius: 0.65rem;
+  background: color-mix(in srgb, var(--admin-nav-bg) 48%, transparent);
+  padding: 0.65rem;
+}
+
+.sourceList code,
+.sourceList small {
+  grid-column: 1 / -1;
+}
+
+.sourceList strong {
+  font-size: 0.74rem;
+  text-transform: uppercase;
+}
+
+.sourceList code,
+.checkList code {
+  overflow-wrap: anywhere;
+  color: var(--admin-text-muted);
+  font-size: 0.76rem;
+}
+
+.sourceList small,
+.checkList small,
+.ownerList small {
+  color: var(--admin-text-muted);
+}
+
+.split {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem;
+}
+
+.checkList li,
+.ownerList li {
+  border-top: 1px solid var(--admin-line);
+  padding-top: 0.7rem;
+}
+
+.checkList li > div,
+.ownerList li > div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.ownerList {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.ownerList input {
+  width: 1.15rem;
+  height: 1.15rem;
+  flex: 0 0 auto;
+  margin-top: 0.1rem;
+}
+
+.deploymentGrid,
+.rollbackGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.deploymentGrid article,
+.rollbackGrid article {
+  border: 1px solid var(--admin-line);
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--admin-nav-bg) 42%, transparent);
+  padding: 0.85rem;
+}
+
+.deploymentGrid article > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.65rem;
+  color: var(--admin-text-muted);
+  font-size: 0.78rem;
+}
+
+.deploymentGrid h3,
+.rollbackGrid h3 {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+}
+
+.safetyNote {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1080px) {
+  .gateGrid,
+  .split,
+  .deploymentGrid,
+  .rollbackGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 760px) {
+  .boundary,
+  .sectionHeading,
+  .gate > header,
+  .rollbackGrid header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .facts,
+  .ownerList {
+    grid-template-columns: 1fr;
+  }
+}

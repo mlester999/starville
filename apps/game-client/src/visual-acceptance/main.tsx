@@ -11,6 +11,7 @@ import {
 import type { PartySnapshot, PublicPresence } from '@starville/realtime';
 import type { CosmeticWardrobe } from '@starville/cosmetics';
 import { housingLocalFixture } from '@starville/housing';
+import { STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION } from '@starville/asset-management';
 
 import { DEFAULT_GAME_SETTINGS, type GameSettings, type GameUiScale } from '../app/game-settings';
 import { COMPILED_AVATAR_STARTER_CATALOG, defaultAvatarSelection } from '../app/avatar-client';
@@ -21,13 +22,16 @@ import { CooperativeActivityPanel } from '../components/CooperativeActivityPanel
 import { CozyGameplay } from '../components/CozyGameplay';
 import { DustHistoryPanel, VillageSupplyShopPanel } from '../components/EconomyPanels';
 import { GameSettingsDialog } from '../components/GameSettingsDialog';
+import { GameModalPortal } from '../components/game-ui';
 import { HousingWorkspacePanel } from '../components/HousingWorkspacePanel';
 import { PlayerStatusDock } from '../components/PlayerStatusDock';
+import { WorldNoticeModal } from '../components/WorldNoticeModal';
 import { PremiumWardrobe } from '../components/PremiumWardrobe';
 import { CompactPartyHud, SocialGraphPanel } from '../components/SocialGraphPanel';
 import { SocialInteractionPanel } from '../components/SocialInteractionPanel';
 import { AVATAR_VISUAL_ACCEPTANCE_PANELS } from './matrix';
 import { PHASE11A_PREVIEW_API_PREFIX, phase11aPreviewApi } from './phase11a-preview';
+import { Phase12DCharacterAcceptance } from './phase12d-character';
 
 type PreviewPanel =
   | 'default'
@@ -48,7 +52,11 @@ type PreviewPanel =
   | 'farming'
   | 'cooking'
   | 'housing'
-  | 'assets';
+  | 'assets'
+  | 'characters'
+  | 'notice'
+  | 'notice-loading'
+  | 'notice-error';
 
 const selfPresenceId = '10000000-0000-4000-8000-000000000001';
 const friendPresenceId = '10000000-0000-4000-8000-000000000002';
@@ -560,21 +568,25 @@ export function PreviewWorld({
     ...DEFAULT_GAME_SETTINGS,
     uiScale: initialScale,
   });
-  const modalOpen = [
-    'settings',
-    'activities',
-    'nearby',
-    'nearby-list',
-    'friends',
-    'requests',
-    'party',
-    'shop',
-    'dust',
-    'cosmetics',
-    'cooking',
-    'housing',
-    'assets',
-  ].includes(panel);
+  const [noticeVisible, setNoticeVisible] = useState(true);
+  const noticePanel = ['notice', 'notice-loading', 'notice-error'].includes(panel);
+  const modalOpen =
+    [
+      'settings',
+      'activities',
+      'nearby',
+      'nearby-list',
+      'friends',
+      'requests',
+      'party',
+      'shop',
+      'dust',
+      'cosmetics',
+      'cooking',
+      'housing',
+      'assets',
+    ].includes(panel) ||
+    (noticePanel && noticeVisible);
   const noop = () => undefined;
   return (
     <main
@@ -594,6 +606,9 @@ export function PreviewWorld({
           <span aria-hidden="true">✦</span>
           <strong>STARVILLE</strong>
         </div>
+        <p className="world-candidate-review-label">
+          LOCAL V2 CANDIDATE REVIEW · UNPUBLISHED · IN MEMORY
+        </p>
         <div className="world-session">
           <span className="world-session__dot" aria-hidden="true" />
           <span>Solana Mainnet</span>
@@ -607,50 +622,113 @@ export function PreviewWorld({
         aria-label="Visual acceptance world"
       >
         <div className="visual-acceptance-world__terrain" aria-hidden="true" />
-        <div className="world-hud world-hud--identity">
-          <p className="world-hud__eyebrow">Villager</p>
-          <strong>CozyJinraeLongname</strong>
-          <span>Safe position ready</span>
+        <div className="game-hud-safe-regions game-hud-safe-regions--top">
+          <div className="game-hud-region game-hud-region--top-left">
+            <div className="world-hud world-hud--identity">
+              <p className="world-hud__eyebrow">Villager</p>
+              <strong>CozyJinraeLongname</strong>
+              <span>Safe position ready</span>
+            </div>
+            <button className="player-guide-tracker" type="button">
+              <span>Starville Guide</span>
+              <strong>Meet the Village Guide</strong>
+              <small>0/1 · Central plaza</small>
+            </button>
+          </div>
+          <div className="game-hud-region game-hud-region--top-center">
+            <button aria-expanded="true" className="world-hud world-hud--location" type="button">
+              <p className="world-hud__eyebrow">Current location</p>
+              <strong>Lantern Square</strong>
+              <span>The lantern-lit village center where four roads meet beside the stream.</span>
+            </button>
+          </div>
+          <div className="game-hud-region game-hud-region--top-right">
+            <div className="world-hud world-hud--controls">
+              <span>
+                <kbd>WASD</kbd> <span className="world-control-label">Move</span>
+              </span>
+              <span>
+                <kbd>Shift</kbd> <span className="world-control-label">Jog</span>
+              </span>
+              <span>
+                <kbd>E</kbd> <span className="world-control-label">Interact</span>
+              </span>
+              <button aria-label="Settings" className="world-settings-button" type="button">
+                Settings
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="world-hud world-hud--location">
-          <p className="world-hud__eyebrow">Current location</p>
-          <strong>Lantern Square</strong>
-          <span>The lantern-lit village center where four roads meet beside the stream.</span>
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-left"
+          data-hud-region="bottom-left"
+        >
+          <button className="chat-panel__toggle visual-chat-launcher" type="button">
+            <span aria-hidden="true">✦</span>
+            <span>Chat</span>
+            <strong aria-label="12 unread messages">12</strong>
+          </button>
         </div>
-        <div className="world-hud world-hud--controls">
-          <span>
-            <kbd>WASD</kbd> Move
-          </span>
-          <span>
-            <kbd>Shift</kbd> Jog
-          </span>
-          <span>
-            <kbd>E</kbd> Interact
-          </span>
-          <button type="button">Settings</button>
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-center"
+          data-hud-region="bottom-center"
+        >
+          <button className="interaction-prompt" type="button">
+            <kbd>E</kbd>
+            <span>Read village board</span>
+          </button>
+          <QuickbarPreview />
         </div>
-        <button className="chat-panel__toggle visual-chat-launcher" type="button">
-          <span aria-hidden="true">✦</span>
-          <span>Chat</span>
-          <strong aria-label="12 unread messages">12</strong>
-        </button>
-        <QuickbarPreview />
-        <PlayerStatusDock
-          activityActive={panel === 'active-activity'}
-          channels={channels}
-          connectionStatus="connected"
-          currentChannelId="channel-1"
-          disabled={modalOpen}
-          dustBalance={250}
-          nearbyCount={3}
-          socialNoticeCount={12}
-          onActivities={noop}
-          onChannelSwitch={noop}
-          onFriends={noop}
-          onInventory={noop}
-          onNearby={noop}
-          onPopoverOpenChange={noop}
-        />
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-right"
+          data-hud-region="bottom-right"
+        >
+          <PlayerStatusDock
+            activityActive={panel === 'active-activity'}
+            channels={channels}
+            connectionStatus="connected"
+            currentChannelId="channel-1"
+            disabled={modalOpen}
+            dust={{ status: 'ready', value: 250 }}
+            level={{ status: 'ready', value: 12 }}
+            nearbyCount={3}
+            socialNoticeCount={12}
+            onActivities={noop}
+            onChannelSwitch={noop}
+            onFriends={noop}
+            onInventory={noop}
+            onNearby={noop}
+            onPopoverOpenChange={noop}
+          />
+        </div>
+
+        {panel === 'notice' && noticeVisible ? (
+          <WorldNoticeModal
+            state={{
+              status: 'ready',
+              title: 'Lantern Square Notice',
+              content: 'Market day begins at first light beside the central fountain.',
+            }}
+            onClose={() => setNoticeVisible(false)}
+          />
+        ) : null}
+        {panel === 'notice-loading' && noticeVisible ? (
+          <WorldNoticeModal
+            state={{ status: 'loading', title: 'Lantern Square Notice' }}
+            onClose={() => setNoticeVisible(false)}
+          />
+        ) : null}
+        {panel === 'notice-error' && noticeVisible ? (
+          <WorldNoticeModal
+            state={{
+              status: 'error',
+              title: 'Lantern Square Notice',
+              message: 'The published notice could not be opened. The world remains safe.',
+            }}
+            onClose={() => setNoticeVisible(false)}
+            onRetry={noop}
+          />
+        ) : null}
 
         {panel === 'settings' ? (
           <GameSettingsDialog
@@ -660,6 +738,7 @@ export function PreviewWorld({
             onResume={noop}
             onReturnLanding={async () => undefined}
             onEndSession={async () => undefined}
+            portal
           />
         ) : null}
         {panel === 'activities' ? (
@@ -777,6 +856,7 @@ export function PreviewWorld({
             onAccessInvalid={noop}
             onInteractionClose={noop}
             onOpenChange={noop}
+            portalPanels
           />
         ) : null}
         {panel === 'cooking' ? (
@@ -796,18 +876,31 @@ export function PreviewWorld({
             onAccessInvalid={noop}
             onInteractionClose={noop}
             onOpenChange={noop}
+            portalPanels
           />
         ) : null}
         {panel === 'housing' ? (
-          <div className="world-overlay cozy-overlay">
-            <section className="cozy-panel" aria-label="Housing responsive preview">
-              <div className="cozy-panel__body">
-                <HousingWorkspacePanel apiUrl={window.location.origin} />
-              </div>
-            </section>
-          </div>
+          <GameModalPortal portal>
+            <div className="world-overlay cozy-overlay">
+              <section
+                aria-label="Housing responsive preview"
+                aria-modal="true"
+                className="cozy-panel"
+                role="dialog"
+              >
+                <div className="cozy-panel__body">
+                  <HousingWorkspacePanel apiUrl={window.location.origin} />
+                </div>
+              </section>
+            </div>
+          </GameModalPortal>
         ) : null}
-        {panel === 'assets' ? <AssetCoverageGameTest onClose={noop} /> : null}
+        {panel === 'assets' ? (
+          <AssetCoverageGameTest
+            manifestVersion={STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION}
+            onClose={noop}
+          />
+        ) : null}
       </section>
     </main>
   );
@@ -832,6 +925,8 @@ const allowedPanels: readonly PreviewPanel[] = [
   'housing',
   ...AVATAR_VISUAL_ACCEPTANCE_PANELS,
   ...(import.meta.env.DEV ? (['assets'] as const) : []),
+  ...(import.meta.env.DEV ? (['characters'] as const) : []),
+  ...(import.meta.env.DEV ? (['notice', 'notice-loading', 'notice-error'] as const) : []),
 ];
 const panel: PreviewPanel = allowedPanels.includes((requested ?? '') as PreviewPanel)
   ? (requested as PreviewPanel)
@@ -944,6 +1039,8 @@ const preview =
       panel={panel}
       reducedMotion={reducedMotion}
     />
+  ) : panel === 'characters' ? (
+    <Phase12DCharacterAcceptance highContrast={highContrast} reducedMotion={reducedMotion} />
   ) : (
     <PreviewWorld
       highContrast={highContrast}

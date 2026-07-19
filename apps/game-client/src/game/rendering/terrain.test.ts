@@ -11,7 +11,7 @@ vi.mock('phaser', () => ({
   },
 }));
 
-import { resolveWorldAssetDelivery } from '@starville/asset-management';
+import { resolveWorldAssetDelivery, type WorldAssetDelivery } from '@starville/asset-management';
 import { lanternSquareManifest } from '@starville/game-core';
 
 import {
@@ -19,7 +19,7 @@ import {
   bundledTerrainAssetKeysForManifest,
   renderTerrain,
 } from './terrain';
-import { resolvedWorldAssetTextureKey } from './world-asset-textures';
+import { resolvedWorldAssetTextureKey, worldAssetTextureKey } from './world-asset-textures';
 
 function chainable() {
   const target = {};
@@ -31,6 +31,32 @@ function chainable() {
       return method;
     },
   });
+}
+
+function terrainDelivery(assetKey: string): WorldAssetDelivery {
+  return {
+    assetKey,
+    versionId: '99999999-9999-4999-8999-999999999999',
+    checksum: 'd'.repeat(64),
+    bundledManifestVersion: null,
+    url: `https://assets.example.test/game-assets/starville/${assetKey}/v2/source.webp`,
+    mediaType: 'image/webp',
+    width: 96,
+    height: 48,
+    renderWidth: 96,
+    renderHeight: 48,
+    scale: 1,
+    anchorX: 0.5,
+    anchorY: 0.5,
+    footAnchorX: 0.5,
+    footAnchorY: 0.5,
+    depthAnchorX: 0.5,
+    depthAnchorY: 0.5,
+    collision: { shape: 'none', blocking: false },
+    supportedRotations: [0],
+    defaultRotation: 0,
+    developmentMarker: false,
+  };
 }
 
 describe('bundled isometric terrain rendering', () => {
@@ -87,6 +113,68 @@ describe('bundled isometric terrain rendering', () => {
     expect(keys.every((key) => key.startsWith('world.terrain.'))).toBe(true);
   });
 
+  it('selects the exact uploaded terrain pin before its bundled stable key', () => {
+    const manifest = { ...lanternSquareManifest(), width: 1, height: 1 };
+    const assetKey = bundledTerrainAssetKeysForManifest(manifest)[0]!;
+    const delivery = terrainDelivery(assetKey);
+    const uploadedTextureKey = resolvedWorldAssetTextureKey(
+      resolveWorldAssetDelivery({
+        assetKey,
+        context: 'game_test',
+        delivery,
+      }),
+    );
+    const scene = {
+      textures: { exists: vi.fn((key: string) => key === uploadedTextureKey) },
+      add: {
+        image: vi.fn(() => chainable()),
+        graphics: vi.fn(() => chainable()),
+        container: vi.fn(() => chainable()),
+      },
+    };
+
+    renderTerrain(scene as never, manifest, {
+      assetDeliveries: [delivery],
+      assetResolutionContext: 'game_test',
+    });
+
+    expect(scene.add.image).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      uploadedTextureKey,
+    );
+  });
+
+  it('falls back to the bundled stable terrain key after uploaded media fails', () => {
+    const manifest = { ...lanternSquareManifest(), width: 1, height: 1 };
+    const assetKey = bundledTerrainAssetKeysForManifest(manifest)[0]!;
+    const delivery = terrainDelivery(assetKey);
+    const uploadedTextureKey = worldAssetTextureKey(delivery);
+    const bundledTextureKey = resolvedWorldAssetTextureKey(
+      resolveWorldAssetDelivery({
+        assetKey,
+        context: 'published_world',
+      }),
+    );
+    const scene = {
+      textures: { exists: vi.fn((key: string) => key === bundledTextureKey) },
+      add: {
+        image: vi.fn(() => chainable()),
+        graphics: vi.fn(() => chainable()),
+        container: vi.fn(() => chainable()),
+      },
+    };
+
+    renderTerrain(scene as never, manifest, { assetDeliveries: [delivery] });
+
+    expect(scene.textures.exists).toHaveBeenCalledWith(uploadedTextureKey);
+    expect(scene.add.image).toHaveBeenCalledWith(
+      expect.any(Number),
+      expect.any(Number),
+      bundledTextureKey,
+    );
+  });
+
   it('uses the stable missing tile before procedural terrain when a material fails', () => {
     const manifest = { ...lanternSquareManifest(), width: 1, height: 1 };
     const missing = resolveWorldAssetDelivery({
@@ -94,14 +182,16 @@ describe('bundled isometric terrain rendering', () => {
       context: 'published_world',
     });
     const missingKey = resolvedWorldAssetTextureKey(missing);
-    const fallback = chainable();
-    const fillPoints = vi.fn(() => fallback);
-    Reflect.set(fallback, 'fillPoints', fillPoints);
+    const graphics: object[] = [];
     const scene = {
       textures: { exists: vi.fn((key: string) => key === missingKey) },
       add: {
         image: vi.fn(() => chainable()),
-        graphics: vi.fn(() => fallback),
+        graphics: vi.fn(() => {
+          const graphic = chainable();
+          graphics.push(graphic);
+          return graphic;
+        }),
         container: vi.fn(() => chainable()),
       },
     };
@@ -113,7 +203,8 @@ describe('bundled isometric terrain rendering', () => {
       expect.any(Number),
       missingKey,
     );
-    expect(fillPoints).not.toHaveBeenCalled();
-    expect(Reflect.get(fallback, 'destroy')).toHaveBeenCalledTimes(1);
+    const proceduralFallback = graphics[0]!;
+    expect(Reflect.get(proceduralFallback, 'fillPoints')).not.toHaveBeenCalled();
+    expect(Reflect.get(proceduralFallback, 'destroy')).toHaveBeenCalledTimes(1);
   });
 });

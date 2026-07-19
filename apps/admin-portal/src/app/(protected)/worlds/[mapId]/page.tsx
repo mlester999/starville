@@ -235,6 +235,12 @@ export default async function WorldDetailPage(props: {
                           >
                             Inspect
                           </Link>
+                          <Link
+                            className="table-link"
+                            href={`/worlds/visual-readiness?mapId=${detail.map.id}&version=${version.id}`}
+                          >
+                            Readiness
+                          </Link>
                           {version.id === detail.draftHeadVersionId &&
                           hasAdminPermission(context, 'maps.edit') ? (
                             <Link
@@ -244,9 +250,11 @@ export default async function WorldDetailPage(props: {
                               Edit
                             </Link>
                           ) : null}
-                          {['validated', 'published', 'superseded'].includes(
-                            version.lifecycleStatus,
-                          ) && hasAdminPermission(context, 'maps.preview') ? (
+                          {version.lifecycleStatus === 'validated' &&
+                          version.id === detail.draftHeadVersionId &&
+                          hasAdminPermission(context, 'maps.preview') &&
+                          hasAdminPermission(context, 'maps.edit') &&
+                          hasAdminPermission(context, 'assets.read') ? (
                             <Link
                               className="table-link"
                               href={`/worlds/${detail.map.id}/preview?version=${version.id}`}

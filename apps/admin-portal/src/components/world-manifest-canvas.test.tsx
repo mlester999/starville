@@ -453,6 +453,44 @@ describe('WorldManifestCanvas', () => {
     expect(markup).toContain('role="button"');
     expect(markup).toContain('tabindex="0"');
     expect(markup).toContain('data-world-canvas-label="true"');
+    expect(markup).toContain('data-shadow-object-id="tree-ne"');
+    expect(markup.match(/data-shadow-layer=/gu)).toHaveLength(3);
+  });
+
+  it('keeps runtime contact shadows independent from uploaded render scale and object transforms', () => {
+    const scaledPin = managedTreePin();
+    const manifest = baseManifest({
+      assets: ['tree-pine'],
+      objects: [{ id: 'tree-ne', assetId: 'tree-pine', kind: 'tree', x: 10, y: 10, scale: 1.5 }],
+    });
+    function renderWithAssetScale(scale: number): string {
+      return renderToStaticMarkup(
+        createElement(WorldManifestCanvas, {
+          manifest,
+          assetPins: [
+            {
+              ...scaledPin,
+              pinnedVersion: {
+                ...scaledPin.pinnedVersion,
+                render: { ...scaledPin.pinnedVersion.render, scale },
+              },
+            },
+          ],
+          showGrid: false,
+          showCollisions: false,
+          showSpawns: false,
+          showExits: false,
+        }),
+      );
+    }
+    const compactAsset = renderWithAssetScale(0.35);
+    const largeAsset = renderWithAssetScale(2);
+    const shadowPattern =
+      /<ellipse class="world-canvas__contact-shadow"[^>]*data-shadow-object-id="tree-ne"[^>]*><\/ellipse>/u;
+
+    expect(compactAsset.match(shadowPattern)?.[0]).toBe(largeAsset.match(shadowPattern)?.[0]);
+    expect(compactAsset).toContain('transform="translate(');
+    expect(compactAsset).toContain('scale(1.5) rotate(0)');
   });
 
   it('exposes bundled source indicators and authored directional media without moving the object', () => {
@@ -599,6 +637,72 @@ describe('WorldManifestCanvas', () => {
     expect(front.indexOf('data-world-canvas-reference-player')).toBeGreaterThan(
       front.indexOf('data-render-reason="scene_preview_candidate"'),
     );
+  });
+
+  it('depth-sorts the reference player against every object without a scene-preview override', () => {
+    const manifest = baseManifest({
+      assets: ['tree-pine'],
+      objects: [{ id: 'tree-ne', assetId: 'tree-pine', kind: 'tree', x: 10, y: 10, scale: 1 }],
+    });
+    const behind = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        playerPosition: { x: 9, y: 9 },
+        showGrid: false,
+        showCollisions: false,
+        showSpawns: false,
+        showExits: false,
+      }),
+    );
+    const front = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        playerPosition: { x: 11, y: 11 },
+        showGrid: false,
+        showCollisions: false,
+        showSpawns: false,
+        showExits: false,
+      }),
+    );
+
+    expect(behind.indexOf('data-world-canvas-reference-player')).toBeLessThan(
+      behind.indexOf('data-object-id="tree-ne"'),
+    );
+    expect(front.indexOf('data-world-canvas-reference-player')).toBeGreaterThan(
+      front.indexOf('data-object-id="tree-ne"'),
+    );
+    expect(front).toContain('data-reference-player-height=');
+    expect(front).toContain('data-reference-player-width=');
+    expect(front.match(/data-reference-player-shadow-layer=/gu)).toHaveLength(3);
+    expect(front).toContain('world-canvas__contact-shadow');
+  });
+
+  it('sorts equal-foot-depth shadows independently from their objects like the runtime', () => {
+    const manifest = baseManifest({
+      assets: ['tree-pine'],
+      objects: [
+        { id: 'pine-b', assetId: 'tree-pine', kind: 'tree', x: 6.5, y: 13, scale: 1 },
+        { id: 'pine-c', assetId: 'tree-pine', kind: 'tree', x: 14.5, y: 5, scale: 1 },
+      ],
+    });
+    const markup = renderToStaticMarkup(
+      createElement(WorldManifestCanvas, {
+        manifest,
+        showGrid: false,
+        showCollisions: false,
+        showSpawns: false,
+        showExits: false,
+      }),
+    );
+    const shadowB = markup.indexOf('data-shadow-object-id="pine-b"');
+    const shadowC = markup.indexOf('data-shadow-object-id="pine-c"');
+    const objectB = markup.indexOf('data-object-id="pine-b"');
+    const objectC = markup.indexOf('data-object-id="pine-c"');
+
+    expect([shadowB, shadowC, objectB, objectC].every((index) => index >= 0)).toBe(true);
+    expect(shadowB).toBeLessThan(shadowC);
+    expect(shadowC).toBeLessThan(objectB);
+    expect(objectB).toBeLessThan(objectC);
   });
 
   it('surfaces a safe error panel when rendering fails', () => {

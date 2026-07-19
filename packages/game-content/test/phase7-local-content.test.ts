@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { closestInteraction, isPositionWalkable, PLAYER_FOOT_RADIUS } from '@starville/game-core';
+import {
+  analyzeWorldVisualReadiness,
+  closestInteraction,
+  isPositionWalkable,
+  PLAYER_FOOT_RADIUS,
+} from '@starville/game-core';
 
 import {
   PHASE_7_LOCAL_DRAFTS,
@@ -64,6 +69,39 @@ describe('Phase 7 local draft world content', () => {
     expect(keys).not.toEqual(
       expect.arrayContaining(['price', 'output', 'ownerPlayerId', 'balance', 'inventory']),
     );
+  });
+
+  it('recomposes only the local Lantern Square draft with hierarchy, seating, and edge clusters', () => {
+    const source = WORLD_MANIFESTS.find(({ id }) => id === 'lantern-square');
+    const manifest = getPhase7LocalDraft('lantern-square').manifest;
+    if (source === undefined) throw new Error('Lantern Square source fixture is unavailable');
+
+    expect(source.objects.some(({ id }) => id.startsWith('phase12c-'))).toBe(false);
+    expect(manifest.objects.length).toBeGreaterThanOrEqual(45);
+    expect(manifest.objects).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'phase12c-lantern-heart', kind: 'lamp' }),
+        expect.objectContaining({ id: 'phase7-general-store-object', kind: 'shop' }),
+        expect.objectContaining({ id: 'phase7-home-entrance-object', kind: 'home_entrance' }),
+        expect.objectContaining({ id: 'phase12c-photo-rug', kind: 'furniture' }),
+      ]),
+    );
+    expect(
+      manifest.objects.filter(({ id }) => id.startsWith('phase12c-social-chair-')),
+    ).toHaveLength(4);
+    expect(
+      manifest.objects.filter(
+        ({ id }) => id.startsWith('phase12c-tree-') || id.startsWith('phase12c-bush-'),
+      ).length,
+    ).toBeGreaterThanOrEqual(10);
+    expect(manifest.exits).toEqual(source.exits);
+    expect(manifest.spawns).toEqual(source.spawns);
+
+    const readiness = analyzeWorldVisualReadiness(manifest);
+    expect(readiness).toMatchObject({ ready: true, errors: [], warnings: [] });
+    expect(readiness.recommendations.map(({ code }) => code)).toEqual([
+      'temporary-development-art',
+    ]);
   });
 
   it('retains the five-map public topology in the local preview graph', () => {

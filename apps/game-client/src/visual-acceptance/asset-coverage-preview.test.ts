@@ -11,7 +11,9 @@ describe('Phase 12B local visual acceptance entry', () => {
   it('exposes asset coverage only through the development harness', () => {
     expect(source).toContain("import.meta.env.DEV ? (['assets'] as const) : []");
     expect(source).toContain("panel === 'assets'");
-    expect(source).toContain('<AssetCoverageGameTest onClose={noop} />');
+    expect(source).toContain('<AssetCoverageGameTest');
+    expect(source).toContain('manifestVersion={STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION}');
+    expect(source).toContain('onClose={noop}');
   });
 
   it('does not add an asset API fixture or persistence branch', () => {

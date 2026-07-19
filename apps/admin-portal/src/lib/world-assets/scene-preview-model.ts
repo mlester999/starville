@@ -113,6 +113,7 @@ const COMPATIBLE_KINDS: Readonly<Partial<Record<AssetType, readonly MapObjectKin
   cooking_station: ['cooking_station'],
   crafting_station: ['crafting_station'],
   home_entrance: ['home_entrance'],
+  furniture: ['furniture'],
   decoration: ['flowers', 'bush'],
   tree: ['tree'],
   rock: ['rock'],

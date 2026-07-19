@@ -77,32 +77,204 @@ export function renderBundledAssetSvg(input: SvgRenderInput): string {
   const { asset, variant } = input;
   const { width, height } = asset;
   const palette = PALETTES[asset.generator.palette];
+  const phase12dCandidate = asset.bundledVersion === '2.0.0';
   const title = escapeXml(
     variant === undefined ? asset.displayName : `${asset.displayName} ${variant.id}`,
   );
   const description = escapeXml(asset.description);
   const rotation = variant?.rotation ?? asset.defaultRotation;
   const state = variant?.state ?? asset.generator.variant;
-  const body = renderBody(asset, palette, rotation, state);
+  const baselineBody = renderBody(asset, palette, rotation, state);
+  const body = phase12dCandidate
+    ? `${baselineBody}${productionFinish(asset, palette, rotation, state)}`
+    : baselineBody;
   return normalizeSvgNumbers(
     [
       '<svg xmlns="http://www.w3.org/2000/svg"',
       ` width="${String(width)}" height="${String(height)}" viewBox="0 0 ${String(width)} ${String(height)}"`,
       ' fill="none">',
       `<title>${title}</title><desc>${description}</desc>`,
-      renderDefinitions(palette),
-      `<g stroke-linecap="round" stroke-linejoin="round">${body}</g>`,
+      phase12dCandidate
+        ? '<metadata>Original repository-authored Starville Phase 12D production candidate; exact immutable manifest 2.0.0.</metadata>'
+        : '',
+      renderDefinitions(palette, phase12dCandidate),
+      `<g${phase12dCandidate ? ' data-starville-art-profile="phase12d-production-candidate"' : ''} stroke-linecap="round" stroke-linejoin="round">${body}</g>`,
       '</svg>\n',
     ].join(''),
   );
 }
 
-function renderDefinitions(palette: Palette): string {
+function renderDefinitions(palette: Palette, phase12dCandidate = false): string {
+  if (phase12dCandidate) {
+    return `<defs>
+    <linearGradient id="surface" x1=".08" y1=".04" x2=".92" y2=".96"><stop stop-color="${palette.glow}"/><stop offset=".24" stop-color="${palette.light}"/><stop offset=".72" stop-color="${palette.middle}"/><stop offset="1" stop-color="${palette.deep}"/></linearGradient>
+    <linearGradient id="shade" x1=".08" y1="0" x2=".92" y2="1"><stop stop-color="${palette.light}"/><stop offset=".46" stop-color="${palette.middle}"/><stop offset="1" stop-color="${palette.deep}"/></linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2=".75"><stop stop-color="${palette.glow}" stop-opacity=".9"/><stop offset=".5" stop-color="${palette.accent}" stop-opacity=".36"/><stop offset="1" stop-color="${palette.deep}" stop-opacity=".12"/></linearGradient>
+    <radialGradient id="glow"><stop stop-color="${palette.glow}" stop-opacity=".96"/><stop offset=".45" stop-color="${palette.accent}" stop-opacity=".45"/><stop offset="1" stop-color="${palette.accent}" stop-opacity="0"/></radialGradient>
+  </defs>`;
+  }
   return `<defs>
     <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${palette.light}"/><stop offset="1" stop-color="${palette.middle}"/></linearGradient>
     <linearGradient id="shade" x1="0" y1="0" x2="0" y2="1"><stop stop-color="${palette.middle}"/><stop offset="1" stop-color="${palette.deep}"/></linearGradient>
     <radialGradient id="glow"><stop stop-color="${palette.glow}" stop-opacity=".92"/><stop offset="1" stop-color="${palette.accent}" stop-opacity="0"/></radialGradient>
   </defs>`;
+}
+
+function productionFinish(
+  asset: BundledAssetEntry,
+  palette: Palette,
+  rotation: 0 | 90 | 180 | 270,
+  state: string,
+): string {
+  const { width: w, height: h } = asset;
+  const finishers: Readonly<Record<string, () => string>> = {
+    terrain: () => productionTerrainFinish(w, h, palette, state),
+    building: () => productionBuildingFinish(w, h, palette, state),
+    tree: () => productionTreeFinish(w, h, palette, state),
+    nature_prop: () => productionNatureFinish(w, h, palette, state),
+    boundary: () => productionBoundaryFinish(w, h, palette, rotation, state),
+    lamp: () => productionLampFinish(w, h, palette),
+    sign: () => productionSignFinish(w, h, palette),
+    marker: () => productionMarkerFinish(w, h, palette),
+    station: () => productionStationFinish(w, h, palette, state),
+    entrance: () => productionEntranceFinish(w, h, palette),
+    furniture: () => productionFurnitureFinish(w, h, palette, rotation, state),
+    farm_plot: () => productionFarmFinish(w, h, palette, state),
+    crop: () => productionCropFinish(w, h, palette, asset.generator.stage ?? 0, state),
+    item_icon: () => productionIconFinish(w, h, palette, false),
+    ui_icon: () => productionIconFinish(w, h, palette, true),
+    missing_asset: () => productionMissingFinish(w, h, palette),
+  };
+  return (finishers[asset.generator.kind] ?? (() => ''))();
+}
+
+function productionTerrainFinish(w: number, h: number, palette: Palette, state: string): string {
+  if (state === 'water') {
+    return `<path d="M${w * 0.12} ${h * 0.54}q${w * 0.09}-${h * 0.11} ${w * 0.18} 0t${w * 0.18} 0M${w * 0.55} ${h * 0.42}q${w * 0.08}-${h * 0.1} ${w * 0.16} 0t${w * 0.13} 0" stroke="${palette.glow}" stroke-width="1.35" opacity=".76"/><path d="M${w * 0.28} ${h * 0.69}q${w * 0.08}-${h * 0.08} ${w * 0.16} 0" stroke="${palette.accent}" stroke-width="1" opacity=".6"/>`;
+  }
+  if (state === 'grass' || state === 'grass_clover') {
+    return `<g fill="${palette.glow}" opacity=".48"><circle cx="${w * 0.2}" cy="${h * 0.46}" r=".9"/><circle cx="${w * 0.48}" cy="${h * 0.31}" r=".75"/><circle cx="${w * 0.79}" cy="${h * 0.52}" r=".9"/></g><path d="M${w * 0.17} ${h * 0.58}l2.1 -3.8 1.5 3.4m${w * 0.53}-${h * 0.12}l1.8 -3.6 1.7 3.1" stroke="${palette.deep}" stroke-width=".85" opacity=".42"/>`;
+  }
+  if (state === 'path' || state === 'plaza') {
+    return `<path d="M${w * 0.23} ${h * 0.47}l${w * 0.1}-${h * 0.055}m${w * 0.12} ${h * 0.21}l${w * 0.12}-${h * 0.065}m${w * 0.14}-${h * 0.2}l${w * 0.08} ${h * 0.04}" stroke="${palette.glow}" stroke-width="1.1" opacity=".58"/>`;
+  }
+  return `<g fill="${palette.accent}" opacity=".38"><ellipse cx="${w * 0.22}" cy="${h * 0.54}" rx="1.8" ry=".8"/><ellipse cx="${w * 0.74}" cy="${h * 0.48}" rx="1.5" ry=".7"/></g>`;
+}
+
+function productionBuildingFinish(w: number, h: number, palette: Palette, state: string): string {
+  const store = state.includes('store');
+  return `<path d="M${w * 0.23} ${h * 0.43}l${w * 0.27}-${h * 0.2} ${w * 0.27} ${h * 0.2}M${w * 0.31} ${h * 0.39}l${w * 0.19}-${h * 0.13} ${w * 0.19} ${h * 0.13}M${w * 0.4} ${h * 0.34}l${w * 0.1}-${h * 0.065} ${w * 0.1} ${h * 0.065}" stroke="${palette.light}" stroke-width="${Math.max(2, w * 0.009)}" opacity=".54"/><path d="M${w * 0.205} ${h * 0.48}v${h * 0.3}m${w * 0.59}-${h * 0.3}v${h * 0.3}" stroke="${palette.deep}" stroke-width="${Math.max(2, w * 0.008)}" opacity=".45"/><path d="M${w * 0.72} ${h * 0.31}v-${h * 0.115}l${w * 0.075} ${h * 0.04}v${h * 0.12}" fill="${palette.deep}" stroke="${palette.ink}" stroke-width="${Math.max(2, w * 0.009)}"/><path d="M${w * 0.733} ${h * 0.22}l${w * 0.043} ${h * 0.023}" stroke="${palette.glow}" stroke-width="${Math.max(1.5, w * 0.006)}" opacity=".74"/>${
+    store
+      ? `<path d="M${w * 0.18} ${h * 0.66}q${w * 0.04} ${h * 0.035} ${w * 0.08} 0t${w * 0.08} 0t${w * 0.08} 0t${w * 0.08} 0t${w * 0.08} 0t${w * 0.08} 0t${w * 0.08} 0t${w * 0.08} 0" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.008)}" opacity=".72"/>${sparkle(w * 0.31, h * 0.78, Math.min(w, h) * 0.018, palette)}`
+      : `<path d="M${w * 0.28} ${h * 0.76}q-${w * 0.06}-${h * 0.08}-${w * 0.1} 0q${w * 0.05} ${h * 0.07} ${w * 0.1} 0" fill="${palette.light}" stroke="${palette.deep}" stroke-width="${Math.max(1.5, w * 0.006)}"/>`
+  }`;
+}
+
+function productionTreeFinish(w: number, h: number, palette: Palette, state: string): string {
+  if (state.includes('pine')) {
+    return `<path d="M${w * 0.5} ${h * 0.12}l-${w * 0.105} ${h * 0.19}m${w * 0.105}-${h * 0.11}l${w * 0.11} ${h * 0.2}M${w * 0.31} ${h * 0.55}q${w * 0.19}-${h * 0.095} ${w * 0.38} 0" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.018)}" opacity=".5"/><g fill="${palette.accent}" opacity=".72"><circle cx="${w * 0.38}" cy="${h * 0.46}" r="${w * 0.018}"/><circle cx="${w * 0.61}" cy="${h * 0.58}" r="${w * 0.015}"/></g>`;
+  }
+  return `<path d="M${w * 0.28} ${h * 0.36}q${w * 0.11}-${h * 0.12} ${w * 0.2}-${h * 0.05}m${w * 0.12}-${h * 0.13}q${w * 0.1}-${h * 0.08} ${w * 0.2} ${h * 0.03}m-${w * 0.14} ${h * 0.2}q${w * 0.11}-${h * 0.08} ${w * 0.19} ${h * 0.02}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.018)}" opacity=".52"/><g fill="${palette.accent}" stroke="${palette.deep}" stroke-width="1.5"><circle cx="${w * 0.35}" cy="${h * 0.31}" r="${w * 0.019}"/><circle cx="${w * 0.64}" cy="${h * 0.42}" r="${w * 0.017}"/><circle cx="${w * 0.52}" cy="${h * 0.2}" r="${w * 0.016}"/></g>`;
+}
+
+function productionNatureFinish(w: number, h: number, palette: Palette, state: string): string {
+  if (state.includes('flower')) {
+    return `${sparkle(w * 0.27, h * 0.32, w * 0.025, palette)}<path d="M${w * 0.3} ${h * 0.77}q${w * 0.2}-${h * 0.07} ${w * 0.4} 0" stroke="${palette.light}" stroke-width="${Math.max(2, w * 0.018)}" opacity=".55"/>`;
+  }
+  if (state.includes('bush')) {
+    return `<path d="M${w * 0.27} ${h * 0.56}q${w * 0.09}-${h * 0.13} ${w * 0.17}-${h * 0.02}m${w * 0.07}-${h * 0.1}q${w * 0.1}-${h * 0.11} ${w * 0.18} ${h * 0.03}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.018)}" opacity=".5"/><g fill="${palette.accent}" opacity=".7"><circle cx="${w * 0.32}" cy="${h * 0.45}" r="${w * 0.015}"/><circle cx="${w * 0.58}" cy="${h * 0.39}" r="${w * 0.012}"/></g>`;
+  }
+  return `<path d="M${w * 0.26} ${h * 0.66}q${w * 0.18}-${h * 0.13} ${w * 0.36}-${h * 0.09}m-${w * 0.25}-${h * 0.05}l${w * 0.08} ${h * 0.03}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.018)}" opacity=".5"/><path d="M${w * 0.44} ${h * 0.76}q${w * 0.07}-${h * 0.08} ${w * 0.13} 0" stroke="${palette.light}" stroke-width="${Math.max(2, w * 0.015)}"/>`;
+}
+
+function productionBoundaryFinish(
+  w: number,
+  h: number,
+  palette: Palette,
+  rotation: number,
+  state: string,
+): string {
+  const mirrored = rotation === 90 || rotation === 270;
+  return `<g${mirrored ? ` transform="translate(${String(w)} 0) scale(-1 1)"` : ''}><path d="M${w * 0.18} ${h * 0.39}l${w * 0.64} ${h * 0.18}M${w * 0.18} ${h * 0.58}l${w * 0.64} ${h * 0.18}" stroke="${palette.glow}" stroke-width="${Math.max(2, h * 0.022)}" opacity=".42"/><g fill="${palette.accent}" stroke="${palette.ink}" stroke-width="2"><circle cx="${w * 0.18}" cy="${h * 0.45}" r="${Math.max(3, h * 0.025)}"/><circle cx="${w * 0.82}" cy="${h * 0.63}" r="${Math.max(3, h * 0.025)}"/></g>${
+    state.includes('gate') ? `${sparkle(w * 0.5, h * 0.18, Math.min(w, h) * 0.035, palette)}` : ''
+  }</g>`;
+}
+
+function productionLampFinish(w: number, h: number, palette: Palette): string {
+  return `<path d="M${w * 0.5} ${h * 0.17}v-${h * 0.07}m-${w * 0.24} ${h * 0.22}l-${w * 0.08} ${h * 0.025}m${w * 0.56}-${h * 0.025}l${w * 0.08} ${h * 0.025}m-${w * 0.46} ${h * 0.1}l-${w * 0.07} ${h * 0.06}m${w * 0.4}-${h * 0.06}l${w * 0.07} ${h * 0.06}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.018)}" opacity=".62"/><path d="M${w * 0.44} ${h * 0.34}l${w * 0.06}-${h * 0.05} ${w * 0.06} ${h * 0.05}" stroke="#ffffff" stroke-width="${Math.max(1.5, w * 0.012)}" opacity=".72"/>`;
+}
+
+function productionSignFinish(w: number, h: number, palette: Palette): string {
+  return `<path d="M${w * 0.23} ${h * 0.28}q${w * 0.27}-${h * 0.09} ${w * 0.54} 0M${w * 0.22} ${h * 0.52}q${w * 0.28} ${h * 0.08} ${w * 0.56} 0" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.013)}" opacity=".52"/><g fill="${palette.accent}" stroke="${palette.ink}" stroke-width="2"><circle cx="${w * 0.23}" cy="${h * 0.29}" r="${Math.max(3, w * 0.018)}"/><circle cx="${w * 0.77}" cy="${h * 0.29}" r="${Math.max(3, w * 0.018)}"/></g>`;
+}
+
+function productionMarkerFinish(w: number, h: number, palette: Palette): string {
+  return `${sparkle(w * 0.5, h * 0.25, Math.min(w, h) * 0.055, palette)}<ellipse cx="${w * 0.5}" cy="${h * 0.53}" rx="${w * 0.25}" ry="${h * 0.13}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.014)}" opacity=".6"/>`;
+}
+
+function productionStationFinish(w: number, h: number, palette: Palette, state: string): string {
+  const active = state.includes('active');
+  const ready = state.includes('ready');
+  return `<path d="M${w * 0.24} ${h * 0.73}l${w * 0.26} ${h * 0.13} ${w * 0.26}-${h * 0.13}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.013)}" opacity=".5"/><path d="M${w * 0.29} ${h * 0.54}l${w * 0.08} ${h * 0.04}m${w * 0.26}-${h * 0.04}l${w * 0.08}-${h * 0.04}" stroke="${palette.light}" stroke-width="${Math.max(2, w * 0.014)}" opacity=".65"/>${
+    active
+      ? `<g fill="${palette.glow}" opacity=".8"><circle cx="${w * 0.27}" cy="${h * 0.34}" r="${Math.max(2, w * 0.012)}"/><circle cx="${w * 0.73}" cy="${h * 0.4}" r="${Math.max(2, w * 0.01)}"/></g>`
+      : ready
+        ? `${sparkle(w * 0.24, h * 0.29, Math.min(w, h) * 0.04, palette)}`
+        : ''
+  }`;
+}
+
+function productionEntranceFinish(w: number, h: number, palette: Palette): string {
+  return `<path d="M${w * 0.29} ${h * 0.45}q${w * 0.21}-${h * 0.23} ${w * 0.42} 0M${w * 0.33} ${h * 0.51}q${w * 0.17}-${h * 0.19} ${w * 0.34} 0" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.016)}" opacity=".5"/><path d="M${w * 0.23} ${h * 0.84}q${w * 0.27} ${h * 0.08} ${w * 0.54} 0" stroke="${palette.accent}" stroke-width="${Math.max(2, w * 0.018)}"/>`;
+}
+
+function productionFurnitureFinish(
+  w: number,
+  h: number,
+  palette: Palette,
+  rotation: number,
+  state: string,
+): string {
+  const mirrored = rotation === 90 || rotation === 270;
+  return `<g${mirrored ? ` transform="translate(${String(w)} 0) scale(-1 1)"` : ''}><path d="M${w * 0.29} ${h * 0.49}l${w * 0.21} ${h * 0.1} ${w * 0.21}-${h * 0.1}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.014)}" opacity=".48"/><path d="M${w * 0.37} ${h * 0.7}q${w * 0.13}-${h * 0.06} ${w * 0.26} 0" stroke="${palette.accent}" stroke-width="${Math.max(2, w * 0.012)}" opacity=".5"/>${
+    state.includes('mirror')
+      ? `<path d="M${w * 0.4} ${h * 0.37}l${w * 0.13}-${h * 0.09}" stroke="#ffffff" stroke-width="${Math.max(2, w * 0.022)}" opacity=".7"/>`
+      : ''
+  }</g>`;
+}
+
+function productionFarmFinish(w: number, h: number, palette: Palette, state: string): string {
+  return `<path d="M${w * 0.18} ${h * 0.69}l${w * 0.32} ${h * 0.17} ${w * 0.32}-${h * 0.17}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.012)}" opacity=".35"/><g fill="${palette.accent}" opacity="${state === 'watered' ? '.55' : '.32'}"><ellipse cx="${w * 0.33}" cy="${h * 0.55}" rx="${w * 0.018}" ry="${h * 0.012}"/><ellipse cx="${w * 0.65}" cy="${h * 0.51}" rx="${w * 0.015}" ry="${h * 0.01}"/></g>`;
+}
+
+function productionCropFinish(
+  w: number,
+  h: number,
+  palette: Palette,
+  stage: number,
+  state: string,
+): string {
+  const leafCount = Math.max(1, Math.min(4, stage + 1));
+  const leaves = Array.from({ length: leafCount }, (_, index) => {
+    const side = index % 2 === 0 ? -1 : 1;
+    const x = w * (0.5 + side * (0.1 + Math.floor(index / 2) * 0.045));
+    const y = h * (0.7 - index * 0.09);
+    return `<path d="M${w * 0.5} ${y + h * 0.05}Q${w * (0.5 + side * 0.09)} ${y - h * 0.03} ${x} ${y - h * 0.02}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.014)}" opacity=".48"/>`;
+  }).join('');
+  return `${leaves}${state.includes('cloudberry') && stage >= 3 ? sparkle(w * 0.3, h * 0.34, w * 0.035, palette) : ''}`;
+}
+
+function productionIconFinish(
+  w: number,
+  h: number,
+  palette: Palette,
+  interfaceIcon: boolean,
+): string {
+  return `<circle cx="${w * 0.5}" cy="${h * 0.5}" r="${w * (interfaceIcon ? 0.39 : 0.37)}" fill="none" stroke="url(#rim)" stroke-width="${Math.max(2, w * 0.018)}" opacity=".46"/><path d="M${w * 0.28} ${h * 0.27}q${w * 0.12}-${h * 0.1} ${w * 0.24}-${h * 0.02}" stroke="#ffffff" stroke-width="${Math.max(2, w * 0.016)}" opacity=".42"/>`;
+}
+
+function productionMissingFinish(w: number, h: number, palette: Palette): string {
+  return `${sparkle(w * 0.27, h * 0.3, w * 0.035, palette)}<path d="M${w * 0.29} ${h * 0.73}l${w * 0.21} ${h * 0.11} ${w * 0.21}-${h * 0.11}" stroke="${palette.glow}" stroke-width="${Math.max(2, w * 0.016)}" opacity=".48"/>`;
 }
 
 function renderBody(

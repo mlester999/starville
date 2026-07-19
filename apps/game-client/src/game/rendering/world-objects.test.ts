@@ -115,7 +115,11 @@ describe('production world-object rendering', () => {
     expect(scene.textures.exists).toHaveBeenCalledWith(successfulKey);
     expect(scene.textures.exists).toHaveBeenCalledWith(failedKey);
     expect(images).toHaveLength(2);
-    expect(graphics).toHaveLength(1);
+    expect(graphics).toHaveLength(1 + objects.length);
+    expect(rendered.every(({ shadow }) => shadow !== undefined)).toBe(true);
+    for (const { shadow } of rendered) {
+      expect(Reflect.get(shadow!, 'fillEllipse')).toHaveBeenCalledTimes(3);
+    }
     expect(Reflect.get(images[0]!, 'setOrigin')).toHaveBeenCalledWith(
       successful.footAnchorX,
       successful.footAnchorY,
@@ -178,9 +182,39 @@ describe('production world-object rendering', () => {
       },
     };
 
-    renderWorldObjects(scene as never, manifest);
+    renderWorldObjects(scene as never, manifest, [], { shadows: false });
 
     expect(scene.add.image).toHaveBeenCalledWith(0, 0, missingKey);
     expect(scene.add.graphics).not.toHaveBeenCalled();
+  });
+
+  it('ignores exact terrain deliveries when resolving unrelated world objects', () => {
+    const baseManifest = lanternSquareManifest();
+    const object = baseManifest.objects[0]!;
+    const manifest = { ...baseManifest, objects: [object] };
+    const objectTexture = resolveWorldAssetDelivery({
+      assetKey: object.assetId,
+      context: 'published_world',
+    });
+    const objectTextureKey = resolvedWorldAssetTextureKey(objectTexture);
+    const terrain = delivery('world.terrain.grass.base', '99999999-9999-4999-8999-999999999999', {
+      renderWidth: 96,
+      renderHeight: 48,
+      width: 96,
+      height: 48,
+    });
+    const scene = {
+      textures: { exists: vi.fn((key: string) => key === objectTextureKey) },
+      add: {
+        image: vi.fn(() => chainableGameObject('image')),
+        graphics: vi.fn(() => chainableGameObject('graphics')),
+        container: vi.fn(() => chainableGameObject('graphics')),
+      },
+    };
+
+    renderWorldObjects(scene as never, manifest, [terrain], { shadows: false });
+
+    expect(scene.add.image).toHaveBeenCalledWith(0, 0, objectTextureKey);
+    expect(scene.textures.exists).not.toHaveBeenCalledWith(worldAssetTextureKey(terrain));
   });
 });

@@ -1,4 +1,8 @@
-import { assetIdentifierSchema, assetRotationSchema } from '@starville/asset-management';
+import {
+  assetIdentifierSchema,
+  assetRotationSchema,
+  bundledManifestVersionSchema,
+} from '@starville/asset-management';
 import { z } from 'zod';
 
 import {
@@ -37,11 +41,22 @@ export async function GET(
   const parameters = parametersSchema.safeParse(await context.params);
   if (!parameters.success) return unavailable(400);
   const url = new URL(request.url);
+  if (
+    [...url.searchParams.keys()].some((key) => key !== 'rotation' && key !== 'manifest') ||
+    url.searchParams.getAll('rotation').length > 1 ||
+    url.searchParams.getAll('manifest').length > 1
+  ) {
+    return unavailable(400);
+  }
   const rotationValue = url.searchParams.get('rotation');
   const rotation =
     rotationValue === null ? null : assetRotationSchema.safeParse(Number(rotationValue));
   if (rotation !== null && !rotation.success) return unavailable(400);
   if (parameters.data.variant === 'thumbnail' && rotationValue !== null) return unavailable(400);
+  const manifestValue = url.searchParams.get('manifest');
+  const manifestVersion =
+    manifestValue === null ? null : bundledManifestVersionSchema.safeParse(manifestValue);
+  if (manifestVersion !== null && !manifestVersion.success) return unavailable(400);
 
   const workspaceRoot = findStarvilleWorkspaceRoot();
   if (workspaceRoot === null) return unavailable(503);
@@ -50,6 +65,7 @@ export async function GET(
     variant: parameters.data.variant,
     workspaceRoot,
     ...(rotation === null ? {} : { rotation: rotation.data }),
+    ...(manifestVersion === null ? {} : { manifestVersion: manifestVersion.data }),
   });
   if (descriptor === null) return unavailable();
   const bytes = await readBundledMedia(descriptor, workspaceRoot);

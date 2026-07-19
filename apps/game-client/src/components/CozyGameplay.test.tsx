@@ -490,6 +490,53 @@ afterEach(async () => {
 });
 
 describe('CozyGameplay accessible HUD', () => {
+  it('owns the initial DUST load and exposes a narrow explicit retry state without a duplicate ledger read', async () => {
+    const { bootstrapCozyGameplay, loadDustLedger } = await import('../app/cozy-gameplay-client');
+    const onDustBalanceChange = vi.fn();
+    const onDustLoadState = vi.fn();
+    const baseProps = {
+      apiUrl: 'http://localhost:4000',
+      interaction: null,
+      onAccessInvalid: vi.fn(),
+      onInteractionClose: vi.fn(),
+      onOpenChange: vi.fn(),
+      onDustBalanceChange,
+      onDustLoadState,
+    } as const;
+
+    await act(async () => {
+      root.render(<CozyGameplay {...baseProps} externalDustRefreshRequest={0} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(bootstrapCozyGameplay).toHaveBeenCalledTimes(1);
+    expect(loadDustLedger).not.toHaveBeenCalled();
+    expect(onDustLoadState).toHaveBeenCalledWith('loading');
+    expect(onDustLoadState).toHaveBeenCalledWith('ready');
+    expect(onDustBalanceChange).toHaveBeenCalledWith(250);
+
+    vi.mocked(loadDustLedger).mockResolvedValueOnce({
+      account: {
+        playerId: '22222222-2222-4222-8222-222222222222',
+        balance: 0,
+        stateVersion: 2,
+        starterGrantAppliedAt: fixtures.now,
+        updatedAt: fixtures.now,
+      },
+      items: [],
+      pagination: { page: 1, pageSize: 20, total: 0, totalPages: 0 },
+    });
+    await act(async () => {
+      root.render(<CozyGameplay {...baseProps} externalDustRefreshRequest={1} />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(loadDustLedger).toHaveBeenCalledTimes(1);
+    expect(onDustBalanceChange).toHaveBeenLastCalledWith(0);
+  });
+
   it('shows the authoritative DUST balance and opens inventory without touching Phaser', async () => {
     const onOpenChange = vi.fn();
     await act(async () => {

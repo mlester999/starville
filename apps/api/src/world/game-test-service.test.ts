@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { describe, expect, it, vi } from 'vitest';
 import { getWorldManifest } from '@starville/game-content';
+import { terrainAssetDependencyKeys } from '@starville/game-core';
 
 import type { LogContext, ServiceLogger } from '../contracts.js';
 import type { WorldGameTestGateway } from './game-test-contracts.js';
@@ -228,6 +229,87 @@ describe('World Game Test service', () => {
     expect(result.projection.restrictions).toContain('no_player_persistence');
     expect(result.projection.restrictions).toContain('no_rewards');
     expect(result.projection.restrictions).toContain('no_public_realtime');
+  });
+
+  it('projects an exact uploaded terrain dependency into protected Game Test', async () => {
+    const terrainAssetKey = terrainAssetDependencyKeys(manifest)[0]!;
+    const terrain = {
+      ...materials()[0]!,
+      assetKey: terrainAssetKey,
+      versionId: '99999999-9999-4999-8999-999999999999',
+      checksumSha256: 'd'.repeat(64),
+      mediaType: 'image/webp' as const,
+      width: 96,
+      height: 48,
+      renderWidth: 96,
+      renderHeight: 48,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      footAnchorX: 0.5,
+      footAnchorY: 0.5,
+      depthAnchorX: 0.5,
+      depthAnchorY: 0.5,
+      developmentMarker: false,
+      bundledManifestVersion: null,
+      delivery: {
+        bucket: 'game-assets' as const,
+        objectPath: `starville/${terrainAssetKey}/v2/source.webp`,
+      },
+      fallback: null,
+    };
+    const target = gateway();
+    vi.mocked(target.exchange).mockResolvedValueOnce({
+      ...projection(),
+      assetDeliveries: [...materials(), terrain],
+    });
+
+    const result = await service(target).value.exchange(
+      { grantToken: 'g'.repeat(43), gameClientBuild: 'game-client:test' },
+      'request-terrain-exchange',
+    );
+
+    expect(result.projection.assetDeliveries.at(-1)).toEqual(
+      expect.objectContaining({
+        assetKey: terrainAssetKey,
+        versionId: terrain.versionId,
+        checksum: terrain.checksumSha256,
+        url: `https://assets.example.test/starville/${terrainAssetKey}/v2/source.webp`,
+        developmentMarker: false,
+      }),
+    );
+  });
+
+  it('projects an exact v2 repository-authored candidate in protected Game Test', async () => {
+    const candidate = {
+      ...materials()[0]!,
+      versionId: '77777777-7777-4777-8777-777777777777',
+      checksumSha256: 'e'.repeat(64),
+      materialClass: 'bundled_candidate' as const,
+      bundledManifestVersion: '2.0.0' as const,
+      fallback: 'repository_authored' as const,
+    };
+    const target = gateway();
+    vi.mocked(target.exchange).mockResolvedValueOnce({
+      ...projection(),
+      assetDeliveries: [candidate, ...materials().slice(1)],
+    });
+
+    const result = await service(target).value.exchange(
+      { grantToken: 'g'.repeat(43), gameClientBuild: 'game-client:test' },
+      'request-v2-candidate-exchange',
+    );
+
+    expect(result.projection.assetDeliveries[0]).toEqual(
+      expect.objectContaining({
+        assetKey: candidate.assetKey,
+        versionId: candidate.versionId,
+        checksum: candidate.checksumSha256,
+        materialClass: 'bundled_candidate',
+        bundledManifestVersion: '2.0.0',
+        developmentMarker: true,
+        url: null,
+      }),
+    );
   });
 
   it('binds explicit evidence to the exchanged session build and exact revision', async () => {

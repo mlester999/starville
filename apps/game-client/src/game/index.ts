@@ -20,6 +20,9 @@ export function startGame(parent: HTMLElement, options: GameRuntimeOptions): Gam
     setInputBlocked(blocked) {
       if (!destroyed) scene.setInputBlocked(blocked);
     },
+    setTouchMovementInput(input) {
+      if (!destroyed) scene.setTouchMovementInput(input);
+    },
     setAudioSettings(settings) {
       if (destroyed) return;
       game.sound.setVolume(settings.masterVolume);
@@ -36,6 +39,15 @@ export function startGame(parent: HTMLElement, options: GameRuntimeOptions): Gam
     },
     setRemotePlayerNamesVisible(visible) {
       if (!destroyed) scene.setRemotePlayerNamesVisible(visible);
+    },
+    setVisualSettings(settings) {
+      if (!destroyed) scene.setVisualSettings(settings);
+    },
+    setChatBubbleMessages(messages) {
+      if (!destroyed) scene.setChatBubbleMessages(messages);
+    },
+    setReducedMotion(reducedMotion) {
+      if (!destroyed) scene.setReducedMotion(reducedMotion);
     },
     setSelectedRemotePresence(presenceId) {
       if (!destroyed) scene.setSelectedRemotePresence(presenceId);

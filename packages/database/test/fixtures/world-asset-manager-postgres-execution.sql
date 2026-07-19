@@ -1863,6 +1863,100 @@ begin
 end;
 $$;
 
+do $$
+declare
+  registry_immutable boolean := false;
+  published_version_id uuid;
+  deliveries jsonb;
+begin
+  perform pg_temp.assert_asset_true(
+    (select count(*) = 1 from public.world_asset_bundled_manifests)
+      and exists (
+        select 1
+        from public.world_asset_bundled_manifests
+        where manifest_version = '1.0.0'
+          and source_kind = 'repository_procedural'
+          and readiness_status = 'technical_baseline'
+          and owner_accepted_by_admin_id is null
+          and owner_accepted_at is null
+          and acceptance_evidence is null
+      )
+      and (select count(*) = 106
+        from public.world_asset_bundled_manifest_registry
+        where manifest_version = '1.0.0'
+          and source_kind = 'repository_procedural'
+          and quality_status = 'technical_baseline')
+      and not exists (
+        select 1
+        from public.world_asset_bundled_manifest_registry
+        where source_kind = 'repository_authored'
+           or manifest_version <> '1.0.0'
+      ),
+    'Phase 12D registers only truthful immutable v1 development identities'
+  );
+
+  perform pg_temp.assert_asset_true(
+    not exists (
+      select 1
+      from public.world_asset_bundled_manifest_registry as registry
+      join public.world_assets as asset on asset.id = registry.world_asset_id
+      join public.world_asset_versions as version
+        on version.world_asset_id = registry.world_asset_id
+       and version.id = registry.world_asset_version_id
+      where registry.asset_key <> asset.asset_key
+         or registry.asset_checksum_sha256 <> version.checksum_sha256
+         or asset.bundled_default_version_id <> registry.world_asset_version_id
+         or asset.bundled_manifest_version <> registry.manifest_version
+    ),
+    'the additive registry preserves exact v1 asset versions and bundled-default pointers'
+  );
+
+  begin
+    update public.world_asset_bundled_manifests
+    set readiness_status = 'final'
+    where manifest_version = '1.0.0';
+  exception when insufficient_privilege then
+    registry_immutable :=
+      sqlerrm = 'ASSET_BUNDLED_MANIFEST_REGISTRY_IMMUTABLE';
+  end;
+  perform pg_temp.assert_asset_true(
+    registry_immutable,
+    'bundled manifest readiness cannot be promoted in place'
+  );
+
+  select id into strict published_version_id
+  from public.world_map_versions
+  where lifecycle_status = 'published'
+  order by version_number, id
+  limit 1;
+  deliveries := private.world_asset_deliveries_for_version(published_version_id);
+  perform pg_temp.assert_asset_true(
+    jsonb_array_length(deliveries) > 0
+      and not exists (
+        select 1
+        from jsonb_array_elements(deliveries) as delivery(value)
+        where delivery.value ? 'materialClass'
+      ),
+    'existing v1 database delivery JSON remains backward compatible'
+  );
+
+  perform pg_temp.assert_asset_true(
+    (select relrowsecurity and relforcerowsecurity
+      from pg_class where oid = 'public.world_asset_bundled_manifests'::regclass)
+      and (select relrowsecurity and relforcerowsecurity
+        from pg_class
+        where oid = 'public.world_asset_bundled_manifest_registry'::regclass)
+      and not has_table_privilege(
+        'authenticated', 'public.world_asset_bundled_manifests', 'select'
+      )
+      and not has_table_privilege(
+        'authenticated', 'public.world_asset_bundled_manifest_registry', 'select'
+      ),
+    'the multi-version registry remains forced-RLS and server-private'
+  );
+end;
+$$;
+
 select 'world-asset-manager postgres execution assertions passed' as result;
 
 rollback;

@@ -64,6 +64,11 @@ export default async function OperationsPage() {
           </div>
           <span className="permission-badge">Observed {formatDate(summary.generatedAt)}</span>
         </header>
+        <p>
+          <Link className="button button--primary" href="/operations/beta-readiness">
+            Review Beta Readiness
+          </Link>
+        </p>
         {hasAdminPermission(context, 'live_operations.read') ? (
           <p>
             <Link className="button button--primary" href="/operations/live">

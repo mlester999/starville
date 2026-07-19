@@ -269,6 +269,22 @@ describe('world object asset rendering', () => {
     expect(result.mediaUrl).toBe('/api/bundled-assets/fence-willow/source?rotation=90');
   });
 
+  it('matches runtime by refusing to rotate a single uploaded image into another direction', () => {
+    const pinned = resolve([candidate()], {
+      object: { ...object, rotation: 90 },
+      pins: [pin()],
+    });
+    const active = resolve([candidate()], { object: { ...object, rotation: 90 } });
+
+    expect(pinned.reason).toBe('bundled_fallback');
+    expect(pinned.source).toBe('bundled_default');
+    expect(pinned.renderedVersionId).toBeNull();
+    expect(pinned.explanation).toContain('without rotating the upload');
+    expect(active.reason).toBe('bundled_fallback');
+    expect(active.source).toBe('bundled_default');
+    expect(active.renderedVersionId).toBeNull();
+  });
+
   it('uses the stable bundled missing visual for an unknown allowlisted manifest key', () => {
     const result = resolve([], {
       object: { ...object, assetId: 'world.unknown.fixture' },
@@ -285,8 +301,15 @@ describe('world object asset rendering', () => {
     expect(resolve([candidate()], { mode: 'assets' }).status).toBe('asset');
   });
 
-  it('uses configured render dimensions, scale, and foot anchor for placement', () => {
-    const metrics = worldAssetCanvasMetrics(candidate());
-    expect(metrics).toEqual({ width: 64, height: 80, x: -32, y: -72 });
+  it('uses shared category scale and manifest projection without arbitrary canvas clamps', () => {
+    const metrics = worldAssetCanvasMetrics(candidate(), {
+      kind: 'tree',
+      tileWidth: 96,
+      projectedHalfTileWidth: 24,
+    });
+    expect(metrics.width).toBeCloseTo(74.24);
+    expect(metrics.height).toBeCloseTo(92.8);
+    expect(metrics.x).toBeCloseTo(-37.12);
+    expect(metrics.y).toBeCloseTo(-83.52);
   });
 });

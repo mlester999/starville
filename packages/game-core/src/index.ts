@@ -6,3 +6,5 @@ export * from './isometric';
 export * from './lantern-square';
 export * from './manifest';
 export * from './movement';
+export * from './visual-policy';
+export * from './world-asset-dependencies';

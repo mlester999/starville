@@ -5,7 +5,8 @@ import { z } from 'zod';
 import { WorldDraftPreview } from '../../../../../components/world-draft-preview';
 import { AdminApiError } from '../../../../../lib/admin-api';
 import { requireAuthorizedAdmin } from '../../../../../lib/auth/authorization';
-import { loadWorldPreview } from '../../../../../lib/worlds/api';
+import { loadWorldDraft, loadWorldPreview } from '../../../../../lib/worlds/api';
+import { exactDraftPreviewAssetPins } from '../../../../../lib/worlds/preview-parity';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -15,13 +16,22 @@ export default async function WorldPreviewPage(props: {
   readonly searchParams: Promise<Readonly<Record<string, string | string[] | undefined>>>;
 }) {
   await requireAuthorizedAdmin('maps.preview');
+  await requireAuthorizedAdmin('maps.edit');
+  await requireAuthorizedAdmin('assets.read');
   const { mapId } = await props.params;
   const versionValue = (await props.searchParams)['version'];
   const version = z.uuid().safeParse(typeof versionValue === 'string' ? versionValue : undefined);
   if (!version.success) notFound();
 
   try {
-    const preview = await loadWorldPreview(mapId, version.data);
+    const [preview, draft] = await Promise.all([
+      loadWorldPreview(mapId, version.data),
+      loadWorldDraft(mapId, version.data),
+    ]);
+    const assetPins = exactDraftPreviewAssetPins(preview, draft, preview.manifest.assets);
+    if (assetPins === null) {
+      throw new Error('Exact Draft Preview revision or asset-pin coverage mismatch.');
+    }
     return (
       <main className="world-preview-page" aria-labelledby="preview-title">
         <header className="operations-intro">
@@ -36,14 +46,22 @@ export default async function WorldPreviewPage(props: {
               <code>{preview.version.checksum?.slice(0, 16) ?? 'unavailable'}…</code>
             </p>
           </div>
-          <Link
-            className="button button--secondary"
-            href={`/worlds/${mapId}/editor?version=${preview.version.id}`}
-          >
-            Return to editor
-          </Link>
+          <div className="world-assets-intro__actions">
+            <Link
+              className="button button--secondary"
+              href={`/worlds/visual-readiness?mapId=${preview.map.id}&version=${preview.version.id}`}
+            >
+              Visual Readiness
+            </Link>
+            <Link
+              className="button button--secondary"
+              href={`/worlds/${mapId}/editor?version=${preview.version.id}`}
+            >
+              Return to editor
+            </Link>
+          </div>
         </header>
-        <WorldDraftPreview preview={preview} />
+        <WorldDraftPreview assetPins={assetPins} preview={preview} />
       </main>
     );
   } catch (error) {

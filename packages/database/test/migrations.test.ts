@@ -1241,9 +1241,13 @@ describe('Phase 6 world-management migrations', () => {
       expect(worldManagementTestSql).toContain(`'${assetKey}'`);
     }
 
-    expect(worldManagementTestSql).toContain('count(*) = count(distinct asset.asset_key)');
+    expect(worldManagementTestSql).toContain('count(*) = count(distinct catalog.asset_key)');
     expect(worldManagementTestSql).toContain("asset.approval_status = 'approved'");
     expect(worldManagementTestSql).toContain("asset.production_status = 'development_marker'");
+    expect(worldManagementTestSql).toContain("'starville-procedural:v1:' || catalog.asset_key");
+    expect(worldManagementTestSql).toContain(
+      'no procedural asset exists outside the reviewed bundled catalog',
+    );
     expect(worldManagementTestSql).not.toContain(
       'the reviewed procedural catalog contains fifteen stable assets',
     );
@@ -2925,6 +2929,74 @@ describe('Phase 11C General Store migration chain', () => {
   });
 });
 
+describe('hosted cozy-gameplay canonical seed contract', () => {
+  const testSql = readFileSync(
+    new URL('../../../infrastructure/supabase/tests/cozy_gameplay.test.sql', import.meta.url),
+    'utf8',
+  );
+
+  it('parses with PostgreSQL 17 grammar and accounts for the strengthened pgTAP plan', async () => {
+    const result = await new Parser({ version: 17 }).parse(testSql);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    expect(testSql).toContain('select plan(94);');
+    expect(testSql.match(/select set_eq\(/gu)).toHaveLength(5);
+    expect(testSql).toContain('select * from finish();');
+  });
+
+  it('pins all seven canonical recipes and their exact active versions without a global total', () => {
+    for (const identity of [
+      "'73000000-0000-4000-8000-000000000001'::uuid, 'moonbean-salad'",
+      "'73000000-0000-4000-8000-000000000002', 'sunroot-soup'",
+      "'73000000-0000-4000-8000-000000000003', 'cloudberry-tart'",
+      "'73000000-0000-4000-8000-000000000004', 'meadow-biscuit'",
+      "'73000000-0000-4000-8000-000000000005', 'garden-twine'",
+      "'73000000-0000-4000-8000-000000000006', 'willow-chair'",
+      "'b1100000-0000-4000-8000-000000000011', 'garden-soup'",
+      "'b1100000-0000-4000-8000-000000000107'",
+    ]) {
+      expect(testSql).toContain(identity);
+    }
+    expect(testSql).toContain('every approved canonical recipe key exists exactly once');
+    expect(testSql).toContain(
+      'all approved canonical recipes point to the exact enabled active version',
+    );
+    expect(testSql).not.toContain('six canonical recipes are seeded');
+    expect(testSql).not.toMatch(/count\(\*\)::integer from public\.cozy_recipe_definitions/iu);
+  });
+
+  it('pins all twelve base and active-version ingredient mappings and rejects duplicates or orphans', () => {
+    expect(testSql).toContain(
+      'all twelve approved canonical recipe ingredient mappings retain exact item identities and quantities',
+    );
+    expect(testSql).toContain(
+      "'b1100000-0000-4000-8000-000000000011', '71000000-0000-4000-8000-000000000004', 2",
+    );
+    expect(testSql).toContain('recipe ingredient recipe-item identities are unique');
+    expect(testSql).toContain('recipe ingredients contain no orphan recipe or item references');
+    expect(testSql).toContain(
+      'active recipe-version ingredients exactly match the approved canonical mappings',
+    );
+    expect(testSql).not.toContain('recipe ingredients are normalized exactly');
+    expect(testSql).not.toMatch(/count\(\*\)::integer from public\.cozy_recipe_ingredients/iu);
+  });
+
+  it('pins all seventeen offer identities and exact fixed-price contracts while allowing unrelated additions', () => {
+    for (let suffix = 11; suffix <= 24; suffix += 1) {
+      expect(testSql).toContain(`'74000000-0000-4000-8000-${String(suffix).padStart(12, '0')}'`);
+    }
+    for (const suffix of [20, 21, 22]) {
+      expect(testSql).toContain(`'c1100000-0000-4000-8000-${String(suffix).padStart(12, '0')}'`);
+    }
+    expect(testSql).toContain(
+      'all seventeen approved canonical General Store offers retain exact identities, prices, quantities, active state, and content versions',
+    );
+    expect(testSql).toContain('shop offer IDs and equivalent shop-item identities are unique');
+    expect(testSql).toContain('where offer.id in (');
+    expect(testSql).not.toContain('fourteen fixed-price offers are seeded');
+    expect(testSql).not.toMatch(/count\(\*\)::integer from public\.cozy_shop_offers/iu);
+  });
+});
+
 describe('Phase 11E housing migration chain', () => {
   const migrationDirectory = new URL(
     '../../../infrastructure/supabase/migrations/',
@@ -3244,5 +3316,165 @@ describe('Phase 12B bundled world-asset lifecycle migration', () => {
     expect(sql).toContain("'world'");
     expect(sql).toContain("'furniture'");
     expect(sql).toContain("'farming'");
+  });
+});
+
+describe('Phase 12 hosted-validation repair migration', () => {
+  const sql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260718121000_fix_phase12_hosted_validation.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const executionSql = readFileSync(
+    new URL('./fixtures/phase12a-postgres-execution.sql', import.meta.url),
+    'utf8',
+  );
+
+  it('adds one narrow private recovery overload without replacing inventory authority', async () => {
+    const result = await new Parser({ version: 17 }).parse(sql);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    expect(sql.match(/create function private\.cozy_add_item/gu)).toHaveLength(1);
+    expect(sql).not.toContain('create or replace function private.cozy_add_item');
+    expect(sql).toContain("p_reason <> 'starter_grant'");
+    expect(sql).toContain("p_reference_id <> 'onboarding_recovery'");
+    expect(sql).toContain('char_length(p_recovery_reference_id) not between 1 and 108');
+    expect(sql).toContain('char_length(p_idempotency_key) not between 16 and 128');
+    expect(sql).toContain("request_suffix := ':recovery:' || p_recovery_reference_id");
+    expect(sql).toContain('char_length(request_suffix) + 128');
+    expect(sql).toContain('right(p_request_id, char_length(request_suffix)) <> request_suffix');
+    expect(sql).toContain("'phase12a-recovery:' || encode(");
+    expect(sql).toContain("extensions.digest(convert_to(p_request_id, 'UTF8'), 'sha256')");
+    expect(sql).toContain('ledger_request_id');
+    expect(sql).toContain('return private.cozy_add_item(');
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain('from public, anon, authenticated, service_role');
+    expect(sql).not.toMatch(/grant execute/iu);
+  });
+
+  it('pins the maximum 128-character caller request to a bounded deterministic ledger id', () => {
+    expect(sql).toContain('when char_length(p_request_id) <= 128 then p_request_id');
+    expect(executionSql).toContain(
+      "public.reconcile_phase12a_player_experience(10,repeat('r',128))",
+    );
+    expect(executionSql).toContain("repeat('r',128)||':recovery:'||recovery_grant_id::text");
+    expect(executionSql).toContain('and char_length(request_id)<=128');
+
+    const composedRequestId = `${'r'.repeat(128)}:recovery:00000000-0000-4000-8000-000000000000`;
+    const boundedRequestId = `phase12a-recovery:${createHash('sha256').update(composedRequestId).digest('hex')}`;
+    expect(composedRequestId).toHaveLength(174);
+    expect(boundedRequestId).toHaveLength(82);
+  });
+});
+
+describe('Phase 12C world-manifest object contract migration', () => {
+  const sql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260718122000_phase12c_world_manifest_object_contract.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const executionSql = readFileSync(
+    new URL('./fixtures/world-postgres-execution.sql', import.meta.url),
+    'utf8',
+  );
+
+  it('parses and layers the canonical object contract over the prior validator', async () => {
+    const result = await new Parser({ version: 17 }).parse(sql);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    expect(sql).toContain('rename to validate_world_manifest_phase12b');
+    expect(sql).toContain('private.validate_world_manifest_phase12b(');
+    expect(sql).toContain("object.value - 'rotation'");
+    expect(sql).toContain("object.value ->> 'kind' = 'furniture'");
+    expect(sql).toContain("jsonb_set(object.value - 'rotation', '{kind}', '\"sign\"'::jsonb");
+  });
+
+  it('accepts only the exact optional rotation shape and quarter turns', () => {
+    expect(sql).toContain("array['assetId', 'id', 'kind', 'scale', 'x', 'y']::text[]");
+    expect(sql).toContain("array['assetId', 'id', 'kind', 'rotation', 'scale', 'x', 'y']::text[]");
+    expect(sql).toContain("jsonb_typeof(map_object -> 'rotation') <> 'number'");
+    expect(sql).toContain('rotation_value not in (0, 90, 180, 270)');
+    expect(sql).toContain("'INVALID_PHASE12C_MAP_OBJECT_ROTATION'");
+    expect(sql).toContain("'INVALID_PHASE12C_MAP_OBJECT'");
+    expect(executionSql).toContain('the canonical furniture object and rotation validate');
+    expect(executionSql).toContain('an unsupported furniture rotation is rejected');
+    expect(executionSql).toContain('a nonnumeric furniture rotation is rejected');
+    expect(executionSql).toContain('an extra map-object field is rejected');
+  });
+
+  it('adds only exact furniture asset compatibility and preserves private authority', () => {
+    expect(sql).toContain("when 'furniture' then p_object_kind = 'furniture'");
+    expect(executionSql).toContain('canonical furniture asset/object compatibility is allowed');
+    expect(executionSql).toContain(
+      'furniture assets remain incompatible with non-furniture map objects',
+    );
+    expect(executionSql).toContain(
+      'the Phase 12C validator and compatibility helper remain private',
+    );
+    expect(sql).toContain("set search_path = ''");
+    expect(sql).toContain('revoke all on function private.validate_world_manifest(uuid, jsonb)');
+    expect(sql).toContain(
+      'revoke all on function private.world_asset_object_kind_allowed(text, text)',
+    );
+    expect(sql).not.toMatch(/grant execute|create policy|alter table/iu);
+  });
+});
+
+describe('Phase 12D repository-authored bundled registry migration', () => {
+  const sql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260718123000_phase12d_repository_authored_bundled_registry.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  it('parses and creates an immutable stable-key plus manifest-version registry', async () => {
+    const result = await new Parser({ version: 17 }).parse(sql);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+    expect(sql).toContain('create table public.world_asset_bundled_manifests');
+    expect(sql).toContain('create table public.world_asset_bundled_manifest_registry');
+    expect(sql).toContain('primary key (asset_key, manifest_version)');
+    expect(sql).toContain('world_asset_bundled_manifest_registry_immutable');
+    expect(sql).toContain('ASSET_BUNDLED_MANIFEST_REGISTRY_IMMUTABLE');
+    expect(sql).toContain('force row level security');
+    expect(sql).not.toMatch(/create policy|grant (?:select|insert|update|delete)/iu);
+  });
+
+  it('adds an evidence-gated repository-authored candidate path without fake final approval', () => {
+    expect(sql).toContain("'repository_procedural', 'repository_authored'");
+    expect(sql).toContain(
+      "readiness_status in ('technical_baseline', 'production_candidate', 'final')",
+    );
+    expect(sql).toContain("readiness_status = 'final'");
+    expect(sql).toContain('owner_accepted_by_admin_id is not null');
+    expect(sql).toContain("registry.quality_status = 'final'");
+    expect(sql).toContain("manifest.readiness_status = 'final'");
+    expect(sql).toContain('REPOSITORY_AUTHORED_ASSET_NOT_OWNER_ACCEPTED');
+    expect(sql).not.toMatch(
+      /values\s*\(\s*'2\.0\.0'|set\s+(?:active_version_id|bundled_default_version_id)/iu,
+    );
+  });
+
+  it('seeds only truthful v1 identities and never rewrites assets, overrides, or world pins', () => {
+    expect(sql).toContain("'e86663780a9f890f97bcb436d1c7bfab5ab84b742b022f62757e357291c395df'");
+    expect(sql).toContain('catalog.manifest_version');
+    expect(sql).toContain("'repository_procedural'");
+    expect(sql).toContain("'technical_baseline'");
+    expect(sql).not.toMatch(/update\s+public\.world_assets\b/iu);
+    expect(sql).not.toMatch(/update\s+public\.world_asset_versions\b/iu);
+    expect(sql).not.toMatch(
+      /(?:insert\s+into|update|delete\s+from)\s+public\.world_map_version_assets\b/iu,
+    );
+  });
+
+  it('keeps v1 projection shape compatible while classifying exact authored candidates', () => {
+    expect(sql).toContain('create or replace function private.world_asset_deliveries_for_version');
+    expect(sql).toContain("when registry.source_kind = 'repository_authored' then");
+    expect(sql).toContain("jsonb_build_object('materialClass', 'bundled_candidate')");
+    expect(sql).toContain("when 'repository_procedural' then 'repository_procedural'");
+    expect(sql).toContain("when 'repository_authored' then 'repository_authored'");
   });
 });

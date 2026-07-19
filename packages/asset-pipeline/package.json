@@ -8,9 +8,12 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "check:phase12d": "tsx src/cli.ts check-phase12d",
+    "generate:phase12d": "tsx src/cli.ts generate-phase12d",
     "lint": "eslint src test --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "validate:phase12d": "tsx src/cli.ts validate-phase12d",
     "clean": "rimraf coverage .turbo",
     "generate": "tsx src/cli.ts generate",
     "validate": "tsx src/cli.ts validate",
@@ -21,6 +24,7 @@
   },
   "dependencies": {
     "@starville/asset-management": "workspace:*",
+    "@starville/game-core": "workspace:*",
     "sharp": "0.34.5"
   },
   "devDependencies": {

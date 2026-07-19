@@ -3,6 +3,9 @@ import { describe, expect, it } from 'vitest';
 import {
   STARVILLE_BUNDLED_ASSET_MANIFEST,
   STARVILLE_BUNDLED_ASSETS,
+  STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
+  STARVILLE_PHASE12D_CANDIDATE_ASSETS,
+  STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
   bundledAssetEntrySchema,
   bundledAssetManifestSchema,
   bundledAssetRuntimePath,
@@ -71,6 +74,16 @@ function repositoryDelivery(assetKey = 'tree-pine'): WorldAssetDelivery {
   };
 }
 
+function candidateRepositoryDelivery(assetKey = 'tree-pine'): WorldAssetDelivery {
+  return {
+    ...repositoryDelivery(assetKey),
+    versionId: '00000000-0000-4000-8000-000000000012',
+    checksum: 'c'.repeat(64),
+    materialClass: 'bundled_candidate',
+    bundledManifestVersion: STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+  };
+}
+
 describe('Starville bundled asset manifest', () => {
   it('provides a unique, typed, replaceable baseline without claiming final art', () => {
     expect(STARVILLE_BUNDLED_ASSETS.length).toBeGreaterThanOrEqual(80);
@@ -86,6 +99,44 @@ describe('Starville bundled asset manifest', () => {
       STARVILLE_BUNDLED_ASSETS.every(({ qualityStatus }) => qualityStatus === 'technical_baseline'),
     ).toBe(true);
     expect(getBundledAsset('system.missing-asset')?.replacementAllowed).toBe(false);
+  });
+
+  it('adds a versioned Phase 12D candidate without mutating v1 stable contracts', () => {
+    expect(STARVILLE_PHASE12D_CANDIDATE_ASSETS).toHaveLength(STARVILLE_BUNDLED_ASSETS.length);
+    expect(STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST.manifestVersion).toBe(
+      STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+    );
+    expect(
+      STARVILLE_PHASE12D_CANDIDATE_ASSETS.every(
+        ({ qualityStatus }) => qualityStatus === 'production_candidate',
+      ),
+    ).toBe(true);
+
+    for (const baseline of STARVILLE_BUNDLED_ASSETS) {
+      const candidate = getBundledAsset(
+        baseline.key,
+        STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+      );
+      expect(candidate).toBeDefined();
+      expect(candidate).toMatchObject({
+        key: baseline.key,
+        width: baseline.width,
+        height: baseline.height,
+        anchor: baseline.anchor,
+        footAnchor: baseline.footAnchor,
+        depthAnchor: baseline.depthAnchor,
+        footprint: baseline.footprint,
+        collision: baseline.collision,
+        supportedRotations: baseline.supportedRotations,
+        defaultRotation: baseline.defaultRotation,
+        safeFallbackKey: baseline.safeFallbackKey,
+        replacementAllowed: baseline.replacementAllowed,
+      });
+      expect(candidate?.sourcePath).toMatch(/^assets\/source-v2\//u);
+      expect(candidate?.runtimePath).toMatch(/^\/assets\/starville\/bundled\/v2\//u);
+      expect(baseline.sourcePath).toMatch(/^assets\/source\//u);
+      expect(baseline.runtimePath).toMatch(/^\/assets\/starville\/bundled\/v1\//u);
+    }
   });
 
   it('selects authored furniture rotations instead of rotating one flat bitmap', () => {
@@ -183,6 +234,34 @@ describe('canonical asset source resolution', () => {
     const url = new URL(resolution.url!, 'https://starville.local');
     expect(url.pathname).toBe(getBundledAsset('tree-pine')?.runtimePath);
     expect(url.searchParams.get('manifest')).toBe(STARVILLE_BUNDLED_ASSET_MANIFEST.manifestVersion);
+  });
+
+  it('resolves an exact Phase 12D candidate pin while leaving published defaults on v1', () => {
+    const pinned = resolveWorldAssetDelivery({
+      assetKey: 'tree-pine',
+      context: 'game_test',
+      delivery: candidateRepositoryDelivery(),
+    });
+    expect(pinned.reason).toBe('exact_pinned_bundled_version');
+    expect(pinned.bundled.bundledVersion).toBe(STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION);
+    expect(pinned.bundled.qualityStatus).toBe('production_candidate');
+    expect(new URL(pinned.url, 'https://starville.local').searchParams.get('manifest')).toBe(
+      STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+    );
+
+    const published = resolveAssetSource({
+      assetKey: 'tree-pine',
+      context: 'published_world',
+      preferredBundledManifestVersion: STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+    });
+    expect(published.bundled.bundledVersion).toBe('1.0.0');
+
+    const gameTest = resolveAssetSource({
+      assetKey: 'tree-pine',
+      context: 'game_test',
+      preferredBundledManifestVersion: STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+    });
+    expect(gameTest.bundled.bundledVersion).toBe(STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION);
   });
 
   it('uses an active approved upload only when no exact pin exists and policy allows it', () => {

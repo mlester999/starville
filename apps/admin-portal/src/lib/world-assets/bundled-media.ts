@@ -4,10 +4,12 @@ import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
 
 import {
   GLOBAL_ASSET_DERIVATIVE_MAX_BYTES,
+  STARVILLE_BUNDLED_MANIFEST_VERSION,
   bundledAssetRuntimePath,
   getBundledAsset,
   type AssetRotation,
   type BundledAssetEntry,
+  type BundledManifestVersion,
 } from '@starville/asset-management';
 
 export type BundledAdminMediaVariant = 'source' | 'thumbnail';
@@ -50,8 +52,12 @@ export function resolveBundledMediaDescriptor(input: {
   readonly variant: BundledAdminMediaVariant;
   readonly workspaceRoot: string;
   readonly rotation?: AssetRotation;
+  readonly manifestVersion?: BundledManifestVersion;
 }): BundledMediaDescriptor | null {
-  const asset = getBundledAsset(input.key);
+  const asset = getBundledAsset(
+    input.key,
+    input.manifestVersion ?? STARVILLE_BUNDLED_MANIFEST_VERSION,
+  );
   if (asset === undefined) return null;
   const manifestPath =
     input.variant === 'thumbnail'

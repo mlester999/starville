@@ -9,5 +9,8 @@ export default defineConfig({
   clean: true,
   splitting: false,
   dts: false,
+  banner: {
+    js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+  },
   noExternal: [/^@starville\//u],
 });

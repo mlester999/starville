@@ -162,6 +162,17 @@ export const ADMIN_ROUTE_METADATA: readonly {
     },
   },
   {
+    path: '/operations/beta-readiness',
+    meta: {
+      title: 'Beta Readiness',
+      description:
+        'Read-only local evidence, hosted and owner gates, deployment preparation, and non-destructive rollback preparation.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
+    },
+  },
+  {
     path: '/operations/player-experience',
     meta: {
       title: 'Player Experience',
@@ -254,6 +265,18 @@ export const ADMIN_ROUTE_METADATA: readonly {
       title: 'Token Access',
       description: 'Token gate and blockchain access configuration.',
       breadcrumbGroup: 'Administration',
+    },
+  },
+  {
+    path: '/worlds/visual-readiness',
+    exact: true,
+    meta: {
+      title: 'Visual Readiness',
+      description:
+        'Read-only camera, composition, viewport, HUD, and screenshot review for exact world revisions.',
+      breadcrumbGroup: 'World Management',
+      breadcrumbParent: 'Worlds',
+      parentHref: '/worlds',
     },
   },
   {

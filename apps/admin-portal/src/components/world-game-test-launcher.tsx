@@ -12,6 +12,16 @@ import {
 } from '../app/actions/world-game-test';
 import type { WorldGameTestStatus } from '../lib/worlds/game-test-api';
 import { buildGameTestReadiness } from '../lib/worlds/editor-usability';
+import {
+  WORLD_VISUAL_REVIEW_CHECKS,
+  WORLD_VISUAL_REVIEW_MODES,
+  worldVisualReviewMode,
+  worldVisualReviewViewport,
+  type WorldVisualReviewCheckId,
+  type WorldVisualReviewModeId,
+} from '../lib/worlds/visual-readiness-review';
+import { PremiumSelect } from './premium-select';
+import visualStyles from './world-game-test-visual-review.module.css';
 
 interface WorldGameTestLauncherProps {
   readonly mapId: string;
@@ -127,6 +137,12 @@ export function WorldGameTestLauncher(props: WorldGameTestLauncherProps) {
   const [checks, setChecks] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(CHECKS.map(([key]) => [key, false])),
   );
+  const [visualModeId, setVisualModeId] = useState<WorldVisualReviewModeId>('arrival_landmark');
+  const [visualChecks, setVisualChecks] = useState<ReadonlySet<WorldVisualReviewCheckId>>(
+    () => new Set(),
+  );
+  const visualMode = worldVisualReviewMode(visualModeId);
+  const visualViewport = worldVisualReviewViewport(visualMode.viewportId);
 
   useEffect(() => {
     if (evidenceSession?.returned !== true) return;
@@ -403,6 +419,90 @@ export function WorldGameTestLauncher(props: WorldGameTestLauncherProps) {
           </div>
         )}
       </details>
+      <details
+        className={visualStyles['review']}
+        data-phase12c-review="local-only"
+        open={evidenceSession !== null ? true : undefined}
+      >
+        <summary>Phase 12C review mode: {visualMode.label}</summary>
+        <div className={visualStyles['reviewBody']}>
+          <div className={visualStyles['reviewHeader']}>
+            <div>
+              <strong>Deterministic visual fixture</strong>
+              <p>
+                Local guidance only. Mode and checkmarks reset on reload and are not sent with the
+                launch grant or recorded evidence.
+              </p>
+            </div>
+            <Link
+              className="button button--quiet"
+              href={`/worlds/visual-readiness?mapId=${props.mapId}&version=${props.versionId}`}
+            >
+              Full Visual Readiness
+            </Link>
+          </div>
+          <div className={visualStyles['modeControl']}>
+            <label id="game-test-visual-mode-label">Review mode</label>
+            <PremiumSelect
+              aria-labelledby="game-test-visual-mode-label"
+              onChange={(value) => {
+                const next = WORLD_VISUAL_REVIEW_MODES.find(({ id }) => id === value);
+                if (next !== undefined) setVisualModeId(next.id);
+              }}
+              options={WORLD_VISUAL_REVIEW_MODES.map((mode) => ({
+                value: mode.id,
+                label: mode.label,
+                description: mode.purpose,
+              }))}
+              size="compact"
+              value={visualModeId}
+            />
+          </div>
+          <dl className={visualStyles['modeFacts']}>
+            <div>
+              <dt>Viewport</dt>
+              <dd>
+                {visualViewport.width}×{visualViewport.height} · {visualViewport.input}
+              </dd>
+            </div>
+            <div>
+              <dt>Fixture</dt>
+              <dd>{visualMode.fixture}</dd>
+            </div>
+          </dl>
+          <ol className={visualStyles['steps']}>
+            {visualMode.steps.map((step) => (
+              <li key={step}>{step}</li>
+            ))}
+          </ol>
+          <div className={visualStyles['checks']} aria-label={`${visualMode.label} local checks`}>
+            {visualMode.checkIds.map((checkId) => {
+              const check = WORLD_VISUAL_REVIEW_CHECKS.find(({ id }) => id === checkId);
+              if (check === undefined) return null;
+              return (
+                <label key={check.id}>
+                  <input
+                    checked={visualChecks.has(check.id)}
+                    onChange={() =>
+                      setVisualChecks((current) => {
+                        const next = new Set(current);
+                        if (next.has(check.id)) next.delete(check.id);
+                        else next.add(check.id);
+                        return next;
+                      })
+                    }
+                    type="checkbox"
+                  />
+                  <span>
+                    <strong>{check.label}</strong>
+                    <small>{check.guidance}</small>
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+      </details>
       {confirmationOpen ? (
         <div
           className="world-game-test-modal-backdrop"
@@ -447,6 +547,12 @@ export function WorldGameTestLauncher(props: WorldGameTestLauncherProps) {
               <div>
                 <dt>Session</dt>
                 <dd>20 minutes · private solo realtime</dd>
+              </div>
+              <div>
+                <dt>Local review mode</dt>
+                <dd>
+                  {visualMode.label} · {visualViewport.width}×{visualViewport.height}
+                </dd>
               </div>
             </dl>
             <p className="world-game-test-modal__warning">

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { WorldAssetBundledComparison } from './world-asset-bundled-comparison';
 
 describe('WorldAssetBundledComparison', () => {
-  it('shows four safe bundled-default comparison contexts and byte evidence without mutation', () => {
+  it('shows four safe baseline/candidate comparison contexts and byte evidence without mutation', () => {
     const markup = renderToStaticMarkup(
       <WorldAssetBundledComparison
         assetKey="tree-pine"
@@ -20,7 +20,10 @@ describe('WorldAssetBundledComparison', () => {
     expect(markup).toContain('Light background');
     expect(markup).toContain('Dark background');
     expect(markup).toContain('Isometric context');
-    expect(markup.match(/\/api\/bundled-assets\/tree-pine\/source/gu)).toHaveLength(4);
+    expect(markup.match(/\/api\/bundled-assets\/tree-pine\/source/gu)).toHaveLength(8);
+    expect(markup.match(/manifest=2\.0\.0/gu)).toHaveLength(4);
+    expect(markup).toContain('Phase 12D candidate');
+    expect(markup).toContain('production candidate · owner review pending');
     expect(markup).toContain('9.1 KB');
     expect(markup).toContain('File size');
     expect(markup).toContain('No eligible processed uploaded media');

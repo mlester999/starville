@@ -6,9 +6,10 @@ import {
   bundledAssetManifestSchema,
   type BundledAssetManifest,
 } from '@starville/asset-management';
+import { STARVILLE_VISUAL_TOKENS } from '@starville/game-core';
 import sharp from 'sharp';
 
-import { ASSET_BUDGETS, ASSET_OUTPUT_PATHS, REQUIRED_GAMEPLAY_ASSET_KEYS } from './constants';
+import { ASSET_BUDGETS, REQUIRED_GAMEPLAY_ASSET_KEYS, assetOutputPathsFor } from './constants';
 import {
   fileSize,
   formattedJson,
@@ -44,6 +45,107 @@ export type AssetValidationOptions = Readonly<{
   enforceGameplayCatalogReferences?: boolean;
 }>;
 
+/**
+ * Enforces the renderer-owned Phase 12C visual contract at the deterministic
+ * bundled-asset boundary. Schema validation remains responsible for data
+ * safety; these findings keep generation and validation aligned with the game
+ * and Composer presentation policy.
+ */
+export function validateBundledAssetVisualPolicy(
+  manifest: BundledAssetManifest,
+): readonly AssetValidationIssue[] {
+  const issues: AssetValidationIssue[] = [];
+  const projection = STARVILLE_VISUAL_TOKENS.projection;
+  const expectedLightDirection = projection.lightDirection.replaceAll('-', '_');
+  const expectedShadowDirection = projection.shadowDirection.replaceAll('-', '_');
+  const expectedObjectBase = projection.objectBase.replaceAll('-', '_');
+  if (
+    manifest.projection.tileWidth !== projection.tileWidth ||
+    manifest.projection.tileHeight !== projection.tileHeight ||
+    manifest.projection.lightDirection !== expectedLightDirection ||
+    manifest.projection.shadowDirection !== expectedShadowDirection ||
+    manifest.projection.objectBase !== expectedObjectBase
+  ) {
+    issues.push({
+      code: 'VISUAL_PROJECTION_POLICY',
+      path: 'projection',
+      message: `Bundled assets must use ${String(projection.tileWidth)}x${String(projection.tileHeight)} tiles, ${expectedLightDirection} light, ${expectedShadowDirection} shadows, and a ${expectedObjectBase} object base`,
+    });
+  }
+
+  for (const asset of manifest.assets) {
+    if (
+      asset.width > STARVILLE_VISUAL_TOKENS.performance.maximumWorldAssetDimension ||
+      asset.height > STARVILLE_VISUAL_TOKENS.performance.maximumWorldAssetDimension
+    ) {
+      issues.push({
+        code: 'VISUAL_ASSET_DIMENSION',
+        path: asset.key,
+        message: 'World asset dimensions exceed the shared visual-performance ceiling',
+      });
+    }
+
+    if (asset.animated) {
+      const frameWidth = asset.frameWidth ?? asset.width;
+      const frameHeight = asset.frameHeight ?? asset.height;
+      if (
+        asset.frameCount > STARVILLE_VISUAL_TOKENS.performance.maximumAnimationFrames ||
+        frameWidth * frameHeight > STARVILLE_VISUAL_TOKENS.performance.maximumAnimationFramePixels
+      ) {
+        issues.push({
+          code: 'VISUAL_ANIMATION_BUDGET',
+          path: asset.key,
+          message: 'Animation frame count or decoded frame area exceeds the shared visual budget',
+        });
+      }
+    }
+
+    const isGroundOrInterface =
+      asset.renderLayer === 'ground' ||
+      asset.renderLayer === 'ground_detail' ||
+      asset.renderLayer === 'interface';
+    if (
+      !isGroundOrInterface &&
+      (asset.footAnchor.x < 0.2 ||
+        asset.footAnchor.x > 0.8 ||
+        asset.footAnchor.y < 0.55 ||
+        asset.footAnchor.y > 1)
+    ) {
+      issues.push({
+        code: 'VISUAL_FOOT_ANCHOR',
+        path: asset.key,
+        message: 'World-object foot anchor must remain inside the lower central visual base',
+      });
+    }
+    if (
+      !isGroundOrInterface &&
+      (Math.abs(asset.footAnchor.x - asset.depthAnchor.x) > 0.2 ||
+        Math.abs(asset.footAnchor.y - asset.depthAnchor.y) > 0.2)
+    ) {
+      issues.push({
+        code: 'VISUAL_DEPTH_ANCHOR',
+        path: asset.key,
+        message: 'Depth anchor is too far from the declared ground-contact anchor',
+      });
+    }
+
+    if (
+      (asset.assetType === 'building' ||
+        asset.assetType === 'shop' ||
+        asset.assetType === 'home_entrance') &&
+      asset.height * asset.recommendedScale <
+        STARVILLE_VISUAL_TOKENS.referencePixels.doorHeight * 1.5
+    ) {
+      issues.push({
+        code: 'VISUAL_CHARACTER_DOOR_SCALE',
+        path: asset.key,
+        message: 'Structure render height is too small for the shared character-to-door scale',
+      });
+    }
+  }
+  return issues;
+}
+
 export async function validateBundledAssets(
   workspaceRoot: string,
   manifest: BundledAssetManifest = STARVILLE_BUNDLED_ASSET_MANIFEST,
@@ -64,12 +166,13 @@ export async function validateBundledAssets(
   }
 
   const descriptors = assetFileDescriptors(manifest);
+  issues.push(...validateBundledAssetVisualPolicy(manifest));
   validateDescriptorPaths(workspaceRoot, descriptors, issues);
   validateAliases(manifest, issues);
   if (options.enforceGameplayCatalogReferences ?? manifest === STARVILLE_BUNDLED_ASSET_MANIFEST) {
     validateGameplayCatalogReferences(manifest, issues);
   }
-  await validateManagedPathCase(workspaceRoot, descriptors, issues);
+  await validateManagedPathCase(workspaceRoot, manifest, descriptors, issues);
 
   let totalBytes = 0;
   for (const descriptor of descriptors) {
@@ -107,24 +210,25 @@ export async function validateBundledAssets(
     });
   }
 
-  await validateOrphans(workspaceRoot, descriptors, issues);
+  await validateOrphans(workspaceRoot, manifest, descriptors, issues);
+  const outputPaths = assetOutputPathsFor(manifest.manifestVersion);
   await validateOutput(
     workspaceRoot,
-    ASSET_OUTPUT_PATHS.manifest,
+    outputPaths.manifest,
     await formattedJson(manifest),
     'MANIFEST_OUTPUT_STALE',
     issues,
   );
   await validateOutput(
     workspaceRoot,
-    ASSET_OUTPUT_PATHS.coverage,
+    outputPaths.coverage,
     await formattedJson(buildCoverageReport(manifest)),
     'COVERAGE_OUTPUT_STALE',
     issues,
   );
   await validateOutput(
     workspaceRoot,
-    ASSET_OUTPUT_PATHS.sizes,
+    outputPaths.sizes,
     await formattedJson(await buildSizeReport(workspaceRoot, manifest)),
     'SIZE_OUTPUT_STALE',
     issues,
@@ -218,15 +322,13 @@ function validateGameplayCatalogReferences(
 
 async function validateManagedPathCase(
   workspaceRoot: string,
+  manifest: BundledAssetManifest,
   descriptors: readonly AssetFileDescriptor[],
   issues: AssetValidationIssue[],
 ): Promise<void> {
   const actualRelativePaths = (
     await Promise.all(
-      [
-        resolveAssetFilesystemPath(workspaceRoot, 'assets/source'),
-        resolveAssetFilesystemPath(workspaceRoot, '/assets/starville/bundled/v1'),
-      ].map((root) => listFilesRecursively(root)),
+      managedMediaRoots(workspaceRoot, manifest).map((root) => listFilesRecursively(root)),
     )
   )
     .flat()
@@ -394,6 +496,7 @@ async function validateTransparentEdgeMargin(
 
 async function validateOrphans(
   workspaceRoot: string,
+  manifest: BundledAssetManifest,
   descriptors: readonly AssetFileDescriptor[],
   issues: AssetValidationIssue[],
 ): Promise<void> {
@@ -402,10 +505,7 @@ async function validateOrphans(
       path.normalize(resolveAssetFilesystemPath(workspaceRoot, manifestPath)),
     ),
   );
-  const roots = [
-    resolveAssetFilesystemPath(workspaceRoot, 'assets/source'),
-    resolveAssetFilesystemPath(workspaceRoot, '/assets/starville/bundled/v1'),
-  ];
+  const roots = managedMediaRoots(workspaceRoot, manifest);
   for (const root of roots) {
     for (const filePath of await listFilesRecursively(root)) {
       if (!/\.(?:svg|webp)$/u.test(filePath)) continue;
@@ -418,6 +518,20 @@ async function validateOrphans(
       }
     }
   }
+}
+
+function managedMediaRoots(
+  workspaceRoot: string,
+  manifest: BundledAssetManifest,
+): readonly string[] {
+  const phase12d = manifest.manifestVersion === '2.0.0';
+  return [
+    resolveAssetFilesystemPath(workspaceRoot, phase12d ? 'assets/source-v2' : 'assets/source'),
+    resolveAssetFilesystemPath(
+      workspaceRoot,
+      phase12d ? '/assets/starville/bundled/v2' : '/assets/starville/bundled/v1',
+    ),
+  ];
 }
 
 async function validateOutput(

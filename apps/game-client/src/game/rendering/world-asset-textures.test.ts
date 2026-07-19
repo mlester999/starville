@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('phaser', () => ({
   default: {
@@ -19,6 +19,7 @@ import {
 } from '@starville/asset-management';
 import { lanternSquareManifest } from '@starville/game-core';
 
+import type { WorldAssetFallbackEvent } from '../contracts';
 import {
   BUNDLED_TERRAIN_ASSET_KEYS,
   isProductionWorldAssetDelivery,
@@ -27,6 +28,7 @@ import {
   worldAssetRenderPlacement,
   worldAssetTextureKey,
 } from './world-asset-textures';
+import { sessionAssetFailureRegistry } from '../../app/asset-failure-registry';
 
 const production: WorldAssetDelivery = {
   assetKey: 'moonpetal-cottage',
@@ -51,6 +53,8 @@ const production: WorldAssetDelivery = {
   defaultRotation: 0,
   developmentMarker: false,
 };
+
+beforeEach(() => sessionAssetFailureRegistry.clear());
 
 describe('world asset texture boundary', () => {
   it('uses pinned identity and checksum without exposing the delivery URL in texture keys', () => {
@@ -145,6 +149,7 @@ describe('world asset texture boundary', () => {
         code: 'WORLD_ASSET_LOAD_FAILED',
         assetKey: production.assetKey,
         versionId: production.versionId,
+        requestId: expect.any(String),
       },
     ]);
     expect(JSON.stringify(failures)).not.toContain('assets.example.test');
@@ -307,7 +312,37 @@ describe('world asset texture boundary', () => {
         code: 'WORLD_ASSET_LOAD_FAILED',
         assetKey: 'tree-pine',
         versionId: 'bundled-manifest:1.0.0',
+        requestId: expect.any(String),
       },
     ]);
+  });
+
+  it('suppresses the same failed cache identity across repeated world loads', () => {
+    let loadErrorHandler: ((file: { readonly key: string }) => void) | undefined;
+    const scene = {
+      load: {
+        setCORS: vi.fn(),
+        image: vi.fn(),
+        on: vi.fn((_event: string, handler: typeof loadErrorHandler) => {
+          loadErrorHandler = handler;
+        }),
+        off: vi.fn(),
+        once: vi.fn(),
+      },
+      textures: { exists: vi.fn(() => false) },
+    };
+    const failures: WorldAssetFallbackEvent[] = [];
+    queueWorldAssetTextures(scene as never, [production], (failure) => failures.push(failure));
+    loadErrorHandler?.({ key: worldAssetTextureKey(production) });
+    const firstAttemptCount = scene.load.image.mock.calls.filter(
+      ([key]) => key === worldAssetTextureKey(production),
+    ).length;
+
+    queueWorldAssetTextures(scene as never, [production], (failure) => failures.push(failure));
+
+    expect(
+      scene.load.image.mock.calls.filter(([key]) => key === worldAssetTextureKey(production)),
+    ).toHaveLength(firstAttemptCount);
+    expect(failures).toHaveLength(1);
   });
 });

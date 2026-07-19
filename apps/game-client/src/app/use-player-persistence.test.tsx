@@ -37,6 +37,9 @@ function Harness({ onAccessInvalid }: { readonly onAccessInvalid: () => void }) 
       >
         Save
       </button>
+      <button onClick={persistence.retry} type="button">
+        Retry
+      </button>
     </div>
   );
 }
@@ -166,6 +169,54 @@ describe('usePlayerPersistence', () => {
     });
 
     expect(onAccessInvalid).toHaveBeenCalledTimes(1);
+  });
+
+  it('retains the newest safe checkpoint for one explicit retry without a retry storm', async () => {
+    globalThis.fetch = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json(
+          {
+            success: false,
+            error: { code: 'PLAYER_PERSISTENCE_UNAVAILABLE' },
+            requestId: 'save-request-1',
+          },
+          { status: 503 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        Response.json({
+          success: true,
+          data: {
+            mapId: 'lantern-square',
+            x: 12.5,
+            y: 8,
+            facingDirection: 'east',
+            gameStateVersion: 2,
+          },
+        }),
+      );
+    await act(async () => root.render(<Harness onAccessInvalid={vi.fn()} />));
+    const button = (label: string) =>
+      [...container.querySelectorAll<HTMLButtonElement>('button')].find(
+        (candidate) => candidate.textContent === label,
+      );
+
+    await act(async () => {
+      button('Save')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(container.querySelector('[data-testid="save-status"]')?.textContent).toBe('unavailable');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      button('Retry')?.click();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(container.querySelector('[data-testid="save-status"]')?.textContent).toBe('saved');
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('drops stale checkpoints during travel and resumes from the authoritative destination version', async () => {

@@ -4,14 +4,37 @@ Starville is a premium 2D isometric cozy multiplayer life-simulation game platfo
 contains the public website, player client, administrator portal, authoritative API, dedicated
 real-time service, background worker, shared packages, and Supabase infrastructure.
 
-The active implementation scope is **Phase 12B: visual asset production, the bundled default asset
-pack, stable-key resolution, world-art integration, World Composer coverage, and optional protected
-Admin overrides**. The repository now owns an original deterministic technical-baseline pack, so
-normal gameplay does not require an uploaded asset. Exact immutable world pins remain authoritative;
-eligible owner uploads are optional versioned replacements, and restoring the bundled default
-preserves upload and audit history. The complete local asset and monorepo validation gates pass;
-hosted validation and owner visual acceptance remain separate and pending. No hosted asset, world,
-player, economy, Auth, or platform data was changed.
+The active implementation scope is **Phase 12E: V2 World Integration, Environmental Ambience, Visual
+Polish, Production Hardening, and Beta Readiness**. Its repository status is **PHASE 12E BETA
+CANDIDATE READY, HOSTED AND OWNER GATES PENDING**. The local implementation and validation matrix is
+complete; Phase 12E is not hosted validated, owner accepted, deployed, or production ready. The
+current local candidate preserves the 47-object/36-collision unpublished Lantern Square composition,
+adds a ninth nonblocking semantic interaction, keeps V1 as normal published play, and reviews exact
+V2 candidate media only through explicit local or protected nonpersistent paths. It also brings
+together the 24-state character rig, bounded object ambience, semantic interaction markers,
+coordinated recovery, performance and accessibility evidence, the integrated Game Test scenario, and
+the authorized Admin Beta Readiness projection. Exact results are recorded in the Phase 12E local
+validation and final reports. Protected signed-in browser review, hosted pgTAP/RLS, and owner
+acceptance remain pending. No hosted asset, world, player, economy, Auth, or platform data was
+changed.
+
+Phase 12D is locally implemented as a **production candidate, not FINAL**. It supplies the additive
+V2 manifest `2.0.0`, 106 stable keys, 19 variants, seven aliases, and the eight-direction
+idle/walk/jog character rig. Its runtime hotfix restores V1 as the unrequested default and confines
+V2 review to explicit local or protected Game Test contexts. Protected product review, hosted
+validation, and owner acceptance remain pending; V2 has not been activated or published.
+
+Phase 12C remains the preserved local world-composition and renderer foundation: the shared 96×48
+isometric policy, scale/depth/contact shadows, camera framing, terrain ambience, HUD presentation,
+touch movement, bounded labels/chat bubbles, Composer preview, and deterministic Game Test fixtures.
+Its historical reports remain useful evidence, but Phase 12C is no longer the active implementation
+scope.
+
+Phase 12B remains locally complete with hosted validation pending. Its original deterministic
+technical-baseline pack, stable-key resolution, exact immutable world pins, World Composer coverage,
+and optional protected Admin overrides remain the asset foundation beneath Phases 12C–12E. Phase
+12D's V2 work remains candidate material and does not retroactively turn the V1 baseline into final
+production artwork.
 
 Phase 12A remains locally complete with hosted migration validation and signed-in owner acceptance
 pending. Its core gameplay integration, guided onboarding, starter quest, Daily Rhythm, world
@@ -427,6 +450,51 @@ owner-controlled wallet holding the configured threshold.
   existing procedural marker for an individual load failure without changing collision, saving,
   travel, access, or server authority.
 
+## Phase 12C visual behavior
+
+- `@starville/game-core` owns the canonical 96×48 projection, scale, camera, depth, shadow,
+  ambience, label, bubble, UI, and visual-performance tokens. The bundled asset pipeline imports
+  those tokens for projection, anchor, structure-scale, dimension, and animation-budget checks.
+- The Game Client recomputes bounded camera framing on resize, draws a non-walkable decorative
+  terrain apron, softens normal terrain seams, applies deterministic grass/water detail, and keeps
+  collision, interaction, movement, and save bounds unchanged.
+- The local Lantern Square draft contains 47 objects and 36 collision shapes. Shared readiness
+  reports zero errors and zero warnings; its only recommendation was the then-truthful temporary-art
+  handoff to Phase 12D. Phase 12D now supplies candidate material rather than final owner-approved
+  art, and the published source manifest remains unchanged.
+- Draft Preview renders only after its independently authorized read supplies exact immutable asset
+  pins for the same map, version, and checksum. Visual Readiness loads one exact server revision and
+  keeps all manual checkmarks browser-local.
+- The protected no-progression Game Test uses the production `GameCanvas` after a valid grant. Its
+  exact authorized revision is the default source; an authorized Lantern Square session may
+  explicitly select the labeled unpublished local composition with bundled-only in-memory
+  deliveries. It adds deterministic one-player, eleven-player, bubble, depth, low-quality,
+  reduced-motion, and compact/expanded HUD controls without a public or offline access bypass.
+- Phone-width touch controls feed the same collision-safe movement pipeline as keyboard input.
+  Structural responsive and accessibility tests pass locally, while actual renderer captures,
+  200-percent browser zoom, device memory/GPU measurements, and signed-in parity remain owner
+  acceptance work.
+
+## Phase 12E local beta-candidate behavior
+
+- Normal published play remains on immutable V1 pins. V2 is an explicit local/protected candidate
+  selection only and cannot activate, publish, persist a version choice, or rewrite player state.
+- The immutable Phase 12E Lantern Square candidate derives from the 47-object, 36-collision source
+  draft, preserves existing object/spawn/exit identities, and adds one safely reachable semantic
+  photo-garden interaction for nine interactions total.
+- Candidate visual dependencies retain the 19 authoritative world keys and separately project five
+  marker keys. Collision, interaction ranges, scale, foot anchors, and depth anchors remain
+  independent of media success or fallback.
+- Object ambience is presentation-only and deterministic, with at most 16 simultaneous animations.
+  Low quality disables it; Reduced Motion keeps static landmark feedback without continuous object
+  animation; travel and shutdown dispose owned nodes and tweens.
+- One semantic marker model covers nearest targets, onboarding, quest, unavailable, and landmark
+  presentation with small depth-aware indicators, high-contrast geometry, Reduced Motion behavior,
+  and exact-media/V1/procedural fallback diagnostics.
+- The full local validation matrix, hosted service/database gates, physical-device and signed-in
+  browser review, and every owner checklist item remain pending. These repository features are beta
+  candidate evidence, not acceptance or production readiness.
+
 ## Security foundation
 
 - Browser code can import only explicitly public environment values and anonymous/publishable
@@ -468,6 +536,23 @@ their pages, APIs, or business operations have been implemented.
 
 ## Architecture references
 
+- [Phase 12E beta-candidate architecture](docs/architecture/phase-12e-beta-readiness.md)
+- [Phase 12E beta trust boundaries](docs/security/phase-12e-beta-trust-boundaries.md)
+- [Phase 12E roadmap and reconciliation](docs/roadmap/phase-12e-reconciliation.md)
+- [Phase 12E owner acceptance checklist](docs/deployment/phase-12e-owner-acceptance.md)
+- [Phase 12E maintenance drill](docs/deployment/phase-12e-maintenance-drill.md)
+- [Phase 12D final-art and character-production architecture](docs/architecture/phase-12d-final-art-and-character-production.md)
+- [Phase 12D visual trust boundaries](docs/security/phase-12d-visual-trust-boundaries.md)
+- [Phase 12D roadmap and reconciliation](docs/roadmap/phase-12d-reconciliation.md)
+- [Phase 12D runtime integration hotfix report](docs/deployment/phase-12d-runtime-integration-hotfix-report.md)
+- [Phase 12C world visual-overhaul architecture](docs/architecture/phase-12c-world-visual-overhaul.md)
+- [Starville visual art bible](docs/assets/starville-visual-art-bible.md)
+- [Phase 12D replacement priorities](docs/assets/phase-12d-replacement-priorities.md)
+- [Phase 12C visual trust boundaries](docs/security/phase-12c-visual-trust-boundaries.md)
+- [Phase 12C roadmap and reconciliation](docs/roadmap/phase-12c-reconciliation.md)
+- [Phase 12C local validation report](docs/deployment/phase-12c-local-validation-report.md)
+- [Phase 12C final report](docs/deployment/phase-12c-final-report.md)
+- [Phase 12C owner acceptance checklist](docs/deployment/phase-12c-owner-acceptance.md)
 - [Phase 12B visual-asset architecture](docs/architecture/phase-12b-visual-assets.md)
 - [Phase 12B bundled defaults and performance budgets](docs/assets/phase-12b-bundled-defaults.md)
 - [Starville isometric asset guide](docs/assets/starville-isometric-asset-guide.md)

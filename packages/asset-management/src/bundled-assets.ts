@@ -7,9 +7,34 @@ import {
   assetRotationSchema,
 } from './contracts';
 import { assetCategorySchema, assetTypeSchema } from './profiles';
+import {
+  STARVILLE_BUNDLED_MANIFEST_VERSION,
+  STARVILLE_BUNDLED_PUBLIC_ROOT,
+  STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+  STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT,
+  bundledManifestVersionSchema,
+  type BundledManifestVersion,
+} from './bundled-versions';
 
-export const STARVILLE_BUNDLED_MANIFEST_VERSION = '1.0.0' as const;
-export const STARVILLE_BUNDLED_PUBLIC_ROOT = '/assets/starville/bundled/v1' as const;
+export {
+  STARVILLE_BUNDLED_MANIFEST_VERSION,
+  STARVILLE_BUNDLED_MANIFEST_VERSIONS,
+  STARVILLE_BUNDLED_PUBLIC_ROOT,
+  STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+  STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT,
+  bundledManifestVersionSchema,
+  type BundledManifestVersion,
+} from './bundled-versions';
+
+export const bundledAssetQualityStatusSchema = z.enum([
+  'technical_baseline',
+  'production_candidate',
+  'final',
+  'needs_refinement',
+  'needs_owner_replacement',
+  'blocking',
+]);
+export type BundledAssetQualityStatus = z.infer<typeof bundledAssetQualityStatusSchema>;
 
 export const bundledAssetRenderLayerSchema = z.enum([
   'ground',
@@ -48,8 +73,8 @@ export const bundledAssetVariantSchema = z
       .string()
       .regex(/^[a-z][a-z0-9_-]*$/u)
       .nullable(),
-    sourcePath: z.string().regex(/^assets\/source\/[a-z0-9_./-]+\.svg$/u),
-    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v1\/[a-z0-9_./-]+\.webp$/u),
+    sourcePath: z.string().regex(/^assets\/(?:source|source-v2)\/[a-z0-9_./-]+\.svg$/u),
+    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v[12]\/[a-z0-9_./-]+\.webp$/u),
   })
   .strict();
 export type BundledAssetVariant = z.infer<typeof bundledAssetVariantSchema>;
@@ -62,11 +87,11 @@ export const bundledAssetEntrySchema = z
     displayName: z.string().trim().min(1).max(100),
     description: z.string().trim().min(8).max(280),
     sourceType: z.literal('bundled_svg'),
-    sourcePath: z.string().regex(/^assets\/source\/[a-z0-9_./-]+\.svg$/u),
-    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v1\/[a-z0-9_./-]+\.webp$/u),
+    sourcePath: z.string().regex(/^assets\/(?:source|source-v2)\/[a-z0-9_./-]+\.svg$/u),
+    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v[12]\/[a-z0-9_./-]+\.webp$/u),
     thumbnailPath: z
       .string()
-      .regex(/^\/assets\/starville\/bundled\/v1\/thumbnails\/[a-z0-9_./-]+\.webp$/u),
+      .regex(/^\/assets\/starville\/bundled\/v[12]\/thumbnails\/[a-z0-9_./-]+\.webp$/u),
     width: z.number().int().positive().max(4096),
     height: z.number().int().positive().max(4096),
     aspectRatio: z.number().positive().max(8),
@@ -99,12 +124,12 @@ export const bundledAssetEntrySchema = z
       .min(1)
       .max(20),
     accessibilityLabel: z.string().trim().min(2).max(160),
-    bundledVersion: z.literal(STARVILLE_BUNDLED_MANIFEST_VERSION),
+    bundledVersion: bundledManifestVersionSchema,
     replacementAllowed: z.boolean(),
     safeFallbackKey: assetIdentifierSchema,
     criticalGroups: z.array(bundledAssetCriticalGroupSchema).max(6),
     usageLocations: z.array(z.string().trim().min(2).max(80)).min(1).max(16),
-    qualityStatus: z.literal('technical_baseline'),
+    qualityStatus: bundledAssetQualityStatusSchema,
     aliasOf: assetIdentifierSchema.nullable(),
     generator: bundledAssetGeneratorSchema,
   })
@@ -251,7 +276,7 @@ export const bundledAssetManifestSchema = z
   .object({
     schemaVersion: z.literal(1),
     game: z.literal('starville'),
-    manifestVersion: z.literal(STARVILLE_BUNDLED_MANIFEST_VERSION),
+    manifestVersion: bundledManifestVersionSchema,
     projection: z
       .object({
         tileWidth: z.literal(96),
@@ -272,6 +297,37 @@ export const bundledAssetManifestSchema = z
     const known = new Set(keys);
     const catalog = new Map(manifest.assets.map((entry) => [entry.key, entry]));
     for (const [index, entry] of manifest.assets.entries()) {
+      if (entry.bundledVersion !== manifest.manifestVersion) {
+        context.addIssue({
+          code: 'custom',
+          path: ['assets', index, 'bundledVersion'],
+          message: 'Asset bundled version must match its manifest identity',
+        });
+      }
+      const expectedSourceRoot =
+        manifest.manifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION
+          ? 'assets/source/'
+          : 'assets/source-v2/';
+      const expectedRuntimeRoot =
+        manifest.manifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION
+          ? `${STARVILLE_BUNDLED_PUBLIC_ROOT}/`
+          : `${STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT}/`;
+      if (
+        !entry.sourcePath.startsWith(expectedSourceRoot) ||
+        !entry.runtimePath.startsWith(expectedRuntimeRoot) ||
+        !entry.thumbnailPath.startsWith(`${expectedRuntimeRoot}thumbnails/`) ||
+        entry.variants.some(
+          (variant) =>
+            !variant.sourcePath.startsWith(expectedSourceRoot) ||
+            !variant.runtimePath.startsWith(expectedRuntimeRoot),
+        )
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['assets', index],
+          message: 'Asset paths must remain inside the declared bundled manifest version',
+        });
+      }
       if (!known.has(entry.safeFallbackKey)) {
         context.addIssue({
           code: 'custom',
@@ -1292,15 +1348,84 @@ export const STARVILLE_BUNDLED_ASSET_MANIFEST = bundledAssetManifestSchema.parse
   ],
 });
 
+function phase12dCandidateSourcePath(sourcePath: string): string {
+  if (!sourcePath.startsWith('assets/source/')) {
+    throw new Error(`Legacy bundled source path is outside the v1 root: ${sourcePath}`);
+  }
+  return sourcePath.replace(/^assets\/source\//u, 'assets/source-v2/');
+}
+
+function phase12dCandidateRuntimePath(runtimePath: string): string {
+  if (!runtimePath.startsWith(`${STARVILLE_BUNDLED_PUBLIC_ROOT}/`)) {
+    throw new Error(`Legacy bundled runtime path is outside the v1 root: ${runtimePath}`);
+  }
+  return runtimePath.replace(
+    `${STARVILLE_BUNDLED_PUBLIC_ROOT}/`,
+    `${STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT}/`,
+  );
+}
+
+function phase12dCandidateEntry(asset: BundledAssetEntry): BundledAssetEntry {
+  return bundledAssetEntrySchema.parse({
+    ...asset,
+    sourcePath: phase12dCandidateSourcePath(asset.sourcePath),
+    runtimePath: phase12dCandidateRuntimePath(asset.runtimePath),
+    thumbnailPath: phase12dCandidateRuntimePath(asset.thumbnailPath),
+    bundledVersion: STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+    qualityStatus: 'production_candidate',
+    variants: asset.variants.map((variant) => ({
+      ...variant,
+      sourcePath: phase12dCandidateSourcePath(variant.sourcePath),
+      runtimePath: phase12dCandidateRuntimePath(variant.runtimePath),
+    })),
+  });
+}
+
+/**
+ * Additive Phase 12D candidate pack. Stable logical keys, anchors, footprints,
+ * collision, and authored rotations remain identical to v1 while every media
+ * path receives a new immutable identity. This manifest is intentionally not
+ * the default for published worlds until owner review and an authorized
+ * forward-only activation bind exact world pins to it.
+ */
+export const STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST = bundledAssetManifestSchema.parse({
+  ...STARVILLE_BUNDLED_ASSET_MANIFEST,
+  manifestVersion: STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+  assets: STARVILLE_BUNDLED_ASSET_MANIFEST.assets.map(phase12dCandidateEntry),
+});
+
 export const STARVILLE_BUNDLED_ASSETS: readonly BundledAssetEntry[] =
   STARVILLE_BUNDLED_ASSET_MANIFEST.assets;
+export const STARVILLE_PHASE12D_CANDIDATE_ASSETS: readonly BundledAssetEntry[] =
+  STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST.assets;
 
 export const STARVILLE_BUNDLED_ASSET_CATALOG: ReadonlyMap<string, BundledAssetEntry> = new Map(
   STARVILLE_BUNDLED_ASSETS.map((asset) => [asset.key, asset]),
 );
+export const STARVILLE_PHASE12D_CANDIDATE_ASSET_CATALOG: ReadonlyMap<string, BundledAssetEntry> =
+  new Map(STARVILLE_PHASE12D_CANDIDATE_ASSETS.map((asset) => [asset.key, asset]));
 
-export function getBundledAsset(key: string): BundledAssetEntry | undefined {
-  return STARVILLE_BUNDLED_ASSET_CATALOG.get(key);
+const BUNDLED_MANIFESTS: Readonly<Record<BundledManifestVersion, BundledAssetManifest>> = {
+  [STARVILLE_BUNDLED_MANIFEST_VERSION]: STARVILLE_BUNDLED_ASSET_MANIFEST,
+  [STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION]: STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
+};
+
+const BUNDLED_CATALOGS: Readonly<
+  Record<BundledManifestVersion, ReadonlyMap<string, BundledAssetEntry>>
+> = {
+  [STARVILLE_BUNDLED_MANIFEST_VERSION]: STARVILLE_BUNDLED_ASSET_CATALOG,
+  [STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION]: STARVILLE_PHASE12D_CANDIDATE_ASSET_CATALOG,
+};
+
+export function getBundledManifest(manifestVersion: BundledManifestVersion): BundledAssetManifest {
+  return BUNDLED_MANIFESTS[manifestVersion];
+}
+
+export function getBundledAsset(
+  key: string,
+  manifestVersion: BundledManifestVersion = STARVILLE_BUNDLED_MANIFEST_VERSION,
+): BundledAssetEntry | undefined {
+  return BUNDLED_CATALOGS[manifestVersion].get(key);
 }
 
 export function bundledAssetVariant(
@@ -1324,8 +1449,12 @@ export function bundledAssetRuntimePath(
 export function bundledAssetAdminMediaPath(
   key: string,
   variant: 'source' | 'thumbnail' = 'source',
+  manifestVersion: BundledManifestVersion = STARVILLE_BUNDLED_MANIFEST_VERSION,
 ): string {
-  return `/api/bundled-assets/${encodeURIComponent(key)}/${variant}`;
+  const path = `/api/bundled-assets/${encodeURIComponent(key)}/${variant}`;
+  return manifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION
+    ? path
+    : `${path}?manifest=${encodeURIComponent(manifestVersion)}`;
 }
 
 export function cropStageAssetKey(

@@ -772,6 +772,7 @@ describe('coalesced realtime movement', () => {
 
   it('flushes at most one safe idle and cancels stale timers on clean disconnect', async () => {
     const { connection, socket } = await connectedRealtime();
+    const removeListener = vi.spyOn(socket, 'removeEventListener');
     vi.useFakeTimers();
     const moving = { ...self, mapId: self.worldId, x: self.x + 0.1 };
 
@@ -786,5 +787,20 @@ describe('coalesced realtime movement', () => {
       'idle',
     ]);
     expect(socket.readyState).toBe(WebSocket.CLOSED);
+    expect(removeListener).toHaveBeenCalledTimes(3);
+  });
+
+  it('uses an explicit retry to resync one live socket without creating a duplicate', async () => {
+    const { connection, socket } = await connectedRealtime();
+    const fetchCalls = vi.mocked(globalThis.fetch).mock.calls.length;
+
+    connection.retryNow();
+
+    expect(JSON.parse(socket.sent.at(-1) ?? '{}')).toEqual({
+      version: 1,
+      type: 'resync',
+    });
+    expect(globalThis.fetch).toHaveBeenCalledTimes(fetchCalls);
+    connection.dispose();
   });
 });

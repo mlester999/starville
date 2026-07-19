@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { PlayerStateUpdate } from '@starville/game-core';
 
+import { runtimeDevelopmentMetrics } from './development-performance';
 import { PlayerRequestError, savePlayerState } from './player-client';
 
 export type SaveStatus = 'ready' | 'saving' | 'saved' | 'unavailable';
@@ -24,6 +25,7 @@ export function usePlayerPersistence({
   const queuedState = useRef<PlayerStateUpdate | undefined>(undefined);
   const activeFlush = useRef<Promise<void> | undefined>(undefined);
   const transitionInProgress = useRef(false);
+  const retryRequired = useRef(false);
   const mounted = useRef(true);
   const [status, setStatus] = useState<SaveStatus>('ready');
 
@@ -54,17 +56,20 @@ export function usePlayerPersistence({
               error.code === 'PLAYER_RENAME_REQUIRED' ||
               error.code === 'PLAYER_STATE_VERSION_CONFLICT')
           ) {
+            retryRequired.current = false;
+            queuedState.current = undefined;
             onAccessInvalid();
-          } else if (mounted.current) {
-            setStatus('unavailable');
+          } else {
+            retryRequired.current = true;
+            queuedState.current = { ...latestState.current };
+            if (mounted.current) setStatus('unavailable');
           }
-          queuedState.current = undefined;
           break;
         }
       }
     })().finally(() => {
       activeFlush.current = undefined;
-      if (queuedState.current !== undefined) void flushQueued();
+      if (queuedState.current !== undefined && !retryRequired.current) void flushQueued();
     });
 
     activeFlush.current = flush;
@@ -80,6 +85,7 @@ export function usePlayerPersistence({
       noteState(state);
       if (transitionInProgress.current) return;
       queuedState.current = { ...state };
+      if (retryRequired.current) return;
       void flushQueued();
     },
     [flushQueued, noteState],
@@ -87,7 +93,15 @@ export function usePlayerPersistence({
 
   const flushBeforeLeave = useCallback(async () => {
     queuedState.current = { ...latestState.current };
+    retryRequired.current = false;
     await flushQueued();
+  }, [flushQueued]);
+
+  const retry = useCallback(() => {
+    if (transitionInProgress.current || !retryRequired.current) return;
+    retryRequired.current = false;
+    queuedState.current = { ...latestState.current };
+    void flushQueued();
   }, [flushQueued]);
 
   const beginTransition = useCallback(async () => {
@@ -107,6 +121,7 @@ export function usePlayerPersistence({
       };
       gameStateVersion.current = state.gameStateVersion;
       queuedState.current = undefined;
+      retryRequired.current = false;
       transitionInProgress.current = false;
       if (mounted.current) setStatus('saved');
     },
@@ -131,9 +146,11 @@ export function usePlayerPersistence({
 
     window.addEventListener('pagehide', preserveState);
     document.addEventListener('visibilitychange', preserveHiddenState);
+    runtimeDevelopmentMetrics.adjustGauge('activeListeners', 2);
     return () => {
       window.removeEventListener('pagehide', preserveState);
       document.removeEventListener('visibilitychange', preserveHiddenState);
+      runtimeDevelopmentMetrics.adjustGauge('activeListeners', -2);
     };
   }, [apiUrl]);
 
@@ -142,6 +159,7 @@ export function usePlayerPersistence({
     noteState,
     checkpoint,
     flushBeforeLeave,
+    retry,
     beginTransition,
     acceptAuthoritativeTransition,
     cancelTransition,

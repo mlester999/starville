@@ -56,6 +56,7 @@ import {
   type WorldEditorLayer,
   type WorldEditorSelection,
 } from '../lib/worlds/editor-state';
+import { analyzeAdminWorldVisualReadiness } from '../lib/worlds/visual-policy';
 import {
   CANVAS_PAN_DRAG_THRESHOLD_PX,
   CANVAS_ZOOM_DEFAULT,
@@ -408,6 +409,7 @@ export function WorldEditor(props: WorldEditorProps) {
   const manifest = history.present;
   const editableDraft = revisionLifecycle === 'draft';
   const issues = useMemo(() => browserManifestIssues(manifest), [manifest]);
+  const visualReadiness = useMemo(() => analyzeAdminWorldVisualReadiness(manifest), [manifest]);
   const dirty = manifestHasUnsavedChanges(manifest, lastSaved);
   const localChangeSummary = useMemo(() => {
     const before = new Map(lastSaved.objects.map((object) => [object.id, object]));
@@ -3157,6 +3159,14 @@ export function WorldEditor(props: WorldEditorProps) {
             >
               {issues.length === 0 ? 'Local schema clear' : `${issues.length} local issue(s)`}
             </span>
+            <span
+              className={`state-chip ${visualReadiness.findings.length === 0 ? 'state-chip--success' : visualReadiness.counts.error > 0 ? 'state-chip--error' : 'state-chip--pending'}`}
+              title="Shared visual-policy findings are advisory and do not change trusted validation"
+            >
+              {visualReadiness.findings.length === 0
+                ? 'Visual policy clear'
+                : `Visual advisories: ${visualReadiness.counts.error} error, ${visualReadiness.counts.warning} warning, ${visualReadiness.counts.recommendation} recommendation`}
+            </span>
             {serverValidation === null ? (
               <span className="state-chip state-chip--pending">No trusted result yet</span>
             ) : (
@@ -3240,6 +3250,65 @@ export function WorldEditor(props: WorldEditorProps) {
                 ))}
               </ul>
             )}
+            <section
+              className="world-visual-advisories"
+              aria-labelledby="world-visual-advisories-title"
+            >
+              <div className="world-visual-advisories__heading">
+                <div>
+                  <strong id="world-visual-advisories-title">Shared visual-policy advisory</strong>
+                  <p>
+                    Local composition guidance only. These findings never save, validate, publish,
+                    or replace exact Game Test review.
+                  </p>
+                </div>
+                <Link
+                  className="button button--quiet"
+                  href={`/worlds/visual-readiness?mapId=${props.draft.map.id}&version=${currentVersionId}`}
+                >
+                  Open Visual Readiness
+                </Link>
+              </div>
+              {visualReadiness.findings.length === 0 ? (
+                <p className="world-validation-panel__ok">
+                  No deterministic shared-policy findings for this manifest. Complete viewport and
+                  screenshot review in Game Test.
+                </p>
+              ) : (
+                <ul className="validation-issues world-visual-advisories__list">
+                  {visualReadiness.findings.map((finding) => (
+                    <li
+                      data-visual-severity={finding.severity}
+                      key={`${finding.severity}-${finding.code}-${finding.objectIds?.join('-') ?? 'map'}`}
+                    >
+                      <strong className="world-visual-advisories__severity">
+                        {finding.severity === 'error'
+                          ? 'Advisory error'
+                          : finding.severity === 'warning'
+                            ? 'Warning'
+                            : 'Recommendation'}
+                      </strong>
+                      <code>{finding.code}</code>
+                      <span>
+                        {finding.message}
+                        {finding.objectIds === undefined || finding.objectIds.length === 0
+                          ? ''
+                          : ` Objects: ${finding.objectIds.join(', ')}.`}
+                      </span>
+                      {finding.path === null ? null : (
+                        <button
+                          className="button button--quiet validation-focus"
+                          onClick={() => focusValidationTarget(finding.path ?? '')}
+                          type="button"
+                        >
+                          Focus
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
             {serverValidation?.valid === true && issues.length === 0 ? (
               <p className="world-validation-panel__ok" role="status">
                 Trusted validation passed

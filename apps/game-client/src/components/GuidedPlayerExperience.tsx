@@ -11,6 +11,7 @@ import {
   startPlayerOnboarding,
   updatePlayerGuidePreferences,
 } from '../app/player-experience-client';
+import { GameModalPortal } from './game-ui';
 
 type GuideTab = 'journey' | 'daily' | 'help';
 
@@ -34,6 +35,7 @@ export function GuidedPlayerExperience({
   onOpenChange,
   onOpenInventory,
   onOpenProgression,
+  portal = false,
 }: {
   readonly apiUrl: string;
   readonly disabled: boolean;
@@ -42,6 +44,7 @@ export function GuidedPlayerExperience({
   readonly onOpenChange: (open: boolean) => void;
   readonly onOpenInventory: () => void;
   readonly onOpenProgression: () => void;
+  readonly portal?: boolean;
 }) {
   const [workspace, setWorkspace] = useState<PlayerExperienceWorkspace>();
   const [open, setOpen] = useState(false);
@@ -171,283 +174,292 @@ export function GuidedPlayerExperience({
       ) : null}
 
       {open || isWelcome ? (
-        <div className="world-overlay player-guide-overlay" role="presentation">
-          <section
-            aria-labelledby="player-guide-title"
-            aria-modal="true"
-            className="player-guide-dialog"
-            role="dialog"
-          >
-            <header>
-              <div>
-                <p className="game-kicker">{isWelcome ? 'Welcome, Starvillian' : 'Player Guide'}</p>
-                <h2 id="player-guide-title">
-                  {isWelcome ? 'Your first day starts in Lantern Square' : 'Your Starville rhythm'}
-                </h2>
-              </div>
-              {isWelcome ? null : (
-                <button
-                  aria-label="Close Player Guide"
-                  type="button"
-                  onClick={() => setOpen(false)}
-                >
-                  ×
-                </button>
-              )}
-            </header>
-
-            {isWelcome ? (
-              <div className="player-guide-welcome">
-                <p>
-                  Follow one clear objective at a time through your home, first harvest, production,
-                  the General Store, progression, housing, and Daily Rhythm.
-                </p>
-                <ul>
-                  <li>Real gameplay actions provide progress evidence.</li>
-                  <li>DUST is off-chain game currency and never withdrawable.</li>
-                  <li>You can pause guidance without losing progress.</li>
-                </ul>
-                <div className="player-guide-actions">
-                  <button
-                    autoFocus
-                    disabled={busy}
-                    type="button"
-                    onClick={() =>
-                      void run((current) =>
-                        startPlayerOnboarding(apiUrl, current.onboarding.revision),
-                      )
-                    }
-                  >
-                    Start guided journey
-                  </button>
-                  <button
-                    disabled={busy}
-                    type="button"
-                    onClick={() =>
-                      void run(async (current) => {
-                        const started = await startPlayerOnboarding(
-                          apiUrl,
-                          current.onboarding.revision,
-                        );
-                        return updatePlayerGuidePreferences(apiUrl, {
-                          minimized: true,
-                          reducedGuidance: true,
-                          expectedRevision: started.onboarding.revision,
-                        });
-                      }).then(() => setOpen(false))
-                    }
-                  >
-                    Explore first
-                  </button>
+        <GameModalPortal portal={portal} {...(isWelcome ? {} : { onClose: () => setOpen(false) })}>
+          <div className="world-overlay player-guide-overlay" role="presentation">
+            <section
+              aria-labelledby="player-guide-title"
+              aria-modal="true"
+              className="player-guide-dialog"
+              role="dialog"
+            >
+              <header>
+                <div>
+                  <p className="game-kicker">
+                    {isWelcome ? 'Welcome, Starvillian' : 'Player Guide'}
+                  </p>
+                  <h2 id="player-guide-title">
+                    {isWelcome
+                      ? 'Your first day starts in Lantern Square'
+                      : 'Your Starville rhythm'}
+                  </h2>
                 </div>
-              </div>
-            ) : (
-              <>
-                <nav aria-label="Player Guide sections" className="player-guide-tabs">
-                  {(['journey', 'daily', 'help'] as const).map((key) => (
+                {isWelcome ? null : (
+                  <button
+                    aria-label="Close Player Guide"
+                    type="button"
+                    onClick={() => setOpen(false)}
+                  >
+                    ×
+                  </button>
+                )}
+              </header>
+
+              {isWelcome ? (
+                <div className="player-guide-welcome">
+                  <p>
+                    Follow one clear objective at a time through your home, first harvest,
+                    production, the General Store, progression, housing, and Daily Rhythm.
+                  </p>
+                  <ul>
+                    <li>Real gameplay actions provide progress evidence.</li>
+                    <li>DUST is off-chain game currency and never withdrawable.</li>
+                    <li>You can pause guidance without losing progress.</li>
+                  </ul>
+                  <div className="player-guide-actions">
                     <button
-                      aria-current={tab === key ? 'page' : undefined}
-                      key={key}
+                      autoFocus
+                      disabled={busy}
                       type="button"
-                      onClick={() => setTab(key)}
+                      onClick={() =>
+                        void run((current) =>
+                          startPlayerOnboarding(apiUrl, current.onboarding.revision),
+                        )
+                      }
                     >
-                      {key === 'journey' ? 'Journey' : key === 'daily' ? 'Daily Rhythm' : 'Help'}
+                      Start guided journey
                     </button>
-                  ))}
-                </nav>
+                    <button
+                      disabled={busy}
+                      type="button"
+                      onClick={() =>
+                        void run(async (current) => {
+                          const started = await startPlayerOnboarding(
+                            apiUrl,
+                            current.onboarding.revision,
+                          );
+                          return updatePlayerGuidePreferences(apiUrl, {
+                            minimized: true,
+                            reducedGuidance: true,
+                            expectedRevision: started.onboarding.revision,
+                          });
+                        }).then(() => setOpen(false))
+                      }
+                    >
+                      Explore first
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <nav aria-label="Player Guide sections" className="player-guide-tabs">
+                    {(['journey', 'daily', 'help'] as const).map((key) => (
+                      <button
+                        aria-current={tab === key ? 'page' : undefined}
+                        key={key}
+                        type="button"
+                        onClick={() => setTab(key)}
+                      >
+                        {key === 'journey' ? 'Journey' : key === 'daily' ? 'Daily Rhythm' : 'Help'}
+                      </button>
+                    ))}
+                  </nav>
 
-                {warning === undefined ? null : <p className="player-guide-warning">{warning}</p>}
+                  {warning === undefined ? null : <p className="player-guide-warning">{warning}</p>}
 
-                {tab === 'journey' && workspace !== undefined ? (
-                  <div className="player-guide-content">
-                    <section className="player-guide-current">
-                      <p className="game-kicker">Current objective</p>
-                      <h3>{objective?.title ?? 'Core journey complete'}</h3>
-                      <p>{objective?.instruction ?? 'Daily Rhythm and Help remain available.'}</p>
-                      {objective == null ? null : (
-                        <div
-                          aria-label={`${objective.title} progress`}
-                          aria-valuemax={100}
-                          aria-valuemin={0}
-                          aria-valuenow={progressPercent(objective.progress, objective.required)}
-                          className="player-guide-progress"
-                          role="progressbar"
-                        >
-                          <span
-                            style={{
-                              width: `${String(progressPercent(objective.progress, objective.required))}%`,
-                            }}
-                          />
+                  {tab === 'journey' && workspace !== undefined ? (
+                    <div className="player-guide-content">
+                      <section className="player-guide-current">
+                        <p className="game-kicker">Current objective</p>
+                        <h3>{objective?.title ?? 'Core journey complete'}</h3>
+                        <p>{objective?.instruction ?? 'Daily Rhythm and Help remain available.'}</p>
+                        {objective == null ? null : (
+                          <div
+                            aria-label={`${objective.title} progress`}
+                            aria-valuemax={100}
+                            aria-valuemin={0}
+                            aria-valuenow={progressPercent(objective.progress, objective.required)}
+                            className="player-guide-progress"
+                            role="progressbar"
+                          >
+                            <span
+                              style={{
+                                width: `${String(progressPercent(objective.progress, objective.required))}%`,
+                              }}
+                            />
+                          </div>
+                        )}
+                        <small>{objective?.routeHint}</small>
+                        <div className="player-guide-actions">
+                          {workspace.onboarding.currentStep === 'inspect_inventory' ? (
+                            <button type="button" onClick={() => acknowledgeAndOpen('inventory')}>
+                              Open Inventory
+                            </button>
+                          ) : null}
+                          {workspace.onboarding.currentStep === 'review_progression' ? (
+                            <button type="button" onClick={() => acknowledgeAndOpen('progression')}>
+                              Open My Journey
+                            </button>
+                          ) : null}
+                          {workspace.onboarding.currentStep === 'review_home_visits' ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void run((current) =>
+                                  acknowledgePlayerExperienceStep(
+                                    apiUrl,
+                                    'review_home_visits',
+                                    current.onboarding.revision,
+                                  ),
+                                )
+                              }
+                            >
+                              Mark settings reviewed
+                            </button>
+                          ) : null}
+                          <button type="button" onClick={() => void refresh()}>
+                            Refresh progress
+                          </button>
                         </div>
-                      )}
-                      <small>{objective?.routeHint}</small>
-                      <div className="player-guide-actions">
-                        {workspace.onboarding.currentStep === 'inspect_inventory' ? (
-                          <button type="button" onClick={() => acknowledgeAndOpen('inventory')}>
-                            Open Inventory
-                          </button>
-                        ) : null}
-                        {workspace.onboarding.currentStep === 'review_progression' ? (
-                          <button type="button" onClick={() => acknowledgeAndOpen('progression')}>
-                            Open My Journey
-                          </button>
-                        ) : null}
-                        {workspace.onboarding.currentStep === 'review_home_visits' ? (
+                      </section>
+                      <ol className="player-guide-step-list">
+                        {workspace.onboarding.steps.map((step) => (
+                          <li data-status={step.status} key={step.key}>
+                            <span aria-hidden="true">
+                              {step.status === 'completed'
+                                ? '✓'
+                                : step.status === 'skipped'
+                                  ? '–'
+                                  : '•'}
+                            </span>
+                            <div>
+                              <strong>{step.title}</strong>
+                              <small>{step.chapter.replaceAll('_', ' ')}</small>
+                            </div>
+                          </li>
+                        ))}
+                      </ol>
+                      <div className="player-guide-actions player-guide-actions--secondary">
+                        <button
+                          disabled={busy || workspace.onboarding.status === 'completed'}
+                          type="button"
+                          onClick={() =>
+                            void run((current) =>
+                              setPlayerOnboardingActivity(
+                                apiUrl,
+                                current.onboarding.status === 'paused' ? 'resume' : 'pause',
+                                current.onboarding.revision,
+                              ),
+                            )
+                          }
+                        >
+                          {workspace.onboarding.status === 'paused'
+                            ? 'Resume guidance'
+                            : 'Pause guidance'}
+                        </button>
+                        {currentStep?.optional === true ? (
                           <button
+                            disabled={busy}
                             type="button"
                             onClick={() =>
                               void run((current) =>
-                                acknowledgePlayerExperienceStep(
-                                  apiUrl,
-                                  'review_home_visits',
-                                  current.onboarding.revision,
-                                ),
+                                skipOptionalPlayerOnboarding(apiUrl, current.onboarding.revision),
                               )
                             }
                           >
-                            Mark settings reviewed
+                            Skip optional social step
                           </button>
                         ) : null}
-                        <button type="button" onClick={() => void refresh()}>
-                          Refresh progress
-                        </button>
-                      </div>
-                    </section>
-                    <ol className="player-guide-step-list">
-                      {workspace.onboarding.steps.map((step) => (
-                        <li data-status={step.status} key={step.key}>
-                          <span aria-hidden="true">
-                            {step.status === 'completed'
-                              ? '✓'
-                              : step.status === 'skipped'
-                                ? '–'
-                                : '•'}
-                          </span>
-                          <div>
-                            <strong>{step.title}</strong>
-                            <small>{step.chapter.replaceAll('_', ' ')}</small>
-                          </div>
-                        </li>
-                      ))}
-                    </ol>
-                    <div className="player-guide-actions player-guide-actions--secondary">
-                      <button
-                        disabled={busy || workspace.onboarding.status === 'completed'}
-                        type="button"
-                        onClick={() =>
-                          void run((current) =>
-                            setPlayerOnboardingActivity(
-                              apiUrl,
-                              current.onboarding.status === 'paused' ? 'resume' : 'pause',
-                              current.onboarding.revision,
-                            ),
-                          )
-                        }
-                      >
-                        {workspace.onboarding.status === 'paused'
-                          ? 'Resume guidance'
-                          : 'Pause guidance'}
-                      </button>
-                      {currentStep?.optional === true ? (
                         <button
                           disabled={busy}
                           type="button"
                           onClick={() =>
                             void run((current) =>
-                              skipOptionalPlayerOnboarding(apiUrl, current.onboarding.revision),
+                              requestPlayerExperienceRecovery(
+                                apiUrl,
+                                currentRecoveryReason(current),
+                                current.onboarding.revision,
+                              ),
                             )
                           }
                         >
-                          Skip optional social step
+                          I’m stuck
                         </button>
-                      ) : null}
-                      <button
-                        disabled={busy}
-                        type="button"
-                        onClick={() =>
-                          void run((current) =>
-                            requestPlayerExperienceRecovery(
-                              apiUrl,
-                              currentRecoveryReason(current),
-                              current.onboarding.revision,
-                            ),
-                          )
-                        }
-                      >
-                        I’m stuck
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                ) : null}
+                  ) : null}
 
-                {tab === 'daily' && workspace !== undefined ? (
-                  <div className="player-guide-content">
-                    <p>
-                      {workspace.daily.completedCount}/3 complete · resets{' '}
-                      {new Date(workspace.daily.resetAt).toLocaleString()} · UTC authority
-                    </p>
-                    <div className="player-guide-daily-grid">
-                      {workspace.daily.objectives.map((daily) => (
-                        <article key={daily.assignmentId} data-status={daily.status}>
-                          <span>{daily.category.replaceAll('_', ' ')}</span>
-                          <h3>{daily.title}</h3>
-                          <p>{daily.description}</p>
-                          <strong>
-                            {daily.progress}/{daily.required}
-                          </strong>
-                          <small>{daily.rewardLabel}</small>
-                        </article>
+                  {tab === 'daily' && workspace !== undefined ? (
+                    <div className="player-guide-content">
+                      <p>
+                        {workspace.daily.completedCount}/3 complete · resets{' '}
+                        {new Date(workspace.daily.resetAt).toLocaleString()} · UTC authority
+                      </p>
+                      <div className="player-guide-daily-grid">
+                        {workspace.daily.objectives.map((daily) => (
+                          <article key={daily.assignmentId} data-status={daily.status}>
+                            <span>{daily.category.replaceAll('_', ' ')}</span>
+                            <h3>{daily.title}</h3>
+                            <p>{daily.description}</p>
+                            <strong>
+                              {daily.progress}/{daily.required}
+                            </strong>
+                            <small>{daily.rewardLabel}</small>
+                          </article>
+                        ))}
+                      </div>
+                      <p className="player-guide-economy-note">
+                        Daily v1 grants a non-economic completion mark: 0 DUST and 0 XP.
+                      </p>
+                      <div className="player-guide-actions">
+                        <button
+                          disabled={busy}
+                          type="button"
+                          onClick={() =>
+                            void run((current) =>
+                              refreshPlayerDailyObjectives(
+                                apiUrl,
+                                current.daily.assignmentRevision,
+                              ),
+                            )
+                          }
+                        >
+                          Refresh daily authority
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {tab === 'help' && workspace !== undefined ? (
+                    <div className="player-guide-content player-guide-help">
+                      {workspace.guide.map((entry) => (
+                        <details key={entry.key}>
+                          <summary>{entry.title}</summary>
+                          <p>{entry.summary}</p>
+                        </details>
                       ))}
+                      <label>
+                        <input
+                          checked={workspace.guidePreferences.reducedGuidance}
+                          type="checkbox"
+                          onChange={(event) =>
+                            void run((current) =>
+                              updatePlayerGuidePreferences(apiUrl, {
+                                minimized: current.guidePreferences.minimized,
+                                reducedGuidance: event.target.checked,
+                                expectedRevision: current.onboarding.revision,
+                              }),
+                            )
+                          }
+                        />
+                        Reduce world guidance and keep text hints
+                      </label>
                     </div>
-                    <p className="player-guide-economy-note">
-                      Daily v1 grants a non-economic completion mark: 0 DUST and 0 XP.
-                    </p>
-                    <div className="player-guide-actions">
-                      <button
-                        disabled={busy}
-                        type="button"
-                        onClick={() =>
-                          void run((current) =>
-                            refreshPlayerDailyObjectives(apiUrl, current.daily.assignmentRevision),
-                          )
-                        }
-                      >
-                        Refresh daily authority
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                {tab === 'help' && workspace !== undefined ? (
-                  <div className="player-guide-content player-guide-help">
-                    {workspace.guide.map((entry) => (
-                      <details key={entry.key}>
-                        <summary>{entry.title}</summary>
-                        <p>{entry.summary}</p>
-                      </details>
-                    ))}
-                    <label>
-                      <input
-                        checked={workspace.guidePreferences.reducedGuidance}
-                        type="checkbox"
-                        onChange={(event) =>
-                          void run((current) =>
-                            updatePlayerGuidePreferences(apiUrl, {
-                              minimized: current.guidePreferences.minimized,
-                              reducedGuidance: event.target.checked,
-                              expectedRevision: current.onboarding.revision,
-                            }),
-                          )
-                        }
-                      />
-                      Reduce world guidance and keep text hints
-                    </label>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </section>
-        </div>
+                  ) : null}
+                </>
+              )}
+            </section>
+          </div>
+        </GameModalPortal>
       ) : null}
     </>
   );

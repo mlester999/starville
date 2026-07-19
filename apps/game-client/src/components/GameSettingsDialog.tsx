@@ -1,6 +1,11 @@
 import { useState, type KeyboardEvent, type ReactNode } from 'react';
 
-import type { GameSettings, GameUiScale } from '../app/game-settings';
+import type {
+  GameHudDensity,
+  GameSettings,
+  GameUiScale,
+  GameVisualQuality,
+} from '../app/game-settings';
 import { GameButton, GameModalShell, KeyboardKey } from './game-ui';
 
 interface GameSettingsDialogProps {
@@ -12,13 +17,15 @@ interface GameSettingsDialogProps {
   readonly onEndSession: () => Promise<void>;
   readonly onEditAppearance?: () => void;
   readonly appearanceEditingAvailable?: boolean;
+  readonly portal?: boolean;
 }
 
 type SettingsSection =
-  'audio' | 'gameplay' | 'appearance' | 'controls' | 'accessibility' | 'how-to-play';
+  'audio' | 'graphics' | 'gameplay' | 'appearance' | 'controls' | 'accessibility' | 'how-to-play';
 
 const SECTIONS: readonly { readonly id: SettingsSection; readonly label: string }[] = [
   { id: 'audio', label: 'Audio' },
+  { id: 'graphics', label: 'Graphics' },
   { id: 'gameplay', label: 'Gameplay' },
   { id: 'appearance', label: 'Wardrobe' },
   { id: 'controls', label: 'Controls' },
@@ -65,6 +72,39 @@ function SettingsSectionCard({
       <h3>{title}</h3>
       {children}
     </section>
+  );
+}
+
+function ChoiceControl<Value extends string>({
+  description,
+  label,
+  options,
+  value,
+  onChange,
+}: {
+  readonly description: string;
+  readonly label: string;
+  readonly options: readonly { readonly label: string; readonly value: Value }[];
+  readonly value: Value;
+  readonly onChange: (value: Value) => void;
+}) {
+  return (
+    <fieldset className="settings-choice-control">
+      <legend>{label}</legend>
+      <p>{description}</p>
+      <div>
+        {options.map((option) => (
+          <button
+            aria-pressed={value === option.value}
+            key={option.value}
+            type="button"
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 
@@ -136,6 +176,7 @@ export function GameSettingsDialog({
   onEndSession,
   onEditAppearance,
   appearanceEditingAvailable = false,
+  portal = false,
 }: GameSettingsDialogProps) {
   const [section, setSection] = useState<SettingsSection>('audio');
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -207,6 +248,7 @@ export function GameSettingsDialog({
       closeLabel="Close Settings"
       eyebrow="Starville"
       footer={footer}
+      portal={portal}
       size="wide"
       subtitle="Tune the village to feel comfortable, clear, and easy to play."
       title="Settings"
@@ -255,11 +297,103 @@ export function GameSettingsDialog({
                   onChange={(event) => update('masterVolume', Number(event.currentTarget.value))}
                 />
               </label>
+              <label className="settings-volume">
+                <span>
+                  <strong>Ambience Volume</strong>
+                  <output>{Math.round(settings.ambienceVolume * 100)}%</output>
+                </span>
+                <input
+                  aria-label="Ambience volume"
+                  max="1"
+                  min="0"
+                  step="0.05"
+                  type="range"
+                  value={settings.ambienceVolume}
+                  onChange={(event) => update('ambienceVolume', Number(event.currentTarget.value))}
+                />
+              </label>
+              <label className="settings-volume">
+                <span>
+                  <strong>Sound Effects Volume</strong>
+                  <output>{Math.round(settings.sfxVolume * 100)}%</output>
+                </span>
+                <input
+                  aria-label="Sound effects volume"
+                  max="1"
+                  min="0"
+                  step="0.05"
+                  type="range"
+                  value={settings.sfxVolume}
+                  onChange={(event) => update('sfxVolume', Number(event.currentTarget.value))}
+                />
+              </label>
               <PreferenceToggle
                 checked={settings.muted}
                 description="Silence all available game audio."
                 title="Mute All Audio"
                 onChange={(value) => update('muted', value)}
+              />
+            </SettingsSectionCard>
+          ) : null}
+
+          {section === 'graphics' ? (
+            <SettingsSectionCard title="Graphics">
+              <ChoiceControl<GameVisualQuality>
+                description="Choose the overall world detail level. Balanced is recommended for most devices."
+                label="Visual quality"
+                options={[
+                  { label: 'Low', value: 'low' },
+                  { label: 'Balanced', value: 'balanced' },
+                  { label: 'High', value: 'high' },
+                ]}
+                value={settings.visualQuality}
+                onChange={(value) => update('visualQuality', value)}
+              />
+              {settings.visualQuality === 'low' ? (
+                <p className="settings-note" role="status">
+                  Low quality turns off ambient effects, shadows, and water animation. Your saved
+                  choices return if you select Balanced or High.
+                </p>
+              ) : null}
+              <PreferenceToggle
+                checked={settings.ambientEffects}
+                description="Show subtle village atmosphere such as drifting pollen and fireflies."
+                title="Ambient Effects"
+                onChange={(value) => update('ambientEffects', value)}
+              />
+              <PreferenceToggle
+                checked={settings.shadows}
+                description="Draw soft grounding shadows beneath villagers, buildings, and props."
+                title="Shadows"
+                onChange={(value) => update('shadows', value)}
+              />
+              <PreferenceToggle
+                checked={settings.waterAnimation}
+                description="Animate streams and other water surfaces."
+                title="Water Animation"
+                onChange={(value) => update('waterAnimation', value)}
+              />
+              <PreferenceToggle
+                checked={settings.chatBubbles}
+                description="Show recent player chat above nearby villagers as well as in chat history."
+                title="Chat Bubbles"
+                onChange={(value) => update('chatBubbles', value)}
+              />
+              <PreferenceToggle
+                checked={settings.worldLabels}
+                description="Show useful nearby villager and world-object labels."
+                title="World Labels"
+                onChange={(value) => update('worldLabels', value)}
+              />
+              <ChoiceControl<GameHudDensity>
+                description="Compact keeps the world clear; Comfortable adds breathing room without removing actions."
+                label="HUD density"
+                options={[
+                  { label: 'Compact', value: 'compact' },
+                  { label: 'Comfortable', value: 'comfortable' },
+                ]}
+                value={settings.hudDensity}
+                onChange={(value) => update('hudDensity', value)}
               />
             </SettingsSectionCard>
           ) : null}
@@ -273,12 +407,6 @@ export function GameSettingsDialog({
                 onChange={(value) => update('showInteractionHints', value)}
               />
               <PreferenceToggle
-                checked={settings.showNearbyPlayerNames}
-                description="Display names above other villagers in the world."
-                title="Show Nearby Player Names"
-                onChange={(value) => update('showNearbyPlayerNames', value)}
-              />
-              <PreferenceToggle
                 checked={settings.showLocationBanner}
                 description="Keep the current location card visible while exploring."
                 title="Show Location Banner"
@@ -289,12 +417,6 @@ export function GameSettingsDialog({
                 description="Ask before leaving an activity that is still underway."
                 title="Confirm Before Leaving Activities"
                 onChange={(value) => update('confirmBeforeLeavingActivities', value)}
-              />
-              <PreferenceToggle
-                checked={settings.compactHud}
-                description="Use tighter spacing while keeping every important action available."
-                title="Compact HUD Mode"
-                onChange={(value) => update('compactHud', value)}
               />
               <PreferenceToggle
                 checked={settings.chatTimestamps}
@@ -367,8 +489,8 @@ export function GameSettingsDialog({
                 <div>
                   <strong>Your Wardrobe Mirror</strong>
                   <p>
-                    Preview and save one authoritative cosmetic appearance. Phase 10A starter
-                    choices are free and never change gameplay power.
+                    Preview and save one authoritative cosmetic appearance. Starter choices are free
+                    and never change gameplay power.
                   </p>
                 </div>
                 <GameButton
@@ -424,12 +546,6 @@ export function GameSettingsDialog({
                 description="Brighten secondary labels and strengthen panel surfaces."
                 title="Increased Text Contrast"
                 onChange={(value) => update('increasedTextContrast', value)}
-              />
-              <PreferenceToggle
-                checked={settings.simplifiedHud}
-                description="Reduce decorative detail while keeping essential status and actions."
-                title="Simplified HUD"
-                onChange={(value) => update('simplifiedHud', value)}
               />
             </SettingsSectionCard>
           ) : null}

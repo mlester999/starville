@@ -1,10 +1,12 @@
 import type { AssetCollisionProfile, AssetRotation, WorldAssetDelivery } from './contracts';
 import {
   STARVILLE_BUNDLED_MANIFEST_VERSION,
+  bundledManifestVersionSchema,
   bundledAssetAdminMediaPath,
   bundledAssetRuntimePath,
   bundledAssetVariant,
   getBundledAsset,
+  type BundledManifestVersion,
   type BundledAssetEntry,
 } from './bundled-assets';
 
@@ -80,6 +82,12 @@ export interface ResolveAssetInput {
   readonly failedIdentities?: ReadonlySet<string>;
   readonly rotation?: AssetRotation;
   readonly mediaSurface?: 'game' | 'admin';
+  /**
+   * Explicit repository candidate used only by local draft/Game Test/Admin
+   * inspection. Published and normal gameplay fall back to the immutable v1
+   * default unless an exact repository pin names another supported version.
+   */
+  readonly preferredBundledManifestVersion?: BundledManifestVersion;
 }
 
 function bundledRender(asset: BundledAssetEntry): ResolvableAssetRender {
@@ -122,24 +130,36 @@ function bundledMedia(
 ): Readonly<{ url: string; thumbnailUrl: string; cacheIdentity: string }> {
   const authoredVariant =
     rotation === undefined ? undefined : bundledAssetVariant(asset, { rotation });
-  const adminSource = bundledAssetAdminMediaPath(asset.key, 'source');
+  const adminSource = bundledAssetAdminMediaPath(asset.key, 'source', asset.bundledVersion);
   const versioned = (path: string): string =>
-    `${path}?manifest=${encodeURIComponent(STARVILLE_BUNDLED_MANIFEST_VERSION)}`;
+    `${path}?manifest=${encodeURIComponent(asset.bundledVersion)}`;
+  const withRotation = (path: string, value: AssetRotation): string =>
+    `${path}${path.includes('?') ? '&' : '?'}rotation=${String(value)}`;
   const url =
     surface === 'admin'
-      ? authoredVariant?.rotation === rotation
-        ? `${adminSource}?rotation=${String(rotation)}`
+      ? rotation !== undefined && authoredVariant?.rotation === rotation
+        ? withRotation(adminSource, rotation)
         : adminSource
       : versioned(bundledAssetRuntimePath(asset, rotation === undefined ? {} : { rotation }));
   const thumbnailUrl =
     surface === 'admin'
-      ? bundledAssetAdminMediaPath(asset.key, 'thumbnail')
+      ? bundledAssetAdminMediaPath(asset.key, 'thumbnail', asset.bundledVersion)
       : versioned(asset.thumbnailPath);
   return {
     url,
     thumbnailUrl,
-    cacheIdentity: `starville-bundled:${STARVILLE_BUNDLED_MANIFEST_VERSION}:${asset.key}:${url}`,
+    cacheIdentity: `starville-bundled:${asset.bundledVersion}:${asset.key}:${url}`,
   };
+}
+
+function defaultBundledManifestVersion(input: ResolveAssetInput): BundledManifestVersion {
+  if (
+    input.preferredBundledManifestVersion !== undefined &&
+    ['draft_world', 'game_test', 'admin_preview'].includes(input.context)
+  ) {
+    return input.preferredBundledManifestVersion;
+  }
+  return STARVILLE_BUNDLED_MANIFEST_VERSION;
 }
 
 function resolveBundled(
@@ -147,9 +167,10 @@ function resolveBundled(
   reason: AssetResolutionReason,
   safeFallbackUsed: boolean,
   versionId: string | null = null,
+  manifestVersion: BundledManifestVersion = defaultBundledManifestVersion(input),
 ): ResolvedAsset {
-  const requested = getBundledAsset(input.assetKey);
-  const bundled = requested ?? getBundledAsset('system.missing-asset');
+  const requested = getBundledAsset(input.assetKey, manifestVersion);
+  const bundled = requested ?? getBundledAsset('system.missing-asset', manifestVersion);
   if (bundled === undefined) {
     throw new Error('Starville bundled missing-asset material is unavailable.');
   }
@@ -179,7 +200,7 @@ function resolveMismatchedBundledPin(
   input: ResolveAssetInput,
   pin: ManagedAssetCandidate,
 ): ResolvedAsset {
-  const missing = getBundledAsset('system.missing-asset');
+  const missing = getBundledAsset('system.missing-asset', defaultBundledManifestVersion(input));
   if (missing === undefined) {
     throw new Error('Starville bundled missing-asset material is unavailable.');
   }
@@ -214,7 +235,10 @@ function resolveUploaded(
   source: Extract<AssetResolutionSource, 'pinned_uploaded' | 'active_uploaded'>,
   reason: Extract<AssetResolutionReason, 'exact_pinned_upload' | 'eligible_active_override'>,
 ): ResolvedAsset {
-  const bundled = getBundledAsset(input.assetKey) ?? getBundledAsset('system.missing-asset');
+  const manifestVersion = defaultBundledManifestVersion(input);
+  const bundled =
+    getBundledAsset(input.assetKey, manifestVersion) ??
+    getBundledAsset('system.missing-asset', manifestVersion);
   if (bundled === undefined) {
     throw new Error('Starville bundled missing-asset material is unavailable.');
   }
@@ -248,14 +272,25 @@ export function resolveAssetSource(input: ResolveAssetInput): ResolvedAsset {
   const pin = input.exactPinned;
   if (pin !== undefined && pin !== null) {
     if (pin.sourceKind === 'bundled') {
-      const requested = getBundledAsset(input.assetKey);
+      const parsedManifestVersion = bundledManifestVersionSchema.safeParse(
+        pin.bundledManifestVersion,
+      );
+      const requested = parsedManifestVersion.success
+        ? getBundledAsset(input.assetKey, parsedManifestVersion.data)
+        : undefined;
       if (
         pin.eligible &&
         pin.versionId !== null &&
-        pin.bundledManifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION &&
+        parsedManifestVersion.success &&
         requested?.bundledVersion === pin.bundledManifestVersion
       ) {
-        return resolveBundled(input, 'exact_pinned_bundled_version', false, pin.versionId);
+        return resolveBundled(
+          input,
+          'exact_pinned_bundled_version',
+          false,
+          pin.versionId,
+          parsedManifestVersion.data,
+        );
       }
       return resolveMismatchedBundledPin(input, pin);
     }

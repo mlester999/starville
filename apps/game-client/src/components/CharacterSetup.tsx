@@ -61,8 +61,8 @@ export function CharacterSetup({ onCreate }: CharacterSetupProps) {
           <p className="game-kicker">First light in Lantern Square</p>
           <h1 id="character-setup-title">Create your villager</h1>
           <p className="setup-intro">
-            Choose a name and one of four cosmetic development palettes. You can begin exploring as
-            soon as the village record is ready.
+            Choose a name and one of four cosmetic starter palettes. You can begin exploring as soon
+            as the village record is ready.
           </p>
 
           <label className="setup-field">
@@ -113,7 +113,7 @@ export function CharacterSetup({ onCreate }: CharacterSetupProps) {
             {submitting ? 'Preparing your arrival…' : 'Create character'}
             <span aria-hidden="true">→</span>
           </button>
-          <p className="setup-note">Temporary original development art · cosmetic only</p>
+          <p className="setup-note">Appearance choices are cosmetic only</p>
         </form>
       </section>
     </main>

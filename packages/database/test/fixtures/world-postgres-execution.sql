@@ -622,6 +622,115 @@ $$;
 
 do $$
 declare
+  lantern_map_id uuid;
+  lantern_version_id uuid;
+  trusted_manifest jsonb;
+  canonical_manifest jsonb;
+  rejected_manifest jsonb;
+  furniture_index integer;
+  validation jsonb;
+begin
+  select version.world_map_id, version.id, version.manifest
+  into strict lantern_map_id, lantern_version_id, trusted_manifest
+  from public.world_map_versions as version
+  where version.id = '79000000-0000-4000-8000-000000000001';
+
+  canonical_manifest := jsonb_set(
+    jsonb_set(
+      trusted_manifest,
+      '{assets}',
+      trusted_manifest -> 'assets' || jsonb_build_array('phase7-dev-willow-chair'),
+      false
+    ),
+    '{objects}',
+    trusted_manifest -> 'objects' || jsonb_build_array(jsonb_build_object(
+      'id', 'phase12c.fixture-chair',
+      'assetId', 'phase7-dev-willow-chair',
+      'kind', 'furniture',
+      'x', 12,
+      'y', 12,
+      'scale', 1,
+      'rotation', 90
+    )),
+    false
+  );
+
+  validation := private.validate_world_manifest(lantern_map_id, canonical_manifest);
+  perform pg_temp.assert_true(
+    coalesce((validation ->> 'valid')::boolean, false)
+      and jsonb_array_length(validation -> 'errors') = 0,
+    'the canonical furniture object and rotation validate'
+  );
+  perform pg_temp.assert_true(
+    private.world_asset_object_kind_allowed('furniture', 'furniture')
+      and private.world_manifest_assets_compatible(lantern_version_id, canonical_manifest),
+    'canonical furniture asset/object compatibility is allowed'
+  );
+  perform pg_temp.assert_true(
+    not private.world_asset_object_kind_allowed('furniture', 'building')
+      and not private.world_asset_object_kind_allowed('sign', 'furniture'),
+    'furniture assets remain incompatible with non-furniture map objects'
+  );
+  perform pg_temp.assert_true(
+    not has_function_privilege(
+      'anon', 'private.validate_world_manifest(uuid,jsonb)', 'EXECUTE'
+    )
+      and not has_function_privilege(
+        'authenticated', 'private.validate_world_manifest_phase12b(uuid,jsonb)', 'EXECUTE'
+      )
+      and not has_function_privilege(
+        'service_role', 'private.world_asset_object_kind_allowed(text,text)', 'EXECUTE'
+      ),
+    'the Phase 12C validator and compatibility helper remain private'
+  );
+
+  furniture_index := jsonb_array_length(canonical_manifest -> 'objects') - 1;
+  rejected_manifest := jsonb_set(
+    canonical_manifest,
+    array['objects', furniture_index::text, 'rotation'],
+    '45'::jsonb,
+    false
+  );
+  validation := private.validate_world_manifest(lantern_map_id, rejected_manifest);
+  perform pg_temp.assert_true(
+    not coalesce((validation ->> 'valid')::boolean, true)
+      and validation -> 'errors'
+        @> '[{"code":"INVALID_PHASE12C_MAP_OBJECT_ROTATION"}]'::jsonb,
+    'an unsupported furniture rotation is rejected'
+  );
+
+  rejected_manifest := jsonb_set(
+    canonical_manifest,
+    array['objects', furniture_index::text, 'rotation'],
+    '"90"'::jsonb,
+    false
+  );
+  validation := private.validate_world_manifest(lantern_map_id, rejected_manifest);
+  perform pg_temp.assert_true(
+    not coalesce((validation ->> 'valid')::boolean, true)
+      and validation -> 'errors'
+        @> '[{"code":"INVALID_PHASE12C_MAP_OBJECT_ROTATION"}]'::jsonb,
+    'a nonnumeric furniture rotation is rejected'
+  );
+
+  rejected_manifest := jsonb_set(
+    canonical_manifest,
+    array['objects', furniture_index::text],
+    canonical_manifest #> array['objects', furniture_index::text]
+      || jsonb_build_object('price', 100),
+    false
+  );
+  validation := private.validate_world_manifest(lantern_map_id, rejected_manifest);
+  perform pg_temp.assert_true(
+    not coalesce((validation ->> 'valid')::boolean, true)
+      and validation -> 'errors' @> '[{"code":"INVALID_PHASE12C_MAP_OBJECT"}]'::jsonb,
+    'an extra map-object field is rejected'
+  );
+end;
+$$;
+
+do $$
+declare
   wallet constant text := '77777777777777777777777777777777';
   suspended_wallet constant text := '88888888888888888888888888888888';
   rename_wallet constant text := '99999999999999999999999999999999';

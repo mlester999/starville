@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('phaser', () => {
   class Scene {
@@ -23,6 +23,7 @@ import { lanternSquareManifest } from '@starville/game-core';
 
 import type { GameRuntimeOptions } from '../contracts';
 import { worldAssetTextureKey } from '../rendering/world-asset-textures';
+import { sessionAssetFailureRegistry } from '../../app/asset-failure-registry';
 import { WorldScene } from './WorldScene';
 
 const production: WorldAssetDelivery = {
@@ -48,6 +49,8 @@ const production: WorldAssetDelivery = {
   defaultRotation: 0,
   developmentMarker: false,
 };
+
+beforeEach(() => sessionAssetFailureRegistry.clear());
 
 describe('WorldScene production-asset fallback', () => {
   it('observes a sanitized visual fallback without changing player, persistence, or travel state', () => {
@@ -113,6 +116,7 @@ describe('WorldScene production-asset fallback', () => {
       code: 'WORLD_ASSET_LOAD_FAILED',
       assetKey: production.assetKey,
       versionId: production.versionId,
+      requestId: expect.any(String),
     });
     expect(JSON.stringify(vi.mocked(callbacks.onWorldAssetFallback).mock.calls)).not.toContain(
       'assets.example.test',
@@ -178,9 +182,8 @@ describe('WorldScene production-asset fallback', () => {
     expect(updatePlayer).toHaveBeenCalledWith(
       { x: initialState.x, y: initialState.y },
       'northeast',
-      false,
+      'idle',
       250,
-      false,
     );
   });
 

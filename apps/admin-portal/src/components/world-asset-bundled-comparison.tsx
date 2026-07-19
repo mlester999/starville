@@ -1,4 +1,5 @@
 import {
+  STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
   bundledAssetAdminMediaPath,
   getBundledAsset,
   type AssetVersion,
@@ -31,6 +32,7 @@ export function WorldAssetBundledComparison(props: {
   readonly uploadedLabel: string;
 }) {
   const bundled = getBundledAsset(props.assetKey);
+  const candidate = getBundledAsset(props.assetKey, STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION);
   return (
     <section className="detail-card" aria-labelledby="bundled-comparison-title">
       <div className="section-heading-row">
@@ -43,7 +45,9 @@ export function WorldAssetBundledComparison(props: {
           </p>
         </div>
         <span className="permission-badge">
-          {bundled === undefined ? 'Bundled key missing' : `Bundled v${bundled.bundledVersion}`}
+          {bundled === undefined
+            ? 'Bundled key missing'
+            : `Bundled v${bundled.bundledVersion} · Candidate v${STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION}`}
         </span>
       </div>
 
@@ -75,6 +79,22 @@ export function WorldAssetBundledComparison(props: {
                       src={bundledAssetAdminMediaPath(bundled.key, 'source')}
                     />
                   </div>
+                  {candidate === undefined ? null : (
+                    <div className={styles['previewFrame']} data-backdrop={backdrop}>
+                      <span>Phase 12D candidate</span>
+                      <img
+                        alt={`${candidate.displayName} Phase 12D production candidate on ${backdrop} background`}
+                        decoding="async"
+                        loading="lazy"
+                        referrerPolicy="no-referrer"
+                        src={bundledAssetAdminMediaPath(
+                          candidate.key,
+                          'source',
+                          STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+                        )}
+                      />
+                    </div>
+                  )}
                   <div className={styles['previewFrame']} data-backdrop={backdrop}>
                     <span>{props.uploadedLabel}</span>
                     {props.uploadedMediaUrl === null ? (
@@ -105,6 +125,7 @@ export function WorldAssetBundledComparison(props: {
                 <tr>
                   <th scope="col">Metric</th>
                   <th scope="col">Bundled Default</th>
+                  <th scope="col">Phase 12D Candidate</th>
                   <th scope="col">{props.uploadedLabel}</th>
                 </tr>
               </thead>
@@ -113,6 +134,11 @@ export function WorldAssetBundledComparison(props: {
                   <th scope="row">Dimensions</th>
                   <td>
                     {bundled.width} × {bundled.height}
+                  </td>
+                  <td>
+                    {candidate === undefined
+                      ? 'Unavailable'
+                      : `${String(candidate.width)} × ${String(candidate.height)}`}
                   </td>
                   <td>
                     {uploadedMetric(props.uploadedVersion, (version) =>
@@ -125,6 +151,7 @@ export function WorldAssetBundledComparison(props: {
                 <tr>
                   <th scope="row">File size</th>
                   <td>{byteLabel(props.bundledSizeBytes)}</td>
+                  <td>Recorded in candidate coverage report</td>
                   <td>
                     {uploadedMetric(props.uploadedVersion, (version) =>
                       byteLabel(version.sourceSizeBytes),
@@ -134,6 +161,7 @@ export function WorldAssetBundledComparison(props: {
                 <tr>
                   <th scope="row">Render scale</th>
                   <td>{bundled.recommendedScale}</td>
+                  <td>{candidate?.recommendedScale ?? 'Unavailable'}</td>
                   <td>
                     {uploadedMetric(props.uploadedVersion, (version) =>
                       String(version.render.scale),
@@ -144,6 +172,11 @@ export function WorldAssetBundledComparison(props: {
                   <th scope="row">Foot anchor</th>
                   <td>
                     {bundled.footAnchor.x}, {bundled.footAnchor.y}
+                  </td>
+                  <td>
+                    {candidate === undefined
+                      ? 'Unavailable'
+                      : `${String(candidate.footAnchor.x)}, ${String(candidate.footAnchor.y)}`}
                   </td>
                   <td>
                     {uploadedMetric(
@@ -158,11 +191,19 @@ export function WorldAssetBundledComparison(props: {
                   <td>
                     {bundled.footprint.width} × {bundled.footprint.height} tile(s)
                   </td>
+                  <td>
+                    {candidate === undefined
+                      ? 'Unavailable'
+                      : `${String(candidate.footprint.width)} × ${String(candidate.footprint.height)} tile(s)`}
+                  </td>
                   <td>World placement remains manifest-owned</td>
                 </tr>
                 <tr>
                   <th scope="row">Collision</th>
                   <td>{humanize(bundled.collision.shape)}</td>
+                  <td>
+                    {candidate === undefined ? 'Unavailable' : humanize(candidate.collision.shape)}
+                  </td>
                   <td>
                     {uploadedMetric(props.uploadedVersion, (version) =>
                       humanize(version.collision.shape),
@@ -177,6 +218,13 @@ export function WorldAssetBundledComparison(props: {
                       .join(', ')}
                   </td>
                   <td>
+                    {candidate === undefined
+                      ? 'Unavailable'
+                      : candidate.supportedRotations
+                          .map((rotation) => `${String(rotation)}°`)
+                          .join(', ')}
+                  </td>
+                  <td>
                     {uploadedMetric(props.uploadedVersion, (version) =>
                       version.render.supportedRotations
                         .map((rotation) => `${String(rotation)}°`)
@@ -187,6 +235,11 @@ export function WorldAssetBundledComparison(props: {
                 <tr>
                   <th scope="row">Validation</th>
                   <td>{humanize(bundled.qualityStatus)} · manifest validated</td>
+                  <td>
+                    {candidate === undefined
+                      ? 'Unavailable'
+                      : `${humanize(candidate.qualityStatus)} · owner review pending`}
+                  </td>
                   <td>
                     {uploadedMetric(props.uploadedVersion, (version) =>
                       humanize(version.validationStatus),

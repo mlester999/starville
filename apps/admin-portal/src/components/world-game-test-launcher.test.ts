@@ -53,6 +53,19 @@ describe('administrator Open in Game Test workflow', () => {
     expect(actions).not.toContain('publishWorldDraft');
   });
 
+  it('adds deterministic Phase 12C visual modes without persisting local review state', () => {
+    expect(launcher).toContain('data-phase12c-review="local-only"');
+    expect(launcher).toContain('WORLD_VISUAL_REVIEW_MODES');
+    expect(launcher).toContain('WORLD_VISUAL_REVIEW_CHECKS');
+    expect(launcher).toContain('Deterministic visual fixture');
+    expect(launcher).toContain('reset on reload');
+    expect(launcher).toContain('not sent with the');
+    expect(launcher).toContain('checklist: checks');
+    expect(launcher).not.toContain('checklist: visualChecks');
+    expect(launcher).not.toContain('localStorage');
+    expect(launcher).not.toContain('sessionStorage');
+  });
+
   it('uses an accessible confirmation dialog and retains no raw launch URL in active state', () => {
     expect(launcher).toContain('aria-modal="true"');
     expect(launcher).toContain('aria-haspopup="dialog"');

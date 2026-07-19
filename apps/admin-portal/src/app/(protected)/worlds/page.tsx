@@ -49,7 +49,12 @@ export default async function WorldsPage(props: {
               Normal players can load only the active published version.
             </p>
           </div>
-          <span className="permission-badge">{directory.total} map(s)</span>
+          <div className="world-assets-intro__actions">
+            <span className="permission-badge">{directory.total} map(s)</span>
+            <Link className="button button--secondary" href="/worlds/visual-readiness">
+              Visual Readiness
+            </Link>
+          </div>
         </header>
 
         <WorldTopology topology={topology} />

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { bundledManifestVersionSchema } from './bundled-versions';
+
 import {
   ASSET_CATEGORIES,
   ASSET_INTERACTION_COMPATIBILITIES,
@@ -217,14 +219,36 @@ const adminAssetMediaUrlSchema = z.union([
 ]);
 const nullableAdminAssetMediaUrlSchema = adminAssetMediaUrlSchema.nullable();
 
+export const worldAssetMaterialClassSchema = z.enum([
+  'bundled_development',
+  'bundled_candidate',
+  'uploaded',
+]);
+export type WorldAssetMaterialClass = z.infer<typeof worldAssetMaterialClassSchema>;
+
+export function resolveWorldAssetMaterialClass(
+  value: Readonly<{
+    materialClass?: WorldAssetMaterialClass | undefined;
+    developmentMarker: boolean;
+  }>,
+): WorldAssetMaterialClass {
+  return value.materialClass ?? (value.developmentMarker ? 'bundled_development' : 'uploaded');
+}
+
 /** Safe, immutable descriptor delivered beside a published world manifest. */
 export const worldAssetDeliverySchema = z
   .object({
     assetKey: assetIdentifierSchema,
     versionId: assetUuidSchema,
     checksum: assetChecksumSchema,
+    /**
+     * Explicit material provenance/readiness. It remains optional on input only
+     * so existing hosted v1 projections continue to parse; all new API
+     * projections emit it and every v2 repository candidate must provide it.
+     */
+    materialClass: worldAssetMaterialClassSchema.optional(),
     /** Exact checked-in manifest identity for repository material; null for uploaded media. */
-    bundledManifestVersion: z.literal('1.0.0').nullable(),
+    bundledManifestVersion: bundledManifestVersionSchema.nullable(),
     url: nullableDeliveryUrlSchema,
     mediaType: z.literal('image/webp').nullable(),
     width: z.number().int().positive().max(GLOBAL_ASSET_MAX_DIMENSION).nullable(),
@@ -253,6 +277,46 @@ export const worldAssetDeliverySchema = z
       value.renderWidth,
       value.renderHeight,
     ];
+    const materialClass = resolveWorldAssetMaterialClass(value);
+
+    if (value.materialClass === undefined && value.bundledManifestVersion === '2.0.0') {
+      context.addIssue({
+        code: 'custom',
+        path: ['materialClass'],
+        message: 'Repository-authored candidate material requires an explicit classification',
+      });
+    }
+    if (
+      materialClass === 'bundled_development' &&
+      value.materialClass !== undefined &&
+      (value.bundledManifestVersion === '2.0.0' || !value.developmentMarker)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['materialClass'],
+        message: 'Bundled development material must be legacy-unbound or identify v1',
+      });
+    }
+    if (
+      materialClass === 'bundled_candidate' &&
+      (value.bundledManifestVersion !== '2.0.0' || !value.developmentMarker)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['materialClass'],
+        message: 'Bundled candidate material must identify the v2 candidate manifest',
+      });
+    }
+    if (
+      materialClass === 'uploaded' &&
+      (value.bundledManifestVersion !== null || value.developmentMarker)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['materialClass'],
+        message: 'Uploaded material cannot claim a bundled identity or development marker',
+      });
+    }
     if (value.developmentMarker && productionFields.some((field) => field !== null)) {
       context.addIssue({
         code: 'custom',

@@ -8,6 +8,7 @@ import {
 import type { WorldEditorAssetCandidate } from '../world-assets/contracts';
 import { adminAssetMediaPath, availableAdminAssetMediaPath } from '../world-assets/media';
 import type { AdminWorldManifest, WorldDraftAssetPin } from './contracts';
+import { adminWorldAssetProjectionScale } from './visual-policy';
 
 export const WORLD_OBJECT_RENDER_MODES = ['mixed', 'assets', 'markers', 'collision'] as const;
 export type WorldObjectRenderMode = (typeof WORLD_OBJECT_RENDER_MODES)[number];
@@ -52,6 +53,24 @@ export interface WorldObjectRenderResolution {
 }
 
 type MapObject = AdminWorldManifest['objects'][number];
+
+function uploadedImageCanRepresentObjectRotation(
+  object: MapObject,
+  render: WorldDraftAssetPin['pinnedVersion']['render'],
+): boolean {
+  /*
+   * Uploaded delivery currently exposes one immutable image rather than directional frames.
+   * Match the runtime contract: only the authored default direction may use that image. Never
+   * manufacture another isometric direction with an SVG/CSS transform.
+   */
+  return (object.rotation ?? render.defaultRotation) === render.defaultRotation;
+}
+
+export interface WorldAssetCanvasProjection {
+  readonly kind: MapObject['kind'];
+  readonly tileWidth: number;
+  readonly projectedHalfTileWidth: number;
+}
 
 function markerResolution(input: {
   reason: Exclude<WorldObjectRenderReason, 'pinned_asset' | 'active_asset'>;
@@ -329,6 +348,19 @@ export function resolveWorldObjectRendering(input: {
         replacementCandidate,
       });
     }
+    if (!uploadedImageCanRepresentObjectRotation(input.object, pinned.render)) {
+      return bundledOrPlaceholder({
+        object: input.object,
+        reason: 'bundled_fallback',
+        explanation: `Pinned Version ${pinned.versionNumber} has no authored image for this object direction, so the authored bundled direction is shown without rotating the upload.`,
+        nextSafeAction:
+          'Add immutable directional upload delivery before using this object rotation.',
+        failedMediaIds: input.failedVersionIds,
+        pin,
+        candidate,
+        replacementCandidate,
+      });
+    }
     return {
       status: 'asset',
       reason: 'pinned_asset',
@@ -441,6 +473,18 @@ export function resolveWorldObjectRendering(input: {
       replacementCandidate,
     });
   }
+  if (!uploadedImageCanRepresentObjectRotation(input.object, candidate.activeVersion.render)) {
+    return bundledOrPlaceholder({
+      object: input.object,
+      reason: 'bundled_fallback',
+      explanation: `Active uploaded Version ${candidate.activeVersion.versionNumber} has no authored image for this object direction, so the authored bundled direction is shown without rotating the upload.`,
+      nextSafeAction:
+        'Add immutable directional upload delivery before using this object rotation.',
+      failedMediaIds: input.failedVersionIds,
+      candidate,
+      replacementCandidate,
+    });
+  }
   return {
     status: 'asset',
     reason: 'active_asset',
@@ -466,6 +510,7 @@ export function resolveWorldObjectRendering(input: {
 
 export function worldAssetCanvasMetrics(
   source: WorldEditorAssetCandidate | WorldDraftAssetPin,
+  projection: WorldAssetCanvasProjection,
 ): Readonly<{
   width: number;
   height: number;
@@ -474,7 +519,7 @@ export function worldAssetCanvasMetrics(
 }> {
   const render =
     'pinnedVersion' in source ? source.pinnedVersion.render : source.activeVersion.render;
-  return worldAssetCanvasMetricsForRender(render);
+  return worldAssetCanvasMetricsForRender(render, projection);
 }
 
 export function worldAssetCanvasMetricsForRender(
@@ -484,15 +529,21 @@ export function worldAssetCanvasMetricsForRender(
     scale: number;
     footAnchor: Readonly<{ x: number; y: number }>;
   }>,
+  projection: WorldAssetCanvasProjection,
 ): Readonly<{
   width: number;
   height: number;
   x: number;
   y: number;
 }> {
-  const ratio = render.renderWidth / render.renderHeight;
-  const height = Math.min(180, Math.max(28, render.renderHeight * render.scale * 0.25));
-  const width = Math.min(220, Math.max(20, height * ratio));
+  const visualScale = adminWorldAssetProjectionScale({
+    kind: projection.kind,
+    authoredScale: render.scale,
+    tileWidth: projection.tileWidth,
+    projectedHalfTileWidth: projection.projectedHalfTileWidth,
+  });
+  const width = render.renderWidth * visualScale;
+  const height = render.renderHeight * visualScale;
   return {
     width,
     height,

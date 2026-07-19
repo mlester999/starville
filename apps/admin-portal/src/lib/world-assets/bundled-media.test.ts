@@ -27,6 +27,18 @@ describe('bundled asset media allowlist', () => {
     expect(thumbnail?.manifestPath).toBe(
       '/assets/starville/bundled/v1/thumbnails/nature/tree-pine.webp',
     );
+
+    const candidate = resolveBundledMediaDescriptor({
+      key: 'tree-pine',
+      variant: 'source',
+      manifestVersion: '2.0.0',
+      workspaceRoot: '/workspace/starville',
+    });
+    expect(candidate?.asset.qualityStatus).toBe('production_candidate');
+    expect(candidate?.manifestPath).toBe('/assets/starville/bundled/v2/nature/tree-pine.webp');
+    expect(candidate?.filesystemPath).toBe(
+      '/workspace/starville/assets/starville/bundled/v2/nature/tree-pine.webp',
+    );
   });
 
   it('selects only authored rotation variants and never rotates a requested path', () => {
@@ -61,17 +73,20 @@ describe('bundled asset media allowlist', () => {
     expect(workspaceRoot).not.toBeNull();
     if (workspaceRoot === null) return;
 
-    for (const variant of ['source', 'thumbnail'] as const) {
-      const descriptor = resolveBundledMediaDescriptor({
-        key: 'tree-pine',
-        variant,
-        workspaceRoot,
-      });
-      expect(descriptor).not.toBeNull();
-      if (descriptor === null) continue;
-      const bytes = await readBundledMedia(descriptor, workspaceRoot);
-      expect(bytes?.subarray(0, 4).toString('ascii')).toBe('RIFF');
-      expect(bytes?.subarray(8, 12).toString('ascii')).toBe('WEBP');
+    for (const manifestVersion of ['1.0.0', '2.0.0'] as const) {
+      for (const variant of ['source', 'thumbnail'] as const) {
+        const descriptor = resolveBundledMediaDescriptor({
+          key: 'tree-pine',
+          variant,
+          manifestVersion,
+          workspaceRoot,
+        });
+        expect(descriptor).not.toBeNull();
+        if (descriptor === null) continue;
+        const bytes = await readBundledMedia(descriptor, workspaceRoot);
+        expect(bytes?.subarray(0, 4).toString('ascii')).toBe('RIFF');
+        expect(bytes?.subarray(8, 12).toString('ascii')).toBe('WEBP');
+      }
     }
   });
 

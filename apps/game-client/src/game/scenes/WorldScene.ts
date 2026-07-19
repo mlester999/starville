@@ -1,7 +1,10 @@
 import Phaser from 'phaser';
 
+import { avatarAnimationStateForMovement } from '@starville/avatar';
 import {
+  STARVILLE_VISUAL_TOKENS,
   closestInteraction,
+  computeWorldCameraFrame,
   moveWithCollisions,
   movementDelta,
   movementSpeed,
@@ -9,27 +12,49 @@ import {
   nextFacingDirection,
   projectWorld,
   sanitizeInteractionText,
+  resolveWorldVisualSettings,
   type MapExit,
   type MapManifest,
   type IsometricProjection,
+  type MovementInput,
   type PlayerStateUpdate,
   type WorldInteraction,
+  type WorldVisualSettings,
 } from '@starville/game-core';
 
-import type { ActivityInteractionTarget, GameRuntimeOptions, RuntimeWorld } from '../contracts';
+import type {
+  ActivityInteractionTarget,
+  GameRuntimeOptions,
+  RuntimeWorld,
+  WorldChatBubbleMessage,
+} from '../contracts';
 import type { CooperativeActivityInstanceSnapshot } from '@starville/cooperative-activities';
 import { isGameplayInputAllowed } from '../input/focus';
 import { createGameplayKeys, type GameplayKeys } from '../input/keyboard';
 import { isJogging, readMovementInput } from '../input/movement-key-state';
+import { interactionPromptLabel } from '../input/interaction-prompt';
+import { IDLE_TOUCH_MOVEMENT, mergeMovementInput } from '../input/touch-movement';
 import { renderCollisionDebug, type CollisionDebugOverlay } from '../rendering/collision-debug';
-import { PlayerRenderer } from '../rendering/player';
+import {
+  createAvatarPlayerRenderer,
+  type AvatarPlayerRenderer,
+} from '../rendering/avatar-player-renderer';
 import { RemotePlayerRenderer } from '../rendering/remote-player';
 import type { PublicPresence } from '@starville/realtime';
 import { SOCIAL_INTERACTION_DISTANCE, socialDistance } from '@starville/realtime';
 import { bundledTerrainAssetKeysForManifest, renderTerrain } from '../rendering/terrain';
+import {
+  renderInteractionMarkerLayer,
+  type InteractionMarkerLayer,
+} from '../rendering/interaction-markers';
+import {
+  renderWorldObjectAmbience,
+  type WorldObjectAmbienceLayer,
+} from '../rendering/world-ambience';
 import { queueWorldAssetTextures } from '../rendering/world-asset-textures';
 import { renderWorldObjects, type RenderedWorldObject } from '../rendering/world-objects';
 import { fallbackResolvedAvatar, type ResolvedAvatarProfile } from '../../app/avatar-client';
+import { WorldChatBubbleRenderer, selectVisibleWorldChatBubbles } from '../rendering/chat-bubbles';
 
 const CHECKPOINT_INTERVAL_MS = 5_000;
 const STATE_REPORT_INTERVAL_MS = 100;
@@ -42,12 +67,22 @@ function currentAssetRotations(manifest: MapManifest) {
   );
 }
 
-function currentTextureQueue(manifest: MapManifest) {
+function currentTextureQueue(
+  manifest: MapManifest,
+  assetResolutionContext: RuntimeWorld['assetResolutionContext'],
+) {
   return {
     assetKeys: manifest.assets,
     assetRotations: currentAssetRotations(manifest),
     terrainAssetKeys: bundledTerrainAssetKeysForManifest(manifest),
+    ...(assetResolutionContext === undefined ? {} : { assetResolutionContext }),
   } as const;
+}
+
+function highContrastPreference(): boolean {
+  return (
+    typeof window !== 'undefined' && window.matchMedia?.('(forced-colors: active)').matches === true
+  );
 }
 
 function insideExit(position: PlayerStateUpdate, exit: MapExit): boolean {
@@ -65,10 +100,12 @@ export class WorldScene extends Phaser.Scene {
   private projection: IsometricProjection;
   private state: PlayerStateUpdate;
   private lastOutsideExitState: PlayerStateUpdate;
-  private player: PlayerRenderer | undefined;
+  private player: AvatarPlayerRenderer | undefined;
+  private localChatBubble: WorldChatBubbleRenderer | undefined;
   private keys: GameplayKeys | undefined;
   private currentInteraction: WorldInteraction | undefined;
   private inputBlocked = false;
+  private touchMovementInput: MovementInput = IDLE_TOUCH_MOVEMENT;
   private transitionPending = false;
   private exitArmed = false;
   private rearmAfter = 0;
@@ -78,12 +115,16 @@ export class WorldScene extends Phaser.Scene {
   private dirty = false;
   private terrain: Phaser.GameObjects.Container | undefined;
   private worldObjects: readonly RenderedWorldObject[] = [];
-  private interactionMarkers: Phaser.GameObjects.Graphics[] = [];
+  private interactionMarkers: InteractionMarkerLayer | undefined;
+  private objectAmbience: WorldObjectAmbienceLayer | undefined;
   private collisionDebug: CollisionDebugOverlay | undefined;
   private readonly remotePlayers = new Map<string, RemotePlayerRenderer>();
   private remoteAvatarProfiles: Readonly<Record<string, ResolvedAvatarProfile>> = {};
   private remotePlayerNamesVisible = true;
   private selectedRemotePresenceId: string | null = null;
+  private visualSettings: WorldVisualSettings;
+  private reducedMotion: boolean;
+  private chatBubbleMessages: readonly WorldChatBubbleMessage[] = [];
   private activityInstance: CooperativeActivityInstanceSnapshot | null = null;
   private currentActivityObject: ActivityInteractionTarget | undefined;
   private normalWorldState: PlayerStateUpdate | undefined;
@@ -98,6 +139,8 @@ export class WorldScene extends Phaser.Scene {
     this.world = options.initialWorld;
     this.manifest = options.initialWorld.manifest;
     this.projection = this.projectionFor(this.manifest);
+    this.visualSettings = resolveWorldVisualSettings(options.visualSettings);
+    this.reducedMotion = options.reducedMotion;
     this.state = { ...options.initialState };
     this.lastOutsideExitState = { ...options.initialState };
   }
@@ -107,28 +150,33 @@ export class WorldScene extends Phaser.Scene {
       this,
       this.world.assetDeliveries,
       (event) => this.options.callbacks.onWorldAssetFallback(event),
-      currentTextureQueue(this.manifest),
+      currentTextureQueue(this.manifest, this.world.assetResolutionContext),
     );
   }
 
   public create(): void {
     try {
-      this.cameras.main.setBackgroundColor('#17382b');
+      this.cameras.main.setBackgroundColor('#456f55');
       this.renderMap();
 
-      this.player = new PlayerRenderer(
+      this.player = createAvatarPlayerRenderer(
+        this.options.avatarRendererMode ?? 'published_v1',
         this,
         this.options.avatarProfile ?? fallbackResolvedAvatar(this.options.appearancePreset),
         this.projection,
-        this.options.reducedMotion,
+        this.reducedMotion,
       );
+      this.player.setShadowsEnabled(this.visualSettings.shadows);
+      this.localChatBubble = new WorldChatBubbleRenderer(this, this.projection);
+      this.localChatBubble.setEnabled(this.visualSettings.chatBubbles);
       this.updatePlayer(false, 0, false);
       this.configureCamera();
+      this.scale.on('resize', this.handleResize, this);
 
       if (this.input.keyboard !== null) this.keys = createGameplayKeys(this.input.keyboard);
       this.events.on(Phaser.Scenes.Events.PAUSE, this.reportStoppedMovement, this);
       this.events.on(Phaser.Scenes.Events.SLEEP, this.reportStoppedMovement, this);
-      this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.reportStoppedMovement, this);
+      this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.handleShutdown, this);
       this.refreshInteractionTarget();
       this.options.callbacks.onMapChanged(this.world);
       this.options.callbacks.onReady();
@@ -140,22 +188,28 @@ export class WorldScene extends Phaser.Scene {
   public override update(time: number, delta: number): void {
     const player = this.player;
     const keys = this.keys;
-    if (player === undefined || keys === undefined) return;
+    if (player === undefined) return;
 
-    const mayUseKeyboard = isGameplayInputAllowed(
-      this.inputBlocked || this.transitionPending,
-      document.activeElement,
-    );
-    if (mayUseKeyboard && Phaser.Input.Keyboard.JustDown(keys.settings)) {
+    const mayUseKeyboard =
+      keys !== undefined &&
+      isGameplayInputAllowed(this.inputBlocked || this.transitionPending, document.activeElement);
+    if (mayUseKeyboard && keys !== undefined && Phaser.Input.Keyboard.JustDown(keys.settings)) {
       this.options.callbacks.onSettingsRequested();
       return;
     }
-    if (mayUseKeyboard && Phaser.Input.Keyboard.JustDown(keys.interact)) this.interact();
+    if (mayUseKeyboard && keys !== undefined && Phaser.Input.Keyboard.JustDown(keys.interact)) {
+      this.interact();
+    }
 
-    const input = mayUseKeyboard
-      ? readMovementInput(keys)
-      : { up: false, down: false, left: false, right: false };
-    const jogging = mayUseKeyboard && isJogging(keys);
+    const keyboardInput =
+      mayUseKeyboard && keys !== undefined
+        ? readMovementInput(keys)
+        : { up: false, down: false, left: false, right: false };
+    const input = mergeMovementInput(
+      keyboardInput,
+      this.inputBlocked || this.transitionPending ? IDLE_TOUCH_MOVEMENT : this.touchMovementInput,
+    );
+    const jogging = mayUseKeyboard && keys !== undefined && isJogging(keys);
     const movement = movementDelta(input, movementSpeed(jogging), delta / 1_000);
     const next = moveWithCollisions(
       { x: this.state.x, y: this.state.y },
@@ -184,7 +238,12 @@ export class WorldScene extends Phaser.Scene {
     this.wasMoving = moving;
 
     this.updatePlayer(moving, time, jogging);
-    for (const remote of this.remotePlayers.values()) remote.update(performance.now());
+    const interpolationNow = performance.now();
+    const wallNow = this.wallClockNow();
+    for (const remote of this.remotePlayers.values()) {
+      remote.update(interpolationNow, this.state, wallNow);
+    }
+    this.localChatBubble?.update(this.state, this.state, wallNow);
     this.checkExit(time);
 
     if (this.dirty && !this.transitionPending) {
@@ -199,6 +258,18 @@ export class WorldScene extends Phaser.Scene {
 
   public setInputBlocked(blocked: boolean): void {
     this.inputBlocked = blocked;
+    if (blocked) this.touchMovementInput = IDLE_TOUCH_MOVEMENT;
+  }
+
+  public setTouchMovementInput(input: MovementInput): void {
+    this.touchMovementInput = this.inputBlocked
+      ? IDLE_TOUCH_MOVEMENT
+      : {
+          up: input.up === true,
+          down: input.down === true,
+          left: input.left === true,
+          right: input.right === true,
+        };
   }
 
   public setRemotePresences(presences: readonly PublicPresence[]): void {
@@ -221,8 +292,10 @@ export class WorldScene extends Phaser.Scene {
             this,
             presence,
             this.projection,
-            this.options.reducedMotion,
+            this.reducedMotion,
             (presenceId) => this.selectRemotePlayer(presenceId),
+            this.visualSettings,
+            this.options.avatarRendererMode ?? 'published_v1',
           ),
         );
       } else {
@@ -239,6 +312,7 @@ export class WorldScene extends Phaser.Scene {
         .get(presence.presenceId)
         ?.setNameplateVisible(this.remotePlayerNamesVisible);
     }
+    this.refreshChatBubbles();
   }
 
   public setLocalAvatarProfile(profile: ResolvedAvatarProfile): void {
@@ -257,6 +331,50 @@ export class WorldScene extends Phaser.Scene {
   public setRemotePlayerNamesVisible(visible: boolean): void {
     this.remotePlayerNamesVisible = visible;
     for (const remote of this.remotePlayers.values()) remote.setNameplateVisible(visible);
+  }
+
+  public setVisualSettings(settings: Partial<WorldVisualSettings>): void {
+    const next = resolveWorldVisualSettings(settings);
+    const rendererChanged =
+      next.quality !== this.visualSettings.quality ||
+      next.shadows !== this.visualSettings.shadows ||
+      next.ambientEffects !== this.visualSettings.ambientEffects ||
+      next.animatedWater !== this.visualSettings.animatedWater;
+    const labelsChanged =
+      next.remoteLabels !== this.visualSettings.remoteLabels ||
+      next.chatBubbles !== this.visualSettings.chatBubbles;
+    if (!rendererChanged && !labelsChanged) return;
+    this.visualSettings = next;
+    this.player?.setShadowsEnabled(this.visualSettings.shadows);
+    this.localChatBubble?.setEnabled(this.visualSettings.chatBubbles);
+    for (const remote of this.remotePlayers.values()) remote.setVisualSettings(this.visualSettings);
+    if (rendererChanged && this.terrain !== undefined) {
+      this.clearMap();
+      this.renderMap();
+      this.renderActivityMarkers();
+      this.refreshInteractionTarget();
+    }
+    this.configureCamera();
+    this.refreshChatBubbles();
+  }
+
+  public setChatBubbleMessages(messages: readonly WorldChatBubbleMessage[]): void {
+    this.chatBubbleMessages = messages.slice(-50);
+    this.refreshChatBubbles();
+  }
+
+  public setReducedMotion(reducedMotion: boolean): void {
+    if (this.reducedMotion === reducedMotion) return;
+    this.reducedMotion = reducedMotion;
+    this.player?.setReducedMotion(reducedMotion);
+    for (const remote of this.remotePlayers.values()) remote.setReducedMotion(reducedMotion);
+    if (this.terrain !== undefined) {
+      this.clearMap();
+      this.renderMap();
+      this.renderActivityMarkers();
+      this.refreshInteractionTarget();
+    }
+    this.configureCamera();
   }
 
   public setSelectedRemotePresence(presenceId: string | null): void {
@@ -324,7 +442,7 @@ export class WorldScene extends Phaser.Scene {
       this,
       world.assetDeliveries,
       (event) => this.options.callbacks.onWorldAssetFallback(event),
-      currentTextureQueue(world.manifest),
+      currentTextureQueue(world.manifest, world.assetResolutionContext),
     );
     const commit = (): void => {
       if (loadGeneration !== this.mapLoadGeneration) return;
@@ -367,8 +485,10 @@ export class WorldScene extends Phaser.Scene {
 
     this.renderMap();
     this.player?.setProjection(this.projection);
+    this.localChatBubble?.setProjection(this.projection);
     this.updatePlayer(false, this.time.now, false);
     this.configureCamera();
+    this.refreshChatBubbles();
     this.refreshInteractionTarget();
     this.options.callbacks.onMapChanged(world);
   }
@@ -421,8 +541,30 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private renderMap(): void {
-    this.terrain = renderTerrain(this, this.manifest);
-    this.worldObjects = renderWorldObjects(this, this.manifest, this.world.assetDeliveries);
+    this.terrain = renderTerrain(this, this.manifest, {
+      apronTiles: STARVILLE_VISUAL_TOKENS.camera.maximumApronTiles,
+      reducedMotion: this.reducedMotion,
+      quality: this.visualSettings.quality,
+      animatedWater: this.visualSettings.animatedWater,
+      ambientEffects: this.visualSettings.ambientEffects,
+      assetDeliveries: this.world.assetDeliveries,
+      ...(this.world.assetResolutionContext === undefined
+        ? {}
+        : { assetResolutionContext: this.world.assetResolutionContext }),
+    });
+    this.worldObjects = renderWorldObjects(this, this.manifest, this.world.assetDeliveries, {
+      shadows: this.visualSettings.shadows,
+      quality: this.visualSettings.quality,
+      ...(this.world.assetResolutionContext === undefined
+        ? {}
+        : { assetResolutionContext: this.world.assetResolutionContext }),
+    });
+    this.objectAmbience = renderWorldObjectAmbience(this, this.manifest, this.worldObjects, {
+      enabled: this.visualSettings.ambientEffects,
+      reducedMotion: this.reducedMotion,
+      quality: this.visualSettings.quality,
+      highContrast: highContrastPreference(),
+    });
     if (this.options.collisionDebug) {
       this.collisionDebug = renderCollisionDebug(
         this,
@@ -435,43 +577,102 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private clearMap(): void {
-    this.terrain?.destroy();
+    if (this.terrain !== undefined) {
+      this.tweens?.killTweensOf(this.terrain.getAll());
+      this.terrain.destroy();
+    }
     this.terrain = undefined;
-    for (const object of this.worldObjects) object.container.destroy(true);
+    this.objectAmbience?.destroy();
+    this.objectAmbience = undefined;
+    for (const object of this.worldObjects) {
+      object.container.destroy(true);
+      object.shadow?.destroy();
+    }
     this.worldObjects = [];
-    for (const marker of this.interactionMarkers) marker.destroy();
-    this.interactionMarkers = [];
+    this.interactionMarkers?.destroy();
+    this.interactionMarkers = undefined;
     this.collisionDebug?.destroy();
     this.collisionDebug = undefined;
     this.clearActivityMarkers();
   }
 
   private configureCamera(): void {
-    const bounds = this.manifest.cameraBounds;
-    this.cameras.main.setBounds(
-      bounds.minX,
-      bounds.minY,
-      bounds.maxX - bounds.minX,
-      bounds.maxY - bounds.minY,
-    );
+    const camera = this.cameras?.main;
+    if (camera === undefined) return;
+    const frame = computeWorldCameraFrame({
+      manifest: this.manifest,
+      viewportWidth: camera.width,
+      viewportHeight: camera.height,
+      reducedMotion: this.reducedMotion,
+    });
+    const bounds = frame.bounds;
+    camera.setZoom(frame.zoom);
+    camera.setBounds(bounds.x, bounds.y, bounds.width, bounds.height);
     if (this.player !== undefined) {
-      this.cameras.main.startFollow(
+      camera.startFollow(
         this.player.container,
         true,
-        this.options.reducedMotion ? 1 : 0.13,
-        this.options.reducedMotion ? 1 : 0.13,
+        this.reducedMotion ? 1 : 0.13,
+        this.reducedMotion ? 1 : 0.13,
       );
-      this.cameras.main.setDeadzone(70, 46);
+      camera.setDeadzone(frame.deadzone.width, frame.deadzone.height);
     }
+  }
+
+  private handleResize(): void {
+    this.configureCamera();
+  }
+
+  private handleShutdown(): void {
+    this.reportStoppedMovement();
+    this.mapLoadGeneration += 1;
+    this.transitionPending = false;
+    this.scale.off('resize', this.handleResize, this);
+    this.events.off(Phaser.Scenes.Events.PAUSE, this.reportStoppedMovement, this);
+    this.events.off(Phaser.Scenes.Events.SLEEP, this.reportStoppedMovement, this);
+    for (const remote of this.remotePlayers.values()) remote.destroy();
+    this.remotePlayers.clear();
+    this.remoteAvatarProfiles = {};
+    this.selectedRemotePresenceId = null;
+    this.player?.destroy();
+    this.player = undefined;
+    this.localChatBubble?.destroy();
+    this.localChatBubble = undefined;
+    this.clearMap();
+    this.keys = undefined;
+    this.currentInteraction = undefined;
+    this.chatBubbleMessages = [];
+    this.activityInstance = null;
+    this.currentActivityObject = undefined;
+    this.normalWorldState = undefined;
+  }
+
+  private refreshChatBubbles(): void {
+    const visiblePresenceIds = new Set(this.remotePlayers.keys());
+    const selected = selectVisibleWorldChatBubbles({
+      messages: this.chatBubbleMessages,
+      worldId: this.manifest.id,
+      visiblePresenceIds,
+      now: this.wallClockNow(),
+      quality: this.visualSettings.quality,
+    });
+    const bySpeaker = new Map(selected.map((message) => [message.speakerKey, message]));
+    this.localChatBubble?.setMessage(bySpeaker.get('local'));
+    for (const [presenceId, remote] of this.remotePlayers) {
+      remote.setChatBubble(bySpeaker.get(presenceId));
+    }
+  }
+
+  private wallClockNow(): number {
+    return this.options.clock?.now() ?? Date.now();
   }
 
   private updatePlayer(moving: boolean, time: number, jogging: boolean): void {
     this.player?.update(
       { x: this.state.x, y: this.state.y },
       this.state.facingDirection,
-      moving,
+      avatarAnimationStateForMovement(moving, jogging),
       time,
-      jogging,
     );
     this.collisionDebug?.updatePlayer(this.state);
   }
@@ -529,12 +730,18 @@ export class WorldScene extends Phaser.Scene {
             };
       if (
         next?.key === this.currentActivityObject?.key &&
-        next?.expectedRevision === this.currentActivityObject?.expectedRevision
+        next?.expectedRevision === this.currentActivityObject?.expectedRevision &&
+        this.currentInteraction === undefined
       ) {
         return;
       }
       this.currentActivityObject = next;
       this.currentInteraction = undefined;
+      this.interactionMarkers?.setState({
+        targetedInteractionId: null,
+        reducedMotion: this.reducedMotion,
+        highContrast: highContrastPreference(),
+      });
       this.options.callbacks.onInteractionTarget(
         next === undefined ? null : { id: next.key, label: next.label },
       );
@@ -547,21 +754,17 @@ export class WorldScene extends Phaser.Scene {
     );
     if (next?.id === this.currentInteraction?.id) return;
     this.currentInteraction = next;
+    this.interactionMarkers?.setState({
+      targetedInteractionId: next?.id ?? null,
+      reducedMotion: this.reducedMotion,
+      highContrast: highContrastPreference(),
+    });
     this.options.callbacks.onInteractionTarget(
       next === undefined
         ? null
         : {
             id: next.id,
-            label:
-              next.type === 'starter_npc'
-                ? 'Talk to Willow Guide'
-                : next.type === 'home_entrance'
-                  ? 'Open home plot'
-                  : next.type === 'farm_plot'
-                    ? 'Inspect garden plot'
-                    : next.type === 'home_farm_tile'
-                      ? 'Farm this garden tile'
-                      : 'Interact',
+            label: interactionPromptLabel(next),
           },
     );
   }
@@ -601,24 +804,20 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private renderInteractionMarkers(): void {
-    this.interactionMarkers = this.manifest.interactions.map((interaction) => {
-      const screen = projectWorld(interaction, this.projection);
-      const marker = this.add.graphics();
-      marker.fillStyle(0xf1d375, 0.16).fillCircle(0, -21, 18);
-      marker.fillStyle(0xf1d375, 0.9).fillCircle(0, -21, 4);
-      marker.setPosition(screen.x, screen.y);
-      marker.setDepth(999_999_500);
-      if (!this.options.reducedMotion) {
-        this.tweens.add({
-          targets: marker,
-          alpha: { from: 0.55, to: 1 },
-          duration: 1_350,
-          ease: 'Sine.InOut',
-          yoyo: true,
-          repeat: -1,
-        });
-      }
-      return marker;
-    });
+    this.interactionMarkers = renderInteractionMarkerLayer(
+      this,
+      this.manifest,
+      this.world.assetDeliveries,
+      {
+        ...(this.world.assetResolutionContext === undefined
+          ? {}
+          : { assetResolutionContext: this.world.assetResolutionContext }),
+        state: {
+          targetedInteractionId: this.currentInteraction?.id ?? null,
+          reducedMotion: this.reducedMotion,
+          highContrast: highContrastPreference(),
+        },
+      },
+    );
   }
 }

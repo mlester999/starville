@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { PlayerProfile, PlayerStateUpdate, WorldInteraction } from '@starville/game-core';
 import type { PlayableVerticalSlice } from '@starville/cozy-gameplay';
@@ -28,7 +28,7 @@ import { useAvatarProfiles } from '../app/use-avatar-profiles';
 import { SocialInteractionPanel } from './SocialInteractionPanel';
 import { CompactPartyHud, SocialGraphPanel } from './SocialGraphPanel';
 import { CooperativeActivityPanel } from './CooperativeActivityPanel';
-import { PlayerStatusDock } from './PlayerStatusDock';
+import { PlayerStatusDock, type HudValueState } from './PlayerStatusDock';
 import { PremiumWardrobe, QuickEmoteWheel } from './PremiumWardrobe';
 import {
   trackedProgressionQuest,
@@ -39,6 +39,23 @@ import { GuidedPlayerExperience } from './GuidedPlayerExperience';
 import { GameplayAssetOverrideProvider } from './GameplayAssetOverrides';
 import type { GameplayAssetOverride } from '@starville/asset-management';
 import { beginGameWorldReads } from '../app/game-world-bootstrap';
+import { projectWorldChatBubbleMessages } from '../game/rendering/chat-bubbles';
+import { WorldNoticeModal } from './WorldNoticeModal';
+import {
+  applyLocalVisualCandidateReview,
+  resolveLocalVisualCandidateReview,
+} from '../app/local-visual-candidate';
+import {
+  estimateManagedTextureUsage,
+  RUNTIME_PERFORMANCE_EVENT_NAME,
+  runtimeDevelopmentMetrics,
+} from '../app/development-performance';
+import {
+  automaticRetryAvailable,
+  runtimeFailure,
+  runtimeRetryDelay,
+  type RuntimeDependency,
+} from '../app/runtime-recovery';
 
 interface GameWorldProps {
   readonly apiUrl: string;
@@ -51,6 +68,8 @@ interface GameWorldProps {
   readonly onLeaveVillage: () => Promise<void>;
   readonly onRegisterMaintenanceFlush?: (handler: (() => Promise<void>) | undefined) => void;
   readonly realtimeUrl?: string | undefined;
+  readonly profileConnectionWarning?: boolean;
+  readonly onProfileConnectionRetry?: () => void;
 }
 
 interface LoadedGameWorldProps extends GameWorldProps {
@@ -110,7 +129,27 @@ function LoadedGameWorld({
   onRegisterMaintenanceFlush,
   initialWorld,
   realtimeUrl,
+  profileConnectionWarning = false,
+  onProfileConnectionRetry,
 }: LoadedGameWorldProps) {
+  const localVisualCandidate = useMemo(
+    () =>
+      resolveLocalVisualCandidateReview({
+        development: import.meta.env.DEV,
+        hostname: window.location.hostname,
+        search: window.location.search,
+      }),
+    [],
+  );
+  const runtimeWorldForReview = useCallback(
+    (source: PublishedWorld) =>
+      applyLocalVisualCandidateReview(runtimeWorld(source), localVisualCandidate),
+    [localVisualCandidate],
+  );
+  const applyReviewToRuntimeWorld = useCallback(
+    (source: RuntimeWorld) => applyLocalVisualCandidateReview(source, localVisualCandidate),
+    [localVisualCandidate],
+  );
   const runtime = useRef<GameRuntimeHandle | null>(null);
   const transitionRequest = useRef<AbortController | null>(null);
   const [world, setWorld] = useState(initialWorld);
@@ -139,10 +178,13 @@ function LoadedGameWorld({
   const [guidedObjectiveActive, setGuidedObjectiveActive] = useState(false);
   const [playerExperienceRefresh, setPlayerExperienceRefresh] = useState(0);
   const cozyPanelWasOpen = useRef(false);
-  const [playerLevel, setPlayerLevel] = useState<number>();
+  const progressionHudRequest = useRef(0);
+  const dialogueReturnFocus = useRef<HTMLElement | null>(null);
+  const [playerLevel, setPlayerLevel] = useState<HudValueState<number>>({ status: 'loading' });
   const [trackedQuest, setTrackedQuest] = useState<TrackedProgressionQuest | null>(null);
   const [channelPopoverOpen, setChannelPopoverOpen] = useState(false);
-  const [dustBalance, setDustBalance] = useState<number>();
+  const [dustBalance, setDustBalance] = useState<HudValueState<number>>({ status: 'loading' });
+  const [dustRefreshRequest, setDustRefreshRequest] = useState(0);
   const [inventoryRequest, setInventoryRequest] = useState(0);
   const [dustHistoryRequest, setDustHistoryRequest] = useState(0);
   const [nearbyRequest, setNearbyRequest] = useState(0);
@@ -155,6 +197,7 @@ function LoadedGameWorld({
   const [transition, setTransition] = useState<TransitionState | null>(null);
   const initialState = stateFromWorld(initialWorld);
   const [insidePersonalHome, setInsidePersonalHome] = useState(false);
+  const [locationExpanded, setLocationExpanded] = useState(true);
   const publicStateBeforeHome = useRef(initialState);
   const personalHomeViewRef = useRef<PlayableVerticalSlice | undefined>(undefined);
   const realtime = useRealtimePresence({
@@ -166,9 +209,15 @@ function LoadedGameWorld({
     enabled: !insidePersonalHome,
   });
 
+  useEffect(() => {
+    setLocationExpanded(true);
+    const timeout = window.setTimeout(() => setLocationExpanded(false), 5_000);
+    return () => window.clearTimeout(timeout);
+  }, [insidePersonalHome, world.version.id]);
+
   const updateProgressionHud = useCallback(
     (progression: Awaited<ReturnType<typeof loadProgression>>) => {
-      setPlayerLevel(progression.playerLevel.level);
+      setPlayerLevel({ status: 'ready', value: progression.playerLevel.level });
       setTrackedQuest(trackedProgressionQuest(progression));
     },
     [],
@@ -179,6 +228,13 @@ function LoadedGameWorld({
     setCozyOpen(open);
     if (wasOpen && !open) setPlayerExperienceRefresh((value) => value + 1);
   }, []);
+  const handleDustBalanceChange = useCallback(
+    (balance: number) => setDustBalance({ status: 'ready', value: balance }),
+    [],
+  );
+  const handleDustLoadState = useCallback((status: 'loading' | 'ready' | 'unavailable') => {
+    if (status !== 'ready') setDustBalance({ status });
+  }, []);
   const handleProgressionWorkspaceChange = useCallback(
     (next: Awaited<ReturnType<typeof loadProgression>>) => {
       updateProgressionHud(next);
@@ -187,17 +243,27 @@ function LoadedGameWorld({
     [updateProgressionHud],
   );
 
-  useEffect(() => {
-    let active = true;
+  const refreshProgressionHud = useCallback(() => {
+    const requestId = ++progressionHudRequest.current;
+    setPlayerLevel({ status: 'loading' });
     void loadProgression(apiUrl)
       .then((progression) => {
-        if (active) updateProgressionHud(progression);
+        if (progressionHudRequest.current === requestId) updateProgressionHud(progression);
       })
-      .catch(() => undefined);
+      .catch((error: unknown) => {
+        if (progressionHudRequest.current !== requestId) return;
+        setPlayerLevel({ status: 'unavailable' });
+        if (accessInvalid(error)) onAccessInvalid();
+      });
+  }, [apiUrl, onAccessInvalid, updateProgressionHud]);
+
+  useEffect(() => {
+    refreshProgressionHud();
     return () => {
-      active = false;
+      progressionHudRequest.current += 1;
     };
-  }, [apiUrl, updateProgressionHud]);
+  }, [refreshProgressionHud]);
+
   const avatars = useAvatarProfiles(apiUrl, profile.appearancePreset, realtime.state.remotes);
   const activityInstanceRef = useRef(realtime.state.activity.instance);
   activityInstanceRef.current = realtime.state.activity.instance;
@@ -208,6 +274,14 @@ function LoadedGameWorld({
     initialGameStateVersion: initialWorld.playerState.gameStateVersion,
     onAccessInvalid,
   });
+  const retryPlayerServices = useCallback(() => {
+    persistence.retry();
+    realtime.reconcile();
+    refreshProgressionHud();
+    setDustRefreshRequest((value) => value + 1);
+    onProfileConnectionRetry?.();
+    void onRecheck();
+  }, [onProfileConnectionRetry, onRecheck, persistence, realtime, refreshProgressionHud]);
   useEffect(() => {
     onRegisterMaintenanceFlush?.(persistence.flushBeforeLeave);
     return () => onRegisterMaintenanceFlush?.(undefined);
@@ -226,7 +300,9 @@ function LoadedGameWorld({
     playerGuideOpen ||
     leaving ||
     traveling;
-  const inputBlocked = blockingModalOpen || chatInputActive || channelPopoverOpen;
+  const persistenceUnavailable = persistence.status === 'unavailable';
+  const inputBlocked =
+    blockingModalOpen || chatInputActive || channelPopoverOpen || persistenceUnavailable;
 
   useEffect(
     () => () => {
@@ -240,22 +316,30 @@ function LoadedGameWorld({
       runtime.current = nextRuntime;
       const homeView = personalHomeViewRef.current;
       if (nextRuntime !== null && insidePersonalHome && homeView !== undefined) {
-        nextRuntime.loadWorld(personalHomeRuntimeWorld(runtimeWorld(world), homeView), {
-          ...publicStateBeforeHome.current,
-          x: homeView.plot.spawn.x,
-          y: homeView.plot.spawn.y,
-          facingDirection: 'north',
-        });
+        nextRuntime.loadWorld(
+          applyReviewToRuntimeWorld(personalHomeRuntimeWorld(runtimeWorld(world), homeView)),
+          {
+            ...publicStateBeforeHome.current,
+            x: homeView.plot.spawn.x,
+            y: homeView.plot.spawn.y,
+            facingDirection: 'north',
+          },
+        );
       }
     },
-    [insidePersonalHome, world],
+    [applyReviewToRuntimeWorld, insidePersonalHome, world],
   );
 
   const toggleSettings = useCallback(() => {
     if (dialogue === null && !leaving && !traveling) setSettingsOpen((value) => !value);
   }, [dialogue, leaving, traveling]);
 
-  const closeDialogue = useCallback(() => setDialogue(null), []);
+  const closeDialogue = useCallback(() => {
+    setDialogue(null);
+    const target = dialogueReturnFocus.current;
+    dialogueReturnFocus.current = null;
+    if (target?.isConnected) window.setTimeout(() => target.focus({ preventScroll: true }), 0);
+  }, []);
 
   const openInteraction = useCallback((nextInteraction: WorldInteraction) => {
     if (
@@ -264,6 +348,8 @@ function LoadedGameWorld({
     ) {
       setAvatarEditorOpen(true);
     } else if (nextInteraction.type === 'notice') {
+      dialogueReturnFocus.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       setDialogue({
         id: nextInteraction.id,
         title: nextInteraction.title,
@@ -365,7 +451,7 @@ function LoadedGameWorld({
           assetDeliveries: destination.assetDeliveries,
           playerState: destination.playerState,
         };
-        runtime.current?.loadWorld(runtimeWorld(nextWorld), stateFromWorld(nextWorld));
+        runtime.current?.loadWorld(runtimeWorldForReview(nextWorld), stateFromWorld(nextWorld));
         setLocalPlayerState(stateFromWorld(nextWorld));
         setSelectedRemotePresenceId(null);
         setWorld(nextWorld);
@@ -392,7 +478,14 @@ function LoadedGameWorld({
         if (transitionRequest.current === controller) transitionRequest.current = null;
       }
     },
-    [apiUrl, onAccessInvalid, persistence, world.manifest.id, world.version.id],
+    [
+      apiUrl,
+      onAccessInvalid,
+      persistence,
+      runtimeWorldForReview,
+      world.manifest.id,
+      world.version.id,
+    ],
   );
 
   async function leaveVillage() {
@@ -432,6 +525,23 @@ function LoadedGameWorld({
       presence.channelId === realtime.state.self?.channelId &&
       socialDistance(localPlayerState, presence) <= realtime.state.social.interactionDistance,
   );
+  const worldChatBubbleMessages = useMemo(
+    () =>
+      projectWorldChatBubbleMessages(
+        [
+          ...realtime.state.chat.messages.nearby,
+          ...realtime.state.chat.messages.channel,
+          ...realtime.state.chat.messages.party,
+        ],
+        realtime.state.self?.presenceId,
+      ),
+    [
+      realtime.state.chat.messages.channel,
+      realtime.state.chat.messages.nearby,
+      realtime.state.chat.messages.party,
+      realtime.state.self?.presenceId,
+    ],
+  );
 
   const socialNoticeCount =
     realtime.state.socialGraph.incomingRequests.length +
@@ -463,11 +573,112 @@ function LoadedGameWorld({
     setSocialGraphRequest((value) => value + 1);
   }
 
+  const lowQuality = settings.visualQuality === 'low';
+  const effectiveAmbientEffects = !lowQuality && settings.ambientEffects;
+  const effectiveShadows = !lowQuality && settings.shadows;
+  const effectiveWaterAnimation = !lowQuality && settings.waterAnimation;
+  const rendererVisualSettings = useMemo(
+    () => ({
+      quality: settings.visualQuality,
+      ambientEffects: settings.ambientEffects,
+      shadows: settings.shadows,
+      animatedWater: settings.waterAnimation,
+      remoteLabels: settings.worldLabels,
+      chatBubbles: settings.chatBubbles,
+    }),
+    [
+      settings.ambientEffects,
+      settings.chatBubbles,
+      settings.shadows,
+      settings.visualQuality,
+      settings.waterAnimation,
+      settings.worldLabels,
+    ],
+  );
+  const mountedModalCount = [
+    settingsOpen,
+    avatarEditorOpen,
+    emoteWheelOpen,
+    dialogue !== null,
+    cozyOpen,
+    socialOpen,
+    socialGraphOpen,
+    activityPanelOpen,
+    progressionOpen,
+    playerGuideOpen,
+    transition !== null,
+  ].filter(Boolean).length;
+  const textureUsage = useMemo(
+    () => estimateManagedTextureUsage(world.assetDeliveries),
+    [world.assetDeliveries],
+  );
+  useEffect(() => {
+    if (import.meta.env.PROD || typeof window.requestAnimationFrame !== 'function') return;
+    let frame = 0;
+    let previous = performance.now();
+    const sampleFrame = (now: number) => {
+      runtimeDevelopmentMetrics.recordFrame(now - previous);
+      previous = now;
+      frame = window.requestAnimationFrame(sampleFrame);
+    };
+    frame = window.requestAnimationFrame(sampleFrame);
+    const publish = window.setInterval(() => {
+      const snapshot = runtimeDevelopmentMetrics.snapshot();
+      if (snapshot !== null) {
+        window.dispatchEvent(new CustomEvent(RUNTIME_PERFORMANCE_EVENT_NAME, { detail: snapshot }));
+      }
+    }, 5_000);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearInterval(publish);
+    };
+  }, []);
+  useEffect(() => {
+    runtimeDevelopmentMetrics.setGauge('activeRemotePlayers', realtime.state.remotes.length);
+    runtimeDevelopmentMetrics.setGauge('mountedModals', mountedModalCount);
+    runtimeDevelopmentMetrics.setGauge('mountedHudPanels', 5);
+    runtimeDevelopmentMetrics.setGauge(
+      'activeAnimations',
+      settings.reducedMotion ? 0 : realtime.state.remotes.length + 1,
+    );
+    runtimeDevelopmentMetrics.setGauge(
+      'activeParticles',
+      settings.reducedMotion || !effectiveAmbientEffects
+        ? 0
+        : settings.visualQuality === 'high'
+          ? 24
+          : 12,
+    );
+    runtimeDevelopmentMetrics.setGauge('activeTextures', textureUsage.activeTextures);
+    runtimeDevelopmentMetrics.setGauge('estimatedTextureBytes', textureUsage.estimatedTextureBytes);
+    return () => {
+      runtimeDevelopmentMetrics.setGauge('activeRemotePlayers', 0);
+      runtimeDevelopmentMetrics.setGauge('mountedModals', 0);
+      runtimeDevelopmentMetrics.setGauge('mountedHudPanels', 0);
+      runtimeDevelopmentMetrics.setGauge('activeAnimations', 0);
+      runtimeDevelopmentMetrics.setGauge('activeParticles', 0);
+      runtimeDevelopmentMetrics.setGauge('activeTextures', 0);
+      runtimeDevelopmentMetrics.setGauge('estimatedTextureBytes', 0);
+    };
+  }, [
+    effectiveAmbientEffects,
+    mountedModalCount,
+    realtime.state.remotes.length,
+    settings.reducedMotion,
+    settings.visualQuality,
+    textureUsage.activeTextures,
+    textureUsage.estimatedTextureBytes,
+  ]);
   const shellClasses = [
     'world-shell',
     `game-ui-scale--${String(Math.round(settings.uiScale * 100))}`,
-    settings.compactHud ? 'world-shell--compact-hud' : '',
-    settings.simplifiedHud ? 'world-shell--simplified-hud' : '',
+    `world-shell--hud-density-${settings.hudDensity}`,
+    `world-shell--visual-${settings.visualQuality}`,
+    effectiveAmbientEffects ? 'world-shell--ambient-effects' : '',
+    effectiveShadows ? 'world-shell--shadows' : '',
+    effectiveWaterAnimation ? 'world-shell--water-animation' : '',
+    settings.chatBubbles ? 'world-shell--chat-bubbles' : '',
+    settings.worldLabels ? 'world-shell--world-labels' : '',
     settings.increasedTextContrast ? 'world-shell--increased-contrast' : '',
     settings.largerChatText ? 'world-shell--larger-chat' : '',
     settings.reducedMotion ? 'world-shell--reduced-motion' : '',
@@ -485,12 +696,24 @@ function LoadedGameWorld({
   }, [nearbyPlayers, selectedRemotePresenceId]);
 
   return (
-    <main className={shellClasses}>
+    <main
+      className={shellClasses}
+      data-ambient-effects={effectiveAmbientEffects ? 'on' : 'off'}
+      data-hud-density={settings.hudDensity}
+      data-shadows={effectiveShadows ? 'on' : 'off'}
+      data-visual-quality={settings.visualQuality}
+      data-water-animation={effectiveWaterAnimation ? 'on' : 'off'}
+    >
       <header className="world-topbar">
         <div className="world-brand" aria-label="Starville">
           <span aria-hidden="true">✦</span>
           <strong>STARVILLE</strong>
         </div>
+        {localVisualCandidate.label === null ? null : (
+          <p className="world-candidate-review-label" role="status">
+            {localVisualCandidate.label}
+          </p>
+        )}
         <div className="world-session">
           <span className="world-session__dot" aria-hidden="true" />
           <span>{networkLabel(access.network)}</span>
@@ -505,49 +728,96 @@ function LoadedGameWorld({
           realtime.state.activity.instance === null ? '' : ' world-frame--activity-active'
         }`}
         aria-labelledby="world-map-name"
+        aria-describedby="world-map-description"
       >
-        <div className="world-hud world-hud--identity">
-          <p className="world-hud__eyebrow">Villager</p>
-          <strong>{profile.displayName}</strong>
-          <span>{saveLabel}</span>
-        </div>
-        {!settings.showLocationBanner ? null : (
-          <div className="world-hud world-hud--location">
-            <p className="world-hud__eyebrow">Current location</p>
-            <strong id="world-map-name">
-              {insidePersonalHome ? 'Private Home Plot' : world.map.displayName}
-            </strong>
-            <span>
-              {insidePersonalHome ? 'Owner-only starter cottage garden' : world.map.description}
-            </span>
+        <h1 className="sr-only" id="world-map-name">
+          {insidePersonalHome ? 'Private Home Plot' : world.map.displayName}
+        </h1>
+        <p className="sr-only" id="world-map-description">
+          {insidePersonalHome ? 'Owner-only starter cottage garden' : world.map.description}
+        </p>
+        <div className="game-hud-safe-regions game-hud-safe-regions--top">
+          <div className="game-hud-region game-hud-region--top-left">
+            <div className="world-hud world-hud--identity">
+              <p className="world-hud__eyebrow">Villager</p>
+              <strong>{profile.displayName}</strong>
+              <span>{saveLabel}</span>
+            </div>
+            <GuidedPlayerExperience
+              apiUrl={apiUrl}
+              disabled={blockingModalOpen || chatInputActive || traveling}
+              onObjectiveChange={setGuidedObjectiveActive}
+              onOpenChange={setPlayerGuideOpen}
+              onOpenInventory={() => setInventoryRequest((value) => value + 1)}
+              onOpenProgression={() => setProgressionOpen(true)}
+              portal
+              refreshSignal={playerExperienceRefresh}
+            />
+            {trackedQuest === null || guidedObjectiveActive ? null : (
+              <button
+                className="progression-tracked-hud"
+                disabled={blockingModalOpen || chatInputActive || traveling}
+                type="button"
+                onClick={() => setProgressionOpen(true)}
+              >
+                <span>{trackedQuest.questName}</span>
+                <strong>{trackedQuest.objectiveLabel}</strong>
+                <small>
+                  {trackedQuest.currentCount}/{trackedQuest.requiredCount}
+                </small>
+              </button>
+            )}
           </div>
-        )}
-        <div className="world-hud world-hud--controls">
-          <span>
-            <kbd>WASD</kbd> Move
-          </span>
-          <span>
-            <kbd>Shift</kbd> Jog
-          </span>
-          <span>
-            <kbd>E</kbd> Interact
-          </span>
-          <button
-            className="world-emote-button"
-            disabled={blockingModalOpen || realtime.state.status !== 'connected'}
-            type="button"
-            onClick={() => setEmoteWheelOpen(true)}
-          >
-            <kbd>Q</kbd> Emote
-          </button>
-          <button
-            className="world-settings-button"
-            type="button"
-            aria-expanded={settingsOpen}
-            onClick={toggleSettings}
-          >
-            Settings
-          </button>
+          <div className="game-hud-region game-hud-region--top-center">
+            {!settings.showLocationBanner ? null : (
+              <button
+                aria-expanded={locationExpanded}
+                className="world-hud world-hud--location"
+                type="button"
+                onClick={() => setLocationExpanded((value) => !value)}
+              >
+                <p className="world-hud__eyebrow">Current location</p>
+                <strong>{insidePersonalHome ? 'Private Home Plot' : world.map.displayName}</strong>
+                {locationExpanded ? (
+                  <span>
+                    {insidePersonalHome
+                      ? 'Owner-only starter cottage garden'
+                      : world.map.description}
+                  </span>
+                ) : null}
+              </button>
+            )}
+          </div>
+          <div className="game-hud-region game-hud-region--top-right">
+            <div className="world-hud world-hud--controls">
+              <span>
+                <kbd>WASD</kbd> <span className="world-control-label">Move</span>
+              </span>
+              <span>
+                <kbd>Shift</kbd> <span className="world-control-label">Jog</span>
+              </span>
+              <span>
+                <kbd>E</kbd> <span className="world-control-label">Interact</span>
+              </span>
+              <button
+                aria-label="Open emotes"
+                className="world-emote-button"
+                disabled={blockingModalOpen || realtime.state.status !== 'connected'}
+                type="button"
+                onClick={() => setEmoteWheelOpen(true)}
+              >
+                <kbd>Q</kbd> <span className="world-control-label">Emote</span>
+              </button>
+              <button
+                className="world-settings-button"
+                type="button"
+                aria-expanded={settingsOpen}
+                onClick={toggleSettings}
+              >
+                Settings
+              </button>
+            </div>
+          </div>
         </div>
 
         {import.meta.env.MODE === 'production' ? null : (
@@ -555,12 +825,16 @@ function LoadedGameWorld({
         )}
 
         <GameCanvas
+          avatarRendererMode={localVisualCandidate.avatarRendererMode}
           appearancePreset={profile.appearancePreset}
           avatarProfile={avatars.localProfile}
           audioSettings={settings}
-          showRemotePlayerNames={settings.showNearbyPlayerNames}
+          chatBubbleMessages={worldChatBubbleMessages}
+          reducedMotion={settings.reducedMotion}
+          showRemotePlayerNames={settings.worldLabels}
+          visualSettings={rendererVisualSettings}
           initialState={initialState}
-          initialWorld={runtimeWorld(initialWorld)}
+          initialWorld={runtimeWorldForReview(initialWorld)}
           inputBlocked={inputBlocked}
           onCheckpoint={persistence.checkpoint}
           onError={setRuntimeError}
@@ -601,91 +875,104 @@ function LoadedGameWorld({
           </div>
         )}
 
-        {interaction === null || inputBlocked || !settings.showInteractionHints ? null : (
-          <button
-            className="interaction-prompt"
-            type="button"
-            onClick={() => runtime.current?.interact()}
-          >
-            <kbd>E</kbd>
-            <span>{interaction.label}</span>
-          </button>
-        )}
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-center"
+          data-hud-region="bottom-center"
+        >
+          {interaction === null || inputBlocked || !settings.showInteractionHints ? null : (
+            <button
+              className="interaction-prompt"
+              type="button"
+              onClick={() => runtime.current?.interact()}
+            >
+              <kbd>E</kbd>
+              <span>{interaction.label}</span>
+            </button>
+          )}
+        </div>
 
         {dialogue === null ? null : (
-          <div className="world-overlay" role="presentation">
-            <section
-              className="dialogue-card"
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="world-dialogue-title"
-            >
-              <p className="game-kicker">World landmark</p>
-              <h2 id="world-dialogue-title">{dialogue.title}</h2>
-              <p>{dialogue.content}</p>
-              <button autoFocus type="button" onClick={closeDialogue}>
-                Continue exploring
-              </button>
-            </section>
-          </div>
+          <WorldNoticeModal
+            state={
+              dialogue.content.trim().length === 0
+                ? { status: 'empty', title: dialogue.title }
+                : { status: 'ready', title: dialogue.title, content: dialogue.content }
+            }
+            onClose={closeDialogue}
+          />
         )}
 
-        <CozyGameplay
-          apiUrl={apiUrl}
-          realtimeUrl={realtimeUrl}
-          interaction={cozyInteraction}
-          onAccessInvalid={onAccessInvalid}
-          onInteractionClose={() => setCozyInteraction(null)}
-          onOpenChange={handleCozyOpenChange}
-          externalInventoryRequest={inventoryRequest}
-          externalDustRequest={dustHistoryRequest}
-          onDustBalanceChange={setDustBalance}
-          showStandaloneHud={false}
-          onHomeAccessChange={(location, view) => {
-            if (location === 'personal_home') {
-              personalHomeViewRef.current = view;
-              const currentPublicState = runtime.current?.getState() ?? stateFromWorld(world);
-              publicStateBeforeHome.current = currentPublicState;
-              const privateWorld = personalHomeRuntimeWorld(runtimeWorld(world), view);
-              const privateState = {
-                ...currentPublicState,
-                x: view.plot.spawn.x,
-                y: view.plot.spawn.y,
-                facingDirection: 'north' as const,
-              };
-              runtime.current?.loadWorld(privateWorld, privateState);
-              setLocalPlayerState(privateState);
-              setSelectedRemotePresenceId(null);
-              setInsidePersonalHome(true);
-              setPlayerExperienceRefresh((value) => value + 1);
-            } else {
-              personalHomeViewRef.current = undefined;
-              const publicState = publicStateBeforeHome.current;
-              runtime.current?.loadWorld(runtimeWorld(world), publicState);
-              setLocalPlayerState(publicState);
-              setInsidePersonalHome(false);
-              setPlayerExperienceRefresh((value) => value + 1);
-            }
-          }}
-        />
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-center"
+          data-hud-region="bottom-center"
+        >
+          <CozyGameplay
+            apiUrl={apiUrl}
+            realtimeUrl={realtimeUrl}
+            interaction={cozyInteraction}
+            onAccessInvalid={onAccessInvalid}
+            onInteractionClose={() => setCozyInteraction(null)}
+            onOpenChange={handleCozyOpenChange}
+            externalInventoryRequest={inventoryRequest}
+            externalDustRequest={dustHistoryRequest}
+            externalDustRefreshRequest={dustRefreshRequest}
+            onDustBalanceChange={handleDustBalanceChange}
+            onDustLoadState={handleDustLoadState}
+            portalPanels
+            showStandaloneHud={false}
+            onHomeAccessChange={(location, view) => {
+              if (location === 'personal_home') {
+                personalHomeViewRef.current = view;
+                const currentPublicState = runtime.current?.getState() ?? stateFromWorld(world);
+                publicStateBeforeHome.current = currentPublicState;
+                const privateWorld = applyReviewToRuntimeWorld(
+                  personalHomeRuntimeWorld(runtimeWorld(world), view),
+                );
+                const privateState = {
+                  ...currentPublicState,
+                  x: view.plot.spawn.x,
+                  y: view.plot.spawn.y,
+                  facingDirection: 'north' as const,
+                };
+                runtime.current?.loadWorld(privateWorld, privateState);
+                setLocalPlayerState(privateState);
+                setSelectedRemotePresenceId(null);
+                setInsidePersonalHome(true);
+                setPlayerExperienceRefresh((value) => value + 1);
+              } else {
+                personalHomeViewRef.current = undefined;
+                const publicState = publicStateBeforeHome.current;
+                runtime.current?.loadWorld(runtimeWorldForReview(world), publicState);
+                setLocalPlayerState(publicState);
+                setInsidePersonalHome(false);
+                setPlayerExperienceRefresh((value) => value + 1);
+              }
+            }}
+          />
+        </div>
 
-        <ChatPanel
-          chat={realtime.state.chat}
-          connectionStatus={realtime.state.status}
-          disabled={blockingModalOpen}
-          partyEnabled={realtime.state.socialGraph.party !== null}
-          showTimestamps={settings.chatTimestamps}
-          onInputActiveChange={setChatInputActive}
-          onMarkRead={realtime.markChatRead}
-          onPreference={realtime.setChatPreference}
-          onReport={(messageId, category, reason) => {
-            realtime.reportChat(messageId, category, reason);
-          }}
-          onSend={(scope, text) => {
-            realtime.sendChat(scope, text);
-          }}
-          selfPresenceId={realtime.state.self?.presenceId}
-        />
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-left"
+          data-hud-region="bottom-left"
+        >
+          <ChatPanel
+            chat={realtime.state.chat}
+            connectionStatus={realtime.state.status}
+            disabled={blockingModalOpen}
+            partyEnabled={realtime.state.socialGraph.party !== null}
+            showTimestamps={settings.chatTimestamps}
+            onInputActiveChange={setChatInputActive}
+            onMarkRead={realtime.markChatRead}
+            onPreference={realtime.setChatPreference}
+            onReport={(messageId, category, reason) => {
+              realtime.reportChat(messageId, category, reason);
+            }}
+            onSend={(scope, text) => {
+              realtime.sendChat(scope, text);
+            }}
+            selfPresenceId={realtime.state.self?.presenceId}
+          />
+        </div>
 
         {realtime.state.activity.instance === null ? (
           <SocialInteractionPanel
@@ -768,50 +1055,36 @@ function LoadedGameWorld({
             : { selfPresenceId: realtime.state.self.presenceId })}
         />
 
-        <GuidedPlayerExperience
-          apiUrl={apiUrl}
-          disabled={blockingModalOpen || chatInputActive || traveling}
-          onObjectiveChange={setGuidedObjectiveActive}
-          onOpenChange={setPlayerGuideOpen}
-          onOpenInventory={() => setInventoryRequest((value) => value + 1)}
-          onOpenProgression={() => setProgressionOpen(true)}
-          refreshSignal={playerExperienceRefresh}
-        />
-
-        {trackedQuest === null || guidedObjectiveActive ? null : (
-          <button
-            className="progression-tracked-hud"
+        <div
+          className="game-hud-region-anchor game-hud-region-anchor--bottom-right"
+          data-hud-region="bottom-right"
+        >
+          <PlayerStatusDock
+            accessRechecking={rechecking}
+            activityActive={realtime.state.activity.instance !== null}
+            channels={realtime.state.channels}
+            connectionStatus={realtime.state.status}
+            persistenceStatus={persistence.status}
+            profileConnectionWarning={profileConnectionWarning}
+            currentChannelId={realtime.state.self?.channelId}
             disabled={blockingModalOpen || chatInputActive || traveling}
-            type="button"
-            onClick={() => setProgressionOpen(true)}
-          >
-            <span>{trackedQuest.questName}</span>
-            <strong>{trackedQuest.objectiveLabel}</strong>
-            <small>
-              {trackedQuest.currentCount}/{trackedQuest.requiredCount}
-            </small>
-          </button>
-        )}
-
-        <PlayerStatusDock
-          activityActive={realtime.state.activity.instance !== null}
-          channels={realtime.state.channels}
-          connectionStatus={realtime.state.status}
-          currentChannelId={realtime.state.self?.channelId}
-          disabled={blockingModalOpen || chatInputActive || traveling}
-          dustBalance={dustBalance}
-          nearbyCount={nearbyPlayers.length}
-          {...(playerLevel === undefined ? {} : { playerLevel })}
-          socialNoticeCount={socialNoticeCount}
-          onActivities={() => setActivityRequest((value) => value + 1)}
-          onProgression={() => setProgressionOpen(true)}
-          onChannelSwitch={realtime.switchChannel}
-          onFriends={() => openSocialGraph('friends')}
-          onInventory={() => setInventoryRequest((value) => value + 1)}
-          onDustHistory={() => setDustHistoryRequest((value) => value + 1)}
-          onNearby={() => setNearbyRequest((value) => value + 1)}
-          onPopoverOpenChange={setChannelPopoverOpen}
-        />
+            dust={dustBalance}
+            level={playerLevel}
+            nearbyCount={nearbyPlayers.length}
+            socialNoticeCount={socialNoticeCount}
+            onActivities={() => setActivityRequest((value) => value + 1)}
+            onProgression={() => setProgressionOpen(true)}
+            onChannelSwitch={realtime.switchChannel}
+            onFriends={() => openSocialGraph('friends')}
+            onInventory={() => setInventoryRequest((value) => value + 1)}
+            onDustHistory={() => setDustHistoryRequest((value) => value + 1)}
+            onDustRetry={() => setDustRefreshRequest((value) => value + 1)}
+            onLevelRetry={refreshProgressionHud}
+            onConnectionRetry={retryPlayerServices}
+            onNearby={() => setNearbyRequest((value) => value + 1)}
+            onPopoverOpenChange={setChannelPopoverOpen}
+          />
+        </div>
 
         <ProgressionPanel
           apiUrl={apiUrl}
@@ -820,8 +1093,9 @@ function LoadedGameWorld({
             setProgressionOpen(false);
             setPlayerExperienceRefresh((value) => value + 1);
           }}
-          onLevelChange={setPlayerLevel}
+          onLevelChange={(level) => setPlayerLevel({ status: 'ready', value: level })}
           onWorkspaceChange={handleProgressionWorkspaceChange}
+          portal
         />
 
         {realtime.state.emotes.activations.length === 0 ? null : (
@@ -876,6 +1150,7 @@ function LoadedGameWorld({
             onReturnLanding={returnToLanding}
             onSettingsChange={updateSettings}
             pendingAction={leaving}
+            portal
             settings={settings}
           />
         )}
@@ -908,7 +1183,11 @@ function LoadedGameWorld({
 export function GameWorld(props: GameWorldProps) {
   const { apiUrl, onAccessInvalid } = props;
   const [world, setWorld] = useState<PublishedWorld>();
-  const [loadError, setLoadError] = useState<{ readonly requestId?: string }>();
+  const [loadError, setLoadError] = useState<{
+    readonly dependency: Extract<RuntimeDependency, 'player_persistence' | 'world_manifest'>;
+    readonly code: string;
+    readonly requestId?: string;
+  }>();
   const [retryVersion, setRetryVersion] = useState(0);
   const [assetOverrides, setAssetOverrides] = useState<readonly GameplayAssetOverride[]>([]);
   const worldRef = useRef<PublishedWorld | undefined>(undefined);
@@ -918,6 +1197,7 @@ export function GameWorld(props: GameWorldProps) {
 
   useEffect(() => {
     const controller = new AbortController();
+    let retryTimer: number | undefined;
     const reads = beginGameWorldReads(apiUrl, controller.signal);
     setLoadError(undefined);
     void reads.assetOverrides.then(setAssetOverrides).catch((error: unknown) => {
@@ -934,14 +1214,29 @@ export function GameWorld(props: GameWorldProps) {
         if (controller.signal.aborted) return;
         if (accessInvalid(error)) onAccessInvalidRef.current();
         else if (worldRef.current === undefined) {
-          setLoadError(
-            error instanceof PlayerRequestError && error.requestId !== undefined
-              ? { requestId: error.requestId }
-              : {},
-          );
+          const dependency =
+            error instanceof PlayerRequestError && error.code === 'PLAYER_PERSISTENCE_UNAVAILABLE'
+              ? 'player_persistence'
+              : 'world_manifest';
+          const failure = runtimeFailure(dependency, error);
+          if (failure.retryable && automaticRetryAvailable(dependency, retryVersion)) {
+            retryTimer = window.setTimeout(
+              () => setRetryVersion((value) => value + 1),
+              runtimeRetryDelay(dependency, retryVersion),
+            );
+          } else {
+            setLoadError({
+              dependency,
+              code: failure.code,
+              ...(failure.requestId === undefined ? {} : { requestId: failure.requestId }),
+            });
+          }
         }
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+    };
   }, [apiUrl, retryVersion]);
 
   if (loadError !== undefined) {
@@ -951,9 +1246,20 @@ export function GameWorld(props: GameWorldProps) {
           <div className="gate-mark" aria-hidden="true">
             ✦
           </div>
-          <p className="game-kicker">Published world unavailable</p>
-          <h1 id="world-load-error">Your last safe map could not be opened.</h1>
-          <p>No partial map was started. Retry after the Starville world service is available.</p>
+          <p className="game-kicker">
+            {loadError.dependency === 'player_persistence'
+              ? 'Player persistence unavailable'
+              : 'Published world unavailable'}
+          </p>
+          <h1 id="world-load-error">
+            {loadError.dependency === 'player_persistence'
+              ? 'Your saved arrival could not be verified.'
+              : 'Your last safe map could not be opened.'}
+          </h1>
+          <p>
+            No mutations or partial map were started. Retry after the affected Starville service is
+            available.
+          </p>
           {loadError.requestId === undefined ? null : (
             <p>
               Request ID: <code>{loadError.requestId}</code>

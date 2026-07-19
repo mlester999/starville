@@ -32,8 +32,18 @@ vi.mock('./CharacterCustomization', () => ({
   ),
 }));
 vi.mock('./GameWorld', () => ({
-  GameWorld: ({ profile }: { readonly profile: PlayerProfile }) => (
-    <div data-name={profile.displayName} data-testid="game-world" />
+  GameWorld: ({
+    profile,
+    profileConnectionWarning,
+  }: {
+    readonly profile: PlayerProfile;
+    readonly profileConnectionWarning?: boolean;
+  }) => (
+    <div
+      data-connection-warning={String(profileConnectionWarning ?? false)}
+      data-name={profile.displayName}
+      data-testid="game-world"
+    />
   ),
 }));
 vi.mock('./RequiredRename', () => ({
@@ -224,7 +234,11 @@ describe('PlayerExperience moderation bootstrap boundary', () => {
     });
 
     expect(container.querySelector('[data-testid="game-world"]')).not.toBeNull();
-    expect(container.textContent).toContain('Connection interrupted');
+    expect(
+      container
+        .querySelector('[data-testid="game-world"]')
+        ?.getAttribute('data-connection-warning'),
+    ).toBe('true');
     expect(container.textContent).not.toContain('Loading your villager');
   });
 

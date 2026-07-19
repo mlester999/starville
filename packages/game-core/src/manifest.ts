@@ -101,6 +101,7 @@ export const mapObjectKinds = [
   'cooking_station',
   'crafting_station',
   'home_entrance',
+  'furniture',
 ] as const;
 const mapObjectSchema = z
   .object({

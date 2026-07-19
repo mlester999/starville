@@ -234,7 +234,7 @@ describe('VillageSupplyShopPanel', () => {
     expect(container.textContent).toContain('Lantern General Store');
     expect(container.textContent).toContain('250 DUST');
     expect(container.textContent).toContain('A gentle meadow seed for Moonbeans.');
-    expect(container.textContent).toContain('Development artwork');
+    expect(container.textContent).toContain('Artwork preview unavailable');
     expect(container.textContent).toContain('40 per UTC day');
     expect(container.textContent).toContain('2 purchased · 38 remaining');
     expect(container.textContent).toContain('No wait between purchases');

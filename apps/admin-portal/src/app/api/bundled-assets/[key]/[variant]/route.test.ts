@@ -28,18 +28,21 @@ describe('protected bundled asset media route', () => {
   });
 
   it('serves allowlisted source and thumbnail WebPs with private safe headers', async () => {
-    for (const variant of ['source', 'thumbnail'] as const) {
-      const response = await GET(
-        new Request(`http://localhost:3002/api/bundled-assets/tree-pine/${variant}`),
-        context('tree-pine', variant),
-      );
-      const bytes = Buffer.from(await response.arrayBuffer());
-      expect(response.status).toBe(200);
-      expect(response.headers.get('content-type')).toBe('image/webp');
-      expect(response.headers.get('cache-control')).toBe('private, no-store, max-age=0');
-      expect(response.headers.get('x-content-type-options')).toBe('nosniff');
-      expect(bytes.subarray(0, 4).toString('ascii')).toBe('RIFF');
-      expect(bytes.subarray(8, 12).toString('ascii')).toBe('WEBP');
+    for (const manifest of [null, '2.0.0'] as const) {
+      for (const variant of ['source', 'thumbnail'] as const) {
+        const query = manifest === null ? '' : `?manifest=${manifest}`;
+        const response = await GET(
+          new Request(`http://localhost:3002/api/bundled-assets/tree-pine/${variant}${query}`),
+          context('tree-pine', variant),
+        );
+        const bytes = Buffer.from(await response.arrayBuffer());
+        expect(response.status).toBe(200);
+        expect(response.headers.get('content-type')).toBe('image/webp');
+        expect(response.headers.get('cache-control')).toBe('private, no-store, max-age=0');
+        expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+        expect(bytes.subarray(0, 4).toString('ascii')).toBe('RIFF');
+        expect(bytes.subarray(8, 12).toString('ascii')).toBe('WEBP');
+      }
     }
   });
 
@@ -55,6 +58,15 @@ describe('protected bundled asset media route', () => {
       context('tree-pine', 'thumbnail'),
     );
     expect(thumbnailRotation.status).toBe(400);
+
+    for (const url of [
+      'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=3.0.0',
+      'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=2.0.0&manifest=2.0.0',
+      'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=2.0.0&token=private',
+    ]) {
+      const malformed = await GET(new Request(url), context('tree-pine', 'source'));
+      expect(malformed.status).toBe(400);
+    }
 
     const traversal = await GET(
       new Request('http://localhost:3002/api/bundled-assets/unknown/source'),

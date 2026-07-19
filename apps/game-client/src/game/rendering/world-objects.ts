@@ -2,14 +2,20 @@ import type Phaser from 'phaser';
 
 import {
   resolveWorldAssetDelivery,
+  type AssetResolutionContext,
   type ResolvedAsset,
   type WorldAssetDelivery,
 } from '@starville/asset-management';
 import {
+  STARVILLE_VISUAL_TOKENS,
   depthForFootPosition,
   projectWorld,
+  resolveWorldContactShadowLayers,
+  resolveWorldObjectContactShadow,
+  resolveWorldObjectVisualScale,
   type MapManifest,
   type MapObject,
+  type WorldVisualQuality,
 } from '@starville/game-core';
 
 import { WORLD_COLORS } from './palette';
@@ -21,10 +27,16 @@ import {
 export interface RenderedWorldObject {
   readonly id: string;
   readonly container: Phaser.GameObjects.Container;
+  readonly shadow?: Phaser.GameObjects.Graphics;
+}
+
+export interface WorldObjectRenderOptions {
+  readonly shadows?: boolean;
+  readonly quality?: WorldVisualQuality;
+  readonly assetResolutionContext?: AssetResolutionContext;
 }
 
 function drawBuilding(graphics: Phaser.GameObjects.Graphics, sage: boolean): void {
-  graphics.fillStyle(WORLD_COLORS.shadow, 0.28).fillEllipse(0, -4, 235, 42);
   graphics.fillStyle(sage ? 0x6c8064 : 0xa46c49).fillRoundedRect(-92, -115, 184, 112, 10);
   graphics.fillStyle(sage ? 0x415a4b : 0x714433).fillPoints(
     [
@@ -49,7 +61,6 @@ function drawBuilding(graphics: Phaser.GameObjects.Graphics, sage: boolean): voi
 }
 
 function drawTree(graphics: Phaser.GameObjects.Graphics, maple: boolean): void {
-  graphics.fillStyle(WORLD_COLORS.shadow, 0.25).fillEllipse(0, 0, 88, 27);
   graphics.fillStyle(0x594332).fillRoundedRect(-11, -89, 22, 88, 8);
   const colors = maple
     ? ([0x8e6f45, 0xa4804a, 0x73855a] as const)
@@ -77,7 +88,6 @@ function drawFence(graphics: Phaser.GameObjects.Graphics): void {
 }
 
 function drawLamp(graphics: Phaser.GameObjects.Graphics): void {
-  graphics.fillStyle(WORLD_COLORS.shadow, 0.22).fillEllipse(0, 0, 42, 15);
   graphics.fillStyle(0x3d443b).fillRoundedRect(-4, -98, 8, 96, 3);
   graphics.fillStyle(WORLD_COLORS.gold, 0.17).fillCircle(0, -105, 35);
   graphics.fillStyle(0xf7dc83).fillCircle(0, -105, 12);
@@ -86,7 +96,6 @@ function drawLamp(graphics: Phaser.GameObjects.Graphics): void {
 }
 
 function drawNotice(graphics: Phaser.GameObjects.Graphics): void {
-  graphics.fillStyle(WORLD_COLORS.shadow, 0.25).fillEllipse(0, 0, 62, 18);
   graphics.fillStyle(0x6f5035).fillRoundedRect(-5, -73, 10, 72, 3);
   graphics.fillStyle(0x9b7548).fillRoundedRect(-43, -91, 86, 50, 7);
   graphics.lineStyle(3, 0xd5b66c, 0.55).strokeRoundedRect(-43, -91, 86, 50, 7);
@@ -99,7 +108,6 @@ function drawSmallObject(
   object: Pick<MapObject, 'kind'>,
 ): void {
   if (object.kind === 'rock') {
-    graphics.fillStyle(WORLD_COLORS.shadow, 0.2).fillEllipse(0, 0, 75, 20);
     graphics.fillStyle(0x788176).fillPoints(
       [
         { x: -34, y: -8 },
@@ -127,7 +135,6 @@ function drawSmallObject(
     }
     return;
   }
-  graphics.fillStyle(WORLD_COLORS.shadow, 0.2).fillEllipse(0, 0, 75, 19);
   graphics.fillStyle(0x527453).fillCircle(-20, -22, 25);
   graphics.fillStyle(0x63865c).fillCircle(13, -25, 30);
   graphics.fillStyle(0x77986a, 0.65).fillCircle(2, -39, 17);
@@ -159,11 +166,12 @@ function resolvedVisual(
     rotation: MapObject['rotation'] | undefined;
   }>,
   delivery: WorldAssetDelivery | undefined,
+  context: AssetResolutionContext,
 ): ResolvedAsset | undefined {
   const rotation = object.rotation ?? delivery?.defaultRotation ?? 0;
   const selected = resolveWorldAssetDelivery({
     assetKey: object.assetId,
-    context: 'published_world',
+    context,
     ...(delivery === undefined ? {} : { delivery }),
     rotation,
   });
@@ -184,14 +192,14 @@ function resolvedVisual(
 
   const bundled = resolveWorldAssetDelivery({
     assetKey: object.assetId,
-    context: 'published_world',
+    context,
     rotation,
   });
   if (scene.textures.exists(resolvedWorldAssetTextureKey(bundled))) return bundled;
 
   const missing = resolveWorldAssetDelivery({
     assetKey: 'system.missing-asset',
-    context: 'published_world',
+    context,
   });
   return scene.textures.exists(resolvedWorldAssetTextureKey(missing)) ? missing : undefined;
 }
@@ -200,6 +208,7 @@ export function renderWorldObjects(
   scene: Phaser.Scene,
   manifest: MapManifest,
   deliveries: readonly WorldAssetDelivery[] = [],
+  options: WorldObjectRenderOptions = {},
 ): readonly RenderedWorldObject[] {
   const projection = {
     tileWidth: manifest.tileWidth,
@@ -209,6 +218,7 @@ export function renderWorldObjects(
   };
 
   const deliveriesByKey = new Map(deliveries.map((delivery) => [delivery.assetKey, delivery]));
+  const resolutionContext = options.assetResolutionContext ?? 'published_world';
 
   return manifest.objects.map((object) => {
     const screen = projectWorld(object, projection);
@@ -217,9 +227,12 @@ export function renderWorldObjects(
       scene,
       { assetId: object.assetId, rotation: object.rotation },
       delivery,
+      resolutionContext,
     );
     let visual: Phaser.GameObjects.GameObject;
     let depthOffset = 0;
+    const categoryScale = resolveWorldObjectVisualScale(object.kind);
+    const visualScale = resolveWorldObjectVisualScale(object.kind, object.scale);
 
     if (resolved !== undefined) {
       const placement = resolvedWorldAssetRenderPlacement(resolved);
@@ -234,12 +247,33 @@ export function renderWorldObjects(
     } else {
       const graphics = scene.add.graphics();
       drawObject(graphics, object);
+      // Procedural fallbacks were authored directly at canonical screen size.
+      // Normalize them so the shared category scale still applies uniformly at
+      // the container boundary without shrinking the development fallback.
+      graphics.setScale(1 / categoryScale);
       visual = graphics;
     }
 
+    const baseDepth = depthForFootPosition(object.x, object.y, object.id);
     const container = scene.add.container(screen.x, screen.y, [visual]);
-    container.setScale(object.scale);
-    container.setDepth(depthForFootPosition(object.x, object.y, object.id) + depthOffset);
-    return { id: object.id, container };
+    container.setScale(visualScale);
+    container.setDepth(baseDepth + depthOffset);
+
+    if (options.shadows === false) return { id: object.id, container };
+    const shadowSpec = resolveWorldObjectContactShadow(object.kind, object.scale);
+    const shadow = scene.add.graphics();
+    const qualityAlpha = options.quality === 'low' ? shadowSpec.alpha * 0.76 : shadowSpec.alpha;
+    for (const layer of resolveWorldContactShadowLayers({
+      ...shadowSpec,
+      alpha: qualityAlpha,
+    })) {
+      shadow
+        .fillStyle(STARVILLE_VISUAL_TOKENS.shadows.color, layer.alpha)
+        .fillEllipse(0, layer.offsetY, layer.width, layer.height);
+    }
+    shadow
+      .setPosition(screen.x, screen.y)
+      .setDepth(baseDepth - STARVILLE_VISUAL_TOKENS.depth.shadowOffset);
+    return { id: object.id, container, shadow };
   });
 }

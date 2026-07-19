@@ -63,6 +63,9 @@ describe('CharacterCustomization', () => {
     expect(container.textContent).toContain('Choose a comfortable base');
     expect(container.querySelectorAll('.avatar-direction-ring button')).toHaveLength(8);
     expect(container.querySelectorAll('.avatar-animation-controls button')).toHaveLength(4);
+    const preview = container.querySelector<HTMLElement>('.avatar-preview');
+    const southPose = preview?.dataset['pose'];
+    const southTorsoWidth = preview?.style.getPropertyValue('--avatar-torso-width');
 
     await act(async () =>
       container.querySelector<HTMLButtonElement>('button[title="North east"]')?.click(),
@@ -72,6 +75,11 @@ describe('CharacterCustomization', () => {
       'northeast',
     );
     expect(container.querySelector('.avatar-preview')?.getAttribute('data-animation')).toBe('jog');
+    expect(preview?.dataset['pose']).toBe('pose-northeast');
+    expect(preview?.dataset['faceMode']).toBe('back-three-quarter-right');
+    expect(preview?.dataset['nearSide']).toBe('left');
+    expect(preview?.dataset['pose']).not.toBe(southPose);
+    expect(preview?.style.getPropertyValue('--avatar-torso-width')).not.toBe(southTorsoWidth);
 
     await act(async () => button('Next')?.click());
     expect(container.textContent).toContain('Shape a friendly expression');

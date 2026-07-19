@@ -1,10 +1,13 @@
 import type {
   AppearancePreset,
+  MapId,
   MapManifest,
+  MovementInput,
   PlayerStateUpdate,
+  WorldVisualSettings,
   WorldInteraction,
 } from '@starville/game-core';
-import type { WorldAssetDelivery } from '@starville/asset-management';
+import type { AssetResolutionContext, WorldAssetDelivery } from '@starville/asset-management';
 import type { PublicPresence } from '@starville/realtime';
 import type {
   CooperativeActivityInstanceSnapshot,
@@ -28,7 +31,11 @@ export interface RuntimeWorld {
   readonly versionId: string;
   readonly checksum: string;
   readonly assetDeliveries: readonly WorldAssetDelivery[];
+  /** Defaults to published_world; protected renderer fixtures opt into game_test explicitly. */
+  readonly assetResolutionContext?: AssetResolutionContext;
 }
+
+export type AvatarRendererMode = 'published_v1' | 'phase12d_candidate';
 
 export interface ExitTransitionRequest {
   readonly exitId: string;
@@ -47,6 +54,8 @@ export interface WorldAssetFallbackEvent {
   readonly code: 'WORLD_ASSET_LOAD_FAILED';
   readonly assetKey: string;
   readonly versionId: string;
+  /** Opaque client diagnostic; delivery URLs and storage paths must never be included. */
+  readonly requestId?: string;
 }
 
 export const WORLD_ASSET_FALLBACK_EVENT_NAME = 'starville:world-asset-fallback';
@@ -75,7 +84,29 @@ export interface GameRuntimeCallbacks {
 
 export interface MasterAudioSettings {
   readonly masterVolume: number;
+  /** Reserved for approved ambient sources; no source is registered by Phase 12E. */
+  readonly ambienceVolume?: number;
+  readonly sfxVolume?: number;
   readonly muted: boolean;
+}
+
+/**
+ * Minimal renderer-only projection of an already sanitized chat message.
+ * `local` is explicit so system messages with a null sender cannot be mistaken
+ * for the local player.
+ */
+export interface WorldChatBubbleMessage {
+  readonly id: string;
+  readonly worldId: MapId;
+  readonly senderPresenceId: string | null;
+  readonly text: string;
+  readonly sentAt: string;
+  readonly local?: boolean;
+}
+
+/** Optional deterministic wall clock for renderer-only visual fixtures and tests. */
+export interface GameRuntimeClock {
+  readonly now: () => number;
 }
 
 export interface GameRuntimeOptions {
@@ -83,7 +114,11 @@ export interface GameRuntimeOptions {
   readonly initialWorld: RuntimeWorld;
   readonly appearancePreset: AppearancePreset;
   readonly avatarProfile?: ResolvedAvatarProfile;
+  /** Defaults to the unchanged published V1 renderer. */
+  readonly avatarRendererMode?: AvatarRendererMode;
   readonly reducedMotion: boolean;
+  readonly visualSettings?: Partial<WorldVisualSettings>;
+  readonly clock?: GameRuntimeClock;
   readonly collisionDebug: boolean;
   readonly audioSettings: MasterAudioSettings;
   readonly callbacks: GameRuntimeCallbacks;
@@ -91,11 +126,15 @@ export interface GameRuntimeOptions {
 
 export interface GameRuntimeHandle {
   setInputBlocked(blocked: boolean): void;
+  setTouchMovementInput(input: MovementInput): void;
   setAudioSettings(settings: MasterAudioSettings): void;
   setRemotePresences(presences: readonly PublicPresence[]): void;
   setLocalAvatarProfile(profile: ResolvedAvatarProfile): void;
   setRemoteAvatarProfiles(profiles: Readonly<Record<string, ResolvedAvatarProfile>>): void;
   setRemotePlayerNamesVisible(visible: boolean): void;
+  setVisualSettings(settings: Partial<WorldVisualSettings>): void;
+  setChatBubbleMessages(messages: readonly WorldChatBubbleMessage[]): void;
+  setReducedMotion(reducedMotion: boolean): void;
   setSelectedRemotePresence(presenceId: string | null): void;
   setActivityInstance(instance: CooperativeActivityInstanceSnapshot | null): void;
   interact(): void;

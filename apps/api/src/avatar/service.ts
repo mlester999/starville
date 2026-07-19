@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 import {
   AVATAR_SELECTION_LAYERS,
+  avatarAnimationStateSchema,
   avatarCreateRequestSchema,
   avatarMutationPersistenceResultSchema,
   avatarPreviewRequestSchema,
@@ -41,7 +42,7 @@ const bodyPresetSchema = z
 const catalogAnimationSchema = z
   .object({
     direction: facingDirectionSchema,
-    state: z.enum(['idle', 'walking', 'jogging']),
+    state: avatarAnimationStateSchema,
     frames: z.array(z.number().int().min(0).max(16_383)).min(1).max(64),
     frameDurationMs: z.number().int().min(40).max(2_000),
     loop: z.boolean(),

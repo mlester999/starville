@@ -18,6 +18,7 @@ export const WORLD_ASSET_CATEGORIES = [
   'cooking_station',
   'crafting_station',
   'home_entrance',
+  'furniture',
 ] as const;
 
 export type WorldAssetCategory = (typeof WORLD_ASSET_CATEGORIES)[number];
@@ -63,6 +64,9 @@ export const WORLD_ASSETS = [
   asset('phase7-home-entrance-marker', 'home_entrance'),
   asset('phase10b-wardrobe-mirror-marker', 'decoration'),
   asset('phase10b-wardrobe-furniture-marker', 'decoration'),
+  asset('phase7-dev-willow-chair', 'furniture'),
+  asset('phase7-dev-moonwoven-rug', 'furniture'),
+  asset('phase7-dev-round-leaf-planter', 'furniture'),
 ] as const satisfies readonly RepositoryWorldAsset[];
 
 export const WORLD_ASSET_CATALOG: ReadonlyMap<string, RepositoryWorldAsset> = new Map(

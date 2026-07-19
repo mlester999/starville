@@ -206,7 +206,7 @@ export const COMPILED_AVATAR_STARTER_CATALOG: AvatarStarterCatalog = {
   presets: (['moss', 'marigold', 'moonberry', 'river'] as const).map((preset) => ({
     key: `${preset}-starter`,
     label: `${preset[0]!.toUpperCase()}${preset.slice(1)} starter`,
-    description: 'A curated, cosmetic-only development-safe Starville starter.',
+    description: 'A curated, cosmetic-only Starville starter.',
     selection: defaultAvatarSelection(preset),
   })),
   settings: {

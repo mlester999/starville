@@ -2,6 +2,7 @@ import { pathToFileURL } from 'node:url';
 
 import {
   STARVILLE_BUNDLED_ASSET_MANIFEST,
+  STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
   type BundledAssetManifest,
 } from '@starville/asset-management';
 
@@ -14,13 +15,23 @@ import {
 import { validateBundledAssets } from './validation';
 import { findStarvilleWorkspaceRoot } from './workspace';
 
-const COMMANDS = ['generate', 'validate', 'manifest', 'thumbnails', 'coverage', 'check'] as const;
+const COMMANDS = [
+  'generate',
+  'validate',
+  'manifest',
+  'thumbnails',
+  'coverage',
+  'check',
+  'generate-phase12d',
+  'validate-phase12d',
+  'check-phase12d',
+] as const;
 type Command = (typeof COMMANDS)[number];
 
 export async function runAssetPipelineCli(
   arguments_: readonly string[],
   startDirectory = process.cwd(),
-  manifest: BundledAssetManifest = STARVILLE_BUNDLED_ASSET_MANIFEST,
+  manifest?: BundledAssetManifest,
 ): Promise<number> {
   const command = arguments_[0];
   if (!isCommand(command)) {
@@ -28,22 +39,30 @@ export async function runAssetPipelineCli(
     return 2;
   }
   const workspaceRoot = await findStarvilleWorkspaceRoot(startDirectory);
+  const selectedManifest =
+    manifest ??
+    (command.endsWith('-phase12d')
+      ? STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST
+      : STARVILLE_BUNDLED_ASSET_MANIFEST);
   if (command === 'validate' || command === 'check') {
-    return printValidation(workspaceRoot, manifest);
+    return printValidation(workspaceRoot, selectedManifest);
+  }
+  if (command === 'validate-phase12d' || command === 'check-phase12d') {
+    return printValidation(workspaceRoot, selectedManifest);
   }
   if (command === 'manifest') {
-    printGeneration('manifest', await generateManifestOutput(workspaceRoot, manifest));
+    printGeneration('manifest', await generateManifestOutput(workspaceRoot, selectedManifest));
     return 0;
   }
   if (command === 'thumbnails') {
-    printGeneration('thumbnails', await generateThumbnails(workspaceRoot, manifest));
+    printGeneration('thumbnails', await generateThumbnails(workspaceRoot, selectedManifest));
     return 0;
   }
   if (command === 'coverage') {
-    printGeneration('coverage', await generateCoverageOutputs(workspaceRoot, manifest));
+    printGeneration('coverage', await generateCoverageOutputs(workspaceRoot, selectedManifest));
     return 0;
   }
-  const result = await generateAll(workspaceRoot, manifest);
+  const result = await generateAll(workspaceRoot, selectedManifest);
   printGeneration(command, result);
   return 0;
 }
@@ -73,7 +92,7 @@ async function printValidation(
 }
 
 function printGeneration(
-  command: Command,
+  command: string,
   result: Readonly<{ written: number; unchanged: number; files: number; bytes: number }>,
 ): void {
   console.log(

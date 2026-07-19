@@ -5,7 +5,7 @@ import {
   worldAssetDeliveriesSchema,
   type WorldAssetDelivery,
 } from '@starville/asset-management';
-import { mapIdSchema, validateMapManifest } from '@starville/game-core';
+import { mapIdSchema, validateMapManifest, worldAssetDependencyKeys } from '@starville/game-core';
 
 import { assertInternalStoragePath } from '../asset-management/storage.js';
 import type { ServiceLogger } from '../contracts.js';
@@ -59,17 +59,23 @@ export function projectWorldAssetDeliveries(
   manifestAssets: readonly string[],
   materials: readonly PinnedWorldAssetMaterial[],
   publicAssetUrl: (path: string) => string,
+  allowedDependencies: readonly string[] = manifestAssets,
 ): readonly WorldAssetDelivery[] {
+  const allowedKeys = new Set(allowedDependencies);
+  if (manifestAssets.some((assetKey) => !allowedKeys.has(assetKey))) {
+    throw new Error('Required manifest asset is outside the dependency set');
+  }
   const byKey = new Map<string, WorldAssetDelivery>();
   for (const material of materials) {
     if (byKey.has(material.assetKey)) throw new Error('Duplicate pinned asset material');
-    if (material.developmentMarker) {
-      if (
-        material.bundledManifestVersion === '1.0.0' &&
-        getBundledAsset(material.assetKey) === undefined
-      ) {
-        throw new Error('Unknown repository development marker');
-      }
+    if (!allowedKeys.has(material.assetKey)) throw new Error('Unexpected pinned asset material');
+    const materialClass =
+      material.materialClass ?? (material.developmentMarker ? 'bundled_development' : 'uploaded');
+    if (
+      material.bundledManifestVersion !== null &&
+      getBundledAsset(material.assetKey, material.bundledManifestVersion) === undefined
+    ) {
+      throw new Error('Unknown exact repository material');
     }
     const url =
       material.delivery === null
@@ -79,6 +85,7 @@ export function projectWorldAssetDeliveries(
       assetKey: material.assetKey,
       versionId: material.versionId,
       checksum: material.checksumSha256,
+      materialClass,
       bundledManifestVersion: material.bundledManifestVersion,
       url,
       mediaType: material.mediaType,
@@ -100,13 +107,15 @@ export function projectWorldAssetDeliveries(
     });
     byKey.set(delivery.assetKey, delivery);
   }
-  if (
-    byKey.size !== manifestAssets.length ||
-    manifestAssets.some((assetKey) => !byKey.has(assetKey))
-  ) {
+  if (manifestAssets.some((assetKey) => !byKey.has(assetKey))) {
     throw new Error('Published manifest and pinned asset delivery set differ');
   }
-  return worldAssetDeliveriesSchema.parse(manifestAssets.map((assetKey) => byKey.get(assetKey)));
+  return worldAssetDeliveriesSchema.parse(
+    allowedDependencies.flatMap((assetKey) => {
+      const delivery = byKey.get(assetKey);
+      return delivery === undefined ? [] : [delivery];
+    }),
+  );
 }
 
 function validatePublishedManifest(
@@ -114,10 +123,12 @@ function validatePublishedManifest(
   publicAssetUrl: (path: string) => string,
 ): PublishedManifestView {
   try {
+    const dependencies = worldAssetDependencyKeys(view.manifest);
     const assetDeliveries = projectWorldAssetDeliveries(
       view.manifest.assets,
       view.assetDeliveries,
       publicAssetUrl,
+      dependencies,
     );
     const deliveryCatalog = new Map(
       assetDeliveries.map(({ assetKey }) => [

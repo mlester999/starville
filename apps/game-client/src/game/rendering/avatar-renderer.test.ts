@@ -1,7 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import {
+  avatarAnimationStateForMovement,
+  avatarAnimationStateFromRealtime,
+} from '@starville/avatar';
+import { STARVILLE_VISUAL_TOKENS } from '@starville/game-core';
+
 import { fallbackResolvedAvatar } from '../../app/avatar-client';
-import { PlayerRenderer } from './player';
+import { Phase12DPlayerRenderer as PlayerRenderer } from './phase12d-player';
 import { stablePresenceDepthTie } from './avatar-style';
 
 class FakeGraphics {
@@ -115,15 +121,15 @@ function fixture() {
   };
 }
 
-describe('modular fallback avatar renderer', () => {
+describe('production-candidate modular avatar renderer', () => {
   it('owns separate ordered layers and visibly alternates walking and jogging legs', () => {
     const view = fixture();
     expect(view.graphics).toHaveLength(7);
     expect(view.container.children).toEqual(view.graphics);
 
-    view.renderer.update({ x: 5, y: 4 }, 'southeast', true, 100, false);
+    view.renderer.update({ x: 5, y: 4 }, 'southeast', 'walk', 120);
     const walkLegs = view.graphics[2]!.commands.filter((command) => command[0] === 'lineBetween');
-    view.renderer.update({ x: 5.2, y: 4.2 }, 'southeast', true, 150, true);
+    view.renderer.update({ x: 5.2, y: 4.2 }, 'southeast', 'jog', 160);
     const jogLegs = view.graphics[2]!.commands.filter((command) => command[0] === 'lineBetween');
     expect(walkLegs).toHaveLength(2);
     expect(jogLegs.slice(-2)).not.toEqual(walkLegs);
@@ -131,7 +137,7 @@ describe('modular fallback avatar renderer', () => {
 
   it('updates appearance in place without resetting position, container, or depth tie', () => {
     const view = fixture();
-    view.renderer.update({ x: 9, y: 8 }, 'west', false, 0);
+    view.renderer.update({ x: 9, y: 8 }, 'west', 'idle', 0);
     const container = view.container;
     const before = { x: container.x, y: container.y, depth: container.depth };
     const replacement = {
@@ -145,6 +151,90 @@ describe('modular fallback avatar renderer', () => {
     });
     expect(view.container).toBe(container);
     expect({ x: container.x, y: container.y, depth: container.depth }).toEqual(before);
+  });
+
+  it('stops drawing its contact shadow when dynamic visual settings disable shadows', () => {
+    const view = fixture();
+    const shadow = view.graphics[0]!;
+    view.renderer.update({ x: 5, y: 4 }, 'south', 'idle', 0);
+    expect(shadow.commands.filter(([command]) => command === 'fillEllipse')).toHaveLength(3);
+    expect(
+      shadow.commands
+        .filter(([command]) => command === 'fillStyle')
+        .every(([, color]) => color === STARVILLE_VISUAL_TOKENS.shadows.color),
+    ).toBe(true);
+
+    view.renderer.setShadowsEnabled(false);
+    view.renderer.update({ x: 5, y: 4 }, 'south', 'idle', 1);
+    expect(shadow.commands.filter(([command]) => command === 'fillEllipse')).toHaveLength(3);
+
+    view.renderer.setShadowsEnabled(true);
+    view.renderer.update({ x: 5, y: 4 }, 'south', 'idle', 2);
+    expect(shadow.commands.filter(([command]) => command === 'fillEllipse')).toHaveLength(6);
+  });
+
+  it('draws distinct diagonal and cardinal body geometry from shared pose metadata', () => {
+    const signature = (direction: Parameters<PlayerRenderer['update']>[1]) => {
+      const view = fixture();
+      view.renderer.update({ x: 5, y: 4 }, direction, 'walk', 240);
+      return JSON.stringify(
+        view.graphics
+          .slice(2, 6)
+          .flatMap((graphics) => graphics.commands)
+          .filter(([command]) =>
+            ['lineBetween', 'fillEllipse', 'fillRoundedRect', 'fillTriangle'].includes(
+              String(command),
+            ),
+          ),
+      );
+    };
+
+    const signatures = [
+      'north',
+      'northeast',
+      'east',
+      'southeast',
+      'south',
+      'southwest',
+      'west',
+      'northwest',
+    ].map((direction) => signature(direction as Parameters<PlayerRenderer['update']>[1]));
+    expect(new Set(signatures).size).toBe(8);
+    expect(signature('northeast')).not.toBe(signature('southeast'));
+    expect(signature('northwest')).not.toBe(signature('southwest'));
+  });
+
+  it('keeps local and remote state adapters visually identical in the shared renderer', () => {
+    const local = fixture();
+    const remote = fixture();
+    local.renderer.update(
+      { x: 5, y: 4 },
+      'northwest',
+      avatarAnimationStateForMovement(true, true),
+      320,
+    );
+    remote.renderer.update(
+      { x: 5, y: 4 },
+      'northwest',
+      avatarAnimationStateFromRealtime('jogging'),
+      320,
+    );
+
+    expect(remote.graphics.map((graphics) => graphics.commands)).toEqual(
+      local.graphics.map((graphics) => graphics.commands),
+    );
+  });
+
+  it('freezes vector-rig frames under reduced motion without changing facing', () => {
+    const early = fixture();
+    const late = fixture();
+    early.renderer.setReducedMotion(true);
+    late.renderer.setReducedMotion(true);
+    early.renderer.update({ x: 5, y: 4 }, 'southeast', 'jog', 0);
+    late.renderer.update({ x: 5, y: 4 }, 'southeast', 'jog', 12_000);
+    expect(late.graphics.map((graphics) => graphics.commands)).toEqual(
+      early.graphics.map((graphics) => graphics.commands),
+    );
   });
 
   it('uses a deterministic, bounded depth tie per presence', () => {

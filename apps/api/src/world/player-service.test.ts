@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { getWorldManifest } from '@starville/game-content';
-import type { MapManifest } from '@starville/game-core';
+import { terrainAssetDependencyKeys, type MapManifest } from '@starville/game-core';
 
 import type { LogContext, ServiceLogger } from '../contracts.js';
 import type {
@@ -63,6 +63,8 @@ function publicAssets(materials: readonly PinnedWorldAssetMaterial[]) {
     assetKey: material.assetKey,
     versionId: material.versionId,
     checksum: material.checksumSha256,
+    materialClass:
+      material.materialClass ?? (material.developmentMarker ? 'bundled_development' : 'uploaded'),
     bundledManifestVersion: material.bundledManifestVersion,
     url: null,
     mediaType: null,
@@ -219,6 +221,37 @@ describe('player world service', () => {
     );
   });
 
+  it('projects an exact v2 repository-authored candidate without treating it as an upload', async () => {
+    const candidate = {
+      ...lanternMaterials[0]!,
+      versionId: '88888888-8888-4888-8888-888888888888',
+      checksumSha256: 'e'.repeat(64),
+      materialClass: 'bundled_candidate' as const,
+      bundledManifestVersion: '2.0.0' as const,
+      fallback: 'repository_authored' as const,
+    };
+    expect(pinnedAssetMaterialSchema.safeParse(candidate).success).toBe(true);
+
+    const target = gateway();
+    vi.mocked(target.loadCurrent).mockResolvedValueOnce({
+      ...lanternWorld,
+      assetDeliveries: [candidate, ...lanternMaterials.slice(1)],
+    });
+    const loaded = await service(target).value.loadCurrent('wallet', 'v2-repository-candidate');
+
+    expect(loaded.assetDeliveries[0]).toEqual(
+      expect.objectContaining({
+        assetKey: candidate.assetKey,
+        versionId: candidate.versionId,
+        checksum: candidate.checksumSha256,
+        materialClass: 'bundled_candidate',
+        bundledManifestVersion: '2.0.0',
+        developmentMarker: true,
+        url: null,
+      }),
+    );
+  });
+
   it('fails closed when persistence returns a mismatched or malformed publication', async () => {
     const target = gateway();
     vi.mocked(target.loadCurrent).mockResolvedValueOnce({
@@ -264,6 +297,54 @@ describe('player world service', () => {
     );
     expect(loaded.assetDeliveries[0]).not.toHaveProperty('delivery');
     expect(loaded.assetDeliveries[0]).not.toHaveProperty('objectPath');
+  });
+
+  it('projects an exact uploaded terrain dependency without changing legacy object pins', async () => {
+    const terrainAssetKey = terrainAssetDependencyKeys(lanternManifest)[0]!;
+    const terrain = {
+      ...lanternMaterials[0]!,
+      assetKey: terrainAssetKey,
+      versionId: '99999999-9999-4999-8999-999999999999',
+      checksumSha256: 'd'.repeat(64),
+      mediaType: 'image/webp' as const,
+      width: 96,
+      height: 48,
+      renderWidth: 96,
+      renderHeight: 48,
+      anchorX: 0.5,
+      anchorY: 0.5,
+      footAnchorX: 0.5,
+      footAnchorY: 0.5,
+      depthAnchorX: 0.5,
+      depthAnchorY: 0.5,
+      developmentMarker: false,
+      bundledManifestVersion: null,
+      delivery: {
+        bucket: 'game-assets' as const,
+        objectPath: `starville/${terrainAssetKey}/v2/source.webp`,
+      },
+      fallback: null,
+    };
+    const target = gateway();
+    vi.mocked(target.loadCurrent).mockResolvedValueOnce({
+      ...lanternWorld,
+      assetDeliveries: [...lanternMaterials, terrain],
+    });
+
+    const loaded = await service(target).value.loadCurrent('wallet', 'terrain-production-pin');
+
+    expect(loaded.assetDeliveries.slice(0, lanternMaterials.length)).toEqual(
+      publicAssets(lanternMaterials),
+    );
+    expect(loaded.assetDeliveries.at(-1)).toEqual(
+      expect.objectContaining({
+        assetKey: terrainAssetKey,
+        versionId: terrain.versionId,
+        checksum: terrain.checksumSha256,
+        url: `https://assets.example.test/starville/${terrainAssetKey}/v2/source.webp`,
+        developmentMarker: false,
+      }),
+    );
   });
 
   it('rejects missing pins and cross-key public object paths', async () => {

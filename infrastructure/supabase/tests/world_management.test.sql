@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(70);
+select plan(71);
 
 select has_table('public', 'world_maps', 'world map identities exist');
 select has_table('public', 'world_map_versions', 'immutable world versions exist');
@@ -57,11 +57,13 @@ select ok(
   'general authenticated users cannot enumerate administrator world content'
 );
 select ok(
-  has_function_privilege('service_role', 'public.publish_admin_world_version(uuid,uuid,text,uuid,uuid,integer,uuid,text,text,text,integer)', 'EXECUTE'),
+  has_function_privilege('service_role', 'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)', 'EXECUTE'),
   'service role can call the protected publication RPC'
 );
 select ok(
-  not has_function_privilege('anon', 'public.publish_admin_world_version(uuid,uuid,text,uuid,uuid,integer,uuid,text,text,text,integer)', 'EXECUTE'),
+  not has_function_privilege('public', 'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)', 'EXECUTE')
+    and not has_function_privilege('anon', 'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)', 'EXECUTE')
+    and not has_function_privilege('authenticated', 'public.publish_admin_world_revision(uuid,uuid,text,uuid,uuid,integer,uuid,text,uuid,text,text,integer)', 'EXECUTE'),
   'anon cannot publish world content'
 );
 select ok(
@@ -86,42 +88,156 @@ select is(
 );
 select ok(
   (
-    select count(*) = 20
-      and count(*) = count(distinct asset.asset_key)
-      and array_agg(asset.asset_key order by asset.asset_key) = array[
+    select count(*) = 106
+      and count(*) = count(distinct catalog.asset_key)
+      and array_agg(catalog.asset_key order by catalog.asset_key) = array[
         'brooklight-sign',
         'bush-round',
         'closed-route-marker',
         'cottage-amber',
         'cottage-sage',
+        'farming.crop.cloudberry.ready',
+        'farming.crop.cloudberry.stage-0',
+        'farming.crop.cloudberry.stage-1',
+        'farming.crop.cloudberry.stage-2',
+        'farming.crop.cloudberry.stage-3',
+        'farming.crop.cloudberry.stage-4',
+        'farming.crop.moonbean.ready',
+        'farming.crop.moonbean.stage-0',
+        'farming.crop.moonbean.stage-1',
+        'farming.crop.moonbean.stage-2',
+        'farming.crop.moonbean.stage-3',
+        'farming.crop.sunroot.ready',
+        'farming.crop.sunroot.stage-0',
+        'farming.crop.sunroot.stage-1',
+        'farming.crop.sunroot.stage-2',
+        'farming.crop.sunroot.stage-3',
+        'farming.plot.dry',
+        'farming.plot.empty',
+        'farming.plot.invalid',
+        'farming.plot.planted',
+        'farming.plot.prepared',
+        'farming.plot.selected',
+        'farming.plot.watered',
         'fence-willow',
         'flowers-moon',
         'lamp-star',
         'moonstone-marker',
         'notice-board',
         'orchard-road-sign',
+        'phase10b-wardrobe-furniture-marker',
+        'phase10b-wardrobe-mirror-marker',
+        'phase11a-dev-starter-hoe',
         'phase7-cooking-hearth-marker',
         'phase7-crafting-workbench-marker',
+        'phase7-dev-cloudberry',
+        'phase7-dev-cloudberry-crop',
+        'phase7-dev-cloudberry-seed',
+        'phase7-dev-cloudberry-tart',
+        'phase7-dev-garden-twine',
+        'phase7-dev-hearth-table',
+        'phase7-dev-lantern-floor-lamp',
+        'phase7-dev-meadow-biscuit',
+        'phase7-dev-meadow-flour',
+        'phase7-dev-meadow-shelf',
+        'phase7-dev-moonbean',
+        'phase7-dev-moonbean-crop',
+        'phase7-dev-moonbean-salad',
+        'phase7-dev-moonbean-seed',
+        'phase7-dev-moonwoven-rug',
+        'phase7-dev-round-leaf-planter',
+        'phase7-dev-starter-watering-can',
+        'phase7-dev-sunroot',
+        'phase7-dev-sunroot-crop',
+        'phase7-dev-sunroot-seed',
+        'phase7-dev-sunroot-soup',
+        'phase7-dev-willow-chair',
+        'phase7-dev-willow-planks',
+        'phase7-dev-willow-timber',
         'phase7-farm-plot-marker',
         'phase7-general-store-marker',
         'phase7-home-entrance-marker',
         'rock-moss',
+        'system.missing-asset',
         'tree-maple',
         'tree-pine',
-        'whisperpine-gate'
+        'ui.category.cooking',
+        'ui.category.crafting',
+        'ui.category.farming',
+        'ui.category.housing',
+        'ui.category.inventory',
+        'ui.category.shop',
+        'ui.category.social',
+        'ui.currency.dust',
+        'ui.direction',
+        'ui.exit',
+        'ui.interaction',
+        'ui.objective.active',
+        'ui.quest.active',
+        'ui.social.appreciation',
+        'ui.social.guestbook',
+        'ui.social.home-visit',
+        'ui.social.photo-area',
+        'ui.spawn',
+        'ui.validation.error',
+        'ui.validation.success',
+        'ui.warning',
+        'whisperpine-gate',
+        'world.building.general-store.highlight',
+        'world.station.cooking-hearth.active',
+        'world.station.cooking-hearth.ready',
+        'world.station.crafting-workbench.active',
+        'world.station.crafting-workbench.ready',
+        'world.terrain.bridge',
+        'world.terrain.dirt',
+        'world.terrain.grass.base',
+        'world.terrain.grass.clover',
+        'world.terrain.path.stone',
+        'world.terrain.plaza',
+        'world.terrain.soil.dry',
+        'world.terrain.soil.watered',
+        'world.terrain.water'
       ]::text[]
       and bool_and(
-        asset.approval_status = 'approved'
-        and asset.repository_owned
-        and asset.source_type = 'repository_procedural'
+        version.source_kind = 'repository_procedural'
+        and version.detected_mime_type = 'application/x-starville-procedural'
+        and version.checksum_sha256 = encode(extensions.digest(
+          convert_to('starville-procedural:v1:' || catalog.asset_key, 'UTF8'), 'sha256'
+        ), 'hex')
+        and version.lifecycle_status = 'active'
+        and asset.approval_status = 'approved'
         and asset.lifecycle_status = 'active'
-        and asset.production_status = 'development_marker'
-        and asset.development_marker_replacement_key is null
         and asset.active_version_id is not null
+        and case
+          when asset.repository_owned then
+            asset.source_type = 'repository_procedural'
+            and asset.production_status = 'development_marker'
+            and asset.development_marker_replacement_key is null
+          else
+            -- A stable-key collision preserves the pre-existing user-owned
+            -- asset; the bundled identity is still pinned by the exact
+            -- checksum-bound repository version above.
+            asset.source_type <> 'repository_procedural'
+        end
       )
-    from public.world_assets as asset
+    from public.world_asset_bundled_catalog as catalog
+    join public.world_assets as asset on asset.id = catalog.world_asset_id
+    join public.world_asset_versions as version
+      on version.id = catalog.world_asset_version_id
+     and version.world_asset_id = asset.id
   ),
-  'the reviewed procedural catalog is the exact twenty-key development-marker set'
+  'the reviewed procedural catalog is the exact 106-key checksum-bound bundled set'
+);
+select ok(
+  not exists (
+    select 1 from public.world_assets as asset
+    where asset.source_type = 'repository_procedural'
+      and not exists (
+        select 1 from public.world_asset_bundled_catalog as catalog
+        where catalog.world_asset_id = asset.id
+      )
+  ),
+  'no procedural asset exists outside the reviewed bundled catalog'
 );
 select ok(
   not exists (

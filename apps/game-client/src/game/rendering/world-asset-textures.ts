@@ -4,13 +4,22 @@ import {
   getBundledAsset,
   resolveWorldAssetDelivery,
   STARVILLE_BUNDLED_MANIFEST_VERSION,
+  type AssetResolutionContext,
   type AssetRotation,
   type ResolvedAsset,
   type WorldAssetDelivery,
 } from '@starville/asset-management';
 import { depthOffsetForAnchors } from '@starville/game-core';
 
+import {
+  sessionAssetFailureRegistry,
+  type AssetFailureRegistry,
+} from '../../app/asset-failure-registry';
+import { runtimeDevelopmentMetrics } from '../../app/development-performance';
 import type { WorldAssetFallbackEvent } from '../contracts';
+import { BUNDLED_TERRAIN_ASSET_KEYS } from './world-asset-keys';
+
+export { BUNDLED_TERRAIN_ASSET_KEYS } from './world-asset-keys';
 
 export type ProductionWorldAssetDelivery = WorldAssetDelivery & {
   readonly developmentMarker: false;
@@ -53,16 +62,9 @@ export function resolvedWorldAssetTextureKey(asset: ResolvedAsset): string {
   return asset.cacheIdentity;
 }
 
-export const BUNDLED_TERRAIN_ASSET_KEYS = [
-  'world.terrain.grass.base',
-  'world.terrain.grass.clover',
-  'world.terrain.path.stone',
-  'world.terrain.plaza',
-  'world.terrain.water',
-  'world.terrain.bridge',
-] as const;
-
 export interface QueueWorldAssetTextureOptions {
+  /** Protected previews use the resolver's explicit game_test trust context. */
+  readonly assetResolutionContext?: AssetResolutionContext;
   /** Stable keys referenced by the immutable world manifest. */
   readonly assetKeys: readonly string[];
   /** Authored rotations currently visible in the map; unopened variants remain lazy. */
@@ -74,6 +76,8 @@ export interface QueueWorldAssetTextureOptions {
   readonly terrainAssetKeys?: readonly string[];
   /** Compatibility option for focused fixtures that intentionally need every terrain kind. */
   readonly includeTerrain?: boolean;
+  /** Deterministic fixture override; normal runtime uses one bounded session registry. */
+  readonly failureRegistry?: AssetFailureRegistry;
 }
 
 export function worldAssetDepthOffset(delivery: WorldAssetDelivery): number {
@@ -109,12 +113,11 @@ export function resolvedWorldAssetRenderPlacement(asset: ResolvedAsset): WorldAs
   };
 }
 
-function fallbackEvent(
+function assetFailureIdentity(
   resolved: ResolvedAsset,
   delivery?: WorldAssetDelivery,
-): WorldAssetFallbackEvent {
+): Readonly<{ assetKey: string; versionId: string }> {
   return {
-    code: 'WORLD_ASSET_LOAD_FAILED',
     assetKey: resolved.requestedKey,
     versionId:
       resolved.versionId ??
@@ -124,12 +127,11 @@ function fallbackEvent(
 }
 
 function reportFallbackSafely(
-  resolved: ResolvedAsset,
+  event: WorldAssetFallbackEvent,
   onLoadFailure: (event: WorldAssetFallbackEvent) => void,
-  delivery?: WorldAssetDelivery,
 ): void {
   try {
-    onLoadFailure(fallbackEvent(resolved, delivery));
+    onLoadFailure(event);
   } catch {
     // Observability must never turn a visual fallback into a fatal game error.
   }
@@ -145,6 +147,8 @@ export function queueWorldAssetTextures(
   onLoadFailure?: (event: WorldAssetFallbackEvent) => void,
   options?: QueueWorldAssetTextureOptions,
 ): number {
+  const resolutionContext = options?.assetResolutionContext ?? 'published_world';
+  const failureRegistry = options?.failureRegistry ?? sessionAssetFailureRegistry;
   scene.load.setCORS('anonymous');
   let queued = 0;
   const queuedResolutions = new Map<
@@ -155,15 +159,24 @@ export function queueWorldAssetTextures(
 
   const queueResolved = (resolved: ResolvedAsset, delivery?: WorldAssetDelivery): void => {
     const key = resolvedWorldAssetTextureKey(resolved);
-    if (queuedKeys.has(key) || scene.textures.exists(key)) return;
+    if (queuedKeys.has(key)) return;
+    if (scene.textures.exists(key)) {
+      failureRegistry.succeed(key);
+      runtimeDevelopmentMetrics.recordAssetRequest(true);
+      return;
+    }
+    if (!failureRegistry.begin(key)) return;
+    runtimeDevelopmentMetrics.recordAssetRequest(false);
     try {
       scene.load.image(key, resolved.url);
       queuedKeys.add(key);
       queuedResolutions.set(key, delivery === undefined ? { resolved } : { resolved, delivery });
       queued += 1;
     } catch {
-      if (onLoadFailure !== undefined) {
-        reportFallbackSafely(resolved, onLoadFailure, delivery);
+      const identity = assetFailureIdentity(resolved, delivery);
+      const failure = failureRegistry.fail(key, identity.assetKey, identity.versionId);
+      if (failure.shouldReport && onLoadFailure !== undefined) {
+        reportFallbackSafely(failure.event, onLoadFailure);
       }
     }
   };
@@ -172,7 +185,7 @@ export function queueWorldAssetTextures(
   queueResolved(
     resolveWorldAssetDelivery({
       assetKey: 'system.missing-asset',
-      context: 'published_world',
+      context: resolutionContext,
     }),
   );
 
@@ -182,14 +195,14 @@ export function queueWorldAssetTextures(
       if (!isProductionWorldAssetDelivery(delivery)) continue;
       const resolved = resolveWorldAssetDelivery({
         assetKey: delivery.assetKey,
-        context: 'published_world',
+        context: resolutionContext,
         delivery,
       });
       queueResolved(resolved, delivery);
       queueResolved(
         resolveWorldAssetDelivery({
           assetKey: delivery.assetKey,
-          context: 'published_world',
+          context: resolutionContext,
           rotation: delivery.defaultRotation,
         }),
       );
@@ -220,7 +233,7 @@ export function queueWorldAssetTextures(
       for (const rotation of rotations) {
         const selected = resolveWorldAssetDelivery({
           assetKey,
-          context: 'published_world',
+          context: resolutionContext,
           ...(delivery === undefined ? {} : { delivery }),
           rotation,
         });
@@ -234,7 +247,7 @@ export function queueWorldAssetTextures(
           queueResolved(
             resolveWorldAssetDelivery({
               assetKey,
-              context: 'published_world',
+              context: resolutionContext,
               rotation,
             }),
           );
@@ -243,15 +256,24 @@ export function queueWorldAssetTextures(
     }
   }
 
-  if (onLoadFailure !== undefined && queuedResolutions.size > 0) {
+  if (queuedResolutions.size > 0) {
     const handleLoadError = (file: Phaser.Loader.File): void => {
       const queuedResolution = queuedResolutions.get(file.key);
       if (queuedResolution === undefined) return;
       queuedResolutions.delete(file.key);
-      reportFallbackSafely(queuedResolution.resolved, onLoadFailure, queuedResolution.delivery);
+      const identity = assetFailureIdentity(queuedResolution.resolved, queuedResolution.delivery);
+      const failure = failureRegistry.fail(file.key, identity.assetKey, identity.versionId);
+      if (failure.shouldReport && onLoadFailure !== undefined) {
+        reportFallbackSafely(failure.event, onLoadFailure);
+      }
     };
     const stopObserving = (): void => {
       scene.load.off(Phaser.Loader.Events.FILE_LOAD_ERROR, handleLoadError);
+      for (const [key] of queuedResolutions) {
+        if (scene.textures.exists(key)) failureRegistry.succeed(key);
+        else failureRegistry.cancel(key);
+      }
+      queuedResolutions.clear();
     };
     scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, handleLoadError);
     scene.load.once(Phaser.Loader.Events.COMPLETE, stopObserving);

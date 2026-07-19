@@ -27,6 +27,8 @@ import type {
 } from '@starville/cooperative-activities';
 import type { PlayerStateUpdate } from '@starville/game-core';
 import { z } from 'zod';
+import { runtimeDevelopmentMetrics } from './development-performance';
+import { automaticRetryAvailable, runtimeRetryDelay } from './runtime-recovery';
 
 const apiEnvelopeSchema = z
   .object({ success: z.literal(true), data: realtimeTicketViewSchema, requestId: z.string() })
@@ -664,8 +666,7 @@ export function reconcileRealtimeMessage(
 }
 
 export function reconnectDelay(attempt: number, random = Math.random): number {
-  const base = Math.min(500 * 2 ** Math.min(attempt, 5), 10_000);
-  return Math.round(base * (0.8 + random() * 0.4));
+  return runtimeRetryDelay('realtime', attempt, random);
 }
 
 async function issueTicket(apiUrl: string, channelId: string | undefined, signal: AbortSignal) {
@@ -709,6 +710,7 @@ export class RealtimeConnection {
   private controller: AbortController | undefined;
   private reconnectTimer: number | undefined;
   private pingTimer: number | undefined;
+  private socketListenerCleanup: (() => void) | undefined;
   private disposed = false;
   private attempt = 0;
   private preferredChannelId: string | undefined;
@@ -737,6 +739,8 @@ export class RealtimeConnection {
     this.controller?.abort();
     if (this.reconnectTimer !== undefined) window.clearTimeout(this.reconnectTimer);
     if (this.pingTimer !== undefined) window.clearInterval(this.pingTimer);
+    this.socketListenerCleanup?.();
+    this.socketListenerCleanup = undefined;
     this.socket?.close(1000, 'Client left realtime');
     this.socket = undefined;
     this.publish({ ...this.state, status: 'disconnected', remotes: [] });
@@ -753,6 +757,18 @@ export class RealtimeConnection {
     } else if (!this.disposed) {
       void this.connect(true);
     }
+  }
+
+  public retryNow(): void {
+    if (this.disposed || this.state.status === 'blocked') return;
+    if (this.socket?.readyState === WebSocket.OPEN) {
+      this.socket.send(JSON.stringify({ version: REALTIME_PROTOCOL_VERSION, type: 'resync' }));
+      return;
+    }
+    if (this.reconnectTimer !== undefined) window.clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = undefined;
+    this.attempt = 0;
+    void this.connect(true);
   }
 
   public switchChannel(channelId: string): void {
@@ -1287,7 +1303,7 @@ export class RealtimeConnection {
         `${this.options.realtimeUrl.replace(/\/$/u, '')}/connect`,
       );
       this.socket = socket;
-      socket.addEventListener('open', () => {
+      const handleOpen = () => {
         socket.send(
           JSON.stringify({
             version: REALTIME_PROTOCOL_VERSION,
@@ -1295,9 +1311,10 @@ export class RealtimeConnection {
             ticket: ticket.ticket,
           }),
         );
-      });
-      socket.addEventListener('message', (event) => {
+      };
+      const handleMessage = (event: MessageEvent) => {
         if (this.socket !== socket || this.disposed) return;
+        runtimeDevelopmentMetrics.recordRealtimeMessage();
         const parsed = realtimeServerMessageSchema.safeParse(
           (() => {
             try {
@@ -1343,10 +1360,12 @@ export class RealtimeConnection {
         ) {
           this.options.onAccessInvalid();
         }
-      });
-      socket.addEventListener('close', (event) => {
+      };
+      const handleClose = (event: CloseEvent) => {
         if (this.socket !== socket) return;
         this.socket = undefined;
+        this.socketListenerCleanup?.();
+        this.socketListenerCleanup = undefined;
         this.cancelMovementQueue();
         this.movementActive = false;
         this.movementSuspended = true;
@@ -1354,7 +1373,20 @@ export class RealtimeConnection {
         if (this.disposed || event.code === 1000) return;
         if (this.state.status === 'blocked') return;
         this.scheduleReconnect();
-      });
+      };
+      let listenersAttached = true;
+      this.socketListenerCleanup = () => {
+        if (!listenersAttached) return;
+        listenersAttached = false;
+        socket.removeEventListener('open', handleOpen);
+        socket.removeEventListener('message', handleMessage);
+        socket.removeEventListener('close', handleClose);
+        runtimeDevelopmentMetrics.adjustGauge('activeListeners', -3);
+      };
+      socket.addEventListener('open', handleOpen);
+      socket.addEventListener('message', handleMessage);
+      socket.addEventListener('close', handleClose);
+      runtimeDevelopmentMetrics.adjustGauge('activeListeners', 3);
       this.pingTimer = window.setInterval(() => {
         if (socket.readyState === WebSocket.OPEN && document.visibilityState === 'visible') {
           socket.send(
@@ -1383,6 +1415,15 @@ export class RealtimeConnection {
 
   private scheduleReconnect(): void {
     if (this.disposed || this.reconnectTimer !== undefined) return;
+    if (!automaticRetryAvailable('realtime', this.attempt)) {
+      this.publish({
+        ...this.state,
+        status: 'unavailable',
+        remotes: [],
+        retryAttempt: this.attempt,
+      });
+      return;
+    }
     const delay = reconnectDelay(this.attempt);
     this.attempt += 1;
     this.publish({

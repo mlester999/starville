@@ -163,9 +163,8 @@ for (let frame = 0; frame < FRAME_COUNT; frame += 1) {
         y: 7 + row * 1.2 + Math.cos(frame / 21 + index) * 0.08,
       },
       directions[(frame + index) % directions.length]!,
-      state !== 'idle',
+      state,
       frame * 16.667,
-      state === 'jog',
     );
   }
   frameTimes.push(performance.now() - frameStarted);

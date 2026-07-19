@@ -16,7 +16,7 @@ import {
   worldRollbackResponseSchema,
   worldValidationResponseSchema,
 } from '@starville/game-content';
-import { mapManifestSchema } from '@starville/game-core';
+import { normalizeMapManifestAssetDependencies } from '@starville/game-core';
 
 import type { ServiceLogger } from '../contracts.js';
 import { PublicApiError } from '../errors.js';
@@ -303,7 +303,10 @@ export function createAdminWorldService(options: {
       }
       let manifest;
       try {
-        manifest = mapManifestSchema.parse(parsed.data.manifest);
+        manifest = normalizeMapManifestAssetDependencies(parsed.data.manifest);
+        if (Buffer.byteLength(JSON.stringify(manifest)) > options.manifestMaximumBytes) {
+          throw new Error('Normalized manifest exceeds the maximum payload size');
+        }
       } catch {
         throw new PublicApiError(422, 'WORLD_VALIDATION_FAILED');
       }

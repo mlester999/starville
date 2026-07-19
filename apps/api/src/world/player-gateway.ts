@@ -5,6 +5,8 @@ import {
   assetCollisionProfileSchema,
   assetIdentifierSchema,
   assetRotationSchema,
+  bundledManifestVersionSchema,
+  worldAssetMaterialClassSchema,
 } from '@starville/asset-management';
 import {
   facingDirectionSchema,
@@ -87,7 +89,8 @@ export const pinnedAssetMaterialSchema = z
     assetKey: assetIdentifierSchema,
     versionId: z.uuid(),
     checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
-    bundledManifestVersion: z.literal('1.0.0').nullable(),
+    materialClass: worldAssetMaterialClassSchema.optional(),
+    bundledManifestVersion: bundledManifestVersionSchema.nullable(),
     mediaType: z.literal('image/webp').nullable(),
     width: z.number().int().positive().max(4096).nullable(),
     height: z.number().int().positive().max(4096).nullable(),
@@ -111,31 +114,60 @@ export const pinnedAssetMaterialSchema = z
       })
       .strict()
       .nullable(),
-    fallback: z.literal('repository_procedural').nullable(),
+    fallback: z.enum(['repository_procedural', 'repository_authored']).nullable(),
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.developmentMarker) {
+    const materialClass =
+      value.materialClass ?? (value.developmentMarker ? 'bundled_development' : 'uploaded');
+    const mediaFields = [
+      value.mediaType,
+      value.width,
+      value.height,
+      value.renderWidth,
+      value.renderHeight,
+    ];
+    if (value.materialClass === undefined && value.bundledManifestVersion === '2.0.0') {
+      context.addIssue({
+        code: 'custom',
+        path: ['materialClass'],
+        message: 'Repository-authored material requires an explicit classification',
+      });
+    }
+    if (materialClass === 'bundled_development') {
       if (
         value.delivery !== null ||
         (value.bundledManifestVersion === '1.0.0'
           ? value.fallback !== 'repository_procedural'
           : value.fallback !== null) ||
-        [value.mediaType, value.width, value.height, value.renderWidth, value.renderHeight].some(
-          (field) => field !== null,
-        )
+        mediaFields.some((field) => field !== null) ||
+        !value.developmentMarker ||
+        (value.materialClass !== undefined && value.bundledManifestVersion === '2.0.0')
       ) {
         context.addIssue({ code: 'custom', message: 'Invalid development asset material' });
       }
-    } else if (
+      return;
+    }
+    if (materialClass === 'bundled_candidate') {
+      if (
+        value.bundledManifestVersion !== '2.0.0' ||
+        value.delivery !== null ||
+        value.fallback !== 'repository_authored' ||
+        mediaFields.some((field) => field !== null) ||
+        !value.developmentMarker
+      ) {
+        context.addIssue({ code: 'custom', message: 'Invalid repository-authored candidate' });
+      }
+      return;
+    }
+    if (
       value.bundledManifestVersion !== null ||
       value.delivery === null ||
       value.fallback !== null ||
-      [value.mediaType, value.width, value.height, value.renderWidth, value.renderHeight].some(
-        (field) => field === null,
-      )
+      mediaFields.some((field) => field === null) ||
+      value.developmentMarker
     ) {
-      context.addIssue({ code: 'custom', message: 'Invalid production asset material' });
+      context.addIssue({ code: 'custom', message: 'Invalid uploaded asset material' });
     }
   });
 const loadedManifestSchema = z.object({

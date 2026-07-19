@@ -50,6 +50,7 @@ import { DustHistoryPanel } from './EconomyPanels';
 import { GeneralStorePanel } from './GeneralStorePanel';
 import { HousingWorkspacePanel } from './HousingWorkspacePanel';
 import { BundledAssetImage } from './BundledAssetImage';
+import { GameModalPortal } from './game-ui';
 
 type CozyInteraction = Exclude<WorldInteraction, { readonly type: 'notice' }>;
 type CozyPanel =
@@ -64,8 +65,11 @@ interface CozyGameplayProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly externalInventoryRequest?: number;
   readonly externalDustRequest?: number;
+  readonly externalDustRefreshRequest?: number;
   readonly showStandaloneHud?: boolean;
-  readonly onDustBalanceChange?: (balance: number | undefined) => void;
+  readonly portalPanels?: boolean;
+  readonly onDustBalanceChange?: (balance: number) => void;
+  readonly onDustLoadState?: (state: 'loading' | 'ready' | 'unavailable') => void;
   readonly onHomeAccessChange?: (
     location: 'public_world' | 'personal_home',
     view: PlayableVerticalSlice,
@@ -243,11 +247,18 @@ export function CozyGameplay({
   onOpenChange,
   externalInventoryRequest = 0,
   externalDustRequest = 0,
+  externalDustRefreshRequest = 0,
   showStandaloneHud = true,
+  portalPanels = false,
   onDustBalanceChange,
+  onDustLoadState,
   onHomeAccessChange,
 }: CozyGameplayProps) {
   const [state, setState] = useState<CozyState>();
+  const [dustLoadState, setDustLoadState] = useState<'loading' | 'ready' | 'unavailable'>(
+    'loading',
+  );
+  const [dustHudBalance, setDustHudBalance] = useState<number>();
   const [panel, setPanel] = useState<CozyPanel | null>(null);
   const [selectedSlot, setSelectedSlot] = useState(1);
   const [selectedFarmingItem, setSelectedFarmingItem] = useState<
@@ -262,7 +273,6 @@ export function CozyGameplay({
   const [error, setError] = useState<{ readonly message: string }>();
   const [status, setStatus] = useState<{ readonly title: string; readonly detail: string }>();
   const [workstationReadyNotice, setWorkstationReadyNotice] = useState<string>();
-  const panelRef = useRef<HTMLElement>(null);
   const operationLockRef = useRef(false);
   const generalStoreEventNumberRef = useRef(0);
   const reportedHomeLocationRef = useRef<'public_world' | 'personal_home' | undefined>(undefined);
@@ -330,7 +340,16 @@ export function CozyGameplay({
   }, [workstationReadyNotice]);
 
   const loadFoundation = useCallback(async () => {
-    const bootstrap = await bootstrapCozyGameplay(apiUrl);
+    setDustLoadState('loading');
+    let bootstrap: CozyBootstrap;
+    try {
+      bootstrap = await bootstrapCozyGameplay(apiUrl);
+    } catch (cause) {
+      setDustLoadState('unavailable');
+      throw cause;
+    }
+    setDustHudBalance(bootstrap.dust.balance);
+    setDustLoadState('ready');
     const [inventory, farm, items, home, verticalSlice] = await Promise.all([
       loadCozyInventory(apiUrl),
       loadFarmPlots(apiUrl),
@@ -345,6 +364,26 @@ export function CozyGameplay({
       home,
       verticalSlice,
     });
+  }, [apiUrl]);
+
+  const refreshDustBalance = useCallback(async () => {
+    setDustLoadState('loading');
+    try {
+      const dust = await loadDustLedger(apiUrl);
+      setDustHudBalance(dust.account.balance);
+      setState((current) =>
+        current === undefined
+          ? current
+          : {
+              ...current,
+              bootstrap: { ...current.bootstrap, dust: dust.account },
+            },
+      );
+      setDustLoadState('ready');
+    } catch (cause) {
+      setDustLoadState('unavailable');
+      throw cause;
+    }
   }, [apiUrl]);
 
   const refreshMutableState = useCallback(async () => {
@@ -415,9 +454,16 @@ export function CozyGameplay({
 
   useEffect(() => onOpenChange(panel !== null), [onOpenChange, panel]);
 
+  const authoritativeDustBalance = state?.bootstrap.dust.balance;
   useEffect(() => {
-    onDustBalanceChange?.(state?.bootstrap.dust.balance);
-  }, [onDustBalanceChange, state?.bootstrap.dust.balance]);
+    if (authoritativeDustBalance !== undefined) setDustHudBalance(authoritativeDustBalance);
+  }, [authoritativeDustBalance]);
+
+  useEffect(() => {
+    if (dustHudBalance !== undefined) onDustBalanceChange?.(dustHudBalance);
+  }, [dustHudBalance, onDustBalanceChange]);
+
+  useEffect(() => onDustLoadState?.(dustLoadState), [dustLoadState, onDustLoadState]);
 
   useEffect(() => {
     if (state === undefined || onHomeAccessChange === undefined) return;
@@ -443,33 +489,9 @@ export function CozyGameplay({
   }, [externalDustRequest]);
 
   useEffect(() => {
-    if (panel === null) return;
-    const returnTarget =
-      document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    function trapFocus(event: KeyboardEvent) {
-      if (event.key !== 'Tab' || panelRef.current === null) return;
-      const focusable = [
-        ...panelRef.current.querySelectorAll<HTMLElement>(
-          'button:not(:disabled), a[href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
-        ),
-      ];
-      const first = focusable[0];
-      const last = focusable.at(-1);
-      if (first === undefined || last === undefined) return;
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-    document.addEventListener('keydown', trapFocus);
-    return () => {
-      document.removeEventListener('keydown', trapFocus);
-      returnTarget?.focus();
-    };
-  }, [panel]);
+    if (externalDustRefreshRequest <= 0) return;
+    void refreshDustBalance().catch(setErrorFromCause);
+  }, [externalDustRefreshRequest, refreshDustBalance, setErrorFromCause]);
 
   useEffect(() => {
     if (panel !== 'cooking' && panel !== 'crafting') return;
@@ -547,18 +569,6 @@ export function CozyGameplay({
     window.addEventListener('keydown', selectQuickbar);
     return () => window.removeEventListener('keydown', selectQuickbar);
   }, [panel]);
-
-  useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key !== 'Escape' || panel === null) return;
-      setPanel(null);
-      setError(undefined);
-      setStatus(undefined);
-      if (interaction !== null) onInteractionClose();
-    }
-    window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
-  }, [interaction, onInteractionClose, panel]);
 
   const perform = useCallback(
     async (
@@ -795,357 +805,365 @@ export function CozyGameplay({
       )}
 
       {panel === null ? null : (
-        <div className="world-overlay cozy-overlay" role="presentation">
-          <section
-            ref={panelRef}
-            className="cozy-panel"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="cozy-panel-title"
-          >
-            <header className="cozy-panel__header">
-              <div>
-                <p className="game-kicker">
-                  {panel === 'shop'
-                    ? 'Village shopping'
-                    : panel === 'dust'
-                      ? 'Your DUST journal'
-                      : 'Your village bag'}
-                </p>
-                <h2 id="cozy-panel-title">
-                  {panel === 'inventory'
-                    ? 'Inventory & Quickbar'
-                    : panel === 'dust'
-                      ? 'DUST history'
-                      : panel === 'shop'
-                        ? (generalStore?.shop.name ?? interaction?.title ?? 'General Store')
-                        : panel === 'starter_quest'
-                          ? (state?.verticalSlice.quest.name ?? 'Starter farming quest')
-                          : (interaction?.title ?? 'Cozy journal')}
-                </h2>
-              </div>
-              <button autoFocus type="button" aria-label="Close cozy panel" onClick={closePanel}>
-                ×
-              </button>
-            </header>
+        <GameModalPortal portal={portalPanels} onClose={closePanel}>
+          <div className="world-overlay cozy-overlay" role="presentation">
+            <section
+              className="cozy-panel"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cozy-panel-title"
+            >
+              <header className="cozy-panel__header">
+                <div>
+                  <p className="game-kicker">
+                    {panel === 'shop'
+                      ? 'Village shopping'
+                      : panel === 'dust'
+                        ? 'Your DUST journal'
+                        : 'Your village bag'}
+                  </p>
+                  <h2 id="cozy-panel-title">
+                    {panel === 'inventory'
+                      ? 'Inventory & Quickbar'
+                      : panel === 'dust'
+                        ? 'DUST history'
+                        : panel === 'shop'
+                          ? (generalStore?.shop.name ?? interaction?.title ?? 'General Store')
+                          : panel === 'starter_quest'
+                            ? (state?.verticalSlice.quest.name ?? 'Starter farming quest')
+                            : (interaction?.title ?? 'Cozy journal')}
+                  </h2>
+                </div>
+                <button autoFocus type="button" aria-label="Close cozy panel" onClick={closePanel}>
+                  ×
+                </button>
+              </header>
 
-            {state === undefined ? (
-              <div className="cozy-panel__loading" role="status">
-                <span className="game-loader" />
-                <p>Opening your inventory…</p>
-              </div>
-            ) : null}
+              {state === undefined ? (
+                <div className="cozy-panel__loading" role="status">
+                  <span className="game-loader" />
+                  <p>Opening your inventory…</p>
+                </div>
+              ) : null}
 
-            {busy && busyLabel !== undefined ? (
-              <div
-                className="cozy-feedback cozy-feedback--loading"
-                role="status"
-                aria-live="polite"
-              >
-                <strong>{busyLabel}</strong>
-              </div>
-            ) : null}
+              {busy && busyLabel !== undefined ? (
+                <div
+                  className="cozy-feedback cozy-feedback--loading"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <strong>{busyLabel}</strong>
+                </div>
+              ) : null}
 
-            {error === undefined ? null : (
-              <div className="cozy-feedback" role="alert">
-                <strong>Could not update</strong>
-                <span>{error.message}</span>
-              </div>
-            )}
+              {error === undefined ? null : (
+                <div className="cozy-feedback" role="alert">
+                  <strong>Could not update</strong>
+                  <span>{error.message}</span>
+                </div>
+              )}
 
-            {status === undefined ? null : (
-              <div
-                className="cozy-feedback cozy-feedback--success"
-                role="status"
-                aria-live="polite"
-              >
-                <strong>{status.title}</strong>
-                <span>{status.detail}</span>
-              </div>
-            )}
+              {status === undefined ? null : (
+                <div
+                  className="cozy-feedback cozy-feedback--success"
+                  role="status"
+                  aria-live="polite"
+                >
+                  <strong>{status.title}</strong>
+                  <span>{status.detail}</span>
+                </div>
+              )}
 
-            {state !== undefined && panel === 'inventory' ? (
-              <InventoryPanel
-                state={state}
-                selectedSlot={selectedSlot}
-                busy={busy}
-                onSelectSlot={setSelectedSlot}
-                onAssign={(stackId, itemName, replacing) =>
-                  void perform(
-                    () =>
-                      updateQuickbar(apiUrl, selectedSlot, {
-                        inventoryStackId: stackId,
-                        expectedStateVersion: state.bootstrap.quickbar.stateVersion,
-                      }),
-                    stackId === null
-                      ? {
-                          title: 'Quickbar updated',
-                          detail: `Slot ${selectedSlot} is now empty.`,
-                        }
-                      : {
-                          title: 'Quickbar updated',
-                          detail: replacing
-                            ? `${itemName} replaced the previous item in Slot ${selectedSlot}.`
-                            : `${itemName} is now available in Slot ${selectedSlot}.`,
-                        },
-                    `Updating Slot ${selectedSlot}…`,
-                  )
-                }
-              />
-            ) : null}
-
-            {state !== undefined && panel === 'dust' ? (
-              <DustHistoryPanel
-                economy={economyHistory}
-                loadingMore={historyLoadingMore}
-                {...(economyHistory?.nextCursor === null
-                  ? {}
-                  : { onLoadMore: () => void loadEarlierEconomyHistory() })}
-              />
-            ) : null}
-
-            {state !== undefined && panel === 'farm' ? (
-              <FarmPanel
-                plots={targetPlots}
-                seedName={seedStack?.item.name}
-                busy={busy}
-                onAction={(plot, action) =>
-                  void perform(
-                    () =>
-                      mutateFarm(
-                        apiUrl,
-                        action,
-                        plot,
-                        action === 'plant' ? seedStack?.item.slug : undefined,
-                      ),
-                    {
-                      title:
-                        action === 'plant'
-                          ? 'Seed planted'
-                          : action === 'water'
-                            ? 'Crop watered'
-                            : 'Crop harvested',
-                      detail:
-                        action === 'plant'
-                          ? 'Your seed is growing in this garden plot.'
-                          : action === 'water'
-                            ? 'Growth continues on its own from here.'
-                            : 'The harvest was added to your inventory.',
-                    },
-                  )
-                }
-              />
-            ) : null}
-
-            {state !== undefined && panel === 'shop' ? (
-              <GeneralStorePanel
-                workspace={generalStore}
-                busy={busy}
-                onTransaction={async (entry, direction, quantity) => {
-                  if (interaction?.type !== 'shop' || generalStore === undefined) {
-                    throw new Error('The General Store catalog changed. Reload and try again.');
+              {state !== undefined && panel === 'inventory' ? (
+                <InventoryPanel
+                  state={state}
+                  selectedSlot={selectedSlot}
+                  busy={busy}
+                  onSelectSlot={setSelectedSlot}
+                  onAssign={(stackId, itemName, replacing) =>
+                    void perform(
+                      () =>
+                        updateQuickbar(apiUrl, selectedSlot, {
+                          inventoryStackId: stackId,
+                          expectedStateVersion: state.bootstrap.quickbar.stateVersion,
+                        }),
+                      stackId === null
+                        ? {
+                            title: 'Quickbar updated',
+                            detail: `Slot ${selectedSlot} is now empty.`,
+                          }
+                        : {
+                            title: 'Quickbar updated',
+                            detail: replacing
+                              ? `${itemName} replaced the previous item in Slot ${selectedSlot}.`
+                              : `${itemName} is now available in Slot ${selectedSlot}.`,
+                          },
+                      `Updating Slot ${selectedSlot}…`,
+                    )
                   }
-                  if (operationLockRef.current)
-                    throw new Error('That transaction is already being checked.');
-                  operationLockRef.current = true;
-                  setBusy(true);
-                  setBusyLabel(`Checking this ${direction} with the village server…`);
-                  setError(undefined);
-                  try {
-                    const expectedUnitPrice =
-                      direction === 'buy' ? entry.buyPrice : entry.sellPrice;
-                    if (expectedUnitPrice === null)
-                      throw new Error('That catalog direction is unavailable.');
-                    const result = await transactGeneralStore(apiUrl, interaction.id, {
-                      entryId: entry.entryId,
-                      direction,
-                      quantity,
-                      expectedUnitPrice,
-                      expectedCatalogVersionId: generalStore.catalog.versionId,
-                      expectedCatalogRevision: generalStore.catalog.revision,
-                      expectedEntryRevision: entry.entryRevision,
-                      expectedStockRevision: entry.stock === null ? null : entry.stockRevision,
-                      expectedDustStateVersion: generalStore.dust.stateVersion,
-                      expectedInventoryStateVersion: generalStore.inventory.stateVersion,
-                      idempotencyKey: crypto.randomUUID(),
-                    });
-                    await refreshMutableState();
-                    const latest = await loadGeneralStore(apiUrl, interaction.id).catch(
-                      () => undefined,
-                    );
-                    if (latest !== undefined) setGeneralStore(latest);
-                    setStatus({
-                      title: direction === 'buy' ? 'Purchase complete' : 'Sale complete',
-                      detail: `${quantity.toLocaleString()} × ${entry.itemName}. Receipt ${result.receipt.receiptId}.`,
-                    });
-                    return result;
-                  } catch (cause) {
-                    if (cause instanceof PlayerRequestError && cause.status === 401)
-                      onAccessInvalid();
-                    const latest = await loadGeneralStore(apiUrl, interaction.id).catch(
-                      () => undefined,
-                    );
-                    if (latest !== undefined) setGeneralStore(latest);
-                    throw new Error(requestFailure(cause).message, { cause });
-                  } finally {
-                    operationLockRef.current = false;
-                    setBusy(false);
-                    setBusyLabel(undefined);
-                  }
-                }}
-                onInspectReceipt={async (receiptId) => {
-                  await loadGeneralStoreReceipt(apiUrl, receiptId);
-                  if (interaction?.type === 'shop') {
-                    setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
-                  }
-                  setStatus({
-                    title: 'Receipt verified',
-                    detail: `${receiptId} belongs to this player.`,
-                  });
-                }}
-                onAcceptTutorial={async () => {
-                  if (interaction?.type !== 'shop') return;
-                  await acceptGeneralStoreTutorial(apiUrl, interaction.id);
-                  setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
-                }}
-                onTurnInTutorial={async (stateVersion) => {
-                  if (interaction?.type !== 'shop') return;
-                  await turnInGeneralStoreTutorial(apiUrl, interaction.id, stateVersion);
-                  await refreshMutableState();
-                  setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
-                }}
-              />
-            ) : null}
+                />
+              ) : null}
 
-            {state !== undefined && (panel === 'cooking' || panel === 'crafting') ? (
-              <WorkstationPanel
-                workspace={workstationWorkspace}
-                legacyStation={
-                  (interaction?.type === 'cooking_station' ||
-                    interaction?.type === 'crafting_station') &&
-                  interaction.workstationInstanceId === undefined
-                }
-                busy={busy}
-                onStart={(recipeVersionId, quantity) => {
-                  if (workstationWorkspace === undefined) return;
-                  void perform(
-                    async () => {
-                      const result = await startWorkstationJob(
-                        apiUrl,
-                        workstationWorkspace,
-                        recipeVersionId,
+              {state !== undefined && panel === 'dust' ? (
+                <DustHistoryPanel
+                  economy={economyHistory}
+                  loadingMore={historyLoadingMore}
+                  {...(economyHistory?.nextCursor === null
+                    ? {}
+                    : { onLoadMore: () => void loadEarlierEconomyHistory() })}
+                />
+              ) : null}
+
+              {state !== undefined && panel === 'farm' ? (
+                <FarmPanel
+                  plots={targetPlots}
+                  seedName={seedStack?.item.name}
+                  busy={busy}
+                  onAction={(plot, action) =>
+                    void perform(
+                      () =>
+                        mutateFarm(
+                          apiUrl,
+                          action,
+                          plot,
+                          action === 'plant' ? seedStack?.item.slug : undefined,
+                        ),
+                      {
+                        title:
+                          action === 'plant'
+                            ? 'Seed planted'
+                            : action === 'water'
+                              ? 'Crop watered'
+                              : 'Crop harvested',
+                        detail:
+                          action === 'plant'
+                            ? 'Your seed is growing in this garden plot.'
+                            : action === 'water'
+                              ? 'Growth continues on its own from here.'
+                              : 'The harvest was added to your inventory.',
+                      },
+                    )
+                  }
+                />
+              ) : null}
+
+              {state !== undefined && panel === 'shop' ? (
+                <GeneralStorePanel
+                  workspace={generalStore}
+                  busy={busy}
+                  onTransaction={async (entry, direction, quantity) => {
+                    if (interaction?.type !== 'shop' || generalStore === undefined) {
+                      throw new Error('The General Store catalog changed. Reload and try again.');
+                    }
+                    if (operationLockRef.current)
+                      throw new Error('That transaction is already being checked.');
+                    operationLockRef.current = true;
+                    setBusy(true);
+                    setBusyLabel(`Checking this ${direction} with the village server…`);
+                    setError(undefined);
+                    try {
+                      const expectedUnitPrice =
+                        direction === 'buy' ? entry.buyPrice : entry.sellPrice;
+                      if (expectedUnitPrice === null)
+                        throw new Error('That catalog direction is unavailable.');
+                      const result = await transactGeneralStore(apiUrl, interaction.id, {
+                        entryId: entry.entryId,
+                        direction,
                         quantity,
+                        expectedUnitPrice,
+                        expectedCatalogVersionId: generalStore.catalog.versionId,
+                        expectedCatalogRevision: generalStore.catalog.revision,
+                        expectedEntryRevision: entry.entryRevision,
+                        expectedStockRevision: entry.stock === null ? null : entry.stockRevision,
+                        expectedDustStateVersion: generalStore.dust.stateVersion,
+                        expectedInventoryStateVersion: generalStore.inventory.stateVersion,
+                        idempotencyKey: crypto.randomUUID(),
+                      });
+                      await refreshMutableState();
+                      const latest = await loadGeneralStore(apiUrl, interaction.id).catch(
+                        () => undefined,
                       );
-                      setWorkstationWorkspace(result.workspace);
-                    },
-                    {
-                      title: panel === 'cooking' ? 'Cooking started' : 'Crafting started',
-                      detail: 'Ingredients were consumed once. Return here when the job is ready.',
-                    },
-                    'Starting the server-authoritative workstation job…',
-                  );
-                }}
-                onCollect={(job) => {
-                  if (workstationWorkspace === undefined) return;
-                  void perform(
-                    async () => {
-                      const result = await collectWorkstationJob(apiUrl, workstationWorkspace, job);
-                      setWorkstationWorkspace(result.workspace);
-                    },
-                    {
-                      title: 'Output collected',
-                      detail: `${job.output.quantity} ${job.output.itemName} added to your inventory.`,
-                    },
-                    'Checking the completed job and inventory capacity…',
-                  );
-                }}
-              />
-            ) : null}
-
-            {state !== undefined && panel === 'home' ? (
-              <HomePanel
-                apiUrl={apiUrl}
-                realtimeUrl={realtimeUrl}
-                state={state}
-                busy={busy}
-                selectedFarmingItem={selectedFarmingItem}
-                realtimeStatus={privateHomeRealtime.state.status}
-                onAccess={(operation) =>
-                  void perform(
-                    async () => {
-                      const access = await changeHomeAccess(apiUrl, operation, state.home.home);
-                      const latestView = await loadPlayableVerticalSlice(apiUrl);
-                      setState((current) =>
-                        current === undefined ? current : { ...current, verticalSlice: latestView },
+                      if (latest !== undefined) setGeneralStore(latest);
+                      setStatus({
+                        title: direction === 'buy' ? 'Purchase complete' : 'Sale complete',
+                        detail: `${quantity.toLocaleString()} × ${entry.itemName}. Receipt ${result.receipt.receiptId}.`,
+                      });
+                      return result;
+                    } catch (cause) {
+                      if (cause instanceof PlayerRequestError && cause.status === 401)
+                        onAccessInvalid();
+                      const latest = await loadGeneralStore(apiUrl, interaction.id).catch(
+                        () => undefined,
                       );
-                      reportedHomeLocationRef.current = access.location;
-                      onHomeAccessChange?.(access.location, latestView);
-                      return access;
-                    },
-                    {
-                      title: operation === 'enter' ? 'Welcome home' : 'Back in the village',
-                      detail:
-                        operation === 'enter'
-                          ? 'You entered your private starter home.'
-                          : 'You returned to the public village.',
-                    },
-                  )
-                }
-                onFarmAction={(tile, operation) =>
-                  void performVerticalSlice(
-                    () =>
-                      mutateHomeFarm(
-                        apiUrl,
-                        operation,
-                        tile,
-                        operation === 'plant' ? 'moonbean-seed' : undefined,
-                      ),
-                    operation === 'prepare'
-                      ? 'Preparing soil…'
-                      : operation === 'plant'
-                        ? 'Planting seed…'
-                        : operation === 'water'
-                          ? 'Watering crop…'
-                          : 'Harvesting crop…',
-                  )
-                }
-              />
-            ) : null}
+                      if (latest !== undefined) setGeneralStore(latest);
+                      throw new Error(requestFailure(cause).message, { cause });
+                    } finally {
+                      operationLockRef.current = false;
+                      setBusy(false);
+                      setBusyLabel(undefined);
+                    }
+                  }}
+                  onInspectReceipt={async (receiptId) => {
+                    await loadGeneralStoreReceipt(apiUrl, receiptId);
+                    if (interaction?.type === 'shop') {
+                      setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
+                    }
+                    setStatus({
+                      title: 'Receipt verified',
+                      detail: `${receiptId} belongs to this player.`,
+                    });
+                  }}
+                  onAcceptTutorial={async () => {
+                    if (interaction?.type !== 'shop') return;
+                    await acceptGeneralStoreTutorial(apiUrl, interaction.id);
+                    setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
+                  }}
+                  onTurnInTutorial={async (stateVersion) => {
+                    if (interaction?.type !== 'shop') return;
+                    await turnInGeneralStoreTutorial(apiUrl, interaction.id, stateVersion);
+                    await refreshMutableState();
+                    setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
+                  }}
+                />
+              ) : null}
 
-            {state !== undefined && panel === 'starter_quest' ? (
-              <StarterQuestPanel
-                view={state.verticalSlice}
-                busy={busy}
-                onAccept={() =>
-                  void performVerticalSlice(
-                    () => acceptStarterFarmingQuest(apiUrl),
-                    'Preparing your starter farming kit…',
-                  )
-                }
-                onDeliver={() =>
-                  void performVerticalSlice(
-                    () => deliverStarterFarmingQuest(apiUrl, state.verticalSlice.quest),
-                    'Settling your one-time delivery…',
-                  )
-                }
-                onAcceptWorkstation={() =>
-                  void perform(() => acceptWorkstationTutorial(apiUrl), {
-                    title: 'Hearth and Hands started',
-                    detail: 'Garden Soup is unlocked at your home Cooking Hearth.',
-                  })
-                }
-                onTurnInWorkstation={() => {
-                  const tutorial = state.verticalSlice.workstationTutorial;
-                  if (tutorial === undefined) return;
-                  void perform(() => turnInWorkstationTutorial(apiUrl, tutorial), {
-                    title: 'Hearth and Hands complete',
-                    detail: '20 DUST was settled exactly once by the server.',
-                  });
-                }}
-              />
-            ) : null}
-          </section>
-        </div>
+              {state !== undefined && (panel === 'cooking' || panel === 'crafting') ? (
+                <WorkstationPanel
+                  workspace={workstationWorkspace}
+                  legacyStation={
+                    (interaction?.type === 'cooking_station' ||
+                      interaction?.type === 'crafting_station') &&
+                    interaction.workstationInstanceId === undefined
+                  }
+                  busy={busy}
+                  onStart={(recipeVersionId, quantity) => {
+                    if (workstationWorkspace === undefined) return;
+                    void perform(
+                      async () => {
+                        const result = await startWorkstationJob(
+                          apiUrl,
+                          workstationWorkspace,
+                          recipeVersionId,
+                          quantity,
+                        );
+                        setWorkstationWorkspace(result.workspace);
+                      },
+                      {
+                        title: panel === 'cooking' ? 'Cooking started' : 'Crafting started',
+                        detail:
+                          'Ingredients were consumed once. Return here when the job is ready.',
+                      },
+                      'Starting the server-authoritative workstation job…',
+                    );
+                  }}
+                  onCollect={(job) => {
+                    if (workstationWorkspace === undefined) return;
+                    void perform(
+                      async () => {
+                        const result = await collectWorkstationJob(
+                          apiUrl,
+                          workstationWorkspace,
+                          job,
+                        );
+                        setWorkstationWorkspace(result.workspace);
+                      },
+                      {
+                        title: 'Output collected',
+                        detail: `${job.output.quantity} ${job.output.itemName} added to your inventory.`,
+                      },
+                      'Checking the completed job and inventory capacity…',
+                    );
+                  }}
+                />
+              ) : null}
+
+              {state !== undefined && panel === 'home' ? (
+                <HomePanel
+                  apiUrl={apiUrl}
+                  realtimeUrl={realtimeUrl}
+                  state={state}
+                  busy={busy}
+                  selectedFarmingItem={selectedFarmingItem}
+                  realtimeStatus={privateHomeRealtime.state.status}
+                  onAccess={(operation) =>
+                    void perform(
+                      async () => {
+                        const access = await changeHomeAccess(apiUrl, operation, state.home.home);
+                        const latestView = await loadPlayableVerticalSlice(apiUrl);
+                        setState((current) =>
+                          current === undefined
+                            ? current
+                            : { ...current, verticalSlice: latestView },
+                        );
+                        reportedHomeLocationRef.current = access.location;
+                        onHomeAccessChange?.(access.location, latestView);
+                        return access;
+                      },
+                      {
+                        title: operation === 'enter' ? 'Welcome home' : 'Back in the village',
+                        detail:
+                          operation === 'enter'
+                            ? 'You entered your private starter home.'
+                            : 'You returned to the public village.',
+                      },
+                    )
+                  }
+                  onFarmAction={(tile, operation) =>
+                    void performVerticalSlice(
+                      () =>
+                        mutateHomeFarm(
+                          apiUrl,
+                          operation,
+                          tile,
+                          operation === 'plant' ? 'moonbean-seed' : undefined,
+                        ),
+                      operation === 'prepare'
+                        ? 'Preparing soil…'
+                        : operation === 'plant'
+                          ? 'Planting seed…'
+                          : operation === 'water'
+                            ? 'Watering crop…'
+                            : 'Harvesting crop…',
+                    )
+                  }
+                />
+              ) : null}
+
+              {state !== undefined && panel === 'starter_quest' ? (
+                <StarterQuestPanel
+                  view={state.verticalSlice}
+                  busy={busy}
+                  onAccept={() =>
+                    void performVerticalSlice(
+                      () => acceptStarterFarmingQuest(apiUrl),
+                      'Preparing your starter farming kit…',
+                    )
+                  }
+                  onDeliver={() =>
+                    void performVerticalSlice(
+                      () => deliverStarterFarmingQuest(apiUrl, state.verticalSlice.quest),
+                      'Settling your one-time delivery…',
+                    )
+                  }
+                  onAcceptWorkstation={() =>
+                    void perform(() => acceptWorkstationTutorial(apiUrl), {
+                      title: 'Hearth and Hands started',
+                      detail: 'Garden Soup is unlocked at your home Cooking Hearth.',
+                    })
+                  }
+                  onTurnInWorkstation={() => {
+                    const tutorial = state.verticalSlice.workstationTutorial;
+                    if (tutorial === undefined) return;
+                    void perform(() => turnInWorkstationTutorial(apiUrl, tutorial), {
+                      title: 'Hearth and Hands complete',
+                      detail: '20 DUST was settled exactly once by the server.',
+                    });
+                  }}
+                />
+              ) : null}
+            </section>
+          </div>
+        </GameModalPortal>
       )}
     </>
   );
@@ -1834,7 +1852,7 @@ function StarterQuestPanel({
   return (
     <div className="cozy-panel__body cozy-starter-quest">
       <section className="cozy-starter-quest__guide">
-        <span className="cozy-dev-marker" aria-label="Willow Guide development marker">
+        <span className="cozy-dev-marker" aria-label="Willow Guide emblem">
           ✦
         </span>
         <div>
@@ -1877,7 +1895,7 @@ function StarterQuestPanel({
       ) : null}
       {workstationTutorial === undefined ? null : (
         <section className="cozy-starter-quest__continuation" aria-labelledby="hearth-hands-title">
-          <p className="game-kicker">Phase 11B continuation</p>
+          <p className="game-kicker">Next village chapter</p>
           <h3 id="hearth-hands-title">{workstationTutorial.name}</h3>
           <p>{workstationTutorial.description}</p>
           <ol className="cozy-starter-quest__objectives">

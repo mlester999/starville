@@ -712,6 +712,9 @@ importers:
       '@starville/asset-management':
         specifier: workspace:*
         version: link:../asset-management
+      '@starville/game-core':
+        specifier: workspace:*
+        version: link:../game-core
       sharp:
         specifier: 0.34.5
         version: 0.34.5

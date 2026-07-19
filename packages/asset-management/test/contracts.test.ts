@@ -115,6 +115,102 @@ describe('asset management foundation contracts', () => {
     ).toBe(true);
   });
 
+  it('classifies repository-authored v2 material as a candidate rather than an upload or final art', () => {
+    const candidate = {
+      assetKey: 'tree-pine',
+      versionId: '00000000-0000-4000-8000-000000000012',
+      checksum: 'c'.repeat(64),
+      materialClass: 'bundled_candidate',
+      bundledManifestVersion: '2.0.0',
+      url: null,
+      mediaType: null,
+      width: null,
+      height: null,
+      renderWidth: null,
+      renderHeight: null,
+      scale: 1,
+      anchorX: 0.5,
+      anchorY: 1,
+      footAnchorX: 0.5,
+      footAnchorY: 0.92,
+      depthAnchorX: 0.5,
+      depthAnchorY: 0.92,
+      collision: { shape: 'none', blocking: false },
+      supportedRotations: [0],
+      defaultRotation: 0,
+      developmentMarker: true,
+    } as const;
+
+    expect(worldAssetDeliverySchema.parse(candidate).materialClass).toBe('bundled_candidate');
+    expect(
+      worldAssetDeliverySchema.safeParse({
+        ...candidate,
+        materialClass: undefined,
+      }).success,
+    ).toBe(false);
+    expect(
+      worldAssetDeliverySchema.safeParse({
+        ...candidate,
+        developmentMarker: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      worldAssetDeliverySchema.safeParse({
+        ...candidate,
+        materialClass: 'uploaded',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts explicit v1 and uploaded classes while preserving legacy payloads', () => {
+    const repository = {
+      assetKey: 'tree-pine',
+      versionId: '00000000-0000-4000-8000-000000000013',
+      checksum: 'd'.repeat(64),
+      bundledManifestVersion: '1.0.0',
+      url: null,
+      mediaType: null,
+      width: null,
+      height: null,
+      renderWidth: null,
+      renderHeight: null,
+      scale: 1,
+      anchorX: 0.5,
+      anchorY: 1,
+      footAnchorX: 0.5,
+      footAnchorY: 0.92,
+      depthAnchorX: 0.5,
+      depthAnchorY: 0.92,
+      collision: { shape: 'none', blocking: false },
+      supportedRotations: [0],
+      defaultRotation: 0,
+      developmentMarker: true,
+    } as const;
+    const upload = {
+      ...repository,
+      bundledManifestVersion: null,
+      url: 'https://assets.example.test/game-assets/starville/tree-pine/v2/source.webp',
+      mediaType: 'image/webp',
+      width: 512,
+      height: 640,
+      renderWidth: 256,
+      renderHeight: 320,
+      developmentMarker: false,
+    } as const;
+
+    expect(worldAssetDeliverySchema.safeParse(repository).success).toBe(true);
+    expect(
+      worldAssetDeliverySchema.safeParse({
+        ...repository,
+        materialClass: 'bundled_development',
+      }).success,
+    ).toBe(true);
+    expect(worldAssetDeliverySchema.safeParse(upload).success).toBe(true);
+    expect(
+      worldAssetDeliverySchema.safeParse({ ...upload, materialClass: 'uploaded' }).success,
+    ).toBe(true);
+  });
+
   it('accepts unresolved legacy repository pins without letting uploads claim a manifest', () => {
     const common = {
       assetKey: 'phase7-farm-plot-marker',

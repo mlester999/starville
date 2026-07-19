@@ -62,14 +62,14 @@ const CUSTOMIZATION_STEPS: readonly CustomizationStep[] = [
     id: 'hair',
     label: 'Hair',
     title: 'Find your village hairstyle',
-    description: 'Pair an approved development hairstyle with a bounded color palette.',
+    description: 'Pair a Starville hairstyle with a curated color palette.',
     layers: ['hair', 'hairColor'],
   },
   {
     id: 'outfit',
     label: 'Outfit',
     title: 'Put together a starter outfit',
-    description: 'All Phase 10A starter clothing is free and cosmetic-only.',
+    description: 'All starter clothing is free and cosmetic-only.',
     layers: ['top', 'bottom', 'footwear'],
   },
   {
@@ -370,7 +370,7 @@ export function CharacterCustomization({
         </fieldset>
 
         <p className="avatar-customizer__art-note">
-          Original modular development fallback · production artwork still requires review
+          Original modular character preview · appearance is cosmetic only
         </p>
       </aside>
 

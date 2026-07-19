@@ -2,7 +2,12 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { z } from 'zod';
 import { ENVIRONMENT_NAMES, type EnvironmentName } from '@starville/shared-types';
-import { defaultMapSpawn, mapManifestSchema, validateMapManifest } from '@starville/game-core';
+import {
+  defaultMapSpawn,
+  mapManifestSchema,
+  validateMapManifest,
+  worldAssetDependencyKeys,
+} from '@starville/game-core';
 import { WORLD_ASSET_CATALOG } from '@starville/game-content';
 
 import type { ServiceLogger } from '../contracts.js';
@@ -253,6 +258,7 @@ function parseProjection(
       raw.manifest.assets,
       raw.assetDeliveries,
       publicAssetUrl,
+      worldAssetDependencyKeys(raw.manifest),
     );
     const catalog = new Map(
       deliveries.map(({ assetKey }) => [assetKey, { key: assetKey, status: 'approved' as const }]),

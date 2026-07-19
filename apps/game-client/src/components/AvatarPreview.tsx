@@ -1,5 +1,10 @@
 import type { CSSProperties } from 'react';
 
+import {
+  AVATAR_ANIMATION_STATES as SHARED_AVATAR_ANIMATION_STATES,
+  resolveAvatarVectorRigFrame,
+  type AvatarAnimationState,
+} from '@starville/avatar';
 import type { FacingDirection } from '@starville/game-core';
 
 import type { AvatarSelection } from '../app/avatar-client';
@@ -16,8 +21,8 @@ export const AVATAR_PREVIEW_DIRECTIONS = [
   'northwest',
 ] as const satisfies readonly FacingDirection[];
 
-export const AVATAR_ANIMATION_STATES = ['idle', 'walk', 'jog'] as const;
-export type AvatarAnimationState = (typeof AVATAR_ANIMATION_STATES)[number];
+export const AVATAR_ANIMATION_STATES = SHARED_AVATAR_ANIMATION_STATES;
+export type { AvatarAnimationState };
 
 interface AvatarPreviewProps {
   readonly selection: AvatarSelection;
@@ -39,6 +44,16 @@ type AvatarPreviewVariables = CSSProperties &
     '--avatar-footwear': string;
     '--avatar-accessory': string;
     '--avatar-body-scale': string;
+    '--avatar-body-x': string;
+    '--avatar-torso-width': string;
+    '--avatar-torso-skew': string;
+    '--avatar-head-x': string;
+    '--avatar-head-scale-x': string;
+    '--avatar-leg-spread': string;
+    '--avatar-limb-depth': string;
+    '--avatar-shoulder-slope': string;
+    '--avatar-gait-angle': string;
+    '--avatar-frame-duration': string;
   }>;
 
 export function AvatarPreview({
@@ -50,6 +65,13 @@ export function AvatarPreview({
   compact = false,
 }: AvatarPreviewProps) {
   const appearance = resolveAvatarFallbackStyle(selection);
+  const frame = resolveAvatarVectorRigFrame({
+    direction,
+    state: animationState,
+    elapsedMs: 0,
+    reducedMotion: paused,
+  });
+  const { pose } = frame;
   const variables: AvatarPreviewVariables = {
     '--avatar-skin': colorToCss(appearance.skin),
     '--avatar-skin-shade': colorToCss(appearance.skinShade),
@@ -60,6 +82,16 @@ export function AvatarPreview({
     '--avatar-footwear': colorToCss(appearance.footwear),
     '--avatar-accessory': colorToCss(appearance.accessory),
     '--avatar-body-scale': String(appearance.bodyScale),
+    '--avatar-body-x': `${String(pose.torsoYaw * 4)}px`,
+    '--avatar-torso-width': `${String(86 * pose.torsoWidthScale)}px`,
+    '--avatar-torso-skew': `${String(pose.torsoYaw * -7)}deg`,
+    '--avatar-head-x': `${String(pose.headOffsetX * 2)}px`,
+    '--avatar-head-scale-x': String(pose.headWidthScale),
+    '--avatar-leg-spread': `${String(27 * pose.torsoWidthScale)}px`,
+    '--avatar-limb-depth': `${String(pose.limbDepthOffset * 2)}px`,
+    '--avatar-shoulder-slope': `${String(pose.shoulderSlope * 1.25)}deg`,
+    '--avatar-gait-angle': `${String(pose.gaitAxis.x * 5 + pose.gaitAxis.y * 2)}deg`,
+    '--avatar-frame-duration': `${String(frame.frameDurationMs * frame.frameCount)}ms`,
   };
 
   return (
@@ -68,10 +100,15 @@ export function AvatarPreview({
       className={`avatar-preview${compact ? ' avatar-preview--compact' : ''}`}
       data-accessory={appearance.accessoryKey ?? 'none'}
       data-animation={animationState}
+      data-back-facing={pose.backFacing}
       data-direction={direction}
       data-face-variant={appearance.faceVariant}
+      data-face-mode={pose.faceMode}
+      data-frame-count={frame.frameCount}
       data-hair-variant={appearance.hairVariant}
+      data-near-side={pose.nearSide}
       data-paused={paused}
+      data-pose={pose.key}
       role="img"
       style={variables}
     >
@@ -104,7 +141,7 @@ export function AvatarPreview({
         <span className="avatar-preview__satchel" />
       </span>
       <span className="avatar-preview__development-label" aria-hidden="true">
-        Development preview
+        Outfit preview
       </span>
     </div>
   );

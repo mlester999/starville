@@ -39,6 +39,22 @@ select pg_temp.phase12a_assert(
   'player experience state is RLS fail-closed and exposed only through the service-role RPC boundary'
 );
 
+select pg_temp.phase12a_assert(
+  to_regprocedure('private.cozy_add_item(uuid,uuid,integer,text,text,text,text)') is not null
+  and to_regprocedure('private.cozy_add_item(uuid,uuid,integer,text,text,text,text,text)') is not null
+  and not has_function_privilege(
+    'service_role',
+    'private.cozy_add_item(uuid,uuid,integer,text,text,text,text,text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'private.cozy_add_item(uuid,uuid,integer,text,text,text,text,text)',
+    'execute'
+  ),
+  'the narrow onboarding-recovery overload delegates privately without exposing inventory authority'
+);
+
 do $$
 declare
   wallet constant text:='11111111111111111111111111112321';
@@ -227,6 +243,166 @@ begin
       and (select count(*)=1 from public.player_experience_admin_audit_events
         where actor_user_id=admin_user_id and request_id='phase12a:daily-policy:successor'),
     'daily policy management is AAL2, audited, idempotent, version-pinned, and successor-only'
+  );
+end;
+$$;
+
+do $$
+declare
+  wallet constant text:='11111111111111111111111111112321';
+  player_id uuid; seed_item_id uuid; filler_item_id uuid; filler_stack_ids uuid[];
+  onboarding_version uuid; state_rev integer; owned integer; result jsonb;
+  recovery_full_id uuid; recovery_grant_id uuid; recovery_owned_id uuid; recovery_used_id uuid;
+begin
+  select id into strict player_id from public.player_profiles where wallet_address=wallet;
+  select id into strict seed_item_id from public.cozy_item_definitions
+  where slug='moonbean-seed' and active;
+  select id into strict filler_item_id from public.cozy_item_definitions
+  where slug<>'moonbean-seed' and active order by slug limit 1;
+  select onboarding_version_id into strict onboarding_version
+  from public.player_experience_active_onboarding where singleton_key;
+  select state_revision into strict state_rev from public.player_onboarding_states
+  where player_profile_id=player_id;
+
+  owned:=private.cozy_owned_quantity(player_id,seed_item_id);
+  if owned>0 then
+    perform private.cozy_remove_item(player_id,seed_item_id,owned,'system_refund',
+      'phase12a-fixture-clear','phase12a-fixture-clear-0001','phase12a:starter:clear:1');
+  end if;
+
+  with filled as (
+    insert into public.player_inventory_stacks(player_profile_id,item_definition_id,slot_index,quantity)
+    select player_id,filler_item_id,candidate,1
+    from generate_series(1,(select capacity from public.player_inventory_state
+      where player_profile_id=player_id)) candidate
+    where not exists (select 1 from public.player_inventory_stacks occupied
+      where occupied.player_profile_id=player_id and occupied.slot_index=candidate)
+    returning id
+  )
+  select coalesce(array_agg(id),'{}') into filler_stack_ids from filled;
+  insert into public.player_experience_recovery_queue(
+    player_profile_id,onboarding_version_id,reason_code,expected_state_revision,
+    request_id,idempotency_key_hash
+  ) values(player_id,onboarding_version,'starter_seed_missing',state_rev,
+    'phase12a:starter:recovery:1',
+    encode(extensions.digest(convert_to('phase12a-starter-recovery-1','UTF8'),'sha256'),'hex'))
+  returning id into recovery_full_id;
+  result:=public.reconcile_phase12a_player_experience(10,'phase12a:worker:starter:1');
+  perform pg_temp.phase12a_assert(
+    result->>'status'='completed' and (result->>'processed')::integer=1
+      and (result->>'resolved')::integer=0 and (result->>'investigationRequired')::integer=1
+      and (select status='investigation_required'
+        and evidence->>'resolution'='inventory_capacity_or_canonical_grant_failed'
+        from public.player_experience_recovery_queue where id=recovery_full_id)
+      and not exists (select 1 from public.player_inventory_history
+        where player_profile_id=player_id and reason='starter_grant'
+          and reference_id like 'onboarding_recovery:%'),
+    'a full inventory fails the starter recovery grant into investigation without a partial mutation'
+  );
+  delete from public.player_inventory_stacks where id=any(filler_stack_ids);
+
+  insert into public.player_experience_recovery_queue(
+    player_profile_id,onboarding_version_id,reason_code,expected_state_revision,
+    request_id,idempotency_key_hash
+  ) values(player_id,onboarding_version,'starter_seed_missing',state_rev,
+    'phase12a:starter:recovery:2',
+    encode(extensions.digest(convert_to('phase12a-starter-recovery-2','UTF8'),'sha256'),'hex'))
+  returning id into recovery_grant_id;
+  result:=public.reconcile_phase12a_player_experience(10,repeat('r',128));
+  perform pg_temp.phase12a_assert(
+    result->>'status'='completed' and (result->>'processed')::integer=1
+      and (result->>'resolved')::integer=1
+      and (select status='resolved' and evidence->>'resolution'='one_moonbean_seed_granted'
+        from public.player_experience_recovery_queue where id=recovery_grant_id)
+      and private.cozy_owned_quantity(player_id,seed_item_id)=1
+      and (select count(*)=1 from public.player_inventory_history
+        where player_profile_id=player_id and reason='starter_grant'
+          and reference_id='onboarding_recovery:'||recovery_grant_id::text
+          and delta=1
+          and idempotency_key='phase12a-recovery:'||recovery_grant_id::text
+          and request_id='phase12a-recovery:'||encode(extensions.digest(convert_to(
+            repeat('r',128)||':recovery:'||recovery_grant_id::text,'UTF8'
+          ),'sha256'),'hex')
+          and char_length(request_id)<=128)
+      and exists (select 1 from public.player_experience_owner_events
+        where player_profile_id=player_id and event_key='recovery_resolved'
+          and related_entity_id=recovery_grant_id),
+    'the repaired caller safely grants one audited seed with a full-length 128-character request id'
+  );
+
+  insert into public.player_experience_recovery_queue(
+    player_profile_id,onboarding_version_id,reason_code,expected_state_revision,
+    request_id,idempotency_key_hash
+  ) values(player_id,onboarding_version,'starter_seed_missing',state_rev,
+    'phase12a:starter:recovery:3',
+    encode(extensions.digest(convert_to('phase12a-starter-recovery-3','UTF8'),'sha256'),'hex'))
+  returning id into recovery_owned_id;
+  result:=public.reconcile_phase12a_player_experience(10,'phase12a:worker:starter:3');
+  perform pg_temp.phase12a_assert(
+    (select status='resolved' and evidence->>'resolution'='eligible_seed_already_owned'
+      from public.player_experience_recovery_queue where id=recovery_owned_id)
+      and private.cozy_owned_quantity(player_id,seed_item_id)=1
+      and (select count(*)=1 from public.player_inventory_history
+        where player_profile_id=player_id and reason='starter_grant'
+          and reference_id like 'onboarding_recovery:%'),
+    'an already-owned starter seed resolves without a duplicate grant'
+  );
+
+  perform private.cozy_remove_item(player_id,seed_item_id,1,'system_refund',
+    'phase12a-fixture-clear','phase12a-fixture-clear-0002','phase12a:starter:clear:2');
+  insert into public.player_experience_recovery_queue(
+    player_profile_id,onboarding_version_id,reason_code,expected_state_revision,
+    request_id,idempotency_key_hash
+  ) values(player_id,onboarding_version,'starter_seed_missing',state_rev,
+    'phase12a:starter:recovery:4',
+    encode(extensions.digest(convert_to('phase12a-starter-recovery-4','UTF8'),'sha256'),'hex'))
+  returning id into recovery_used_id;
+  result:=public.reconcile_phase12a_player_experience(10,'phase12a:worker:starter:4');
+  perform pg_temp.phase12a_assert(
+    (select status='rejected' and evidence->>'resolution'='recovery_grant_already_used'
+      from public.player_experience_recovery_queue where id=recovery_used_id)
+      and private.cozy_owned_quantity(player_id,seed_item_id)=0
+      and (select count(*)=1 from public.player_inventory_history
+        where player_profile_id=player_id and reason='starter_grant'
+          and reference_id like 'onboarding_recovery:%'),
+    'a spent recovery grant is rejected instead of re-granted'
+  );
+
+  begin
+    perform private.cozy_add_item(player_id,seed_item_id,2,'starter_grant',
+      'onboarding_recovery','fixture-recovery-quantity','phase12a-wrapper-key-0001',
+      'phase12a:wrapper:0001');
+    raise exception 'PHASE12A_ASSERTION_FAILED: recovery overload accepted a bulk quantity';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform private.cozy_add_item(player_id,seed_item_id,1,'shop_purchase',
+      'onboarding_recovery','fixture-recovery-reason','phase12a-wrapper-key-0002',
+      'phase12a:wrapper:0002');
+    raise exception 'PHASE12A_ASSERTION_FAILED: recovery overload accepted a foreign reason';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform private.cozy_add_item(player_id,seed_item_id,1,'starter_grant',
+      'arbitrary_reference','fixture-recovery-reference','phase12a-wrapper-key-0003',
+      'phase12a:wrapper:0003');
+    raise exception 'PHASE12A_ASSERTION_FAILED: recovery overload accepted a foreign reference';
+  exception when invalid_parameter_value then null;
+  end;
+  begin
+    perform private.cozy_add_item(player_id,seed_item_id,1,'starter_grant',
+      'onboarding_recovery',recovery_grant_id::text,
+      'phase12a-recovery:'||recovery_grant_id::text,
+      'phase12a:wrapper:replay:recovery:'||recovery_grant_id::text);
+    raise exception 'PHASE12A_ASSERTION_FAILED: recovery overload replayed a settled idempotency key';
+  exception when unique_violation then null;
+  end;
+  perform pg_temp.phase12a_assert(
+    private.cozy_owned_quantity(player_id,seed_item_id)=0
+      and (select count(*)=1 from public.player_inventory_history
+        where player_profile_id=player_id and reason='starter_grant'
+          and reference_id like 'onboarding_recovery:%'),
+    'rejected and replayed recovery calls leave no partial inventory or ledger evidence'
   );
 end;
 $$;

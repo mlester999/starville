@@ -9,6 +9,7 @@ import {
   trackProgressionQuest,
   updateProgressionIdentity,
 } from '../app/progression-client';
+import { GameModalPortal } from './game-ui';
 
 type Tab = 'overview' | 'skills' | 'quests' | 'achievements' | 'titles';
 
@@ -404,12 +405,14 @@ export function ProgressionPanel({
   onClose,
   onLevelChange,
   onWorkspaceChange,
+  portal = false,
 }: {
   readonly apiUrl: string;
   readonly open: boolean;
   readonly onClose: () => void;
   readonly onLevelChange?: (level: number) => void;
   readonly onWorkspaceChange?: (workspace: ProgressionWorkspace) => void;
+  readonly portal?: boolean;
 }) {
   const [workspace, setWorkspace] = useState<ProgressionWorkspace>();
   const [busy, setBusy] = useState(false);
@@ -484,63 +487,65 @@ export function ProgressionPanel({
 
   const selectedBadge = workspace?.badges.find((badge) => badge.selected)?.badgeId ?? null;
   return (
-    <div className="game-modal-backdrop progression-modal" role="presentation">
-      <section
-        aria-labelledby="progression-title"
-        aria-modal="true"
-        className="game-modal game-modal--wide"
-        role="dialog"
-      >
-        <header className="game-modal__header">
-          <div>
-            <p className="game-kicker">Authoritative progression</p>
-            <h2 id="progression-title">My Starville Journey</h2>
-            <p>
-              Skills, chapters, achievements, unlocks, and rewards are restored from the village
-              server.
-            </p>
+    <GameModalPortal portal={portal} onClose={onClose}>
+      <div className="game-modal-backdrop progression-modal" role="presentation">
+        <section
+          aria-labelledby="progression-title"
+          aria-modal="true"
+          className="game-modal game-modal--wide"
+          role="dialog"
+        >
+          <header className="game-modal__header">
+            <div>
+              <p className="game-kicker">Authoritative progression</p>
+              <h2 id="progression-title">My Starville Journey</h2>
+              <p>
+                Skills, chapters, achievements, unlocks, and rewards are restored from the village
+                server.
+              </p>
+            </div>
+            <button autoFocus type="button" onClick={onClose}>
+              Close
+            </button>
+          </header>
+          <div aria-live="polite" className="progression-notifications">
+            {notifications.join(' · ')}
           </div>
-          <button autoFocus type="button" onClick={onClose}>
-            Close
-          </button>
-        </header>
-        <div aria-live="polite" className="progression-notifications">
-          {notifications.join(' · ')}
-        </div>
-        <div className="game-modal__body">
-          {error === undefined ? null : <p role="alert">{error}</p>}
-          {workspace === undefined ? (
-            <p role="status">Gathering your journey…</p>
-          ) : (
-            <ProgressionWorkspaceView
-              busy={busy}
-              workspace={workspace}
-              onAccept={(questId, configurationRevision) =>
-                void mutate(() => acceptProgressionQuest(apiUrl, questId, configurationRevision))
-              }
-              onComplete={(questId, revision) =>
-                void mutate(() => completeProgressionQuest(apiUrl, questId, revision))
-              }
-              onEquipTitle={(titleId) =>
-                void mutate(() =>
-                  updateProgressionIdentity(
-                    apiUrl,
-                    titleId,
-                    selectedBadge,
-                    workspace.preferencesRevision,
-                  ),
-                )
-              }
-              onRetryReward={(rewardId, revision) =>
-                void mutate(() => retryProgressionReward(apiUrl, rewardId, revision))
-              }
-              onTrack={(questId, tracked, revision) =>
-                void mutate(() => trackProgressionQuest(apiUrl, questId, tracked, revision))
-              }
-            />
-          )}
-        </div>
-      </section>
-    </div>
+          <div className="game-modal__body">
+            {error === undefined ? null : <p role="alert">{error}</p>}
+            {workspace === undefined ? (
+              <p role="status">Gathering your journey…</p>
+            ) : (
+              <ProgressionWorkspaceView
+                busy={busy}
+                workspace={workspace}
+                onAccept={(questId, configurationRevision) =>
+                  void mutate(() => acceptProgressionQuest(apiUrl, questId, configurationRevision))
+                }
+                onComplete={(questId, revision) =>
+                  void mutate(() => completeProgressionQuest(apiUrl, questId, revision))
+                }
+                onEquipTitle={(titleId) =>
+                  void mutate(() =>
+                    updateProgressionIdentity(
+                      apiUrl,
+                      titleId,
+                      selectedBadge,
+                      workspace.preferencesRevision,
+                    ),
+                  )
+                }
+                onRetryReward={(rewardId, revision) =>
+                  void mutate(() => retryProgressionReward(apiUrl, rewardId, revision))
+                }
+                onTrack={(questId, tracked, revision) =>
+                  void mutate(() => trackProgressionQuest(apiUrl, questId, tracked, revision))
+                }
+              />
+            )}
+          </div>
+        </section>
+      </div>
+    </GameModalPortal>
   );
 }

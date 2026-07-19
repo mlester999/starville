@@ -6,6 +6,7 @@ import {
   type PropsWithChildren,
   type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 
 const FOCUSABLE =
   'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
@@ -19,6 +20,97 @@ interface GameModalShellProps extends PropsWithChildren {
   readonly onClose: () => void;
   readonly closeLabel?: string;
   readonly className?: string;
+  readonly closeOnBackdrop?: boolean;
+  readonly portal?: boolean;
+}
+
+const STARVILLE_MODAL_ROOT_ID = 'starville-modal-root';
+let activeBodyLocks = 0;
+let bodyOverflowBeforeModal = '';
+
+function modalRoot(): HTMLElement {
+  const existing = document.getElementById(STARVILLE_MODAL_ROOT_ID);
+  if (existing !== null) return existing;
+  const root = document.createElement('div');
+  root.id = STARVILLE_MODAL_ROOT_ID;
+  root.dataset['starvilleLayer'] = 'modal';
+  document.body.append(root);
+  return root;
+}
+
+function useBodyScrollLock(active: boolean): void {
+  useEffect(() => {
+    if (!active) return;
+    if (activeBodyLocks === 0) {
+      bodyOverflowBeforeModal = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+    }
+    activeBodyLocks += 1;
+    return () => {
+      activeBodyLocks = Math.max(0, activeBodyLocks - 1);
+      if (activeBodyLocks === 0) document.body.style.overflow = bodyOverflowBeforeModal;
+    };
+  }, [active]);
+}
+
+export function GameModalPortal({
+  children,
+  onClose,
+  portal = false,
+}: PropsWithChildren<{
+  readonly onClose?: () => void;
+  readonly portal?: boolean;
+}>) {
+  const layerRef = useRef<HTMLDivElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useBodyScrollLock(true);
+
+  useEffect(() => {
+    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = layerRef.current?.querySelector<HTMLElement>('[role="dialog"]') ?? null;
+    const previousTabIndex = dialog?.getAttribute('tabindex') ?? null;
+    if (dialog !== null && previousTabIndex === null) dialog.tabIndex = -1;
+    dialog?.focus({ preventScroll: true });
+
+    function keyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && onCloseRef.current !== undefined) {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== 'Tab' || dialog === null) return;
+      const focusable = [...dialog.querySelectorAll<HTMLElement>(FOCUSABLE)];
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (first === undefined || last === undefined) return;
+      if (document.activeElement === dialog) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    }
+
+    window.addEventListener('keydown', keyDown, true);
+    return () => {
+      window.removeEventListener('keydown', keyDown, true);
+      if (dialog !== null && previousTabIndex === null) dialog.removeAttribute('tabindex');
+      previous?.focus({ preventScroll: true });
+    };
+  }, []);
+
+  const layer = (
+    <div ref={layerRef} className="game-modal-portal-layer">
+      {children}
+    </div>
+  );
+  return portal ? createPortal(layer, modalRoot()) : layer;
 }
 
 export function GameModalShell({
@@ -31,11 +123,14 @@ export function GameModalShell({
   onClose,
   closeLabel = 'Close panel',
   className = '',
+  closeOnBackdrop = false,
+  portal = false,
 }: GameModalShellProps) {
   const titleId = useId();
   const panelRef = useRef<HTMLElement>(null);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  useBodyScrollLock(true);
 
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -73,8 +168,14 @@ export function GameModalShell({
     };
   }, []);
 
-  return (
-    <div className="game-modal-backdrop" role="presentation">
+  const modal = (
+    <div
+      className="game-modal-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (closeOnBackdrop && event.target === event.currentTarget) onClose();
+      }}
+    >
       <section
         ref={panelRef}
         aria-labelledby={titleId}
@@ -103,6 +204,7 @@ export function GameModalShell({
       </section>
     </div>
   );
+  return portal ? createPortal(modal, modalRoot()) : modal;
 }
 
 interface GameButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

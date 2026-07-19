@@ -113,6 +113,16 @@ describe('world editor shell and presentation', () => {
     expect(editor).toContain('validation-focus');
     expect(editor).toContain('setValidationExpandedPersist');
     expect(editor).toContain('data-validation-expanded');
+    expect(editor).toContain('analyzeAdminWorldVisualReadiness');
+    expect(editor).toContain('Shared visual-policy advisory');
+    expect(editor).toContain('findings never save, validate, publish');
+    expect(editor).toContain(
+      'href={`/worlds/visual-readiness?mapId=${props.draft.map.id}&version=${currentVersionId}`}',
+    );
+    expect(editor).toContain('data-visual-severity');
+    expect(editor).toContain('Advisory error');
+    expect(editor).toContain('visualReadiness.counts.warning');
+    expect(styles).toContain('.world-visual-advisories');
   });
 
   it('makes Layers and Inspector independently scrollable with always-visible custom scrollbars', () => {

@@ -7449,6 +7449,11 @@
     "total": 335
   },
   "fallbackKey": "system.missing-asset",
+  "finalArtHonesty": {
+    "automatedValidationIsNotFinalApproval": true,
+    "candidateManifest": false,
+    "ownerReviewRequired": true
+  },
   "gameplayCatalogReferences": [
     {
       "key": "cottage-amber",
@@ -7758,6 +7763,9 @@
   "manifestVersion": "1.0.0",
   "missingGameplayCatalogReferences": [],
   "pipelineVersion": "1.0.0",
+  "qualityClassificationCounts": {
+    "technical_baseline": 106
+  },
   "qualityStatus": "technical_baseline",
   "schemaVersion": 1,
   "variantCount": 19

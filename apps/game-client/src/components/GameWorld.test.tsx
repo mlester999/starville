@@ -166,6 +166,13 @@ describe('GameWorld controls and settings boundary', () => {
     expect(container.textContent).toContain('Shift');
     expect(container.textContent).toContain('Interact');
     expect(container.textContent).not.toMatch(/[↑↓←→]/u);
+    expect(container.querySelector('.game-hud-region--top-left')).not.toBeNull();
+    expect(container.querySelector('[data-hud-region="bottom-left"]')).not.toBeNull();
+    expect(container.querySelector('[data-hud-region="bottom-center"]')).not.toBeNull();
+    expect(container.querySelector('[data-hud-region="bottom-right"]')).not.toBeNull();
+    expect(
+      (canvasCapture.props as { readonly avatarRendererMode?: string }).avatarRendererMode,
+    ).toBe('published_v1');
     expect(
       container
         .querySelector('[data-testid="game-canvas-boundary"]')
@@ -186,12 +193,97 @@ describe('GameWorld controls and settings boundary', () => {
     expect(container.querySelectorAll('.social-graph-launcher')).toHaveLength(0);
     expect(container.querySelectorAll('.activity-launcher')).toHaveLength(0);
     await act(async () => settings?.click());
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('#starville-modal-root [role="dialog"]')?.textContent).toContain(
+      'Settings',
+    );
     expect(
       container
         .querySelector('[data-testid="game-canvas-boundary"]')
         ?.getAttribute('data-input-blocked'),
     ).toBe('true');
+  });
+
+  it('opens notice-board content in the portalled modal layer above the blurred world', async () => {
+    await act(async () => {
+      root.render(
+        <GameWorld
+          access={{
+            access: 'granted',
+            walletAddress: '11111111111111111111111111111111',
+            network: 'solana:mainnet-beta',
+            symbol: 'STAR',
+            requiredAmount: '1000',
+            observedAmount: '1000',
+            expiresAt: '2099-07-11T05:00:00.000Z',
+          }}
+          apiUrl="http://localhost:4000"
+          landingUrl="http://localhost:3000"
+          onAccessInvalid={vi.fn()}
+          onLeaveVillage={vi.fn(async () => undefined)}
+          onRecheck={vi.fn(async () => undefined)}
+          profile={{
+            id: '11111111-1111-4111-8111-111111111111',
+            displayName: 'Luna Vale',
+            appearancePreset: 'moss',
+            mapId: 'lantern-square',
+            mapVersionId: null,
+            x: 12,
+            y: 7.5,
+            facingDirection: 'south',
+            gameStateVersion: 1,
+            stateVersion: 1,
+            lastTransitionAt: null,
+            createdAt: '2026-07-11T04:00:00.000Z',
+            updatedAt: '2026-07-11T04:00:00.000Z',
+            lastEnteredAt: '2026-07-11T04:00:00.000Z',
+          }}
+          rechecking={false}
+        />,
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+
+    const canvasProps = canvasCapture.props as {
+      readonly inputBlocked: boolean;
+      readonly onInteractionOpen: (interaction: {
+        readonly id: string;
+        readonly type: 'notice';
+        readonly title: string;
+        readonly content: string;
+        readonly x: number;
+        readonly y: number;
+        readonly range: number;
+      }) => void;
+    };
+    await act(async () =>
+      canvasProps.onInteractionOpen({
+        id: 'lantern-board',
+        type: 'notice',
+        title: 'Lantern Square Notice',
+        content: 'Market day begins at first light.',
+        x: 12,
+        y: 8,
+        range: 2,
+      }),
+    );
+    const modalRoot = document.getElementById('starville-modal-root');
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(modalRoot?.querySelector('[role="dialog"]')?.textContent).toContain(
+      'Market day begins at first light.',
+    );
+    expect(
+      container.querySelector('.world-frame')?.classList.contains('world-frame--modal-open'),
+    ).toBe(true);
+    expect(
+      container
+        .querySelector('[data-testid="game-canvas-boundary"]')
+        ?.getAttribute('data-input-blocked'),
+    ).toBe('true');
+    await act(async () =>
+      document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })),
+    );
+    expect(modalRoot?.querySelector('[role="dialog"]')).toBeNull();
   });
 
   it('keeps the trusted world visible when a focus-driven parent refresh changes callbacks', async () => {
@@ -454,7 +546,8 @@ describe('GameWorld controls and settings boundary', () => {
       });
     });
 
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain(
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.querySelector('#starville-modal-root [role="dialog"]')?.textContent).toContain(
       'Lantern General Store',
     );
     expect(

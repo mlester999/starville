@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { isGameplayInputAllowed, isTextEntryElement } from './focus';
 import { isJogging, readMovementInput, type MovementKeyState } from './movement-key-state';
+import { mergeMovementInput, touchMovementForDirections } from './touch-movement';
 
 function key(isDown: boolean) {
   return { isDown };
@@ -35,6 +36,17 @@ describe('gameplay key mapping', () => {
       cursors: { up: key(false), down: key(true), left: key(true), right: key(false) },
     } as unknown as MovementKeyState;
     expect(readMovementInput(keys)).toEqual({ up: true, down: false, left: false, right: true });
+  });
+
+  it('combines simultaneous touch directions with WASD without replacing keyboard input', () => {
+    const touch = touchMovementForDirections(['up', 'right']);
+    expect(touch).toEqual({ up: true, down: false, left: false, right: true });
+    expect(mergeMovementInput({ up: false, down: true, left: true, right: false }, touch)).toEqual({
+      up: true,
+      down: true,
+      left: true,
+      right: true,
+    });
   });
 
   it('enables jogging only while either physical Shift key reports key code 16 down', () => {

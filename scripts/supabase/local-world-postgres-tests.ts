@@ -95,6 +95,9 @@ const migrationFiles = [
   '20260718111000_phase12a_player_experience_functions.sql',
   '20260718112000_phase12a_player_experience_admin_worker.sql',
   '20260718120000_phase12b_world_asset_bundled_lifecycle.sql',
+  '20260718121000_fix_phase12_hosted_validation.sql',
+  '20260718122000_phase12c_world_manifest_object_contract.sql',
+  '20260718123000_phase12d_repository_authored_bundled_registry.sql',
 ] as const;
 
 interface CommandResult {

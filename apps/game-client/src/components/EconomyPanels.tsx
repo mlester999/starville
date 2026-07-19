@@ -397,11 +397,7 @@ export function VillageSupplyShopPanel({
               <article key={offer.offerId} aria-labelledby={titleId}>
                 <div className="cozy-shop-card__art">
                   <span aria-hidden="true">✦</span>
-                  <small>
-                    {item?.assetReadiness === 'approved'
-                      ? 'Artwork preview unavailable'
-                      : 'Development artwork'}
-                  </small>
+                  <small>Artwork preview unavailable</small>
                 </div>
                 <div className="cozy-shop-card__content">
                   <div className="cozy-shop-card__title">

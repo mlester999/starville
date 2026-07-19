@@ -7,6 +7,7 @@ import {
   RealtimeConnection,
   type RealtimeViewState,
 } from './realtime-client';
+import { runtimeDevelopmentMetrics } from './development-performance';
 
 export function useRealtimePresence(options: {
   readonly apiUrl: string;
@@ -41,9 +42,11 @@ export function useRealtimePresence(options: {
     const reconcile = () => realtime.reconcileVisibility();
     window.addEventListener('focus', reconcile);
     document.addEventListener('visibilitychange', reconcile);
+    runtimeDevelopmentMetrics.adjustGauge('activeListeners', 2);
     return () => {
       window.removeEventListener('focus', reconcile);
       document.removeEventListener('visibilitychange', reconcile);
+      runtimeDevelopmentMetrics.adjustGauge('activeListeners', -2);
       realtime.dispose();
       if (connection.current === realtime) connection.current = undefined;
     };
@@ -65,7 +68,7 @@ export function useRealtimePresence(options: {
   const switchChannel = useCallback((channelId: string) => {
     connection.current?.switchChannel(channelId);
   }, []);
-  const reconcile = useCallback(() => connection.current?.reconcileVisibility(), []);
+  const reconcile = useCallback(() => connection.current?.retryNow(), []);
   const refreshAppearance = useCallback(() => connection.current?.refreshAppearance(), []);
   const activateEmote = useCallback(
     (emoteKey: string) => connection.current?.activateEmote(emoteKey),

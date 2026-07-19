@@ -12,9 +12,9 @@ import sharp from 'sharp';
 
 import {
   ASSET_BUDGETS,
-  ASSET_OUTPUT_PATHS,
-  ASSET_PIPELINE_VERSION,
   REQUIRED_GAMEPLAY_ASSET_KEYS,
+  assetOutputPathsFor,
+  assetPipelineVersionFor,
 } from './constants';
 import {
   fileSize,
@@ -149,7 +149,10 @@ export async function generateManifestOutput(
 ): Promise<PipelineResult> {
   const parsed = bundledAssetManifestSchema.parse(manifest);
   const write = await writeFileIfChanged(
-    resolveAssetFilesystemPath(workspaceRoot, ASSET_OUTPUT_PATHS.manifest),
+    resolveAssetFilesystemPath(
+      workspaceRoot,
+      assetOutputPathsFor(manifest.manifestVersion).manifest,
+    ),
     await formattedJson(parsed),
   );
   return summarizeWrites([write]);
@@ -162,7 +165,7 @@ export function buildCoverageReport(
   const catalog = new Set(manifest.assets.map(({ key }) => key));
   return {
     schemaVersion: 1,
-    pipelineVersion: ASSET_PIPELINE_VERSION,
+    pipelineVersion: assetPipelineVersionFor(manifest.manifestVersion),
     manifestVersion: manifest.manifestVersion,
     assetCount: manifest.assets.length,
     variantCount: manifest.assets.reduce((total, asset) => total + asset.variants.length, 0),
@@ -247,7 +250,18 @@ export function buildCoverageReport(
       criticalGroups: asset.criticalGroups,
     })),
     fallbackKey: 'system.missing-asset',
-    qualityStatus: 'technical_baseline',
+    qualityStatus:
+      new Set(manifest.assets.map(({ qualityStatus }) => qualityStatus)).size === 1
+        ? manifest.assets[0]?.qualityStatus
+        : 'mixed',
+    qualityClassificationCounts: countBy(manifest.assets, ({ qualityStatus }) => qualityStatus),
+    finalArtHonesty: {
+      ownerReviewRequired: true,
+      automatedValidationIsNotFinalApproval: true,
+      candidateManifest: manifest.assets.some(
+        ({ qualityStatus }) => qualityStatus === 'production_candidate',
+      ),
+    },
   };
 }
 
@@ -281,7 +295,7 @@ export async function buildSizeReport(
   );
   return {
     schemaVersion: 1,
-    pipelineVersion: ASSET_PIPELINE_VERSION,
+    pipelineVersion: assetPipelineVersionFor(manifest.manifestVersion),
     manifestVersion: manifest.manifestVersion,
     totalBytes,
     totalBudgetBytes: ASSET_BUDGETS.totalBytes,
@@ -323,12 +337,13 @@ export async function generateCoverageOutputs(
   workspaceRoot: string,
   manifest: BundledAssetManifest = STARVILLE_BUNDLED_ASSET_MANIFEST,
 ): Promise<PipelineResult> {
+  const outputPaths = assetOutputPathsFor(manifest.manifestVersion);
   const coverage = await writeFileIfChanged(
-    resolveAssetFilesystemPath(workspaceRoot, ASSET_OUTPUT_PATHS.coverage),
+    resolveAssetFilesystemPath(workspaceRoot, outputPaths.coverage),
     await formattedJson(buildCoverageReport(manifest)),
   );
   const sizes = await writeFileIfChanged(
-    resolveAssetFilesystemPath(workspaceRoot, ASSET_OUTPUT_PATHS.sizes),
+    resolveAssetFilesystemPath(workspaceRoot, outputPaths.sizes),
     await formattedJson(await buildSizeReport(workspaceRoot, manifest)),
   );
   return summarizeWrites([coverage, sizes]);

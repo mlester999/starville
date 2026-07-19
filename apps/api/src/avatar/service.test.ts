@@ -140,7 +140,7 @@ function catalog(items: unknown[]) {
   };
 }
 
-function catalogItem(type: string) {
+function catalogItem(type: string, animations: readonly unknown[] = []) {
   return {
     key: `${type}-one`,
     type,
@@ -158,9 +158,37 @@ function catalogItem(type: string) {
     previewScale: 1,
     castsShadow: false,
     assets: [],
-    animations: [],
+    animations,
     compatibleBodyPresetKeys: ['moss'],
   };
+}
+
+function canonicalCatalogAnimations() {
+  const states = ['idle', 'walk', 'jog'] as const;
+  const directions = [
+    'north',
+    'northeast',
+    'east',
+    'southeast',
+    'south',
+    'southwest',
+    'west',
+    'northwest',
+  ] as const;
+  return states.flatMap((state, stateIndex) =>
+    directions.map((direction, directionIndex) => {
+      const firstFrame = (stateIndex * directions.length + directionIndex) * 4;
+      return {
+        direction,
+        state,
+        frames: [firstFrame, firstFrame + 1, firstFrame + 2, firstFrame + 3],
+        frameDurationMs: state === 'idle' ? 360 : state === 'walk' ? 120 : 80,
+        loop: true,
+        offsetX: 0,
+        offsetY: 0,
+      };
+    }),
+  );
 }
 
 describe('avatar service authority', () => {
@@ -174,7 +202,7 @@ describe('avatar service authority', () => {
       'bottom',
       'footwear',
       'accessory',
-    ].map(catalogItem);
+    ].map((type) => catalogItem(type));
     const complete = createAvatarService({
       gateway: gateway({ getCatalog: vi.fn(async () => catalog(completeItems)) }),
       logger: new SilentLogger(),
@@ -192,6 +220,29 @@ describe('avatar service authority', () => {
     expect(unavailable.settings.customizationEnabled).toBe(false);
     expect(unavailable.options.hair).toEqual([]);
     expect(JSON.stringify(unavailable)).not.toContain('meadow-frame');
+  });
+
+  it('accepts a real non-empty canonical 24-mapping avatar catalog', async () => {
+    const animations = canonicalCatalogAnimations();
+    expect(animations).toHaveLength(24);
+    expect(new Set(animations.map(({ direction, state }) => `${state}:${direction}`)).size).toBe(
+      24,
+    );
+    const completeItems = [
+      catalogItem('face', animations),
+      ...['eyes', 'eyebrows', 'hair', 'top', 'bottom', 'footwear', 'accessory'].map((type) =>
+        catalogItem(type),
+      ),
+    ];
+    const service = createAvatarService({
+      gateway: gateway({ getCatalog: vi.fn(async () => catalog(completeItems)) }),
+      logger: new SilentLogger(),
+    });
+
+    await expect(service.getCatalog(context)).resolves.toMatchObject({
+      settings: { customizationEnabled: true },
+      options: { face: [{ key: 'face-one' }] },
+    });
   });
 
   it('returns no creator profile for a revision-zero shell', async () => {

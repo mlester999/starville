@@ -1,10 +1,27 @@
+import type { BundledManifestVersion } from '@starville/asset-management';
+
 export const ASSET_PIPELINE_VERSION = '1.0.0' as const;
+export const PHASE12D_ASSET_PIPELINE_VERSION = '2.0.0' as const;
 
 export const ASSET_OUTPUT_PATHS = Object.freeze({
   manifest: 'assets/manifests/starville-bundled-v1.json',
   coverage: 'assets/reports/starville-bundled-coverage.json',
   sizes: 'assets/reports/starville-bundled-sizes.json',
 });
+
+export const PHASE12D_ASSET_OUTPUT_PATHS = Object.freeze({
+  manifest: 'assets/manifests/starville-bundled-v2-candidate.json',
+  coverage: 'assets/reports/starville-phase12d-candidate-coverage.json',
+  sizes: 'assets/reports/starville-phase12d-candidate-sizes.json',
+});
+
+export function assetOutputPathsFor(manifestVersion: BundledManifestVersion) {
+  return manifestVersion === '2.0.0' ? PHASE12D_ASSET_OUTPUT_PATHS : ASSET_OUTPUT_PATHS;
+}
+
+export function assetPipelineVersionFor(manifestVersion: BundledManifestVersion) {
+  return manifestVersion === '2.0.0' ? PHASE12D_ASSET_PIPELINE_VERSION : ASSET_PIPELINE_VERSION;
+}
 
 export const ASSET_BUDGETS = Object.freeze({
   sourceBytes: 256 * 1024,

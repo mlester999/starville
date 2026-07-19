@@ -2,14 +2,18 @@ import type { MapId, MapManifest, PlayerStateUpdate } from '@starville/game-core
 import type {
   AssetCollisionProfile,
   AssetRotation,
+  BundledManifestVersion,
   WorldAssetDelivery,
+  WorldAssetMaterialClass,
 } from '@starville/asset-management';
 
 export interface PinnedWorldAssetMaterial {
   readonly assetKey: string;
   readonly versionId: string;
   readonly checksumSha256: string;
-  readonly bundledManifestVersion: '1.0.0' | null;
+  /** Missing only on legacy hosted v1/uploaded payloads. */
+  readonly materialClass?: WorldAssetMaterialClass | undefined;
+  readonly bundledManifestVersion: BundledManifestVersion | null;
   readonly mediaType: 'image/webp' | null;
   readonly width: number | null;
   readonly height: number | null;
@@ -27,7 +31,7 @@ export interface PinnedWorldAssetMaterial {
   readonly defaultRotation: AssetRotation;
   readonly developmentMarker: boolean;
   readonly delivery: Readonly<{ bucket: 'game-assets'; objectPath: string }> | null;
-  readonly fallback: 'repository_procedural' | null;
+  readonly fallback: 'repository_procedural' | 'repository_authored' | null;
 }
 
 export interface PublishedWorldMap {

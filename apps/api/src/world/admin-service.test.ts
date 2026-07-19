@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { getWorldManifest } from '@starville/game-content';
+import { terrainAssetDependencyKeys } from '@starville/game-core';
 
 import type { LogContext, ServiceLogger } from '../contracts.js';
 import type { AdminWorldGateway } from './admin-contracts.js';
@@ -300,6 +301,9 @@ describe('administrator world service', () => {
         p_expected_edit_version: 1,
         p_expected_checksum: checksum,
         p_rate_limit: 30,
+        p_manifest: expect.objectContaining({
+          assets: expect.arrayContaining([...terrainAssetDependencyKeys(manifest)]),
+        }),
       }),
     );
 

@@ -1,0 +1,336 @@
+.page {
+  gap: 1.5rem;
+}
+
+.boundary,
+.progressCard,
+.fixtureCard,
+.revisionHeading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.boundary p,
+.progressCard p,
+.fixtureCard p {
+  margin-bottom: 0;
+}
+
+.boundaryActions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
+.progressCard,
+.fixtureCard,
+.revisionCard,
+.revisionEmpty {
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  background:
+    radial-gradient(
+      circle at 92% 8%,
+      color-mix(in srgb, var(--admin-forest) 12%, transparent),
+      transparent 38%
+    ),
+    var(--admin-surface);
+  padding: 1.25rem;
+}
+
+.revisionHeading h2,
+.revisionEmpty h2 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.revisionFacts {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.revisionFacts div {
+  min-width: 0;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+
+.revisionFacts dt {
+  color: var(--admin-text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.revisionFacts dd {
+  overflow-wrap: anywhere;
+  margin: 0.25rem 0 0;
+  font-weight: 700;
+}
+
+.severitySummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.85rem;
+}
+
+.findingList {
+  display: grid;
+  gap: 0.55rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.findingList li {
+  display: grid;
+  grid-template-columns: max-content max-content 1fr;
+  gap: 0.55rem;
+  align-items: start;
+  border-left: 4px solid var(--admin-line);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--admin-nav-bg) 48%, transparent);
+  padding: 0.7rem;
+}
+
+.findingList li[data-visual-severity='error'] {
+  border-left-color: var(--admin-danger);
+}
+
+.findingList li[data-visual-severity='warning'] {
+  border-left-color: var(--admin-warning, #a96f15);
+}
+
+.revisionClear,
+.revisionBoundary {
+  color: var(--admin-text-muted);
+}
+
+.revisionBoundary {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+}
+
+.progressCard h2,
+.fixtureCard h2,
+.sectionHeading h2 {
+  margin: 0.15rem 0 0.35rem;
+}
+
+.progressControl {
+  display: grid;
+  min-width: min(100%, 19rem);
+  grid-template-columns: minmax(8rem, 1fr) auto;
+  align-items: center;
+  gap: 0.55rem 0.75rem;
+}
+
+.progressControl progress {
+  width: 100%;
+  accent-color: var(--admin-forest);
+}
+
+.progressControl :global(.button) {
+  grid-column: 1 / -1;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.8rem;
+}
+
+.modeGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.modeButton {
+  display: grid;
+  min-height: 9.5rem;
+  grid-template-rows: auto 1fr auto;
+  gap: 0.55rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.85rem;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  padding: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.modeButton:hover,
+.modeButton:focus-visible,
+.modeButtonActive {
+  border-color: var(--admin-forest);
+  background: color-mix(in srgb, var(--admin-forest) 9%, var(--admin-surface));
+}
+
+.modeButton:focus-visible {
+  outline: 3px solid var(--admin-focus);
+  outline-offset: 2px;
+}
+
+.modeButton span,
+.modeButton small,
+.checkCard small,
+.screenshotNote {
+  color: var(--admin-text-muted);
+}
+
+.fixtureIdentity {
+  max-width: 47rem;
+}
+
+.fixtureFacts {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1rem 0 0;
+}
+
+.fixtureFacts div {
+  display: grid;
+  grid-template-columns: 9rem 1fr;
+  gap: 0.75rem;
+}
+
+.fixtureFacts dt {
+  color: var(--admin-text-muted);
+  font-weight: 700;
+}
+
+.fixtureFacts dd {
+  margin: 0;
+}
+
+.steps {
+  min-width: min(100%, 24rem);
+  max-width: 30rem;
+  margin: 0;
+  padding: 1rem 1rem 1rem 2.4rem;
+  border-radius: 0.8rem;
+  background: color-mix(in srgb, var(--admin-nav-bg) 62%, transparent);
+}
+
+.steps li + li {
+  margin-top: 0.65rem;
+}
+
+.checkGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.checkCard {
+  display: flex;
+  gap: 0.75rem;
+  min-height: 8rem;
+  border: 1px solid var(--admin-line);
+  border-radius: 0.85rem;
+  background: var(--admin-surface);
+  padding: 0.9rem;
+  cursor: pointer;
+}
+
+.checkCardActive {
+  box-shadow: inset 3px 0 0 var(--admin-forest);
+}
+
+.checkCard input {
+  width: 1.1rem;
+  height: 1.1rem;
+  flex: 0 0 auto;
+  margin-top: 0.15rem;
+  accent-color: var(--admin-forest);
+}
+
+.page :global(.data-table td:first-child input) {
+  width: 2.75rem;
+  height: 2.75rem;
+  accent-color: var(--admin-forest);
+}
+
+.checkCard span {
+  display: grid;
+  align-content: start;
+  gap: 0.4rem;
+}
+
+.checkCard em {
+  width: fit-content;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--admin-forest) 16%, transparent);
+  color: var(--admin-text);
+  padding: 0.15rem 0.45rem;
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 700;
+}
+
+.screenshotNote {
+  margin: 0.8rem 0 0;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 1100px) {
+  .modeGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .checkGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .revisionFacts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .boundary,
+  .progressCard,
+  .fixtureCard,
+  .sectionHeading,
+  .revisionHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .modeGrid,
+  .checkGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .modeButton {
+    min-height: 0;
+  }
+
+  .fixtureFacts div {
+    grid-template-columns: 1fr;
+    gap: 0.2rem;
+  }
+
+  .steps {
+    min-width: 0;
+  }
+
+  .revisionFacts,
+  .findingList li {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modeButton {
+    transition: none;
+  }
+}

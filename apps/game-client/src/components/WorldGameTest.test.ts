@@ -6,6 +6,10 @@ const component = readFileSync(resolve(process.cwd(), 'src/components/WorldGameT
 const app = readFileSync(resolve(process.cwd(), 'src/app/App.tsx'), 'utf8');
 const client = readFileSync(resolve(process.cwd(), 'src/app/game-test-client.ts'), 'utf8');
 const styles = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8');
+const phase12CFixture = readFileSync(
+  resolve(process.cwd(), 'src/components/phase12c-world-game-test-fixture.ts'),
+  'utf8',
+);
 const shopFixture = readFileSync(
   resolve(process.cwd(), 'src/components/GeneralStoreGameTest.tsx'),
   'utf8',
@@ -16,7 +20,7 @@ describe('real game-client World Game Test boundary', () => {
     expect(app).toContain("window.location.pathname === '/preview/world'");
     expect(app).toContain('<WorldGameTest');
     expect(component).toContain('<GameCanvas');
-    expect(component).toContain('runtimeWorld(props.projection)');
+    expect(component).toContain('initialWorld={reviewSource.world}');
     expect(component).toContain('onStateChanged={(state) => setLocalState(state)}');
   });
 
@@ -40,6 +44,56 @@ describe('real game-client World Game Test boundary', () => {
     expect(component).toContain('World transition disabled');
   });
 
+  it('wires deterministic Phase 12C fixtures into production GameCanvas props', () => {
+    expect(component).toContain('createPhase12CWorldGameTestFixture');
+    expect(component).toContain('phase12CGameCanvasVisualSettings');
+    expect(component).toContain('remotePresences={visualReviewFixture.remotePresences}');
+    expect(component).toContain('chatBubbleMessages={visualReviewFixture.chatBubbleMessages}');
+    expect(component).toContain('initialState={visualReviewFixture.localState}');
+    expect(component).toContain('visualSettings={visualSettings}');
+    expect(component).toContain('reducedMotion={reducedMotion}');
+    expect(component).toContain('showRemotePlayerNames={labels}');
+    expect(component).toContain('key={visualReviewFixture.canvasKey}');
+    expect(component).toContain('clock={visualClock}');
+    expect(component).toContain('Date.parse(props.projection.session.createdAt)');
+    expect(component).toContain(
+      'sourceIdentity: `${reviewSource.identity}:${reviewSource.world.versionId}:${reviewSource.world.checksum}`',
+    );
+    expect(component).not.toContain('setBubbleSentAt');
+    expect(component).not.toContain('setInterval(() => setBubbleSentAt');
+    expect(phase12CFixture).toContain('PHASE12C_VISUAL_REVIEW_PLAYER_CAP = 11');
+    expect(phase12CFixture).toContain('PHASE12C_VISUAL_REVIEW_BUBBLE_CAP = 6');
+    expect(phase12CFixture).toContain('isPositionWalkable');
+    expect(phase12CFixture).toContain('PLAYER_FOOT_RADIUS');
+  });
+
+  it('exposes local-only population, depth, quality, effect, and reusable HUD review modes', () => {
+    for (const label of [
+      'One player',
+      'Eleven players',
+      'Behind tree',
+      'In front of tree',
+      'Behind building',
+      'In front of building',
+      'Normal',
+      'Low performance',
+      'Shadows',
+      'Ambience',
+      'Water animation',
+      'Player labels',
+      'Safe chat bubbles',
+      'Reduced motion',
+    ]) {
+      expect(component).toContain(label);
+    }
+    expect(component).toContain('<PlayerStatusDock');
+    expect(component).toContain("dust={{ status: 'unavailable' }}");
+    expect(component).toContain("level={{ status: 'unavailable' }}");
+    expect(component).toContain('its compact');
+    expect(component).toContain('expanded production layouts');
+    expect(component).toContain('Nothing is sent, saved, rewarded, or measured.');
+  });
+
   it('opens an isolated in-memory General Store fixture without persistent mutation clients', () => {
     expect(component).toContain("worldInteraction.id === 'phase7-general-store'");
     expect(component).toContain('<GeneralStoreGameTest');
@@ -57,7 +111,7 @@ describe('real game-client World Game Test boundary', () => {
 
   it('keeps the session revision visible and revalidates revocation or expiry', () => {
     expect(component).toContain('GAME TEST · NO PROGRESSION');
-    expect(component).toContain('Exact draft revision');
+    expect(component).toContain('Exact authorized revision');
     expect(component).toContain('loadWorldGameTestSession(apiUrl)');
     expect(component).toContain('30_000');
     expect(component).toContain('This Game Test session ended safely.');
@@ -88,5 +142,7 @@ describe('real game-client World Game Test boundary', () => {
     expect(styles).toContain('.world-game-test-banner');
     expect(styles).toContain('@media (max-width: 760px)');
     expect(styles).toContain('.world-game-test-debug');
+    expect(styles).toContain('.phase12c-visual-review');
+    expect(styles).toContain('.phase12c-visual-review__toggles');
   });
 });

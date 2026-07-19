@@ -1,5 +1,6 @@
 import type Phaser from 'phaser';
 
+import type { AvatarAnimationState } from '@starville/avatar';
 import {
   depthForFootPosition,
   projectWorld,
@@ -49,9 +50,8 @@ function motionFrame(
 }
 
 /**
- * Foot-anchored modular development renderer. Each visual layer owns an
- * independent Graphics object so an appearance update redraws in place without
- * replacing the Phaser container, its input binding, position, or depth.
+ * Published V1 renderer. Keep this implementation as the normal runtime
+ * default until an owner explicitly activates the Phase 12D candidate.
  */
 export class PlayerRenderer {
   public readonly container: Phaser.GameObjects.Container;
@@ -62,7 +62,8 @@ export class PlayerRenderer {
   private readonly headLayer: Phaser.GameObjects.Graphics;
   private readonly faceLayer: Phaser.GameObjects.Graphics;
   private readonly frontLayer: Phaser.GameObjects.Graphics;
-  private readonly reducedMotion: boolean;
+  private reducedMotion: boolean;
+  private shadowsEnabled = true;
   private style: AvatarFallbackStyle;
   private profile: ResolvedAvatarProfile;
 
@@ -99,6 +100,15 @@ export class PlayerRenderer {
     this.projection = projection;
   }
 
+  public setReducedMotion(reducedMotion: boolean): void {
+    this.reducedMotion = reducedMotion;
+  }
+
+  public setShadowsEnabled(enabled: boolean): void {
+    this.shadowsEnabled = enabled;
+    if (!enabled) this.shadow.clear();
+  }
+
   public setAppearance(profile: ResolvedAvatarProfile): void {
     if (
       profile.appearanceId === this.profile.appearanceId &&
@@ -122,10 +132,11 @@ export class PlayerRenderer {
   public update(
     position: Point,
     facing: FacingDirection,
-    moving: boolean,
+    animationState: AvatarAnimationState,
     time: number,
-    jogging = false,
   ): void {
+    const moving = animationState !== 'idle';
+    const jogging = animationState === 'jog';
     const screen = projectWorld(position, this.projection);
     const motion = motionFrame(time, moving, jogging, this.reducedMotion);
     const facingVector = FACING_VECTOR[facing];
@@ -147,7 +158,9 @@ export class PlayerRenderer {
   }
 
   private drawShadow(moving: boolean): void {
-    this.shadow.clear().fillStyle(WORLD_COLORS.shadow, moving ? 0.3 : 0.25);
+    this.shadow.clear();
+    if (!this.shadowsEnabled) return;
+    this.shadow.fillStyle(WORLD_COLORS.shadow, moving ? 0.3 : 0.25);
     this.shadow.fillEllipse(0, 0, moving ? 39 : 43, moving ? 13 : 15);
   }
 

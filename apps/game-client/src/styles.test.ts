@@ -32,12 +32,68 @@ describe('game modal layering', () => {
     );
   });
 
+  it('portals the landmark modal into a fixed owned layer above the world blur', () => {
+    expect(stylesheet).toContain('#starville-modal-root');
+    expect(stylesheet).toContain('position: fixed');
+    expect(stylesheet).toContain('.game-modal-backdrop > .game-modal');
+    const world = readFileSync(resolve(process.cwd(), 'src/components/GameWorld.tsx'), 'utf8');
+    const modal = readFileSync(
+      resolve(process.cwd(), 'src/components/WorldNoticeModal.tsx'),
+      'utf8',
+    );
+    expect(world).toContain('<WorldNoticeModal');
+    expect(modal).toContain('<GameModalShell');
+    expect(modal).toContain('portal');
+    expect(world).not.toContain('className="dialogue-card"');
+  });
+
   it('keeps the shared cozy panel close action at a 44-pixel touch target', () => {
     const ruleStart = stylesheet.indexOf('.cozy-panel__header > button {');
     const ruleEnd = stylesheet.indexOf('}', ruleStart);
     const rule = stylesheet.slice(ruleStart, ruleEnd);
     expect(rule).toContain('width: 2.75rem');
     expect(rule).toContain('height: 2.75rem');
+  });
+});
+
+describe('Phase 12D coordinated HUD safe regions', () => {
+  it('owns six named regions and shared bottom width reservations', () => {
+    const component = readFileSync(resolve(process.cwd(), 'src/components/GameWorld.tsx'), 'utf8');
+    for (const region of [
+      'top-left',
+      'top-center',
+      'top-right',
+      'bottom-left',
+      'bottom-center',
+      'bottom-right',
+    ]) {
+      expect(component).toContain(region);
+    }
+    expect(stylesheet).toContain('--game-hud-left-width');
+    expect(stylesheet).toContain('--game-hud-right-width');
+    expect(stylesheet).toContain('.game-hud-safe-regions--top');
+    expect(stylesheet).toContain('.game-hud-region-anchor--bottom-center > .cozy-quickbar');
+  });
+
+  it('stacks the player card and guide and reserves separate mobile rows for hotbar, prompt, and chat', () => {
+    expect(stylesheet).toContain('.game-hud-region--top-left');
+    expect(stylesheet).toContain('display: grid');
+    expect(stylesheet).toContain('bottom: calc(14rem + env(safe-area-inset-bottom))');
+    expect(stylesheet).toContain('bottom: calc(18rem + env(safe-area-inset-bottom))');
+  });
+});
+
+describe('mobile world movement controls', () => {
+  it('exposes the real runtime movement pad at phone widths with safe-area and 44px targets', () => {
+    expect(stylesheet).toContain('@media (max-width: 700px)');
+    expect(stylesheet).toContain('.game-touch-movement');
+    expect(stylesheet).toContain('env(safe-area-inset-left)');
+    const ruleStart = stylesheet.indexOf('.game-touch-movement button {');
+    const ruleEnd = stylesheet.indexOf('}', ruleStart);
+    const rule = stylesheet.slice(ruleStart, ruleEnd);
+    expect(rule).toContain('min-width: 2.75rem');
+    expect(rule).toContain('min-height: 2.75rem');
+    expect(rule).toContain('touch-action: none');
   });
 });
 

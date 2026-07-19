@@ -5,6 +5,7 @@ import {
   resolveAssetSource,
   type AssetResolutionContext,
   type AssetRotation,
+  type BundledManifestVersion,
 } from '@starville/asset-management';
 import { useGameplayAssetOverride } from '../app/gameplay-asset-overrides-context';
 
@@ -15,6 +16,7 @@ export interface BundledAssetImageProps {
   readonly rotation?: AssetRotation;
   readonly context?: Extract<AssetResolutionContext, 'gameplay_ui' | 'game_test'>;
   readonly eager?: boolean;
+  readonly bundledManifestVersion?: BundledManifestVersion;
 }
 
 /**
@@ -29,6 +31,7 @@ export function BundledAssetImage({
   rotation = 0,
   context = 'gameplay_ui',
   eager = false,
+  bundledManifestVersion,
 }: BundledAssetImageProps) {
   const override = useGameplayAssetOverride(assetKey);
   const candidate = useMemo(
@@ -47,8 +50,11 @@ export function BundledAssetImage({
         allowActiveOverride: true,
         failedIdentities,
         rotation,
+        ...(bundledManifestVersion === undefined
+          ? {}
+          : { preferredBundledManifestVersion: bundledManifestVersion }),
       }),
-    [assetKey, candidate, context, failedIdentities, rotation],
+    [assetKey, bundledManifestVersion, candidate, context, failedIdentities, rotation],
   );
   const missing = useMemo(
     () =>
@@ -56,8 +62,11 @@ export function BundledAssetImage({
         assetKey: 'system.missing-asset',
         context,
         allowActiveOverride: false,
+        ...(bundledManifestVersion === undefined
+          ? {}
+          : { preferredBundledManifestVersion: bundledManifestVersion }),
       }),
-    [context],
+    [bundledManifestVersion, context],
   );
   const [source, setSource] = useState(resolved.url);
 

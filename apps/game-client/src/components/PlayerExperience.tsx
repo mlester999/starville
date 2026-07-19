@@ -251,32 +251,19 @@ export function PlayerExperience({
   }
 
   return (
-    <>
-      {backgroundWarning ? (
-        <div
-          className="game-soft-status game-soft-status--warning"
-          role="status"
-          aria-live="polite"
-        >
-          <span className="game-soft-status__dot" aria-hidden="true" />
-          <span>
-            Connection interrupted. Your current village view is still available while Starville
-            reconnects.
-          </span>
-        </div>
-      ) : null}
-      <GameWorld
-        access={access}
-        apiUrl={apiUrl}
-        landingUrl={landingUrl}
-        onAccessInvalid={onAccessInvalid}
-        onLeaveVillage={onLeaveVillage}
-        {...(onRegisterMaintenanceFlush === undefined ? {} : { onRegisterMaintenanceFlush })}
-        onRecheck={onRecheck}
-        profile={profile}
-        rechecking={rechecking}
-        realtimeUrl={realtimeUrl}
-      />
-    </>
+    <GameWorld
+      access={access}
+      apiUrl={apiUrl}
+      landingUrl={landingUrl}
+      onAccessInvalid={onAccessInvalid}
+      onLeaveVillage={onLeaveVillage}
+      {...(onRegisterMaintenanceFlush === undefined ? {} : { onRegisterMaintenanceFlush })}
+      onRecheck={onRecheck}
+      profile={profile}
+      profileConnectionWarning={backgroundWarning}
+      onProfileConnectionRetry={() => setRetryVersion((value) => value + 1)}
+      rechecking={rechecking}
+      realtimeUrl={realtimeUrl}
+    />
   );
 }

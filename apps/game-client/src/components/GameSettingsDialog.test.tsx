@@ -40,8 +40,8 @@ describe('GameSettingsDialog', () => {
 
     expect(container.textContent).toContain('Master Volume');
     expect(container.textContent).not.toContain('Music volume');
-    expect(container.textContent).not.toContain('Ambience volume');
-    expect(container.textContent).not.toContain('Sound-effects volume');
+    expect(container.textContent).toContain('Ambience Volume');
+    expect(container.textContent).toContain('Sound Effects Volume');
 
     const end = [...container.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('End Starville Session'),
@@ -80,7 +80,7 @@ describe('GameSettingsDialog', () => {
     expect(onResume).toHaveBeenCalledTimes(1);
   });
 
-  it('exposes functional gameplay and accessibility preferences plus the accurate play guide', async () => {
+  it('exposes functional graphics, gameplay, and accessibility preferences plus the accurate play guide', async () => {
     const onSettingsChange = vi.fn();
     await act(async () => {
       root.render(
@@ -101,14 +101,25 @@ describe('GameSettingsDialog', () => {
           ?.click(),
       );
     };
-    await click('Gameplay');
-    const compact = [...container.querySelectorAll<HTMLInputElement>('input')].find((input) =>
-      input.closest('label')?.textContent?.includes('Compact HUD Mode'),
-    );
-    await act(async () => compact?.click());
+    await click('Graphics');
+    expect(container.textContent).toContain('Ambient Effects');
+    expect(container.textContent).toContain('Water Animation');
+    expect(container.textContent).toContain('Chat Bubbles');
+    expect(container.textContent).toContain('World Labels');
+    await click('High');
     expect(onSettingsChange).toHaveBeenCalledWith(
-      expect.objectContaining({ compactHud: true, version: 2 }),
+      expect.objectContaining({ visualQuality: 'high', version: 4 }),
     );
+    await click('Comfortable');
+    expect(onSettingsChange).toHaveBeenCalledWith(
+      expect.objectContaining({ hudDensity: 'comfortable', version: 4 }),
+    );
+
+    const bubbles = [...container.querySelectorAll<HTMLInputElement>('input')].find((input) =>
+      input.closest('label')?.textContent?.includes('Chat Bubbles'),
+    );
+    await act(async () => bubbles?.click());
+    expect(onSettingsChange).toHaveBeenCalledWith(expect.objectContaining({ chatBubbles: false }));
 
     await click('Accessibility');
     await click('120%');
@@ -138,11 +149,11 @@ describe('GameSettingsDialog', () => {
     await act(async () =>
       audio?.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true })),
     );
-    const gameplay = container.querySelector<HTMLButtonElement>('#settings-tab-gameplay');
-    expect(gameplay?.getAttribute('aria-selected')).toBe('true');
-    expect(document.activeElement).toBe(gameplay);
+    const graphics = container.querySelector<HTMLButtonElement>('#settings-tab-graphics');
+    expect(graphics?.getAttribute('aria-selected')).toBe('true');
+    expect(document.activeElement).toBe(graphics);
     await act(async () =>
-      gameplay?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })),
+      graphics?.dispatchEvent(new KeyboardEvent('keydown', { key: 'End', bubbles: true })),
     );
     expect(container.textContent).toContain('Explore Starville');
     expect(document.activeElement?.id).toBe('settings-tab-how-to-play');
