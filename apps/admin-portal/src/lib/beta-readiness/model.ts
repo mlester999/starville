@@ -17,9 +17,20 @@ export const BETA_READINESS_EVIDENCE_PATHS = {
   phase12dOwnerReview: 'docs/deployment/phase-12d-owner-acceptance.md',
   runtimeHotfixOwnerReview: 'docs/deployment/phase-12d-runtime-hotfix-owner-review.md',
   phase12eValidation: 'docs/deployment/phase-12e-local-validation-report.md',
-  hostedValidationRecord: 'docs/deployment/phase-12e-hosted-validation-report.md',
-  ownerAcceptanceRecord: 'docs/deployment/phase-12e-owner-acceptance.md',
-  productionApprovalRecord: 'docs/deployment/phase-12e-production-readiness.md',
+  phase13bValidation: 'docs/deployment/phase-13b-local-validation-report.md',
+  phase13bSecurityReview: 'docs/security/phase-13b-closed-beta-trust-boundaries.md',
+  phase13bSecurityMigration:
+    'infrastructure/supabase/migrations/20260722130000_phase13b_closed_beta_security_hardening.sql',
+  phase13bSecurityFixture:
+    'packages/database/test/fixtures/phase13b-security-postgres-execution.sql',
+  phase13bOperationalReadiness: 'docs/deployment/phase-13b-operational-readiness.md',
+  phase13aExactlyOnce: 'docs/architecture/phase-13a-gameplay-integration.md',
+  phase13bLoadHarness: 'apps/realtime-server/src/load-test.ts',
+  audioManifest: 'apps/game-client/src/app/release-candidate-audio.ts',
+  audioValidation: 'scripts/validate-release-candidate-audio.ts',
+  hostedValidationRecord: 'docs/deployment/phase-13b-hosted-validation-report.md',
+  ownerAcceptanceRecord: 'docs/deployment/phase-13b-owner-acceptance.md',
+  productionApprovalRecord: 'docs/deployment/phase-13b-production-readiness.md',
   v1Manifest: 'assets/manifests/starville-bundled-v1.json',
   v2Manifest: 'assets/manifests/starville-bundled-v2-candidate.json',
   databasePolicyTests: 'infrastructure/supabase/tests/world_management.test.sql',
@@ -144,13 +155,13 @@ const GATE_POLICIES: readonly GatePolicy[] = [
     id: 'application-health',
     label: 'Application Health',
     summary:
-      'Landing, Game Client, Admin Portal, API, realtime, and worker readiness for the Phase 12E candidate.',
-    localEvidence: ['phase12eValidation'],
+      'Landing, Game Client, Admin Portal, API, realtime, and worker readiness for the Phase 13B closed-beta candidate.',
+    localEvidence: ['phase13bValidation'],
     attestationEvidence: ['hostedValidationRecord'],
     hostedRequired: true,
     responsibleGate: 'Engineering local validation, then owner-controlled hosted health checks',
     nextAction: {
-      local: 'Run the complete Phase 12E local service-health matrix and record the exact results.',
+      local: 'Run the complete Phase 13B local service-health matrix and record the exact results.',
       hosted:
         'Run owner-controlled hosted health and readiness checks after a reviewed deployment.',
       accepted: 'Record production monitoring coverage before declaring production readiness.',
@@ -160,13 +171,13 @@ const GATE_POLICIES: readonly GatePolicy[] = [
     id: 'database-gates',
     label: 'Database Gates',
     summary:
-      'Local migration and seed-contract evidence exists, while the repaired pgTAP suite still needs its owner-controlled hosted rerun.',
-    localEvidence: ['hostedPgtapRepair', 'economyTests'],
+      'The full applied catalog, Phase 13B forward-only hardening migration, and deterministic security fixture are locally audited.',
+    localEvidence: ['phase13bSecurityMigration', 'phase13bSecurityFixture', 'phase13bValidation'],
     attestationEvidence: ['hostedValidationRecord'],
     hostedRequired: true,
     responsibleGate: 'Owner-controlled hosted database validation',
     nextAction: {
-      local: 'Restore the local database evidence files before proceeding.',
+      local: 'Run the isolated full migration chain and applied-catalog security fixture.',
       hosted:
         'Run the documented hosted lint and pgTAP rerun; attach the exact result without mutating data.',
       accepted: 'Review the hosted database result with the final migration list.',
@@ -176,8 +187,8 @@ const GATE_POLICIES: readonly GatePolicy[] = [
     id: 'rls-gates',
     label: 'RLS Gates',
     summary:
-      'Repository policy tests are present, but local files are not evidence that hosted RLS matches the candidate.',
-    localEvidence: ['databasePolicyTests', 'hostedPgtapRepair'],
+      'Every applied public table is required to have RLS enabled and forced; hosted state still needs owner-controlled verification.',
+    localEvidence: ['phase13bSecurityFixture', 'phase13bSecurityReview', 'phase13bValidation'],
     attestationEvidence: ['hostedValidationRecord'],
     hostedRequired: true,
     responsibleGate: 'Security reviewer and owner-controlled hosted RLS validation',
@@ -185,6 +196,36 @@ const GATE_POLICIES: readonly GatePolicy[] = [
       local: 'Restore the database policy test evidence before proceeding.',
       hosted: 'Run the owner-controlled hosted RLS suite after API and realtime validation.',
       accepted: 'Attach the reviewed hosted RLS result to the deployment record.',
+    },
+  },
+  {
+    id: 'role-access-matrix',
+    label: 'Role Access Matrix',
+    summary:
+      'Anonymous, authenticated player, service-role, read-only admin, support, moderator, LiveOps, blockchain, game-admin, and worker boundaries are catalog-tested.',
+    localEvidence: ['phase13bSecurityFixture', 'phase13bSecurityReview'],
+    attestationEvidence: ['hostedValidationRecord'],
+    hostedRequired: true,
+    responsibleGate: 'Security reviewer and owner-controlled hosted role verification',
+    nextAction: {
+      local: 'Restore the catalog-derived role matrix and privilege assertions.',
+      hosted: 'Verify the same role matrix against the linked hosted project.',
+      accepted: 'Retain the reviewed role evidence with the release record.',
+    },
+  },
+  {
+    id: 'abuse-protections',
+    label: 'Abuse Protections',
+    summary:
+      'Wallet, player, admin, chat, social, cooperative, economy, world, upload, and realtime admission/rate boundaries are locally reviewed.',
+    localEvidence: ['phase13bSecurityReview', 'phase13bValidation'],
+    attestationEvidence: ['ownerAcceptanceRecord'],
+    ownerRequired: true,
+    responsibleGate: 'Security engineering followed by owner abuse-drill review',
+    nextAction: {
+      local: 'Record the endpoint-to-rate-authority inventory and focused rejection evidence.',
+      owner: 'Run the documented closed-beta abuse drills and review false-positive behavior.',
+      accepted: 'Attach drill measurements and the escalation owner.',
     },
   },
   {
@@ -240,8 +281,8 @@ const GATE_POLICIES: readonly GatePolicy[] = [
     id: 'realtime-readiness',
     label: 'Realtime Readiness',
     summary:
-      'Realtime tests exist in the repository, but Phase 12E recovery, load, and soak evidence is not yet consolidated.',
-    localEvidence: ['realtimeTests', 'phase12eValidation'],
+      'The bounded 1/5/10/20/40-client matrix covers bursts, channel routing, mixed clients, dormant tabs, reconnects, and cleanup.',
+    localEvidence: ['realtimeTests', 'phase13bLoadHarness', 'phase13bValidation'],
     attestationEvidence: ['hostedValidationRecord'],
     hostedRequired: true,
     responsibleGate: 'Realtime engineering, then owner-controlled hosted readiness',
@@ -250,6 +291,38 @@ const GATE_POLICIES: readonly GatePolicy[] = [
         'Run the bounded local load, reconnect, cleanup, and soak checks and record their limits.',
       hosted: 'Validate hosted realtime health and readiness after the reviewed deployment.',
       accepted: 'Confirm monitoring, rollback, and revoked-session behavior.',
+    },
+  },
+  {
+    id: 'exact-once-guarantees',
+    label: 'Exact-Once Guarantees',
+    summary:
+      'Economy, rewards, inventory, progression, housing, social settlement, and worker reconciliation retain idempotency and contention evidence.',
+    localEvidence: ['phase13aExactlyOnce', 'phase13bValidation'],
+    attestationEvidence: ['hostedValidationRecord'],
+    hostedRequired: true,
+    responsibleGate:
+      'Gameplay/economy engineering and owner-controlled hosted contention validation',
+    nextAction: {
+      local: 'Run the complete isolated PostgreSQL contention and replay suite.',
+      hosted: 'Run the documented hosted non-destructive exact-once validation.',
+      accepted: 'Review receipts, idempotency keys, and reconciliation evidence.',
+    },
+  },
+  {
+    id: 'worker-status',
+    label: 'Worker Status',
+    summary:
+      'Worker startup is fail-closed on bounded reconciliation jobs and exposes separate liveness/readiness with safe headers.',
+    localEvidence: ['phase13bValidation', 'phase13bOperationalReadiness'],
+    attestationEvidence: ['hostedValidationRecord'],
+    hostedRequired: true,
+    responsibleGate: 'Worker service owner and owner-controlled hosted readiness validation',
+    nextAction: {
+      local: 'Run worker retry, startup-failure, readiness, and job-focused tests.',
+      hosted:
+        'Validate worker readiness, job cadence, alerts, and failure recovery after deployment.',
+      accepted: 'Record service ownership and escalation thresholds.',
     },
   },
   {
@@ -266,6 +339,23 @@ const GATE_POLICIES: readonly GatePolicy[] = [
       hosted: 'Run the documented hosted pgTAP suite and review DUST/inventory invariants.',
       accepted:
         'Confirm no reward, token, marketplace, inventory, or DUST change entered Phase 12E.',
+    },
+  },
+  {
+    id: 'audio-readiness',
+    label: 'Audio and Licensing',
+    summary:
+      'The local candidate has a gesture-gated procedural music, ambience, and SFX foundation with explicit project-owned provenance; owner replacement and listening review remain pending.',
+    localEvidence: ['audioManifest', 'audioValidation', 'phase12eValidation'],
+    attestationEvidence: ['ownerAcceptanceRecord'],
+    ownerRequired: true,
+    responsibleGate: 'Audio engineering evidence followed by owner listening and licensing review',
+    nextAction: {
+      local: 'Run audio:validate and focused lifecycle tests on the exact candidate.',
+      owner:
+        'Review music, ambience, cues, autoplay unlock, group mutes, hidden-tab lifecycle, originality, and development-safe classification.',
+      accepted:
+        'Record the approved replacement or accepted limitation without relabeling development-safe cues as final.',
     },
   },
   {
@@ -353,7 +443,7 @@ const GATE_POLICIES: readonly GatePolicy[] = [
     label: 'Rollback Checklist',
     summary:
       'Non-destructive rollback procedures are prepared locally but remain unexecuted and owner-unaccepted.',
-    localEvidence: ['readinessModel'],
+    localEvidence: ['readinessModel', 'phase13bOperationalReadiness'],
     attestationEvidence: ['ownerAcceptanceRecord'],
     ownerRequired: true,
     responsibleGate: 'Release owner and service owners',
@@ -467,6 +557,31 @@ function automatedEvidence(
       note: 'Pending until the required local command and browser matrix is recorded.',
     },
     {
+      id: 'phase13b-local-gates',
+      label: 'Exact Phase 13B local hardening validation',
+      state: evidenceState(observation, 'phase13bValidation'),
+      source: BETA_READINESS_EVIDENCE_PATHS.phase13bValidation,
+      note: 'Local evidence only; it cannot establish hosted parity or owner acceptance.',
+    },
+    {
+      id: 'phase13b-security-catalog',
+      label: 'Applied-catalog role, RLS, grant, and function audit',
+      state:
+        evidenceState(observation, 'phase13bSecurityMigration') === 'Recorded' &&
+        evidenceState(observation, 'phase13bSecurityFixture') === 'Recorded'
+          ? 'Recorded'
+          : 'Pending',
+      source: `${BETA_READINESS_EVIDENCE_PATHS.phase13bSecurityMigration}; ${BETA_READINESS_EVIDENCE_PATHS.phase13bSecurityFixture}`,
+      note: 'The deterministic fixture audits the applied isolated PostgreSQL catalog, not only migration text.',
+    },
+    {
+      id: 'phase13b-realtime-load',
+      label: 'Bounded realtime capacity, reconnect, and cleanup harness',
+      state: evidenceState(observation, 'phase13bLoadHarness'),
+      source: BETA_READINESS_EVIDENCE_PATHS.phase13bLoadHarness,
+      note: 'Protocol-level local evidence; hosted scale and real-device rendering remain pending.',
+    },
+    {
       id: 'v1-manifest',
       label: 'V1 published-default manifest present',
       state: evidenceState(observation, 'v1Manifest'),
@@ -486,6 +601,17 @@ function automatedEvidence(
       state: evidenceState(observation, 'hostedPgtapRepair'),
       source: BETA_READINESS_EVIDENCE_PATHS.hostedPgtapRepair,
       note: 'The repository report explicitly keeps the actual hosted rerun pending.',
+    },
+    {
+      id: 'audio-catalog',
+      label: 'Procedural audio catalog and provenance validation',
+      state:
+        evidenceState(observation, 'audioManifest') === 'Recorded' &&
+        evidenceState(observation, 'audioValidation') === 'Recorded'
+          ? 'Recorded'
+          : 'Pending',
+      source: `${BETA_READINESS_EVIDENCE_PATHS.audioManifest}; ${BETA_READINESS_EVIDENCE_PATHS.audioValidation}`,
+      note: 'All current cues are project-owned procedural development-safe foundations; file presence is not owner listening acceptance.',
     },
     {
       id: 'git-diff-check',
@@ -522,6 +648,7 @@ const OWNER_CHECK_LABELS = [
   'V2 character',
   'HUD',
   'Modals',
+  'Audio',
   'Reconnect',
   'Mobile',
   'Accessibility',
@@ -542,7 +669,7 @@ function ownerAcceptance(): readonly OwnerAcceptanceItem[] {
 function deploymentChecklist(
   observation: BetaReadinessObservation,
 ): readonly DeploymentReadinessItem[] {
-  const priorLocalEvidence = observation.evidence.phase12dValidation.recognized;
+  const priorLocalEvidence = observation.evidence.phase13bValidation.recognized;
   const dirty = !observation.gitStateAvailable || observation.dirtyPathCount > 0;
   return [
     {
@@ -580,7 +707,7 @@ function deploymentChecklist(
       label: 'Hosted database lint',
       kind: 'Hosted',
       state: 'Pending',
-      note: 'Owner-controlled hosted lint has no recorded Phase 12E result.',
+      note: 'Owner-controlled hosted lint has no recorded Phase 13B result.',
     },
     {
       id: 'hosted-pgtap',
@@ -608,14 +735,14 @@ function deploymentChecklist(
       label: 'Application build',
       kind: 'Automated',
       state: priorLocalEvidence ? 'Ready' : 'Pending',
-      note: 'Prior Phase 12D result only; rerun on the exact Phase 12E candidate.',
+      note: 'Ready only when the exact Phase 13B local validation report is recognized.',
     },
     {
       id: 'security-scan',
       label: 'Security scan',
       kind: 'Automated',
       state: priorLocalEvidence ? 'Ready' : 'Pending',
-      note: 'Prior Phase 12D result only; rerun on the exact Phase 12E candidate.',
+      note: 'Ready only when the exact Phase 13B local validation report is recognized.',
     },
     {
       id: 'application-deployment',

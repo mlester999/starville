@@ -5,6 +5,7 @@ import {
   assertAdminBootstrapWriteApproved,
   assertDatabaseUrlMatchesProjectRef,
   assertHostedTestsApproved,
+  assertProductionRuntimeSafetyGatesClosed,
   assertRemoteMigrationWriteApproved,
   loadAdminSecurityConfig,
   loadAdminRecoveryConfig,
@@ -112,6 +113,32 @@ describe('public browser configuration', () => {
 });
 
 describe('service configuration', () => {
+  it('refuses to start a production runtime with a commissioning gate enabled', () => {
+    for (const name of [
+      'SUPABASE_REMOTE_WRITES_APPROVED',
+      'RUN_HOSTED_SUPABASE_TESTS',
+      'ADMIN_BOOTSTRAP_ENABLED',
+    ] as const) {
+      expect(() =>
+        assertProductionRuntimeSafetyGatesClosed({ NODE_ENV: 'production', [name]: 'true' }),
+      ).toThrow(`${name} must be false when a production service starts`);
+    }
+    expect(() =>
+      assertProductionRuntimeSafetyGatesClosed({
+        NODE_ENV: 'production',
+        SUPABASE_REMOTE_WRITES_APPROVED: 'false',
+        RUN_HOSTED_SUPABASE_TESTS: 'false',
+        ADMIN_BOOTSTRAP_ENABLED: 'false',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertProductionRuntimeSafetyGatesClosed({
+        NODE_ENV: 'development',
+        SUPABASE_REMOTE_WRITES_APPROVED: 'true',
+      }),
+    ).not.toThrow();
+  });
+
   it('loads deterministic development defaults', () => {
     expect(loadApiConfig({})).toEqual({
       application: 'api',
@@ -402,7 +429,7 @@ describe('private server configuration', () => {
     );
   });
 
-  it('rejects production, target mismatch, and ambiguous approval values', () => {
+  it('accepts only an explicitly separated production target', () => {
     const valid = {
       SUPABASE_ENVIRONMENT: 'development',
       SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
@@ -410,8 +437,36 @@ describe('private server configuration', () => {
     };
 
     expect(() =>
-      loadHostedSupabaseSafetyConfig({ ...valid, SUPABASE_ENVIRONMENT: 'production' }),
-    ).toThrow();
+      loadHostedSupabaseSafetyConfig({
+        ...valid,
+        SUPABASE_ENVIRONMENT: 'production',
+        STARVILLE_DEPLOYMENT_TARGET: 'starville-prod',
+        STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+        STARVILLE_DEVELOPMENT_SUPABASE_PROJECT_REF: 'ponmlkjihgfedcbazyxw',
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_APP_ENV: 'production',
+      }),
+    ).not.toThrow();
+    expect(() =>
+      loadHostedSupabaseSafetyConfig({
+        ...valid,
+        SUPABASE_ENVIRONMENT: 'production',
+        STARVILLE_DEPLOYMENT_TARGET: 'starville-prod',
+        STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+        STARVILLE_DEVELOPMENT_SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_APP_ENV: 'production',
+      }),
+    ).toThrow('must differ');
+  });
+
+  it('rejects target mismatch and ambiguous approval values', () => {
+    const valid = {
+      SUPABASE_ENVIRONMENT: 'development',
+      SUPABASE_PROJECT_REF: 'abcdefghijklmnopqrst',
+      NEXT_PUBLIC_SUPABASE_URL: 'https://abcdefghijklmnopqrst.supabase.co',
+    };
+
     expect(() =>
       loadHostedSupabaseSafetyConfig({
         ...valid,
@@ -470,5 +525,14 @@ describe('private server configuration', () => {
         projectRef,
       ),
     ).toThrow('does not match');
+    expect(() =>
+      assertDatabaseUrlMatchesProjectRef(
+        `https://postgres:do-not-print@db.${projectRef}.supabase.co/postgres`,
+        projectRef,
+      ),
+    ).toThrow('not a valid PostgreSQL URL');
+    expect(() => assertDatabaseUrlMatchesProjectRef('not-a-url:do-not-print', projectRef)).toThrow(
+      'not a valid PostgreSQL URL',
+    );
   });
 });

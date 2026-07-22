@@ -125,7 +125,7 @@ export interface WorldManagementConfig {
 }
 
 export interface HostedSupabaseSafetyConfig {
-  readonly environment: 'development';
+  readonly environment: 'development' | 'production';
   readonly projectRef: string;
   readonly projectHostname: string;
   readonly remoteWritesApproved: boolean;
@@ -161,7 +161,9 @@ export interface TokenAccessServerConfig {
 }
 
 function loadEnvironment(env: EnvironmentVariables): EnvironmentName {
-  return environmentNameSchema.parse(env['NODE_ENV'] ?? 'development');
+  const environment = environmentNameSchema.parse(env['NODE_ENV'] ?? 'development');
+  assertProductionRuntimeSafetyGatesClosed(env, environment);
+  return environment;
 }
 
 function defaultLogLevel(environment: EnvironmentName): LogLevel {
@@ -175,6 +177,25 @@ function safeBoolean(value: string | undefined, variableName: string): boolean {
     return strictBooleanSchema.parse(value ?? 'false');
   } catch {
     throw new Error(`${variableName} must be either true or false`);
+  }
+}
+
+export function assertProductionRuntimeSafetyGatesClosed(
+  env: EnvironmentVariables,
+  parsedEnvironment?: EnvironmentName,
+): void {
+  const environment =
+    parsedEnvironment ?? environmentNameSchema.parse(env['NODE_ENV'] ?? 'development');
+  if (environment !== 'production') return;
+
+  for (const name of [
+    'SUPABASE_REMOTE_WRITES_APPROVED',
+    'RUN_HOSTED_SUPABASE_TESTS',
+    'ADMIN_BOOTSTRAP_ENABLED',
+  ] as const) {
+    if (safeBoolean(env[name], name)) {
+      throw new Error(`${name} must be false when a production service starts`);
+    }
   }
 }
 
@@ -584,7 +605,7 @@ export function loadTokenAccessServerConfig(env: EnvironmentVariables): TokenAcc
 export function loadHostedSupabaseSafetyConfig(
   env: EnvironmentVariables,
 ): HostedSupabaseSafetyConfig {
-  const environment = z.literal('development').parse(env['SUPABASE_ENVIRONMENT']);
+  const environment = z.enum(['development', 'production']).parse(env['SUPABASE_ENVIRONMENT']);
   const projectRef = supabaseProjectRefSchema.parse(env['SUPABASE_PROJECT_REF']);
   const url = httpUrlSchema.parse(env['NEXT_PUBLIC_SUPABASE_URL']);
   assertSecureUrlForEnvironment(url, environment, 'NEXT_PUBLIC_SUPABASE_URL');
@@ -593,6 +614,28 @@ export function loadHostedSupabaseSafetyConfig(
 
   if (parsedUrl.hostname !== expectedHostname) {
     throw new Error('Supabase URL hostname does not match SUPABASE_PROJECT_REF');
+  }
+
+  if (environment === 'production') {
+    const deploymentTarget = z.literal('starville-prod').parse(env['STARVILLE_DEPLOYMENT_TARGET']);
+    const productionProjectRef = supabaseProjectRefSchema.parse(
+      env['STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF'],
+    );
+    const developmentProjectRef = supabaseProjectRefSchema.parse(
+      env['STARVILLE_DEVELOPMENT_SUPABASE_PROJECT_REF'],
+    );
+
+    if (deploymentTarget !== 'starville-prod' || projectRef !== productionProjectRef) {
+      throw new Error('Supabase project reference is not the approved production target');
+    }
+    if (projectRef === developmentProjectRef) {
+      throw new Error('Production and development Supabase project references must differ');
+    }
+    if (env['NODE_ENV'] !== 'production' || env['NEXT_PUBLIC_APP_ENV'] !== 'production') {
+      throw new Error('Production Supabase tooling requires the production runtime identity');
+    }
+  } else if (env['STARVILLE_DEPLOYMENT_TARGET'] === 'starville-prod') {
+    throw new Error('Production deployment target cannot use the development Supabase environment');
   }
 
   return {
@@ -640,7 +683,15 @@ export function assertAdminBootstrapWriteApproved(config: HostedSupabaseSafetyCo
 }
 
 export function assertDatabaseUrlMatchesProjectRef(databaseUrl: string, projectRef: string): void {
-  const url = new URL(databaseUrl);
+  let url: URL;
+  try {
+    url = new URL(databaseUrl);
+  } catch {
+    throw new Error('Supabase database URL is not a valid PostgreSQL URL');
+  }
+  if (url.protocol !== 'postgres:' && url.protocol !== 'postgresql:') {
+    throw new Error('Supabase database URL is not a valid PostgreSQL URL');
+  }
   const directHostname = `db.${projectRef}.supabase.co`;
   const isDirectProjectHost = url.hostname === directHostname;
   const isSupabasePooler =

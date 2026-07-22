@@ -804,6 +804,7 @@ describe('CozyGameplay accessible HUD', () => {
         createdAt: fixtures.now,
       },
     });
+    const onAuthoritativeMutation = vi.fn();
 
     await act(async () => {
       root.render(
@@ -820,6 +821,7 @@ describe('CozyGameplay accessible HUD', () => {
             shopSlug: 'lantern-general-store',
           }}
           onAccessInvalid={vi.fn()}
+          onAuthoritativeMutation={onAuthoritativeMutation}
           onInteractionClose={vi.fn()}
           onOpenChange={vi.fn()}
         />,
@@ -859,6 +861,7 @@ describe('CozyGameplay accessible HUD', () => {
     );
     expect(purchaseEconomyShop).not.toHaveBeenCalled();
     expect(executeShopTransaction).not.toHaveBeenCalled();
+    expect(onAuthoritativeMutation).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain('Purchase complete');
     expect(container.textContent).toContain('STORE-0123456789ABCDEF0123');
   });

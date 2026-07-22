@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "kind": "starville-production-release-freeze",
+  "status": "not-started-stage-a-blocked",
+  "frozen": false,
+  "productionMutationAuthorized": false,
+  "sourceCommit": null,
+  "dependencies": "pending exact source commit",
+  "migrationManifest": "infrastructure/deployment/manifests/migrations.v1.json",
+  "referenceSeeds": "infrastructure/deployment/manifests/production-reference-seeds.v1.json",
+  "environmentManifest": "infrastructure/deployment/manifests/production-environment.v1.json",
+  "domains": null,
+  "reownConfiguration": null,
+  "tokenAccessConfiguration": null,
+  "worldRevision": null,
+  "assetManifest": "assets/manifests/starville-bundled-v1.json",
+  "audioManifest": "infrastructure/deployment/manifests/production-audio.v1.json",
+  "catalogs": "infrastructure/deployment/manifests/production-reference-catalogs.v1.json",
+  "administratorRoles": "migration-chain-v1",
+  "deploymentConfiguration": null,
+  "changeRule": "After owner freeze, every change requires explicit approval, affected evidence and tests, migration review when applicable, and GO or NO-GO reevaluation."
+}

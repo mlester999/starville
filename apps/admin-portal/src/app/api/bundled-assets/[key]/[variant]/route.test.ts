@@ -28,7 +28,7 @@ describe('protected bundled asset media route', () => {
   });
 
   it('serves allowlisted source and thumbnail WebPs with private safe headers', async () => {
-    for (const manifest of [null, '2.0.0'] as const) {
+    for (const manifest of [null, '2.0.0', '3.1.0'] as const) {
       for (const variant of ['source', 'thumbnail'] as const) {
         const query = manifest === null ? '' : `?manifest=${manifest}`;
         const response = await GET(
@@ -60,7 +60,7 @@ describe('protected bundled asset media route', () => {
     expect(thumbnailRotation.status).toBe(400);
 
     for (const url of [
-      'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=3.0.0',
+      'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=4.0.0',
       'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=2.0.0&manifest=2.0.0',
       'http://localhost:3002/api/bundled-assets/tree-pine/source?manifest=2.0.0&token=private',
     ]) {

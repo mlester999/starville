@@ -12,6 +12,8 @@ import {
   STARVILLE_BUNDLED_PUBLIC_ROOT,
   STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
   STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT,
+  STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
+  STARVILLE_PRODUCTION_SLICE_PUBLIC_ROOT,
   bundledManifestVersionSchema,
   type BundledManifestVersion,
 } from './bundled-versions';
@@ -22,6 +24,8 @@ export {
   STARVILLE_BUNDLED_PUBLIC_ROOT,
   STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
   STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT,
+  STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
+  STARVILLE_PRODUCTION_SLICE_PUBLIC_ROOT,
   bundledManifestVersionSchema,
   type BundledManifestVersion,
 } from './bundled-versions';
@@ -73,8 +77,10 @@ export const bundledAssetVariantSchema = z
       .string()
       .regex(/^[a-z][a-z0-9_-]*$/u)
       .nullable(),
-    sourcePath: z.string().regex(/^assets\/(?:source|source-v2)\/[a-z0-9_./-]+\.svg$/u),
-    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v[12]\/[a-z0-9_./-]+\.webp$/u),
+    sourcePath: z
+      .string()
+      .regex(/^assets\/(?:source|source-v2|source-v3)\/[a-z0-9_./-]+\.(?:svg|png)$/u),
+    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v[123]\/[a-z0-9_./-]+\.webp$/u),
   })
   .strict();
 export type BundledAssetVariant = z.infer<typeof bundledAssetVariantSchema>;
@@ -86,12 +92,14 @@ export const bundledAssetEntrySchema = z
     category: assetCategorySchema,
     displayName: z.string().trim().min(1).max(100),
     description: z.string().trim().min(8).max(280),
-    sourceType: z.literal('bundled_svg'),
-    sourcePath: z.string().regex(/^assets\/(?:source|source-v2)\/[a-z0-9_./-]+\.svg$/u),
-    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v[12]\/[a-z0-9_./-]+\.webp$/u),
+    sourceType: z.enum(['bundled_svg', 'bundled_raster']),
+    sourcePath: z
+      .string()
+      .regex(/^assets\/(?:source|source-v2|source-v3)\/[a-z0-9_./-]+\.(?:svg|png)$/u),
+    runtimePath: z.string().regex(/^\/assets\/starville\/bundled\/v[123]\/[a-z0-9_./-]+\.webp$/u),
     thumbnailPath: z
       .string()
-      .regex(/^\/assets\/starville\/bundled\/v[12]\/thumbnails\/[a-z0-9_./-]+\.webp$/u),
+      .regex(/^\/assets\/starville\/bundled\/v[123]\/thumbnails\/[a-z0-9_./-]+\.webp$/u),
     width: z.number().int().positive().max(4096),
     height: z.number().int().positive().max(4096),
     aspectRatio: z.number().positive().max(8),
@@ -307,11 +315,15 @@ export const bundledAssetManifestSchema = z
       const expectedSourceRoot =
         manifest.manifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION
           ? 'assets/source/'
-          : 'assets/source-v2/';
+          : manifest.manifestVersion === STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION
+            ? 'assets/source-v2/'
+            : 'assets/source-v3/';
       const expectedRuntimeRoot =
         manifest.manifestVersion === STARVILLE_BUNDLED_MANIFEST_VERSION
           ? `${STARVILLE_BUNDLED_PUBLIC_ROOT}/`
-          : `${STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT}/`;
+          : manifest.manifestVersion === STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION
+            ? `${STARVILLE_PHASE12D_CANDIDATE_PUBLIC_ROOT}/`
+            : `${STARVILLE_PRODUCTION_SLICE_PUBLIC_ROOT}/`;
       if (
         !entry.sourcePath.startsWith(expectedSourceRoot) ||
         !entry.runtimePath.startsWith(expectedRuntimeRoot) ||
@@ -1394,20 +1406,307 @@ export const STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST = bundledAssetManifestS
   assets: STARVILLE_BUNDLED_ASSET_MANIFEST.assets.map(phase12dCandidateEntry),
 });
 
+const PRODUCTION_SLICE_ASSET_SPECS = Object.freeze({
+  'system.missing-asset': { width: 192, height: 192, scale: 1 },
+  'world.terrain.grass.base': { width: 192, height: 96, scale: 1 },
+  'world.terrain.grass.clover': { width: 192, height: 96, scale: 1 },
+  'world.terrain.dirt': { width: 192, height: 96, scale: 1 },
+  'world.terrain.path.stone': { width: 192, height: 96, scale: 1 },
+  'world.terrain.plaza': { width: 192, height: 96, scale: 1 },
+  'world.terrain.water': { width: 192, height: 96, scale: 1 },
+  'world.terrain.bridge': { width: 192, height: 96, scale: 1 },
+  'cottage-amber': { width: 512, height: 512, scale: 0.78 },
+  'notice-board': { width: 320, height: 360, scale: 0.72 },
+  'lamp-star': { width: 256, height: 384, scale: 0.9 },
+  'fence-willow': { width: 512, height: 256, scale: 0.92 },
+  'tree-pine': { width: 320, height: 448, scale: 0.82 },
+  'tree-maple': { width: 384, height: 448, scale: 0.78 },
+  'bush-round': { width: 320, height: 256, scale: 0.78 },
+  'flowers-moon': { width: 320, height: 256, scale: 0.8 },
+  'rock-moss': { width: 384, height: 320, scale: 0.72 },
+  'phase7-dev-willow-chair': { width: 384, height: 320, scale: 0.82 },
+  'phase7-crafting-workbench-marker': { width: 384, height: 320, scale: 0.82 },
+  'phase7-dev-round-leaf-planter': { width: 320, height: 320, scale: 0.72 },
+  'world.terrain.grass.light': {
+    baseKey: 'world.terrain.grass.base',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Light Meadow Grass',
+  },
+  'world.terrain.grass.dark': {
+    baseKey: 'world.terrain.grass.base',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Deep Meadow Grass',
+  },
+  'world.terrain.grass.worn': {
+    baseKey: 'world.terrain.grass.base',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Worn Meadow Grass',
+  },
+  'world.terrain.grass.flowers': {
+    baseKey: 'world.terrain.grass.clover',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Meadow Flower Grass',
+  },
+  'world.terrain.grass.path-edge': {
+    baseKey: 'world.terrain.grass.base',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Path Edge Grass',
+  },
+  'world.terrain.grass.shore': {
+    baseKey: 'world.terrain.grass.base',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Riverbank Grass',
+  },
+  'world.terrain.water.deep': {
+    baseKey: 'world.terrain.water',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Deep River Water',
+  },
+  'world.terrain.water.shallow': {
+    baseKey: 'world.terrain.water',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Shallow River Water',
+  },
+  'world.terrain.water.shore': {
+    baseKey: 'world.terrain.water',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Natural River Shoreline',
+  },
+  'world.terrain.water.disturbance': {
+    baseKey: 'world.terrain.water',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Bridge Water Disturbance',
+  },
+  'v3.interior.floor': {
+    baseKey: 'world.terrain.plaza',
+    width: 192,
+    height: 96,
+    scale: 1,
+    displayName: 'Amber Cottage Willow Floor',
+  },
+  'v3.interior.wall': {
+    baseKey: 'cottage-amber',
+    width: 384,
+    height: 320,
+    scale: 0.72,
+    displayName: 'Amber Cottage Interior Wall',
+  },
+  'v3.interior.door': {
+    baseKey: 'phase7-home-entrance-marker',
+    width: 300,
+    height: 400,
+    scale: 0.68,
+    displayName: 'Amber Cottage Interior Door',
+  },
+  'v3.interior.bed': {
+    baseKey: 'phase7-dev-willow-chair',
+    width: 384,
+    height: 320,
+    scale: 0.78,
+    displayName: 'Star Quilt Bed',
+  },
+  'v3.interior.bedside-table': {
+    baseKey: 'phase7-dev-round-leaf-planter',
+    width: 256,
+    height: 256,
+    scale: 0.7,
+    displayName: 'Willow Bedside Table',
+  },
+  'v3.interior.dining-table': {
+    baseKey: 'phase7-dev-hearth-table',
+    width: 384,
+    height: 320,
+    scale: 0.74,
+    displayName: 'Amber Cottage Dining Table',
+  },
+  'v3.interior.dining-chair': {
+    baseKey: 'phase7-dev-willow-chair',
+    width: 256,
+    height: 320,
+    scale: 0.68,
+    displayName: 'Amber Cottage Dining Chair',
+  },
+  'v3.interior.chest': {
+    baseKey: 'phase7-dev-meadow-shelf',
+    width: 320,
+    height: 256,
+    scale: 0.72,
+    displayName: 'Brass Bound Storage Chest',
+  },
+  'v3.interior.wardrobe': {
+    baseKey: 'phase10b-wardrobe-furniture-marker',
+    width: 320,
+    height: 384,
+    scale: 0.72,
+    displayName: 'Willow Wardrobe',
+  },
+  'v3.interior.rug': {
+    baseKey: 'phase7-dev-moonwoven-rug',
+    width: 256,
+    height: 160,
+    scale: 0.74,
+    displayName: 'Moss and Amber Rug',
+  },
+  'v3.interior.window': {
+    baseKey: 'cottage-amber',
+    width: 300,
+    height: 320,
+    scale: 0.64,
+    displayName: 'Amber Cottage Leaded Window',
+  },
+  'v3.interior.fireplace': {
+    baseKey: 'phase7-cooking-hearth-marker',
+    width: 320,
+    height: 384,
+    scale: 0.72,
+    displayName: 'Amber Cottage Fireplace',
+  },
+  'v3.interior.cooking-counter': {
+    baseKey: 'phase7-cooking-hearth-marker',
+    width: 320,
+    height: 320,
+    scale: 0.72,
+    displayName: 'Amber Cottage Cooking Counter',
+  },
+  'v3.interior.wall-art': {
+    baseKey: 'notice-board',
+    width: 240,
+    height: 280,
+    scale: 0.62,
+    displayName: 'Framed Meadow Botanical',
+  },
+  'v3.interior.floor-lamp': {
+    baseKey: 'phase7-dev-lantern-floor-lamp',
+    width: 200,
+    height: 320,
+    scale: 0.66,
+    displayName: 'Amber Cottage Floor Lamp',
+  },
+  'v3.interior.houseplant': {
+    baseKey: 'phase7-dev-round-leaf-planter',
+    width: 220,
+    height: 280,
+    scale: 0.66,
+    displayName: 'Amber Cottage Houseplant',
+  },
+} as const);
+
+type ProductionSliceAssetKey = keyof typeof PRODUCTION_SLICE_ASSET_SPECS;
+
+function productionSlicePath(
+  asset: BundledAssetEntry,
+  key: string,
+  extension: 'png' | 'webp',
+): string {
+  const stem = fileStem(key);
+  return extension === 'png'
+    ? `assets/source-v3/${asset.category}/${stem}.png`
+    : `${STARVILLE_PRODUCTION_SLICE_PUBLIC_ROOT}/${asset.category}/${stem}.webp`;
+}
+
+function productionSliceEntry(
+  key: ProductionSliceAssetKey,
+  catalog: ReadonlyMap<string, BundledAssetEntry>,
+): BundledAssetEntry {
+  const spec = PRODUCTION_SLICE_ASSET_SPECS[key];
+  const baseKey = 'baseKey' in spec ? spec.baseKey : key;
+  const asset = catalog.get(baseKey);
+  if (asset === undefined) {
+    throw new Error(`Production-slice source metadata is missing: ${baseKey}`);
+  }
+  const sourcePath = productionSlicePath(asset, key, 'png');
+  const runtimePath = productionSlicePath(asset, key, 'webp');
+  return bundledAssetEntrySchema.parse({
+    ...asset,
+    key,
+    displayName: 'displayName' in spec ? spec.displayName : asset.displayName,
+    accessibilityLabel: 'displayName' in spec ? spec.displayName : asset.accessibilityLabel,
+    description:
+      'displayName' in spec
+        ? `${spec.displayName} authored for the local unpublished V3 gameplay candidate.`
+        : asset.description,
+    sourceType: 'bundled_raster',
+    sourcePath,
+    runtimePath,
+    thumbnailPath: `${STARVILLE_PRODUCTION_SLICE_PUBLIC_ROOT}/thumbnails/${asset.category}/${fileStem(key)}.webp`,
+    width: spec.width,
+    height: spec.height,
+    aspectRatio: spec.width / spec.height,
+    footAnchor: asset.renderLayer === 'ground' ? { x: 0.5, y: 0.5 } : { x: 0.5, y: 0.94 },
+    depthAnchor: asset.renderLayer === 'ground' ? { x: 0.5, y: 0.5 } : { x: 0.5, y: 0.94 },
+    recommendedScale: spec.scale,
+    supportedRotations: [0],
+    defaultRotation: 0,
+    variants: [],
+    bundledVersion: STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
+    qualityStatus: 'production_candidate',
+    replacementAllowed: true,
+    aliasOf: null,
+    generator: {
+      ...asset.generator,
+      kind: 'authored_raster',
+      variant: `production-slice-${asset.generator.variant}`,
+    },
+  });
+}
+
+/**
+ * Additive local-review raster pack for Phase 12F-A. It deliberately contains
+ * only the assets exercised by the bounded vertical slice. V1 remains the
+ * published default and V2 remains available solely as rejected comparison.
+ */
+export const STARVILLE_PRODUCTION_SLICE_ASSET_MANIFEST = bundledAssetManifestSchema.parse({
+  schemaVersion: 1,
+  game: 'starville',
+  manifestVersion: STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
+  projection: STARVILLE_BUNDLED_ASSET_MANIFEST.projection,
+  assets: (Object.keys(PRODUCTION_SLICE_ASSET_SPECS) as ProductionSliceAssetKey[]).map((key) =>
+    productionSliceEntry(
+      key,
+      new Map(STARVILLE_BUNDLED_ASSET_MANIFEST.assets.map((asset) => [asset.key, asset])),
+    ),
+  ),
+});
+
 export const STARVILLE_BUNDLED_ASSETS: readonly BundledAssetEntry[] =
   STARVILLE_BUNDLED_ASSET_MANIFEST.assets;
 export const STARVILLE_PHASE12D_CANDIDATE_ASSETS: readonly BundledAssetEntry[] =
   STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST.assets;
+export const STARVILLE_PRODUCTION_SLICE_ASSETS: readonly BundledAssetEntry[] =
+  STARVILLE_PRODUCTION_SLICE_ASSET_MANIFEST.assets;
 
 export const STARVILLE_BUNDLED_ASSET_CATALOG: ReadonlyMap<string, BundledAssetEntry> = new Map(
   STARVILLE_BUNDLED_ASSETS.map((asset) => [asset.key, asset]),
 );
 export const STARVILLE_PHASE12D_CANDIDATE_ASSET_CATALOG: ReadonlyMap<string, BundledAssetEntry> =
   new Map(STARVILLE_PHASE12D_CANDIDATE_ASSETS.map((asset) => [asset.key, asset]));
+export const STARVILLE_PRODUCTION_SLICE_ASSET_CATALOG: ReadonlyMap<string, BundledAssetEntry> =
+  new Map(STARVILLE_PRODUCTION_SLICE_ASSETS.map((asset) => [asset.key, asset]));
 
 const BUNDLED_MANIFESTS: Readonly<Record<BundledManifestVersion, BundledAssetManifest>> = {
   [STARVILLE_BUNDLED_MANIFEST_VERSION]: STARVILLE_BUNDLED_ASSET_MANIFEST,
   [STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION]: STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
+  [STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION]: STARVILLE_PRODUCTION_SLICE_ASSET_MANIFEST,
 };
 
 const BUNDLED_CATALOGS: Readonly<
@@ -1415,6 +1714,7 @@ const BUNDLED_CATALOGS: Readonly<
 > = {
   [STARVILLE_BUNDLED_MANIFEST_VERSION]: STARVILLE_BUNDLED_ASSET_CATALOG,
   [STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION]: STARVILLE_PHASE12D_CANDIDATE_ASSET_CATALOG,
+  [STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION]: STARVILLE_PRODUCTION_SLICE_ASSET_CATALOG,
 };
 
 export function getBundledManifest(manifestVersion: BundledManifestVersion): BundledAssetManifest {

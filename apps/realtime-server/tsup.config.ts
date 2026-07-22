@@ -5,7 +5,7 @@ export default defineConfig({
   format: ['esm'],
   target: 'node22',
   platform: 'node',
-  sourcemap: true,
+  sourcemap: process.env['NODE_ENV'] !== 'production',
   clean: true,
   splitting: false,
   dts: false,

@@ -20,6 +20,7 @@ const SYSTEM_ENVIRONMENT_KEYS = [
 export const ENVIRONMENT_PROFILES = Object.freeze({
   landing: Object.freeze([
     'NODE_ENV',
+    'STARVILLE_DEPLOYMENT_TARGET',
     'NEXT_PUBLIC_APP_ENV',
     'NEXT_PUBLIC_LANDING_URL',
     'NEXT_PUBLIC_GAME_URL',
@@ -34,6 +35,7 @@ export const ENVIRONMENT_PROFILES = Object.freeze({
   ]),
   'game-client': Object.freeze([
     'NODE_ENV',
+    'STARVILLE_DEPLOYMENT_TARGET',
     'NEXT_PUBLIC_APP_ENV',
     'NEXT_PUBLIC_LANDING_URL',
     'NEXT_PUBLIC_GAME_URL',
@@ -48,6 +50,7 @@ export const ENVIRONMENT_PROFILES = Object.freeze({
   ]),
   'admin-portal': Object.freeze([
     'NODE_ENV',
+    'STARVILLE_DEPLOYMENT_TARGET',
     'NEXT_PUBLIC_APP_ENV',
     'NEXT_PUBLIC_ADMIN_URL',
     'NEXT_PUBLIC_API_URL',
@@ -60,6 +63,7 @@ export const ENVIRONMENT_PROFILES = Object.freeze({
   ]),
   api: Object.freeze([
     'NODE_ENV',
+    'STARVILLE_DEPLOYMENT_TARGET',
     'LOG_LEVEL',
     'API_HOST',
     'API_PORT',
@@ -106,6 +110,7 @@ export const ENVIRONMENT_PROFILES = Object.freeze({
   ]),
   'realtime-server': Object.freeze([
     'NODE_ENV',
+    'STARVILLE_DEPLOYMENT_TARGET',
     'LOG_LEVEL',
     'REALTIME_HOST',
     'REALTIME_PORT',
@@ -144,6 +149,7 @@ export const ENVIRONMENT_PROFILES = Object.freeze({
   ]),
   worker: Object.freeze([
     'NODE_ENV',
+    'STARVILLE_DEPLOYMENT_TARGET',
     'LOG_LEVEL',
     'WORKER_HOST',
     'WORKER_HEALTH_PORT',

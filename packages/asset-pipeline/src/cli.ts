@@ -3,6 +3,7 @@ import { pathToFileURL } from 'node:url';
 import {
   STARVILLE_BUNDLED_ASSET_MANIFEST,
   STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST,
+  STARVILLE_PRODUCTION_SLICE_ASSET_MANIFEST,
   type BundledAssetManifest,
 } from '@starville/asset-management';
 
@@ -12,6 +13,7 @@ import {
   generateManifestOutput,
   generateThumbnails,
 } from './pipeline';
+import { preparePhase12FSourceArt, validatePhase12FAvatar } from './phase12f-source-art';
 import { validateBundledAssets } from './validation';
 import { findStarvilleWorkspaceRoot } from './workspace';
 
@@ -25,6 +27,15 @@ const COMMANDS = [
   'generate-phase12d',
   'validate-phase12d',
   'check-phase12d',
+  'generate-phase12f',
+  'validate-phase12f',
+  'check-phase12f',
+  'manifest-phase12d',
+  'manifest-phase12f',
+  'thumbnails-phase12d',
+  'thumbnails-phase12f',
+  'coverage-phase12d',
+  'coverage-phase12f',
 ] as const;
 type Command = (typeof COMMANDS)[number];
 
@@ -39,32 +50,45 @@ export async function runAssetPipelineCli(
     return 2;
   }
   const workspaceRoot = await findStarvilleWorkspaceRoot(startDirectory);
-  const selectedManifest =
-    manifest ??
-    (command.endsWith('-phase12d')
-      ? STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST
-      : STARVILLE_BUNDLED_ASSET_MANIFEST);
+  const selectedManifest = manifest ?? manifestForCommand(command);
   if (command === 'validate' || command === 'check') {
     return printValidation(workspaceRoot, selectedManifest);
   }
-  if (command === 'validate-phase12d' || command === 'check-phase12d') {
+  if (
+    command === 'validate-phase12d' ||
+    command === 'check-phase12d' ||
+    command === 'validate-phase12f' ||
+    command === 'check-phase12f'
+  ) {
+    if (command.endsWith('-phase12f')) {
+      const avatarIssues = await validatePhase12FAvatar(workspaceRoot);
+      for (const issue of avatarIssues) console.error(`AVATAR_ATLAS ${issue}`);
+      if (avatarIssues.length > 0) return 1;
+    }
     return printValidation(workspaceRoot, selectedManifest);
   }
-  if (command === 'manifest') {
+  if (command === 'manifest' || command.startsWith('manifest-')) {
     printGeneration('manifest', await generateManifestOutput(workspaceRoot, selectedManifest));
     return 0;
   }
-  if (command === 'thumbnails') {
+  if (command === 'thumbnails' || command.startsWith('thumbnails-')) {
     printGeneration('thumbnails', await generateThumbnails(workspaceRoot, selectedManifest));
     return 0;
   }
-  if (command === 'coverage') {
+  if (command === 'coverage' || command.startsWith('coverage-')) {
     printGeneration('coverage', await generateCoverageOutputs(workspaceRoot, selectedManifest));
     return 0;
   }
+  if (command === 'generate-phase12f') await preparePhase12FSourceArt(workspaceRoot);
   const result = await generateAll(workspaceRoot, selectedManifest);
   printGeneration(command, result);
   return 0;
+}
+
+function manifestForCommand(command: Command): BundledAssetManifest {
+  if (command.endsWith('-phase12f')) return STARVILLE_PRODUCTION_SLICE_ASSET_MANIFEST;
+  if (command.endsWith('-phase12d')) return STARVILLE_PHASE12D_CANDIDATE_ASSET_MANIFEST;
+  return STARVILLE_BUNDLED_ASSET_MANIFEST;
 }
 
 function isCommand(value: string | undefined): value is Command {

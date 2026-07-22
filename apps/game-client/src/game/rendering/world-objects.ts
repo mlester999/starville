@@ -26,14 +26,297 @@ import {
 
 export interface RenderedWorldObject {
   readonly id: string;
+  readonly assetId: string;
+  readonly kind: MapObject['kind'];
+  readonly world: Readonly<{ x: number; y: number }>;
+  readonly scale: number;
   readonly container: Phaser.GameObjects.Container;
   readonly shadow?: Phaser.GameObjects.Graphics;
+  readonly foreground?: Phaser.GameObjects.Container;
+  readonly screen: Readonly<{ x: number; y: number }>;
+  readonly layerPolicy: WorldObjectLayerPolicy;
+}
+
+export interface WorldObjectCullingMetrics {
+  readonly visibleObjects: number;
+  readonly totalObjects: number;
+  readonly culledObjects: number;
 }
 
 export interface WorldObjectRenderOptions {
   readonly shadows?: boolean;
   readonly quality?: WorldVisualQuality;
   readonly assetResolutionContext?: AssetResolutionContext;
+}
+
+export interface WorldObjectOcclusionPolicy {
+  readonly lateralRadius: number;
+  readonly behindDepth: number;
+  readonly baseAlpha: number;
+  readonly foregroundAlpha: number;
+}
+
+export interface WorldObjectLayerPolicy {
+  readonly foregroundSplit: number | undefined;
+  readonly foregroundDepthOffset: number;
+  readonly occlusion: WorldObjectOcclusionPolicy | undefined;
+}
+
+export interface WorldObjectOcclusionMetrics {
+  readonly occludedObjects: number;
+}
+
+const CANONICAL_WORLD_OBJECT_LAYER_POLICY: WorldObjectLayerPolicy = Object.freeze({
+  foregroundSplit: undefined,
+  foregroundDepthOffset: 0,
+  occlusion: undefined,
+});
+
+/**
+ * Flat decals that hang on the interior back wall (windows, framed art) share the
+ * wall panels' depth band. Because the wall billboards overlap heavily to read as
+ * one continuous wall, a neighbouring panel would otherwise draw over the decal.
+ * Lifting the decal a few depth rows keeps it painted onto its wall while still
+ * sitting behind any furniture standing in front of it.
+ */
+const WALL_MOUNTED_DECAL_ASSET_IDS: ReadonlySet<string> = new Set([
+  'v3.interior.window',
+  'v3.interior.wall-art',
+]);
+const WALL_MOUNTED_DECAL_DEPTH_BONUS = 2_200_000;
+
+/** Explicit A.1 capability check; unrelated future numeric versions stay on canonical layering. */
+export function usesProductionSliceObjectProfile(manifest: MapManifest): boolean {
+  return (
+    manifest.developmentArt.temporary && manifest.developmentArt.label.includes('Phase 12F-A.1')
+  );
+}
+
+const INTERIOR_LAYER_POLICIES: Readonly<
+  Record<string, Readonly<{ split: number; depthOffset: number }>>
+> = {
+  'v3.interior.bed': { split: 0.57, depthOffset: 0.46 },
+  'v3.interior.bedside-table': { split: 0.52, depthOffset: 0.26 },
+  'v3.interior.dining-table': { split: 0.53, depthOffset: 0.48 },
+  'v3.interior.dining-chair': { split: 0.57, depthOffset: 0.3 },
+  'v3.interior.chest': { split: 0.54, depthOffset: 0.32 },
+  'v3.interior.wardrobe': { split: 0.6, depthOffset: 0.5 },
+  'v3.interior.fireplace': { split: 0.62, depthOffset: 0.48 },
+  'v3.interior.cooking-counter': { split: 0.55, depthOffset: 0.44 },
+  'v3.interior.floor-lamp': { split: 0.62, depthOffset: 0.34 },
+  'v3.interior.houseplant': { split: 0.6, depthOffset: 0.3 },
+};
+
+/**
+ * Tall V3 artwork is split at an authored/category-aware silhouette boundary.
+ * The upper slice stays in front until the player's foot anchor has cleared the
+ * object's usable depth; flat rugs, wall decor, and structural wall panels are
+ * deliberately left unsplit.
+ */
+export function resolveWorldObjectLayerPolicy(
+  object: Pick<MapObject, 'kind' | 'assetId' | 'scale'>,
+): WorldObjectLayerPolicy {
+  if (object.assetId === 'v3.interior.wall') {
+    return {
+      foregroundSplit: undefined,
+      foregroundDepthOffset: 0,
+      occlusion: {
+        lateralRadius: 4.1 * object.scale,
+        behindDepth: 5.5 * object.scale,
+        baseAlpha: 0.34,
+        foregroundAlpha: 0.34,
+      },
+    };
+  }
+  if (object.assetId === 'v3.interior.door') {
+    return {
+      foregroundSplit: 0.64,
+      foregroundDepthOffset: 0.38,
+      occlusion: {
+        lateralRadius: 1.7 * object.scale,
+        behindDepth: 3.2 * object.scale,
+        baseAlpha: 0.46,
+        foregroundAlpha: 0.34,
+      },
+    };
+  }
+
+  const interiorPolicy = INTERIOR_LAYER_POLICIES[object.assetId];
+  if (interiorPolicy !== undefined) {
+    return {
+      foregroundSplit: interiorPolicy.split,
+      foregroundDepthOffset: interiorPolicy.depthOffset,
+      occlusion: undefined,
+    };
+  }
+
+  if (object.assetId.startsWith('v3.interior.')) {
+    return { foregroundSplit: undefined, foregroundDepthOffset: 0, occlusion: undefined };
+  }
+
+  if (object.assetId === 'cottage-amber') {
+    return {
+      foregroundSplit: 0.48,
+      foregroundDepthOffset: 0.58,
+      occlusion: {
+        lateralRadius: 3 * object.scale,
+        behindDepth: 4.6 * object.scale,
+        baseAlpha: 0.62,
+        foregroundAlpha: 0.34,
+      },
+    };
+  }
+
+  if (object.kind === 'tree') {
+    return {
+      foregroundSplit: 0.6,
+      foregroundDepthOffset: 0.72,
+      occlusion: {
+        lateralRadius: 1.6 * object.scale,
+        behindDepth: 2.7 * object.scale,
+        baseAlpha: 0.58,
+        foregroundAlpha: 0.34,
+      },
+    };
+  }
+  if (object.kind === 'building' || object.kind === 'shop') {
+    return {
+      foregroundSplit: 0.57,
+      foregroundDepthOffset: 1.05,
+      occlusion: {
+        lateralRadius: 2.55 * object.scale,
+        behindDepth: 3.4 * object.scale,
+        baseAlpha: 0.7,
+        foregroundAlpha: 0.46,
+      },
+    };
+  }
+  if (object.kind === 'furniture') {
+    return { foregroundSplit: 0.54, foregroundDepthOffset: 0.4, occlusion: undefined };
+  }
+  if (object.kind === 'crafting_station' || object.kind === 'cooking_station') {
+    return { foregroundSplit: 0.56, foregroundDepthOffset: 0.48, occlusion: undefined };
+  }
+  if (object.kind === 'home_entrance') {
+    return {
+      foregroundSplit: 0.64,
+      foregroundDepthOffset: 0.38,
+      occlusion: {
+        lateralRadius: 1.7 * object.scale,
+        behindDepth: 3.2 * object.scale,
+        baseAlpha: 0.46,
+        foregroundAlpha: 0.34,
+      },
+    };
+  }
+  return { foregroundSplit: undefined, foregroundDepthOffset: 0, occlusion: undefined };
+}
+
+function hasAuthoredRotation(
+  resolved: ResolvedAsset,
+  rotation: NonNullable<MapObject['rotation']>,
+) {
+  if (resolved.source === 'pinned_uploaded' || resolved.source === 'active_uploaded') {
+    return resolved.render.defaultRotation === rotation;
+  }
+  return (
+    resolved.bundled.defaultRotation === rotation ||
+    resolved.bundled.variants.some((variant) => variant.rotation === rotation)
+  );
+}
+
+/**
+ * The current V3 interior wall has one authored isometric axis. A perpendicular
+ * wall is the horizontal mirror of that raster in screen space; rotating the
+ * bitmap by 90 degrees would break the isometric projection. Once an authored
+ * directional variant exists, the resolver selects it and this fallback stays
+ * inactive.
+ */
+function applyAssetSafeWorldOrientation(
+  image: Phaser.GameObjects.Image,
+  manifest: MapManifest,
+  object: Readonly<{
+    assetId: MapObject['assetId'];
+    rotation: MapObject['rotation'] | undefined;
+  }>,
+  resolved: ResolvedAsset,
+): void {
+  const rotation = object.rotation;
+  if (
+    !usesProductionSliceObjectProfile(manifest) ||
+    object.assetId !== 'v3.interior.wall' ||
+    resolved.visualKey !== object.assetId ||
+    (rotation !== 90 && rotation !== 270) ||
+    hasAuthoredRotation(resolved, rotation)
+  ) {
+    return;
+  }
+  image.setFlipX(true);
+}
+
+function playerOccludesObject(
+  object: Pick<RenderedWorldObject, 'world' | 'layerPolicy'>,
+  player: Readonly<{ x: number; y: number }>,
+): boolean {
+  const policy = object.layerPolicy.occlusion;
+  if (policy === undefined) return false;
+
+  // Rotate logical coordinates into the isometric screen axes. A positive
+  // depth distance means the player's foot anchor is geometrically behind the
+  // object's foot anchor; lateral distance keeps unrelated nearby rows opaque.
+  const lateralDistance =
+    Math.abs(player.x - player.y - (object.world.x - object.world.y)) * Math.SQRT1_2;
+  const behindDistance = (object.world.x + object.world.y - player.x - player.y) * Math.SQRT1_2;
+  return (
+    behindDistance >= 0 &&
+    behindDistance <= policy.behindDepth &&
+    lateralDistance <= policy.lateralRadius
+  );
+}
+
+/**
+ * Fades only tall layered objects that geometrically cover the local player's
+ * foot anchor. Alpha is restored immediately after the player moves to the
+ * front or leaves the object's lateral/depth footprint.
+ */
+export function updateWorldObjectOcclusion(
+  objects: readonly RenderedWorldObject[],
+  player: Readonly<{ x: number; y: number }>,
+): WorldObjectOcclusionMetrics {
+  let occludedObjects = 0;
+  for (const object of objects) {
+    const policy = object.layerPolicy.occlusion;
+    if (policy === undefined) continue;
+    const occluded = playerOccludesObject(object, player);
+    object.container.setAlpha(occluded ? policy.baseAlpha : 1);
+    object.foreground?.setAlpha(occluded ? policy.foregroundAlpha : 1);
+    if (occluded) occludedObjects += 1;
+  }
+  return { occludedObjects };
+}
+
+export function updateWorldObjectCulling(
+  objects: readonly RenderedWorldObject[],
+  worldView: Readonly<{ x: number; y: number; width: number; height: number }>,
+): WorldObjectCullingMetrics {
+  const padding = 620;
+  let visibleObjects = 0;
+  for (const object of objects) {
+    const visible =
+      object.screen.x >= worldView.x - padding &&
+      object.screen.x <= worldView.x + worldView.width + padding &&
+      object.screen.y >= worldView.y - padding &&
+      object.screen.y <= worldView.y + worldView.height + padding;
+    object.container.setVisible(visible);
+    object.foreground?.setVisible(visible);
+    object.shadow?.setVisible(visible);
+    if (visible) visibleObjects += 1;
+  }
+  return {
+    visibleObjects,
+    totalObjects: objects.length,
+    culledObjects: objects.length - visibleObjects,
+  };
 }
 
 function drawBuilding(graphics: Phaser.GameObjects.Graphics, sage: boolean): void {
@@ -219,9 +502,13 @@ export function renderWorldObjects(
 
   const deliveriesByKey = new Map(deliveries.map((delivery) => [delivery.assetKey, delivery]));
   const resolutionContext = options.assetResolutionContext ?? 'published_world';
+  const productionSliceProfile = usesProductionSliceObjectProfile(manifest);
 
   return manifest.objects.map((object) => {
     const screen = projectWorld(object, projection);
+    const layerPolicy = productionSliceProfile
+      ? resolveWorldObjectLayerPolicy(object)
+      : CANONICAL_WORLD_OBJECT_LAYER_POLICY;
     const delivery = deliveriesByKey.get(object.assetId);
     const resolved = resolvedVisual(
       scene,
@@ -230,6 +517,7 @@ export function renderWorldObjects(
       resolutionContext,
     );
     let visual: Phaser.GameObjects.GameObject;
+    let foregroundVisual: Phaser.GameObjects.Image | undefined;
     let depthOffset = 0;
     const categoryScale = resolveWorldObjectVisualScale(object.kind);
     const visualScale = resolveWorldObjectVisualScale(object.kind, object.scale);
@@ -242,6 +530,32 @@ export function renderWorldObjects(
         resolved.render.renderWidth * resolved.render.scale,
         resolved.render.renderHeight * resolved.render.scale,
       );
+      applyAssetSafeWorldOrientation(
+        image,
+        manifest,
+        { assetId: object.assetId, rotation: object.rotation },
+        resolved,
+      );
+      const split = layerPolicy.foregroundSplit;
+      if (split !== undefined) {
+        const width = resolved.render.renderWidth;
+        const height = resolved.render.renderHeight;
+        const splitY = Math.max(1, Math.round(height * split));
+        image.setCrop(0, splitY, width, Math.max(1, height - splitY));
+        foregroundVisual = scene.add.image(0, 0, resolvedWorldAssetTextureKey(resolved));
+        foregroundVisual.setOrigin(placement.originX, placement.originY);
+        foregroundVisual.setDisplaySize(
+          resolved.render.renderWidth * resolved.render.scale,
+          resolved.render.renderHeight * resolved.render.scale,
+        );
+        applyAssetSafeWorldOrientation(
+          foregroundVisual,
+          manifest,
+          { assetId: object.assetId, rotation: object.rotation },
+          resolved,
+        );
+        foregroundVisual.setCrop(0, 0, width, splitY);
+      }
       visual = image;
       depthOffset = placement.depthOffset;
     } else {
@@ -254,12 +568,41 @@ export function renderWorldObjects(
       visual = graphics;
     }
 
-    const baseDepth = depthForFootPosition(object.x, object.y, object.id);
+    const decalDepthBonus =
+      productionSliceProfile && WALL_MOUNTED_DECAL_ASSET_IDS.has(object.assetId)
+        ? WALL_MOUNTED_DECAL_DEPTH_BONUS
+        : 0;
+    const baseDepth = depthForFootPosition(object.x, object.y, object.id) + decalDepthBonus;
     const container = scene.add.container(screen.x, screen.y, [visual]);
     container.setScale(visualScale);
     container.setDepth(baseDepth + depthOffset);
 
-    if (options.shadows === false) return { id: object.id, container };
+    const foreground =
+      foregroundVisual === undefined
+        ? undefined
+        : scene.add.container(screen.x, screen.y, [foregroundVisual]);
+    if (foreground !== undefined) {
+      const offset = layerPolicy.foregroundDepthOffset;
+      foreground.setScale(visualScale);
+      foreground.setDepth(
+        depthForFootPosition(object.x + offset, object.y + offset, `${object.id}-foreground`) +
+          depthOffset,
+      );
+    }
+
+    if (options.shadows === false) {
+      return {
+        id: object.id,
+        assetId: object.assetId,
+        kind: object.kind,
+        world: { x: object.x, y: object.y },
+        scale: object.scale,
+        container,
+        screen,
+        layerPolicy,
+        ...(foreground === undefined ? {} : { foreground }),
+      };
+    }
     const shadowSpec = resolveWorldObjectContactShadow(object.kind, object.scale);
     const shadow = scene.add.graphics();
     const qualityAlpha = options.quality === 'low' ? shadowSpec.alpha * 0.76 : shadowSpec.alpha;
@@ -274,6 +617,17 @@ export function renderWorldObjects(
     shadow
       .setPosition(screen.x, screen.y)
       .setDepth(baseDepth - STARVILLE_VISUAL_TOKENS.depth.shadowOffset);
-    return { id: object.id, container, shadow };
+    return {
+      id: object.id,
+      assetId: object.assetId,
+      kind: object.kind,
+      world: { x: object.x, y: object.y },
+      scale: object.scale,
+      container,
+      shadow,
+      screen,
+      layerPolicy,
+      ...(foreground === undefined ? {} : { foreground }),
+    };
   });
 }

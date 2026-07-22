@@ -88,7 +88,12 @@ function furnitureAssetRef(workspace: HousingWorkspace, furnitureKey: string): s
 export function HousingWorkspacePanel({
   apiUrl,
   realtimeUrl,
-}: Readonly<{ apiUrl: string; realtimeUrl?: string | undefined }>) {
+  onAuthoritativeMutation,
+}: Readonly<{
+  apiUrl: string;
+  realtimeUrl?: string | undefined;
+  onAuthoritativeMutation?: (() => void) | undefined;
+}>) {
   const [workspace, setWorkspace] = useState<HousingWorkspace>();
   const [draft, setDraft] = useState<HousingLocalDraft>();
   const [tab, setTab] = useState<HousingTab>('decorate');
@@ -251,6 +256,7 @@ export function HousingWorkspacePanel({
       setExitPrompt(false);
       setRestorationOmissions([]);
       setNotice(result.announcement);
+      onAuthoritativeMutation?.();
     });
   }
   function discard() {
@@ -638,6 +644,7 @@ export function HousingWorkspacePanel({
                           stack.itemDefinitionId,
                         );
                         setWorkspace(result.workspace);
+                        onAuthoritativeMutation?.();
                         setNotice(result.announcement);
                       })
                     }
@@ -669,6 +676,7 @@ export function HousingWorkspacePanel({
                             entry.furniture.itemDefinitionId,
                           );
                           setWorkspace(result.workspace);
+                          onAuthoritativeMutation?.();
                           setNotice(result.announcement);
                         })
                       }
@@ -713,6 +721,7 @@ export function HousingWorkspacePanel({
                         setWorkspace(result.workspace);
                         setUpgradeConfirm(undefined);
                         setNotice(result.announcement);
+                        onAuthoritativeMutation?.();
                       })
                     }
                   >
@@ -820,7 +829,13 @@ export function HousingWorkspacePanel({
           )}
         </div>
       ) : null}
-      {tab === 'visits' ? <HomeVisitsPanel apiUrl={apiUrl} realtimeUrl={realtimeUrl} /> : null}
+      {tab === 'visits' ? (
+        <HomeVisitsPanel
+          apiUrl={apiUrl}
+          realtimeUrl={realtimeUrl}
+          onAuthoritativeMutation={onAuthoritativeMutation}
+        />
+      ) : null}
       {tab === 'game_test' ? (
         <div className="housing-game-test">
           <strong>Game Test Housing</strong>

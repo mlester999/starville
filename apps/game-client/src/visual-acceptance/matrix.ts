@@ -1,12 +1,15 @@
 export const AVATAR_VISUAL_ACCEPTANCE_VIEWPORTS = [
   [360, 800],
   [390, 844],
+  [412, 915],
   [768, 1024],
   [820, 1180],
   [1024, 768],
   [1280, 800],
+  [1366, 768],
   [1440, 900],
   [1920, 1080],
+  [2560, 1440],
 ] as const;
 
 export const AVATAR_VISUAL_ACCEPTANCE_SCALES = [90, 100, 110, 120] as const;

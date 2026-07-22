@@ -67,12 +67,19 @@ not activate V2, publish a world, deploy an application, or make Starville produ
 - [ ] Enable Reduced Motion and confirm ambience becomes static or is suppressed.
 - [ ] Enable increased contrast and confirm ambience does not weaken object outlines.
 - [ ] Adjust ambience volume independently.
+- [ ] Adjust music volume independently.
 - [ ] Adjust sound-effect volume independently.
 - [ ] Mute all audio and confirm silence.
+- [ ] Mute music, ambience, and sound effects independently.
+- [ ] Confirm the Lantern Square and personal-home foundations do not overlap or restart
+      unnecessarily.
 - [ ] Background the browser tab and confirm audio suspends safely.
 - [ ] Restore the tab and confirm audio resumes only when allowed by the saved settings and browser
       policy.
 - [ ] Confirm no missing or fabricated sound is represented as production audio.
+- [ ] Confirm every current cue remains labeled `development_safe` with project-owned procedural
+      provenance and no third-party audio.
+- [ ] Block Web Audio and confirm the visible unavailable notice plus text-equivalent feedback.
 
 ## Gameplay states
 
@@ -149,12 +156,15 @@ not activate V2, publish a world, deploy an application, or make Starville produ
 
 - [ ] 360 × 800.
 - [ ] 390 × 844.
+- [ ] 412 × 915.
 - [ ] 768 × 1024.
 - [ ] 820 × 1180.
 - [ ] 1024 × 768.
 - [ ] 1280 × 800.
+- [ ] 1366 × 768.
 - [ ] 1440 × 900.
 - [ ] 1920 × 1080.
+- [ ] 2560 × 1440.
 - [ ] 200 percent browser zoom at a desktop viewport.
 - [ ] Operating-system Reduced Motion preference.
 - [ ] Increased/forced-contrast mode where supported.
@@ -162,10 +172,11 @@ not activate V2, publish a world, deploy an application, or make Starville produ
 
 ## Integrated Game Test
 
-- [ ] Complete all 21 steps in the **Phase 12E beta scenario**.
+- [ ] Complete all 23 steps in the **Phase 12E beta scenario**.
 - [ ] Confirm the scenario covers spawn, V2 character, remote parity, objective, home, farming,
       workstation, store, XP, housing, home visits, guestbook/appreciation, helper watering, modal,
-      reconnect, missing asset, Reduced Motion, high contrast, and mobile review.
+      audio, audio-unavailable fallback, reconnect, missing asset, Reduced Motion, high contrast,
+      and the 11-viewport review.
 - [ ] Confirm the scenario does not mutate player data, inventory, DUST, progression, social state,
       world publication, or hosted asset state.
 - [ ] Switch between exact authorized V1 and the local V2 candidate.

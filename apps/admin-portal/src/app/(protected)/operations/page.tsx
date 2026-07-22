@@ -65,8 +65,23 @@ export default async function OperationsPage() {
           <span className="permission-badge">Observed {formatDate(summary.generatedAt)}</span>
         </header>
         <p>
+          <Link className="button button--primary" href="/operations/production-release-candidate">
+            Review Production Release Candidate
+          </Link>
+        </p>
+        <p>
+          <Link className="button button--primary" href="/operations/release-live-ops">
+            Review Release and Live Ops
+          </Link>
+        </p>
+        <p>
           <Link className="button button--primary" href="/operations/beta-readiness">
-            Review Beta Readiness
+            Review Closed-Beta Readiness
+          </Link>
+        </p>
+        <p>
+          <Link className="button button--secondary" href="/operations/gameplay-health">
+            Review Gameplay Health
           </Link>
         </p>
         {hasAdminPermission(context, 'live_operations.read') ? (

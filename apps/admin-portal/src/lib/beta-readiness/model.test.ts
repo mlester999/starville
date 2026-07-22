@@ -61,13 +61,16 @@ describe('Beta Readiness status model', () => {
 
   it('distinguishes missing local, hosted, owner, and local-only gates', () => {
     const snapshot = buildBetaReadinessSnapshot(
-      observation({}, ['phase12eValidation', 'runtimeHotfix']),
+      observation({}, ['phase12eValidation', 'phase13bValidation', 'runtimeHotfix']),
     );
     const statuses = Object.fromEntries(snapshot.gates.map((gate) => [gate.id, gate.status]));
 
     expect(statuses['application-health']).toBe('Not Started');
-    expect(statuses['database-gates']).toBe('Hosted Validation Pending');
+    expect(statuses['database-gates']).toBe('Not Started');
+    expect(statuses['role-access-matrix']).toBe('Hosted Validation Pending');
+    expect(statuses['abuse-protections']).toBe('Not Started');
     expect(statuses['asset-readiness']).toBe('Owner Review Pending');
+    expect(statuses['audio-readiness']).toBe('Not Started');
     expect(statuses['accessibility']).toBe('Not Started');
     expect(snapshot.gates.every((gate) => gate.environment === 'Local repository')).toBe(true);
     expect(
@@ -128,7 +131,7 @@ describe('Beta Readiness status model', () => {
       }),
     );
 
-    expect(snapshot.ownerAcceptance).toHaveLength(20);
+    expect(snapshot.ownerAcceptance).toHaveLength(21);
     expect(snapshot.ownerAcceptance.every(({ accepted }) => accepted === false)).toBe(true);
     expect(snapshot.automatedEvidence.every((item) => 'state' in item)).toBe(true);
     expect(snapshot.ownerAcceptance.every((item) => !('state' in item))).toBe(true);

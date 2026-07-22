@@ -30,12 +30,15 @@ describe('Phase 11A responsive acceptance fixtures', () => {
     expect(AVATAR_VISUAL_ACCEPTANCE_VIEWPORTS).toEqual([
       [360, 800],
       [390, 844],
+      [412, 915],
       [768, 1024],
       [820, 1180],
       [1024, 768],
       [1280, 800],
+      [1366, 768],
       [1440, 900],
       [1920, 1080],
+      [2560, 1440],
     ]);
   });
 

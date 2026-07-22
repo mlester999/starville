@@ -10,6 +10,7 @@ export type Phase12EBetaScenarioArea =
   | 'housing'
   | 'home_visit'
   | 'modal'
+  | 'audio'
   | 'recovery'
   | 'asset_fallback'
   | 'accessibility'
@@ -181,6 +182,26 @@ export const PHASE12E_BETA_SCENARIO_STEPS: readonly Phase12EBetaScenarioStep[] =
     evidence: 'Shared GameModalShell focus and stacking architecture.',
   },
   {
+    id: 'audio-foundation',
+    area: 'audio',
+    title: 'Music, ambience, and sound controls',
+    instruction:
+      'Unlock audio with one gesture, review both locations, adjust every volume group, then mute each group independently.',
+    expected:
+      'One music and one ambient loop play at most, settings preview immediately, and hidden tabs remain silent.',
+    evidence:
+      'Original procedural development-safe catalog with project-owned provenance and no embedded third-party media.',
+  },
+  {
+    id: 'audio-unavailable',
+    area: 'audio',
+    title: 'Audio unavailable fallback',
+    instruction: 'Block Web Audio or deny playback, then continue the visual scenario.',
+    expected:
+      'The world remains playable, an unavailable notice appears, and meaningful feedback remains available as text.',
+    evidence: 'Fail-silent audio manager and polite text-equivalent status region.',
+  },
+  {
     id: 'reconnect',
     area: 'recovery',
     title: 'Connection interruption and recovery',
@@ -220,7 +241,8 @@ export const PHASE12E_BETA_SCENARIO_STEPS: readonly Phase12EBetaScenarioStep[] =
     id: 'mobile-state',
     area: 'responsive',
     title: 'Mobile and zoom state',
-    instruction: 'Use the browser matrix at 360×800, 390×844, landscape, and 200% zoom.',
+    instruction:
+      'Use the 11-viewport matrix from 360×800 through 2560×1440, landscape, and 200% zoom.',
     expected: 'No HUD collision, hidden primary action, modal overflow, or horizontal page scroll.',
     evidence: 'Production safe-region CSS plus owner/browser geometry inspection.',
   },

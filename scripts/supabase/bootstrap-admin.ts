@@ -9,7 +9,11 @@ import {
 import { createSupabaseServiceRoleClient } from '@starville/supabase/server';
 import { z } from 'zod';
 
-import { assertBootstrapProjectRef, parseBootstrapArguments } from './bootstrap-arguments';
+import {
+  assertBootstrapEnvironmentConfirmation,
+  assertBootstrapProjectRef,
+  parseBootstrapArguments,
+} from './bootstrap-arguments';
 import { safeHostedTargetSummary, verifyCanonicalHostedTarget } from './safety';
 
 async function main(): Promise<void> {
@@ -17,6 +21,7 @@ async function main(): Promise<void> {
   const security = loadAdminSecurityConfig(process.env);
   const options = parseBootstrapArguments(process.argv.slice(2), security.requireMfaByDefault);
   assertBootstrapProjectRef(options, target.projectRef);
+  assertBootstrapEnvironmentConfirmation(options, target.environment);
 
   process.stdout.write(
     `${JSON.stringify({
@@ -39,9 +44,7 @@ async function main(): Promise<void> {
   const authUser = await client.auth.admin.getUserById(options.userId);
 
   if (authUser.error || authUser.data.user.id !== options.userId) {
-    throw new Error(
-      'Bootstrap Auth user could not be verified on the approved development project',
-    );
+    throw new Error('Bootstrap Auth user could not be verified on the approved hosted project');
   }
 
   const previewResult = await client.rpc('preview_first_super_admin_bootstrap', {

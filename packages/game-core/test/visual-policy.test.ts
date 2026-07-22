@@ -156,6 +156,22 @@ describe('shared Starville visual policy', () => {
     }
   });
 
+  it('uses exact authored projected bounds only when a V3 caller opts in', () => {
+    const manifest = lanternSquareManifest();
+    const frame = computeWorldCameraFrame({
+      manifest,
+      viewportWidth: 1_280,
+      viewportHeight: 720,
+      respectManifestBounds: true,
+    });
+    expect(frame.bounds).toEqual({
+      x: manifest.cameraBounds.minX,
+      y: manifest.cameraBounds.minY,
+      width: manifest.cameraBounds.maxX - manifest.cameraBounds.minX,
+      height: manifest.cameraBounds.maxY - manifest.cameraBounds.minY,
+    });
+  });
+
   it('returns categorized, actionable visual readiness findings', () => {
     const manifest = lanternSquareManifest();
     const analysis = analyzeWorldVisualReadiness(manifest);

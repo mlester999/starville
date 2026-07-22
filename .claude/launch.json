@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "game-client",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@starville/game-client", "dev"],
+      "port": 3001
+    }
+  ]
+}

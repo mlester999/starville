@@ -15,12 +15,19 @@ const VALUE_OPTIONS = new Set([
   'expected-status',
   'expected-role',
 ]);
-const FLAG_OPTIONS = new Set(['apply', 'dry-run', 'confirm-development', 'activate-invited']);
+const FLAG_OPTIONS = new Set([
+  'apply',
+  'dry-run',
+  'confirm-development',
+  'confirm-production',
+  'activate-invited',
+]);
 
 export interface BootstrapArguments {
   readonly apply: boolean;
   readonly activateInvited: boolean;
   readonly confirmedDevelopment: boolean;
+  readonly confirmedProduction: boolean;
   readonly userId: string;
   readonly displayName?: string;
   readonly projectRef: string;
@@ -104,8 +111,10 @@ export function parseBootstrapArguments(
     throw new Error('--apply and --dry-run cannot be combined');
   }
 
-  if (apply && !flags.has('confirm-development')) {
-    throw new Error('--confirm-development is required with --apply');
+  if (apply && flags.has('confirm-development') === flags.has('confirm-production')) {
+    throw new Error(
+      'Exactly one of --confirm-development or --confirm-production is required with --apply',
+    );
   }
 
   const userId = z.uuid().parse(values.get('user-id'));
@@ -134,6 +143,7 @@ export function parseBootstrapArguments(
       apply,
       activateInvited,
       confirmedDevelopment: flags.has('confirm-development'),
+      confirmedProduction: flags.has('confirm-production'),
       userId,
       projectRef,
       requireMfa: optionalBoolean(requireMfaValue, defaultRequireMfa),
@@ -150,11 +160,25 @@ export function parseBootstrapArguments(
     apply,
     activateInvited,
     confirmedDevelopment: flags.has('confirm-development'),
+    confirmedProduction: flags.has('confirm-production'),
     userId,
     displayName: z.string().trim().min(1).max(100).parse(displayNameValue),
     projectRef,
     requireMfa: optionalBoolean(requireMfaValue, defaultRequireMfa),
   };
+}
+
+export function assertBootstrapEnvironmentConfirmation(
+  options: BootstrapArguments,
+  environment: 'development' | 'production',
+): void {
+  if (!options.apply) return;
+  if (environment === 'development' && !options.confirmedDevelopment) {
+    throw new Error('Development bootstrap requires --confirm-development');
+  }
+  if (environment === 'production' && !options.confirmedProduction) {
+    throw new Error('Production bootstrap requires --confirm-production');
+  }
 }
 
 export function assertBootstrapProjectRef(

@@ -23,6 +23,12 @@ export function startGame(parent: HTMLElement, options: GameRuntimeOptions): Gam
     setTouchMovementInput(input) {
       if (!destroyed) scene.setTouchMovementInput(input);
     },
+    setTouchJogging(jogging) {
+      if (!destroyed) scene.setTouchJogging(jogging);
+    },
+    setCollisionDebug(enabled) {
+      if (!destroyed) scene.setCollisionDebug(enabled);
+    },
     setAudioSettings(settings) {
       if (destroyed) return;
       game.sound.setVolume(settings.masterVolume);
@@ -60,6 +66,9 @@ export function startGame(parent: HTMLElement, options: GameRuntimeOptions): Gam
     },
     getState() {
       return scene.getState();
+    },
+    getDiagnostics() {
+      return scene.getDiagnostics();
     },
     loadWorld(world, state) {
       if (!destroyed) scene.loadWorld(world, state);

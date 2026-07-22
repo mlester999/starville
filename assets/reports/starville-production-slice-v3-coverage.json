@@ -1,0 +1,3633 @@
+{
+  "aliases": [],
+  "assetCount": 46,
+  "assets": [
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "interaction_marker",
+      "bundledStatus": "bundled_default_available",
+      "category": "interaction",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": [
+        "lantern_square",
+        "personal_home",
+        "farming",
+        "housing",
+        "interface",
+        "game_test"
+      ],
+      "dimensions": {
+        "aspectRatio": 1,
+        "height": 192,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": true,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "system.missing-asset",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming,housing,interface,game_test"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/interaction/system__missing-asset.webp",
+      "sourcePath": "assets/source-v3/interaction/system__missing-asset.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/interaction/system__missing-asset.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Game Client fallback", "World Composer diagnostics", "Admin Portal"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.base",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__base.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__base.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__base.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.clover",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__clover.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__clover.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__clover.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.dirt",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__dirt.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__dirt.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__dirt.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.path.stone",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__path__stone.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__path__stone.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__path__stone.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.plaza",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__plaza.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__plaza.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__plaza.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.water",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.bridge",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__bridge.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__bridge.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__bridge.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.88
+        },
+        "interactionRadius": 1.6,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "building",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 1.4,
+        "offsetX": -1.1,
+        "offsetY": -0.7,
+        "shape": "rectangle",
+        "width": 2.2
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1,
+        "height": 512,
+        "recommendedScale": 0.78,
+        "width": 512
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 2.5,
+        "width": 3
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "cottage-amber",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/cottage-amber.webp",
+      "sourcePath": "assets/source-v3/structure/cottage-amber.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/cottage-amber.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal-home entrance"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.92
+        },
+        "interactionRadius": 1.5,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "sign",
+      "bundledStatus": "bundled_default_available",
+      "category": "signage",
+      "collision": {
+        "blocking": true,
+        "height": 0.36,
+        "offsetX": -0.35,
+        "offsetY": -0.18,
+        "shape": "rectangle",
+        "width": 0.7
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 0.8888888888888888,
+        "height": 360,
+        "recommendedScale": 0.72,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "notice-board",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/signage/notice-board.webp",
+      "sourcePath": "assets/source-v3/signage/notice-board.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/signage/notice-board.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World guidance", "World Composer"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "lamp",
+      "bundledStatus": "bundled_default_available",
+      "category": "lighting",
+      "collision": {
+        "blocking": true,
+        "height": 0.36,
+        "offsetX": -0.18,
+        "offsetY": -0.18,
+        "shape": "rectangle",
+        "width": 0.36
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 0.6666666666666666,
+        "height": 384,
+        "recommendedScale": 0.9,
+        "width": 256
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "lamp-star",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/lighting/lamp-star.webp",
+      "sourcePath": "assets/source-v3/lighting/lamp-star.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/lighting/lamp-star.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "World paths"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "fence",
+      "bundledStatus": "bundled_default_available",
+      "category": "boundary",
+      "collision": {
+        "blocking": true,
+        "height": 0.4,
+        "offsetX": -1.5,
+        "offsetY": -0.2,
+        "shape": "rectangle",
+        "width": 3
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 256,
+        "recommendedScale": 0.92,
+        "width": 512
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 0.5,
+        "width": 3
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "fence-willow",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/boundary/fence-willow.webp",
+      "sourcePath": "assets/source-v3/boundary/fence-willow.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/boundary/fence-willow.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "tree",
+      "bundledStatus": "bundled_default_available",
+      "category": "nature",
+      "collision": {
+        "blocking": true,
+        "height": 0.48,
+        "offsetX": -0.22,
+        "offsetY": -0.24,
+        "shape": "rectangle",
+        "width": 0.44
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 0.7142857142857143,
+        "height": 448,
+        "recommendedScale": 0.82,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "tree-pine",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/nature/tree-pine.webp",
+      "sourcePath": "assets/source-v3/nature/tree-pine.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/nature/tree-pine.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Whisperpine Gate"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "tree",
+      "bundledStatus": "bundled_default_available",
+      "category": "nature",
+      "collision": {
+        "blocking": true,
+        "height": 0.48,
+        "offsetX": -0.22,
+        "offsetY": -0.24,
+        "shape": "rectangle",
+        "width": 0.44
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 0.8571428571428571,
+        "height": 448,
+        "recommendedScale": 0.78,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "tree-maple",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/nature/tree-maple.webp",
+      "sourcePath": "assets/source-v3/nature/tree-maple.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/nature/tree-maple.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "decoration",
+      "bundledStatus": "bundled_default_available",
+      "category": "nature",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 1.25,
+        "height": 256,
+        "recommendedScale": 0.78,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "bush-round",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/nature/bush-round.webp",
+      "sourcePath": "assets/source-v3/nature/bush-round.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/nature/bush-round.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "World Composer"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "decoration",
+      "bundledStatus": "bundled_default_available",
+      "category": "nature",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 1.25,
+        "height": 256,
+        "recommendedScale": 0.8,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "flowers-moon",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/nature/flowers-moon.webp",
+      "sourcePath": "assets/source-v3/nature/flowers-moon.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/nature/flowers-moon.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "World Composer"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "rock",
+      "bundledStatus": "bundled_default_available",
+      "category": "nature",
+      "collision": {
+        "blocking": true,
+        "height": 0.5,
+        "offsetX": -0.35,
+        "offsetY": -0.25,
+        "shape": "rectangle",
+        "width": 0.7
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 1.2,
+        "height": 320,
+        "recommendedScale": 0.72,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "rock-moss",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/nature/rock-moss.webp",
+      "sourcePath": "assets/source-v3/nature/rock-moss.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/nature/rock-moss.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "World Composer"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.2,
+        "height": 320,
+        "recommendedScale": 0.82,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "phase7-dev-willow-chair",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/phase7-dev-willow-chair.webp",
+      "sourcePath": "assets/source-v3/furniture/phase7-dev-willow-chair.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/phase7-dev-willow-chair.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.9
+        },
+        "interactionRadius": 1.5,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "crafting_station",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 0.9,
+        "offsetX": -0.8,
+        "offsetY": -0.45,
+        "shape": "rectangle",
+        "width": 1.6
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.2,
+        "height": 320,
+        "recommendedScale": 0.82,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1.5,
+        "width": 2
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "phase7-crafting-workbench-marker",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/phase7-crafting-workbench-marker.webp",
+      "sourcePath": "assets/source-v3/structure/phase7-crafting-workbench-marker.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/phase7-crafting-workbench-marker.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home workstation"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1,
+        "height": 320,
+        "recommendedScale": 0.72,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "phase7-dev-round-leaf-planter",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/phase7-dev-round-leaf-planter.webp",
+      "sourcePath": "assets/source-v3/furniture/phase7-dev-round-leaf-planter.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/phase7-dev-round-leaf-planter.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.light",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__light.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__light.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__light.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.dark",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__dark.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__dark.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__dark.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.worn",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__worn.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__worn.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__worn.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.flowers",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__flowers.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__flowers.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__flowers.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.path-edge",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__path-edge.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__path-edge.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__path-edge.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.grass.shore",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__shore.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__shore.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__shore.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.water.deep",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__deep.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__deep.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__deep.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.water.shallow",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__shallow.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__shallow.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__shallow.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.water.shore",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__shore.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__shore.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__shore.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "world.terrain.water.disturbance",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__disturbance.webp",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__disturbance.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__disturbance.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.5
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 0.5
+        }
+      },
+      "animationState": "static",
+      "assetType": "terrain_tile",
+      "bundledStatus": "bundled_default_available",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "dimensions": {
+        "aspectRatio": 2,
+        "height": 96,
+        "recommendedScale": 1,
+        "width": 192
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.floor",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home,farming"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/terrain/v3__interior__floor.webp",
+      "sourcePath": "assets/source-v3/terrain/v3__interior__floor.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/terrain/v3__interior__floor.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.88
+        },
+        "interactionRadius": 1.6,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "building",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 1.4,
+        "offsetX": -1.1,
+        "offsetY": -0.7,
+        "shape": "rectangle",
+        "width": 2.2
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.2,
+        "height": 320,
+        "recommendedScale": 0.72,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 2.5,
+        "width": 3
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.wall",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__wall.webp",
+      "sourcePath": "assets/source-v3/structure/v3__interior__wall.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__wall.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal-home entrance"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.9
+        },
+        "interactionRadius": 1.5,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "home_entrance",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.75,
+        "height": 400,
+        "recommendedScale": 0.68,
+        "width": 300
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 0.5,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.door",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__door.webp",
+      "sourcePath": "assets/source-v3/structure/v3__interior__door.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__door.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Guided onboarding"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.2,
+        "height": 320,
+        "recommendedScale": 0.78,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.bed",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__bed.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__bed.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__bed.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1,
+        "height": 256,
+        "recommendedScale": 0.7,
+        "width": 256
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.bedside-table",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__bedside-table.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__bedside-table.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__bedside-table.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.2,
+        "height": 320,
+        "recommendedScale": 0.74,
+        "width": 384
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 2
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.dining-table",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__dining-table.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__dining-table.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__dining-table.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.8,
+        "height": 320,
+        "recommendedScale": 0.68,
+        "width": 256
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.dining-chair",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__dining-chair.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__dining-chair.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__dining-chair.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.25,
+        "height": 256,
+        "recommendedScale": 0.72,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.chest",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__chest.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__chest.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__chest.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "home_interior_object",
+      "bundledStatus": "bundled_default_available",
+      "category": "interior",
+      "collision": {
+        "blocking": true,
+        "height": 0.5,
+        "offsetX": -0.45,
+        "offsetY": -0.25,
+        "shape": "rectangle",
+        "width": 0.9
+      },
+      "criticalGroups": ["personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.8333333333333334,
+        "height": 384,
+        "recommendedScale": 0.72,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.wardrobe",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/interior/v3__interior__wardrobe.webp",
+      "sourcePath": "assets/source-v3/interior/v3__interior__wardrobe.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/interior/v3__interior__wardrobe.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Wardrobe workspace"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1.6,
+        "height": 160,
+        "recommendedScale": 0.74,
+        "width": 256
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 2
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.rug",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__rug.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__rug.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__rug.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.88
+        },
+        "interactionRadius": 1.6,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "building",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 1.4,
+        "offsetX": -1.1,
+        "offsetY": -0.7,
+        "shape": "rectangle",
+        "width": 2.2
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.9375,
+        "height": 320,
+        "recommendedScale": 0.64,
+        "width": 300
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 2.5,
+        "width": 3
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.window",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__window.webp",
+      "sourcePath": "assets/source-v3/structure/v3__interior__window.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__window.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal-home entrance"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.9
+        },
+        "interactionRadius": 1.5,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "cooking_station",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 0.9,
+        "offsetX": -0.75,
+        "offsetY": -0.45,
+        "shape": "rectangle",
+        "width": 1.5
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.8333333333333334,
+        "height": 384,
+        "recommendedScale": 0.72,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1.5,
+        "width": 2
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.fireplace",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__fireplace.webp",
+      "sourcePath": "assets/source-v3/structure/v3__interior__fireplace.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__fireplace.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home workstation"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.9
+        },
+        "interactionRadius": 1.5,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "cooking_station",
+      "bundledStatus": "bundled_default_available",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 0.9,
+        "offsetX": -0.75,
+        "offsetY": -0.45,
+        "shape": "rectangle",
+        "width": 1.5
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 1,
+        "height": 320,
+        "recommendedScale": 0.72,
+        "width": 320
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1.5,
+        "width": 2
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.cooking-counter",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__cooking-counter.webp",
+      "sourcePath": "assets/source-v3/structure/v3__interior__cooking-counter.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__cooking-counter.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Lantern Square", "Personal home workstation"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": {
+          "x": 0.5,
+          "y": 0.92
+        },
+        "interactionRadius": 1.5,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "sign",
+      "bundledStatus": "bundled_default_available",
+      "category": "signage",
+      "collision": {
+        "blocking": true,
+        "height": 0.36,
+        "offsetX": -0.35,
+        "offsetY": -0.18,
+        "shape": "rectangle",
+        "width": 0.7
+      },
+      "criticalGroups": ["lantern_square"],
+      "dimensions": {
+        "aspectRatio": 0.8571428571428571,
+        "height": 280,
+        "recommendedScale": 0.62,
+        "width": 240
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.wall-art",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:lantern_square"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/signage/v3__interior__wall-art.webp",
+      "sourcePath": "assets/source-v3/signage/v3__interior__wall-art.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/signage/v3__interior__wall-art.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["World guidance", "World Composer"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.625,
+        "height": 320,
+        "recommendedScale": 0.66,
+        "width": 200
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.floor-lamp",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__floor-lamp.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__floor-lamp.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__floor-lamp.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    },
+    {
+      "aliasOf": null,
+      "anchor": {
+        "depth": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "foot": {
+          "x": 0.5,
+          "y": 0.94
+        },
+        "interaction": null,
+        "interactionRadius": 0,
+        "origin": {
+          "x": 0.5,
+          "y": 1
+        }
+      },
+      "animationState": "static",
+      "assetType": "furniture",
+      "bundledStatus": "bundled_default_available",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "dimensions": {
+        "aspectRatio": 0.7857142857142857,
+        "height": 280,
+        "recommendedScale": 0.66,
+        "width": 220
+      },
+      "fallbackState": {
+        "isCanonicalMissingAsset": false,
+        "safeFallbackKey": "system.missing-asset"
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameInformation": {
+        "frameCount": 1,
+        "frameDurationMs": 160,
+        "frameHeight": null,
+        "frameWidth": null,
+        "loopMode": "none"
+      },
+      "key": "v3.interior.houseplant",
+      "qualityStatus": "production_candidate",
+      "replacementAllowed": true,
+      "replacementPriority": "high",
+      "replacementStatusEvidence": [
+        "quality_status:production_candidate",
+        "replacement_allowed:true",
+        "physical_bundled_media",
+        "critical_groups:housing,personal_home"
+      ],
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__houseplant.webp",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__houseplant.png",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "thumbnail": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__houseplant.webp",
+      "uploadedOverrideStatus": "runtime_lifecycle_managed_not_observable_in_repository",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": []
+    }
+  ],
+  "byAssetType": {
+    "building": 3,
+    "cooking_station": 2,
+    "crafting_station": 1,
+    "decoration": 2,
+    "fence": 1,
+    "furniture": 10,
+    "home_entrance": 1,
+    "home_interior_object": 1,
+    "interaction_marker": 1,
+    "lamp": 1,
+    "rock": 1,
+    "sign": 2,
+    "terrain_tile": 18,
+    "tree": 2
+  },
+  "byCategory": {
+    "boundary": 1,
+    "furniture": 10,
+    "interaction": 1,
+    "interior": 1,
+    "lighting": 1,
+    "nature": 5,
+    "signage": 2,
+    "structure": 7,
+    "terrain": 18
+  },
+  "byCriticalGroup": {
+    "farming": 11,
+    "game_test": 1,
+    "housing": 11,
+    "interface": 1,
+    "lantern_square": 35,
+    "personal_home": 38
+  },
+  "expectedFiles": {
+    "runtime": 46,
+    "source": 46,
+    "thumbnail": 46,
+    "total": 138
+  },
+  "fallbackKey": "system.missing-asset",
+  "finalArtHonesty": {
+    "automatedValidationIsNotFinalApproval": true,
+    "candidateManifest": true,
+    "ownerReviewRequired": true
+  },
+  "gameplayCatalogReferences": [
+    {
+      "key": "cottage-amber",
+      "present": true
+    },
+    {
+      "key": "cottage-sage",
+      "present": false
+    },
+    {
+      "key": "tree-pine",
+      "present": true
+    },
+    {
+      "key": "tree-maple",
+      "present": true
+    },
+    {
+      "key": "rock-moss",
+      "present": true
+    },
+    {
+      "key": "fence-willow",
+      "present": true
+    },
+    {
+      "key": "lamp-star",
+      "present": true
+    },
+    {
+      "key": "notice-board",
+      "present": true
+    },
+    {
+      "key": "flowers-moon",
+      "present": true
+    },
+    {
+      "key": "bush-round",
+      "present": true
+    },
+    {
+      "key": "moonstone-marker",
+      "present": false
+    },
+    {
+      "key": "brooklight-sign",
+      "present": false
+    },
+    {
+      "key": "orchard-road-sign",
+      "present": false
+    },
+    {
+      "key": "whisperpine-gate",
+      "present": false
+    },
+    {
+      "key": "closed-route-marker",
+      "present": false
+    },
+    {
+      "key": "phase7-farm-plot-marker",
+      "present": false
+    },
+    {
+      "key": "phase7-general-store-marker",
+      "present": false
+    },
+    {
+      "key": "phase7-cooking-hearth-marker",
+      "present": false
+    },
+    {
+      "key": "phase7-crafting-workbench-marker",
+      "present": true
+    },
+    {
+      "key": "phase7-home-entrance-marker",
+      "present": false
+    },
+    {
+      "key": "phase10b-wardrobe-mirror-marker",
+      "present": false
+    },
+    {
+      "key": "phase10b-wardrobe-furniture-marker",
+      "present": false
+    },
+    {
+      "key": "system.missing-asset",
+      "present": true
+    },
+    {
+      "key": "world.terrain.grass.base",
+      "present": true
+    },
+    {
+      "key": "world.terrain.grass.clover",
+      "present": true
+    },
+    {
+      "key": "world.terrain.dirt",
+      "present": true
+    },
+    {
+      "key": "world.terrain.path.stone",
+      "present": true
+    },
+    {
+      "key": "world.terrain.plaza",
+      "present": true
+    },
+    {
+      "key": "world.terrain.water",
+      "present": true
+    },
+    {
+      "key": "world.terrain.bridge",
+      "present": true
+    },
+    {
+      "key": "world.terrain.soil.dry",
+      "present": false
+    },
+    {
+      "key": "world.terrain.soil.watered",
+      "present": false
+    },
+    {
+      "key": "world.station.cooking-hearth.active",
+      "present": false
+    },
+    {
+      "key": "world.station.cooking-hearth.ready",
+      "present": false
+    },
+    {
+      "key": "world.station.crafting-workbench.active",
+      "present": false
+    },
+    {
+      "key": "world.station.crafting-workbench.ready",
+      "present": false
+    },
+    {
+      "key": "farming.plot.empty",
+      "present": false
+    },
+    {
+      "key": "farming.plot.prepared",
+      "present": false
+    },
+    {
+      "key": "farming.plot.dry",
+      "present": false
+    },
+    {
+      "key": "farming.plot.watered",
+      "present": false
+    },
+    {
+      "key": "farming.plot.planted",
+      "present": false
+    },
+    {
+      "key": "farming.plot.selected",
+      "present": false
+    },
+    {
+      "key": "farming.plot.invalid",
+      "present": false
+    },
+    {
+      "key": "farming.crop.moonbean.stage-0",
+      "present": false
+    },
+    {
+      "key": "farming.crop.moonbean.stage-3",
+      "present": false
+    },
+    {
+      "key": "farming.crop.sunroot.stage-0",
+      "present": false
+    },
+    {
+      "key": "farming.crop.sunroot.stage-3",
+      "present": false
+    },
+    {
+      "key": "farming.crop.cloudberry.stage-0",
+      "present": false
+    },
+    {
+      "key": "farming.crop.cloudberry.stage-4",
+      "present": false
+    },
+    {
+      "key": "phase7-dev-willow-chair",
+      "present": true
+    },
+    {
+      "key": "phase7-dev-hearth-table",
+      "present": false
+    },
+    {
+      "key": "phase7-dev-moonwoven-rug",
+      "present": false
+    },
+    {
+      "key": "phase7-dev-lantern-floor-lamp",
+      "present": false
+    },
+    {
+      "key": "phase7-dev-meadow-shelf",
+      "present": false
+    },
+    {
+      "key": "phase7-dev-round-leaf-planter",
+      "present": true
+    },
+    {
+      "key": "ui.currency.dust",
+      "present": false
+    },
+    {
+      "key": "ui.category.inventory",
+      "present": false
+    },
+    {
+      "key": "ui.category.farming",
+      "present": false
+    },
+    {
+      "key": "ui.category.cooking",
+      "present": false
+    },
+    {
+      "key": "ui.category.crafting",
+      "present": false
+    },
+    {
+      "key": "ui.category.shop",
+      "present": false
+    },
+    {
+      "key": "ui.category.housing",
+      "present": false
+    },
+    {
+      "key": "ui.category.social",
+      "present": false
+    },
+    {
+      "key": "ui.quest.active",
+      "present": false
+    },
+    {
+      "key": "ui.objective.active",
+      "present": false
+    },
+    {
+      "key": "ui.direction",
+      "present": false
+    },
+    {
+      "key": "ui.interaction",
+      "present": false
+    },
+    {
+      "key": "ui.spawn",
+      "present": false
+    },
+    {
+      "key": "ui.exit",
+      "present": false
+    },
+    {
+      "key": "ui.warning",
+      "present": false
+    },
+    {
+      "key": "ui.validation.success",
+      "present": false
+    },
+    {
+      "key": "ui.validation.error",
+      "present": false
+    },
+    {
+      "key": "ui.social.home-visit",
+      "present": false
+    },
+    {
+      "key": "ui.social.photo-area",
+      "present": false
+    },
+    {
+      "key": "ui.social.guestbook",
+      "present": false
+    },
+    {
+      "key": "ui.social.appreciation",
+      "present": false
+    }
+  ],
+  "manifestVersion": "3.1.0",
+  "missingGameplayCatalogReferences": [
+    "cottage-sage",
+    "moonstone-marker",
+    "brooklight-sign",
+    "orchard-road-sign",
+    "whisperpine-gate",
+    "closed-route-marker",
+    "phase7-farm-plot-marker",
+    "phase7-general-store-marker",
+    "phase7-cooking-hearth-marker",
+    "phase7-home-entrance-marker",
+    "phase10b-wardrobe-mirror-marker",
+    "phase10b-wardrobe-furniture-marker",
+    "world.terrain.soil.dry",
+    "world.terrain.soil.watered",
+    "world.station.cooking-hearth.active",
+    "world.station.cooking-hearth.ready",
+    "world.station.crafting-workbench.active",
+    "world.station.crafting-workbench.ready",
+    "farming.plot.empty",
+    "farming.plot.prepared",
+    "farming.plot.dry",
+    "farming.plot.watered",
+    "farming.plot.planted",
+    "farming.plot.selected",
+    "farming.plot.invalid",
+    "farming.crop.moonbean.stage-0",
+    "farming.crop.moonbean.stage-3",
+    "farming.crop.sunroot.stage-0",
+    "farming.crop.sunroot.stage-3",
+    "farming.crop.cloudberry.stage-0",
+    "farming.crop.cloudberry.stage-4",
+    "phase7-dev-hearth-table",
+    "phase7-dev-moonwoven-rug",
+    "phase7-dev-lantern-floor-lamp",
+    "phase7-dev-meadow-shelf",
+    "ui.currency.dust",
+    "ui.category.inventory",
+    "ui.category.farming",
+    "ui.category.cooking",
+    "ui.category.crafting",
+    "ui.category.shop",
+    "ui.category.housing",
+    "ui.category.social",
+    "ui.quest.active",
+    "ui.objective.active",
+    "ui.direction",
+    "ui.interaction",
+    "ui.spawn",
+    "ui.exit",
+    "ui.warning",
+    "ui.validation.success",
+    "ui.validation.error",
+    "ui.social.home-visit",
+    "ui.social.photo-area",
+    "ui.social.guestbook",
+    "ui.social.appreciation"
+  ],
+  "pipelineVersion": "3.1.0",
+  "qualityClassificationCounts": {
+    "production_candidate": 46
+  },
+  "qualityStatus": "production_candidate",
+  "schemaVersion": 1,
+  "variantCount": 0
+}

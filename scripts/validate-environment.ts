@@ -12,6 +12,8 @@ import {
 } from '@starville/config/server';
 import { environmentNameSchema, portSchema } from '@starville/shared-validation';
 
+import { assertDeploymentEnvironment } from './phase13c-release-readiness';
+
 function required(name: string): string {
   const value = process.env[name];
 
@@ -23,6 +25,7 @@ function required(name: string): string {
 }
 
 const environment = environmentNameSchema.parse(required('NEXT_PUBLIC_APP_ENV'));
+assertDeploymentEnvironment(process.env);
 const commonPublic = {
   environment,
   apiUrl: required('NEXT_PUBLIC_API_URL'),
@@ -107,8 +110,7 @@ process.stdout.write(
     },
     supabase: {
       environment: hostedSupabase.environment,
-      projectRef: hostedSupabase.projectRef,
-      projectHostname: hostedSupabase.projectHostname,
+      targetConsistencyVerified: hostedSupabase.projectHostname.endsWith('.supabase.co'),
       remoteWritesApproved: hostedSupabase.remoteWritesApproved,
       hostedTestsApproved: hostedSupabase.hostedTestsApproved,
       bootstrapEnabled: hostedSupabase.bootstrapEnabled,

@@ -18,7 +18,7 @@ export async function verifyCanonicalHostedTarget(
     linkedRef = (await readFile(linkedRefPath, 'utf8')).trim();
   } catch {
     throw new Error(
-      'Canonical Supabase workdir is not linked. Run the documented link command for the verified development project.',
+      'Canonical Supabase workdir is not linked. Run the documented link command for the verified hosted project.',
     );
   }
 
@@ -29,11 +29,16 @@ export async function verifyCanonicalHostedTarget(
   return config;
 }
 
+function maskedIdentifier(value: string): string {
+  if (value.length <= 8) return '<masked>';
+  return `${value.slice(0, 4)}...${value.slice(-4)}`;
+}
+
 export function safeHostedTargetSummary(config: HostedSupabaseSafetyConfig) {
   return {
     environment: config.environment,
-    projectRef: config.projectRef,
-    projectHostname: config.projectHostname,
+    projectRef: maskedIdentifier(config.projectRef),
+    projectHostname: `${maskedIdentifier(config.projectRef)}.supabase.co`,
     linked: true,
     remoteWritesApproved: config.remoteWritesApproved,
     hostedTestsApproved: config.hostedTestsApproved,

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "kind": "starville-production-reference-seed-manifest",
+  "status": "plan-only-owner-acceptance-pending",
+  "policy": {
+    "applicationMethod": "The clean migration chain installs versioned reference catalogs. Post-migration world and asset publication uses existing reviewed Admin Portal workflows.",
+    "idempotency": "Migrations are applied once in timestamp order; publication commands use idempotency keys and expected revisions.",
+    "playerDataAllowed": false,
+    "syntheticAccountsAllowed": false,
+    "developmentUrlsAllowed": false,
+    "secretsAllowed": false,
+    "productionExecutionAuthorized": false
+  },
+  "sources": [
+    {
+      "id": "migration-reference-catalogs",
+      "path": "infrastructure/deployment/manifests/migrations.v1.json",
+      "sha256": "DERIVED_AND_VALIDATED_FROM_EACH_ORDERED_ENTRY",
+      "classification": "schema-and-reference-data",
+      "selection": "all entries in order",
+      "activation": "clean-chain-only",
+      "rollback": "commissioning abort or provider restore"
+    },
+    {
+      "id": "bundled-assets-v1",
+      "path": "assets/manifests/starville-bundled-v1.json",
+      "sha256": "e86663780a9f890f97bcb436d1c7bfab5ab84b742b022f62757e357291c395df",
+      "classification": "accepted-bundled-fallback-catalog",
+      "selection": "current published default",
+      "activation": "migration registry plus reviewed Admin Portal action",
+      "rollback": "restore bundled default"
+    },
+    {
+      "id": "bundled-assets-v2-candidate",
+      "path": "assets/manifests/starville-bundled-v2-candidate.json",
+      "sha256": "361421e0660e2af2cdc3fbd2324946a9b0d3d22801f68a929ea65d415867624f",
+      "classification": "local-candidate-not-production-approved",
+      "selection": "excluded until owner acceptance",
+      "activation": "not-authorized",
+      "rollback": "not-applicable"
+    },
+    {
+      "id": "production-slice-avatar-v3-candidate",
+      "path": "assets/manifests/starville-production-slice-avatar-v3.json",
+      "sha256": "303995169a6fd591b65c32abee25434309b1ddd0ed583ba1ec1b001fd4597442",
+      "classification": "local-candidate-not-production-approved",
+      "selection": "excluded until owner acceptance",
+      "activation": "not-authorized",
+      "rollback": "not-applicable"
+    },
+    {
+      "id": "production-slice-v3-candidate",
+      "path": "assets/manifests/starville-production-slice-v3.json",
+      "sha256": "f07c0fa92dce1f7383335da1f4172c3019195da17094567f0e5a2813f09759b1",
+      "classification": "local-candidate-not-production-approved",
+      "selection": "excluded until owner acceptance",
+      "activation": "not-authorized",
+      "rollback": "not-applicable"
+    }
+  ]
+}

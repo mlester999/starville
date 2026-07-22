@@ -148,6 +148,21 @@ describe('token-access HTTP boundary', () => {
     });
   });
 
+  it('fails readiness safely when the authoritative configuration store is unavailable', async () => {
+    const service = createTokenService();
+    vi.mocked(service.getPublicConfig).mockRejectedValueOnce(new Error('private database detail'));
+
+    const response = await createApp(service).inject({ method: 'GET', url: '/ready' });
+
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      status: 'degraded',
+      readiness: 'not-ready',
+      dependencies: 'unavailable',
+    });
+    expect(response.body).not.toContain('private database detail');
+  });
+
   it('exposes only the closed safe configuration-unavailable error', async () => {
     const service = createTokenService();
     vi.mocked(service.getPublicConfig).mockRejectedValueOnce(

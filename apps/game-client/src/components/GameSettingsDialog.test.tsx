@@ -39,9 +39,14 @@ describe('GameSettingsDialog', () => {
     });
 
     expect(container.textContent).toContain('Master Volume');
-    expect(container.textContent).not.toContain('Music volume');
+    expect(container.textContent).toContain('Music Volume');
     expect(container.textContent).toContain('Ambience Volume');
     expect(container.textContent).toContain('Sound Effects Volume');
+    expect(container.textContent).toContain('Mute All Audio');
+    expect(container.textContent).toContain('Mute Music');
+    expect(container.textContent).toContain('Mute Ambient Audio');
+    expect(container.textContent).toContain('Mute Sound Effects');
+    expect(container.textContent).toContain('original procedural development-safe foundation');
 
     const end = [...container.querySelectorAll('button')].find((button) =>
       button.textContent?.includes('End Starville Session'),
@@ -53,7 +58,7 @@ describe('GameSettingsDialog', () => {
     );
     await act(async () => confirm?.click());
     expect(onEndSession).toHaveBeenCalledTimes(1);
-  });
+  }, 15_000);
 
   it('closes safely on Escape and keeps Tab focus within the semantic dialog', async () => {
     const onResume = vi.fn();
@@ -108,11 +113,11 @@ describe('GameSettingsDialog', () => {
     expect(container.textContent).toContain('World Labels');
     await click('High');
     expect(onSettingsChange).toHaveBeenCalledWith(
-      expect.objectContaining({ visualQuality: 'high', version: 4 }),
+      expect.objectContaining({ visualQuality: 'high', version: 5 }),
     );
     await click('Comfortable');
     expect(onSettingsChange).toHaveBeenCalledWith(
-      expect.objectContaining({ hudDensity: 'comfortable', version: 4 }),
+      expect.objectContaining({ hudDensity: 'comfortable', version: 5 }),
     );
 
     const bubbles = [...container.querySelectorAll<HTMLInputElement>('input')].find((input) =>

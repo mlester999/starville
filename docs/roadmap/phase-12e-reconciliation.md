@@ -11,9 +11,9 @@ accepted, or FINAL.
 
 ## Phase 12E
 
-**V2 World Integration, Environmental Ambience, Visual Polish, Production Hardening, and Beta
-Readiness — local implementation and validation complete; beta candidate ready; hosted and owner
-gates pending.**
+**Release-Candidate Visual Polish, Audio Integration, Animation/Movement/Camera Polish, Loading,
+Responsive Hardening, Performance, Accessibility, and Closed-Beta Visual Readiness — closed-beta
+visual candidate locally ready; owner acceptance and hosted gates pending.**
 
 The current repository candidate derives from the unpublished 47-object, 36-collision Lantern Square
 composition and preserves its stable objects, spawns, exits, collision, and 19 authoritative world
@@ -27,6 +27,9 @@ integrated nonpersistent Game Test, and the authorized read-only Admin Beta Read
 local command, asset, browser, service-health, load, soak, security, and temporary PostgreSQL matrix
 passes. This makes the unpublished working candidate ready for hosted and owner review. It does not
 mean:
+
+- the ten original procedural audio cues are owner-approved final music or sound design;
+- Safari, Firefox, screen-reader, or physical-device acceptance passed;
 
 - hosted pgTAP or RLS passed;
 - owner acceptance passed;

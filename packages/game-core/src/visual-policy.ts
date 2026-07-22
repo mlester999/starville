@@ -59,11 +59,19 @@ export type WorldVisualManifest = Pick<
 export interface WorldCameraFrameInput {
   readonly manifest: Pick<
     MapManifest,
-    'width' | 'height' | 'tileWidth' | 'tileHeight' | 'projectionOrigin' | 'safeSaveBounds'
+    | 'width'
+    | 'height'
+    | 'tileWidth'
+    | 'tileHeight'
+    | 'projectionOrigin'
+    | 'safeSaveBounds'
+    | 'cameraBounds'
   >;
   readonly viewportWidth: number;
   readonly viewportHeight: number;
   readonly reducedMotion?: boolean;
+  /** V3 maps author exact projected bounds; published V1/V2 retain the apron policy. */
+  readonly respectManifestBounds?: boolean;
 }
 
 export interface WorldCameraFrame {
@@ -388,13 +396,21 @@ export function computeWorldCameraFrame(input: WorldCameraFrameInput): WorldCame
     STARVILLE_VISUAL_TOKENS.camera.maximumZoom,
   );
 
+  const authored = manifest.cameraBounds;
   return {
-    bounds: {
-      x: minimumX,
-      y: minimumY,
-      width: maximumX - minimumX,
-      height: maximumY - minimumY,
-    },
+    bounds: input.respectManifestBounds
+      ? {
+          x: authored.minX,
+          y: authored.minY,
+          width: authored.maxX - authored.minX,
+          height: authored.maxY - authored.minY,
+        }
+      : {
+          x: minimumX,
+          y: minimumY,
+          width: maximumX - minimumX,
+          height: maximumY - minimumY,
+        },
     zoom,
     deadzone: input.reducedMotion
       ? { width: 0, height: 0 }

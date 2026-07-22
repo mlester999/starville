@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "starville-production-reference-catalog-manifest",
+  "version": "1.0.0",
+  "status": "local-reviewed-owner-production-approval-pending",
+  "installation": "installed only by the frozen ordered migration chain",
+  "productionExecutionAuthorized": false,
+  "globalRestrictions": {
+    "playerStateAllowed": false,
+    "administratorIdentityAllowed": false,
+    "walletIdentityAllowed": false,
+    "developmentUrlAllowed": false,
+    "developmentProjectAllowed": false,
+    "qaEconomyRecordAllowed": false,
+    "debugFeatureAllowed": false,
+    "animalCareEnabled": false
+  },
+  "catalogs": [
+    {
+      "id": "admin-authorization",
+      "tables": ["admin_roles", "admin_permissions", "admin_role_permissions"],
+      "stableKey": "role key, permission key, and their unique pair",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-security-owner",
+      "idempotency": "ON CONFLICT by stable key or pair",
+      "migrationDependency": "20260710090000_admin_authorization_schema.sql",
+      "productionEligibility": "eligible-reference-only",
+      "environmentRestriction": "no auth.users or admin_users identity",
+      "rollbackLimitation": "forward repair or provider restore"
+    },
+    {
+      "id": "token-access-default",
+      "tables": ["token_gate_configs"],
+      "stableKey": "environment_key plus Solana network",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-wallet-integration-owner",
+      "idempotency": "ON CONFLICT DO NOTHING",
+      "migrationDependency": "20260710100000_token_access_schema.sql",
+      "productionEligibility": "eligible-only-after-mainnet-owner-configuration",
+      "environmentRestriction": "no hardcoded production mint; fail closed until configured",
+      "rollbackLimitation": "versioned administrative configuration change"
+    },
+    {
+      "id": "world-foundation",
+      "tables": ["world_assets", "world_maps", "world_map_versions", "world_map_version_assets"],
+      "stableKey": "asset_key, map slug, and map plus version number",
+      "version": "migration-chain-v1",
+      "ownerApproval": "production-world-revision-missing",
+      "idempotency": "ON CONFLICT by stable key",
+      "migrationDependency": "20260712102000_world_management_seed.sql",
+      "productionEligibility": "catalog-eligible-publication-not-authorized",
+      "environmentRestriction": "no development labels or test-only publication",
+      "rollbackLimitation": "publish a reviewed immutable rollback revision"
+    },
+    {
+      "id": "cozy-gameplay",
+      "tables": [
+        "cozy_item_definitions",
+        "cozy_crop_definitions",
+        "cozy_recipe_definitions",
+        "cozy_recipe_ingredients",
+        "cozy_shop_definitions",
+        "cozy_shop_offers",
+        "cozy_gameplay_stations"
+      ],
+      "stableKey": "definition UUID or slug and versioned relationship key",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-product-and-economy-owner",
+      "idempotency": "ON CONFLICT by immutable identifier",
+      "migrationDependency": "20260713100000_cozy_gameplay_foundation.sql",
+      "productionEligibility": "eligible-reference-only",
+      "environmentRestriction": "no inventory, DUST, crop, or player-state rows",
+      "rollbackLimitation": "forward content version; do not delete settled references"
+    },
+    {
+      "id": "housing",
+      "tables": [
+        "cozy_furniture_definitions",
+        "cozy_home_templates",
+        "cozy_home_entrances",
+        "cozy_home_workstation_templates"
+      ],
+      "stableKey": "definition UUID and template version",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-product-owner",
+      "idempotency": "ON CONFLICT by immutable identifier or template tuple",
+      "migrationDependency": "20260713102000_cozy_gameplay_housing_admin.sql",
+      "productionEligibility": "eligible-reference-only",
+      "environmentRestriction": "no player_homes or player furniture placement",
+      "rollbackLimitation": "forward template version"
+    },
+    {
+      "id": "economy",
+      "tables": [
+        "economy_source_versions",
+        "economy_sink_versions",
+        "economy_policy_versions",
+        "economy_shop_versions",
+        "economy_shop_version_offers"
+      ],
+      "stableKey": "source key, sink key, policy version, shop definition, and offer key",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-economy-owner",
+      "idempotency": "versioned insert plus explicit active pointer",
+      "migrationDependency": "20260716090000_phase9a_economy_schema.sql",
+      "productionEligibility": "eligible-reference-only",
+      "environmentRestriction": "no ledger, balance, purchase, correction, or QA metric rows",
+      "rollbackLimitation": "activate an earlier reviewed version or post a reviewed inverse correction"
+    },
+    {
+      "id": "avatar-and-cosmetics",
+      "tables": [
+        "avatar_body_presets",
+        "avatar_settings",
+        "avatar_content_definitions",
+        "cosmetic_collections",
+        "cosmetic_collection_items"
+      ],
+      "stableKey": "preset, game, content, and collection keys",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-product-owner",
+      "idempotency": "ON CONFLICT by stable key",
+      "migrationDependency": "20260716100000_phase10a_avatar_schema.sql",
+      "productionEligibility": "eligible-reference-only",
+      "environmentRestriction": "no player ownership, loadout, entitlement, or history",
+      "rollbackLimitation": "archive or activate a reviewed content version"
+    },
+    {
+      "id": "objectives-and-progression",
+      "tables": [
+        "cozy_quest_definitions",
+        "cozy_quest_versions",
+        "cozy_quest_objectives",
+        "player_onboarding_versions",
+        "player_onboarding_steps",
+        "player_daily_objective_definitions",
+        "player_achievement_definitions",
+        "player_title_definitions"
+      ],
+      "stableKey": "definition UUID, slug, objective key, or version tuple",
+      "version": "migration-chain-v1",
+      "ownerApproval": "pending-product-owner",
+      "idempotency": "ON CONFLICT by stable identifier",
+      "migrationDependency": "20260717110000_phase11b_workstation_recipe_job_schema.sql",
+      "productionEligibility": "eligible-reference-only",
+      "environmentRestriction": "no player progress, assignment, achievement, title, or telemetry",
+      "rollbackLimitation": "forward definition version"
+    },
+    {
+      "id": "bundled-assets-v1",
+      "tables": ["world_assets", "world_asset_versions", "world_asset_references"],
+      "stableKey": "106 bundled asset keys and manifest version 1.0.0",
+      "version": "1.0.0",
+      "ownerApproval": "accepted-bundled-fallback-phase13d-selection-pending",
+      "idempotency": "immutable manifest hash and ON CONFLICT registry insert",
+      "migrationDependency": "20260718123000_phase12d_repository_authored_bundled_registry.sql",
+      "productionEligibility": "eligible-fallback",
+      "environmentRestriction": "V2 and V3 excluded; no uploaded override",
+      "rollbackLimitation": "restore bundled default through protected audited workflow"
+    }
+  ]
+}

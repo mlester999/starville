@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   STARVILLE_BUNDLED_ASSETS,
   STARVILLE_PHASE12D_CANDIDATE_ASSETS,
+  STARVILLE_PRODUCTION_SLICE_ASSETS,
 } from '../../packages/asset-management/src/bundled-assets';
 
 import {
@@ -35,6 +36,18 @@ describe('bundled asset Vite boundary', () => {
         '/assets/starville/bundled/v1/terrain/not-in-the-manifest.webp?manifest=1.0.0',
       ),
     ).toBeNull();
+    expect(
+      bundledAssetFileForRequest(
+        '/assets/starville/bundled/v3/structure/cottage-amber.webp?manifest=3.1.0',
+      ),
+    ).toMatch(/assets\/starville\/bundled\/v3\/structure\/cottage-amber\.webp$/u);
+    expect(
+      bundledAssetFileForRequest(
+        '/assets/starville/avatar/production-slice-v3/starville-production-adventurer.webp?manifest=3.1.0',
+      ),
+    ).toMatch(
+      /assets\/starville\/avatar\/production-slice-v3\/starville-production-adventurer\.webp$/u,
+    );
     expect(
       bundledAssetFileForRequest(
         '/assets/starville/bundled/v2/terrain/world__terrain__grass__base.webp?manifest=2.0.0',
@@ -111,12 +124,17 @@ describe('bundled asset Vite boundary', () => {
       {} as never,
     );
 
-    const expected = [...STARVILLE_BUNDLED_ASSETS, ...STARVILLE_PHASE12D_CANDIDATE_ASSETS]
+    const expected = [
+      ...STARVILLE_BUNDLED_ASSETS,
+      ...STARVILLE_PHASE12D_CANDIDATE_ASSETS,
+      ...STARVILLE_PRODUCTION_SLICE_ASSETS,
+    ]
       .flatMap((asset) => [
         asset.runtimePath.slice(1),
         asset.thumbnailPath.slice(1),
         ...asset.variants.map((variant) => variant.runtimePath.slice(1)),
       ])
+      .concat('assets/starville/avatar/production-slice-v3/starville-production-adventurer.webp')
       .sort();
     expect(emitted.sort()).toEqual([...new Set(expected)]);
     expect(new Set(emitted).size).toBe(emitted.length);
@@ -127,6 +145,7 @@ describe('bundled asset Vite boundary', () => {
     expect(emitted).toContain(
       'assets/starville/bundled/v2/terrain/world__terrain__grass__base.webp',
     );
+    expect(emitted).toContain('assets/starville/bundled/v3/structure/cottage-amber.webp');
     expect(emitted).not.toContain('assets/starville/bundled/v1/not-in-manifest.webp');
     expect(emitted).not.toContain('assets/starville/bundled/v2/not-in-manifest.webp');
   });

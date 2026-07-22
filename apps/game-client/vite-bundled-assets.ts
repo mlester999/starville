@@ -7,6 +7,8 @@ import {
   STARVILLE_BUNDLED_MANIFEST_VERSION,
   STARVILLE_PHASE12D_CANDIDATE_ASSETS,
   STARVILLE_PHASE12D_CANDIDATE_MANIFEST_VERSION,
+  STARVILLE_PRODUCTION_SLICE_ASSETS,
+  STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
   type BundledManifestVersion,
 } from '../../packages/asset-management/src/bundled-assets';
 import type { Plugin } from 'vite';
@@ -28,7 +30,7 @@ function runtimeRoot(relative: string): string | null {
 }
 
 function manifestPaths(
-  assets: typeof STARVILLE_BUNDLED_ASSETS | typeof STARVILLE_PHASE12D_CANDIDATE_ASSETS,
+  assets: readonly (typeof STARVILLE_BUNDLED_ASSETS)[number][],
 ): ReadonlySet<string> {
   return new Set(
     assets.flatMap((asset) => [
@@ -51,6 +53,20 @@ const BUNDLED_RUNTIMES: readonly BundledRuntime[] = [
     urlPrefix: '/assets/starville/bundled/v2/',
     root: runtimeRoot('assets/starville/bundled/v2'),
     manifestPaths: manifestPaths(STARVILLE_PHASE12D_CANDIDATE_ASSETS),
+  },
+  {
+    manifestVersion: STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
+    urlPrefix: '/assets/starville/bundled/v3/',
+    root: runtimeRoot('assets/starville/bundled/v3'),
+    manifestPaths: manifestPaths(STARVILLE_PRODUCTION_SLICE_ASSETS),
+  },
+  {
+    manifestVersion: STARVILLE_PRODUCTION_SLICE_MANIFEST_VERSION,
+    urlPrefix: '/assets/starville/avatar/production-slice-v3/',
+    root: runtimeRoot('assets/starville/avatar/production-slice-v3'),
+    manifestPaths: new Set([
+      '/assets/starville/avatar/production-slice-v3/starville-production-adventurer.webp',
+    ]),
   },
 ];
 
@@ -177,7 +193,7 @@ export function starvilleBundledAssetsPlugin(): Plugin[] {
             .then((content) => {
               response.statusCode = 200;
               response.setHeader('Content-Type', 'image/webp');
-              response.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+              response.setHeader('Cache-Control', 'no-cache');
               response.end(content);
             })
             .catch(() => {

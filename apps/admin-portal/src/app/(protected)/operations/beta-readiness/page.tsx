@@ -34,10 +34,11 @@ export default async function BetaReadinessPage() {
       <header className={`operations-intro ${styles['header']}`}>
         <div>
           <p className="eyebrow">Read-only local evidence</p>
-          <h1 id="beta-readiness-title">Beta Readiness</h1>
+          <h1 id="beta-readiness-title">Closed-Beta Readiness</h1>
           <p>
             A computed view of repository evidence, pending hosted gates, owner review, deployment
-            preparation, and non-destructive rollback preparation for the Phase 12E candidate.
+            preparation, and non-destructive rollback preparation for the Phase 13B closed-beta
+            hardening candidate.
           </p>
         </div>
         <span

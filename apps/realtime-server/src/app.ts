@@ -299,6 +299,25 @@ export function buildRealtimeApp({
   const socialGraphRates = new SocialGraphRateAuthority(config.socialGraphRateLimits);
   let systemSequence = 0;
 
+  app.addHook('onRequest', async (request, reply) => {
+    void reply.header('x-request-id', request.id);
+    void reply.header('cache-control', 'no-store');
+    void reply.header(
+      'content-security-policy',
+      "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    );
+    void reply.header(
+      'permissions-policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    );
+    void reply.header('referrer-policy', 'no-referrer');
+    void reply.header('x-content-type-options', 'nosniff');
+    void reply.header('x-frame-options', 'DENY');
+    if (config.environment === 'production') {
+      void reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');
+    }
+  });
+
   function refreshChannelDefinitions(): void {
     channelAuthority.replaceChannels([...channelsByWorld.values()].flat());
   }
@@ -2406,22 +2425,35 @@ export function buildRealtimeApp({
     uptimeSeconds: Math.floor(process.uptime()),
   }));
 
-  app.get('/ready', async () => ({
-    service: 'realtime-server' as const,
-    environment: config.environment,
-    status: 'ok' as const,
-    version: SERVICE_VERSION,
-    timestamp: new Date().toISOString(),
-    connections: {
-      active: connections.size,
-      admitted:
-        activeByConnection.size +
-        activePrivateHomeByConnection.size +
-        activeHomeVisitByConnection.size,
-      limit: connections.limit,
-    },
-    channels: [...channelsByWorld.values()].flat().length,
-  }));
+  app.get('/ready', async (request, reply) => {
+    let dependencyStatus: 'available' | 'unavailable' = 'available';
+    try {
+      await persistence.revalidate('00000000-0000-0000-0000-000000000000');
+    } catch (error) {
+      dependencyStatus = 'unavailable';
+      logger.child({ requestId: request.id }).warn('realtime.readiness.degraded', { error });
+      void reply.status(503);
+    }
+    const ready = dependencyStatus === 'available';
+    return {
+      service: 'realtime-server' as const,
+      environment: config.environment,
+      status: ready ? ('ok' as const) : ('degraded' as const),
+      version: SERVICE_VERSION,
+      timestamp: new Date().toISOString(),
+      readiness: ready ? ('ready' as const) : ('not-ready' as const),
+      dependencies: dependencyStatus,
+      connections: {
+        active: connections.size,
+        admitted:
+          activeByConnection.size +
+          activePrivateHomeByConnection.size +
+          activeHomeVisitByConnection.size,
+        limit: connections.limit,
+      },
+      channels: [...channelsByWorld.values()].flat().length,
+    };
+  });
 
   void app.register(async function registerRealtimeWebSocket(instance) {
     await instance.register(websocket, {

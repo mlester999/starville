@@ -18,6 +18,9 @@ import {
   bundledTerrainAssetKey,
   bundledTerrainAssetKeysForManifest,
   renderTerrain,
+  productionSliceTerrainAssetKey,
+  updateTerrainCulling,
+  usesProductionSliceTerrainProfile,
 } from './terrain';
 import { resolvedWorldAssetTextureKey, worldAssetTextureKey } from './world-asset-textures';
 
@@ -111,6 +114,105 @@ describe('bundled isometric terrain rendering', () => {
     expect(keys.length).toBeLessThanOrEqual(6);
     expect(new Set(keys).size).toBe(keys.length);
     expect(keys.every((key) => key.startsWith('world.terrain.'))).toBe(true);
+  });
+
+  it('selects stable V3 grass, layered rescue water, bridge disturbance, and an interior floor', async () => {
+    const { PRODUCTION_SLICE_V3_INTERIOR_MANIFEST, PRODUCTION_SLICE_V3_MANIFEST } =
+      await import('@starville/game-content');
+    const grassKeys = new Set<string>();
+    for (let y = 2; y < 14; y += 1) {
+      for (let x = 2; x < 14; x += 1) {
+        grassKeys.add(productionSliceTerrainAssetKey(PRODUCTION_SLICE_V3_MANIFEST, x, y, 'grass'));
+      }
+    }
+    expect(grassKeys.size).toBeGreaterThan(2);
+    const waterCoordinates = Array.from({ length: PRODUCTION_SLICE_V3_MANIFEST.height })
+      .flatMap((_, y) =>
+        Array.from({ length: PRODUCTION_SLICE_V3_MANIFEST.width }, (_unused, x) => ({ x, y })),
+      )
+      .filter(({ x, y }) =>
+        PRODUCTION_SLICE_V3_MANIFEST.terrain.some(
+          (area) =>
+            area.terrain === 'water' &&
+            x >= area.x &&
+            y >= area.y &&
+            x < area.x + area.width &&
+            y < area.y + area.height,
+        ),
+      );
+    const waterKeys = new Set(
+      waterCoordinates.map(({ x, y }) =>
+        productionSliceTerrainAssetKey(PRODUCTION_SLICE_V3_MANIFEST, x, y, 'water'),
+      ),
+    );
+    expect(waterKeys).toContain('world.terrain.water.shallow');
+    expect(waterKeys).toContain('world.terrain.water.disturbance');
+    expect(waterKeys).toContain('world.terrain.water.deep');
+    expect(waterKeys).not.toContain('world.terrain.water.shore');
+    expect(
+      productionSliceTerrainAssetKey(PRODUCTION_SLICE_V3_INTERIOR_MANIFEST, 4, 4, 'plaza'),
+    ).toBe('v3.interior.floor');
+  });
+
+  it('keys the A.1 profile to an explicit development capability instead of a version range', async () => {
+    const { PRODUCTION_SLICE_V3_MANIFEST } = await import('@starville/game-content');
+    expect(usesProductionSliceTerrainProfile(PRODUCTION_SLICE_V3_MANIFEST)).toBe(true);
+    expect(
+      usesProductionSliceTerrainProfile({
+        ...lanternSquareManifest(),
+        version: 99_999,
+      }),
+    ).toBe(false);
+  });
+
+  it('culls V3 tile overlays and environmental-frame images while reporting global auxiliaries', async () => {
+    const { PRODUCTION_SLICE_V3_MANIFEST } = await import('@starville/game-content');
+    const manifest = {
+      ...PRODUCTION_SLICE_V3_MANIFEST,
+      width: 16,
+      height: 16,
+      safeSaveBounds: { minX: 1, minY: 1, maxX: 15, maxY: 15 },
+    };
+    const containers: object[] = [];
+    const images: object[] = [];
+    const scene = {
+      textures: { exists: vi.fn(() => true) },
+      add: {
+        image: vi.fn(() => {
+          const image = chainable();
+          images.push(image);
+          return image;
+        }),
+        graphics: vi.fn(() => chainable()),
+        container: vi.fn(() => {
+          const container = chainable();
+          containers.push(container);
+          return container;
+        }),
+      },
+    };
+
+    const layer = renderTerrain(scene as never, manifest, {
+      ambientEffects: false,
+      animatedWater: false,
+      assetResolutionContext: 'game_test',
+    });
+    const metrics = updateTerrainCulling(layer, { x: 0, y: 0, width: 320, height: 200 });
+
+    expect(layer).toBe(containers[0]);
+    expect(metrics).toMatchObject({
+      activeChunks: 0,
+      totalChunks: 4,
+      visibleNodes: 0,
+      totalNodes: 256,
+    });
+    expect(metrics.visibleAuxiliaryNodes).toBeGreaterThan(0);
+    expect(metrics.visibleAuxiliaryNodes).toBeLessThan(metrics.totalAuxiliaryNodes);
+    expect(
+      images.some((image) =>
+        Reflect.get(image, 'setVisible').mock.calls.some((call: unknown[]) => call[0] === false),
+      ),
+    ).toBe(true);
   });
 
   it('selects the exact uploaded terrain pin before its bundled stable key', () => {

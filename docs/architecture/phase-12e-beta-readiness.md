@@ -122,22 +122,26 @@ continuous sway/flicker/pulsing with stable static feedback. Owned ambience node
 destroyed on world replacement and scene shutdown. Ambience never creates blocking or interactive
 layers.
 
-## Ambient audio
+## Release-candidate audio
 
-Phase 12E provides a lifecycle boundary and separate local master, ambience, and SFX preferences. It
-supports:
+Phase 12E now provides an integrated, original procedural development-safe foundation with separate
+master, music, ambience, and SFX preferences. It supports:
 
 - explicit user gesture before playback;
-- mute;
-- location transitions with bounded fade;
+- master and per-group mute;
+- separate visible group volumes with immediate preview;
+- one music and one ambient identity for Lantern Square or the personal home;
 - pause on hidden/background state;
-- one loop per registered ambience identity;
+- bounded sound-effect cooldowns;
 - teardown on location change or disposal;
 - no duplicated loop after reconnect.
 
-No repository-authored or licensed ambience file existed at preflight. Phase 12E therefore registers
-no fabricated or copyrighted sound. The lifecycle remains safely silent until approved audio sources
-are added. Subjective audio acceptance remains pending.
+The ten cues contain repository-declared Web Audio synthesis parameters rather than downloaded or
+embedded media. Every entry records project-owned provenance, no third-party audio, and an honest
+`development_safe` classification. The binary audio payload and decoded audio-file memory are both
+zero bytes. Meaningful cues retain visible text equivalents and Web Audio failure leaves the game
+playable with an unavailable notice. Production audio replacement and subjective owner listening
+acceptance remain pending.
 
 ## Gameplay-state readability
 
@@ -279,9 +283,9 @@ walkthrough, and WAN test remain pending.
 
 ## Responsive and accessibility matrix
 
-The required matrix is 360×800, 390×844, 768×1024, 820×1180, 1024×768, 1280×800, 1440×900, and
-1920×1080, plus a 200%-zoom equivalent, narrow desktop, tablet/mobile landscape, Reduced Motion, and
-high contrast.
+The required matrix is 360×800, 390×844, 412×915, 768×1024, 820×1180, 1024×768, 1280×800, 1366×768,
+1440×900, 1920×1080, and 2560×1440, plus a 200%-zoom equivalent, narrow desktop, tablet/mobile
+landscape, Reduced Motion, and high contrast.
 
 Acceptance requires:
 
@@ -293,18 +297,19 @@ Acceptance requires:
 - polite/assertive connection announcements by priority;
 - deduplicated notifications;
 - screen-reader-safe world interaction summaries;
-- separate audio mute/ambience control;
+- separate master/music/ambience/SFX volume and mute controls;
 - non-color-only state communication.
 
 ## Integrated protected Game Test
 
-The Phase 12E beta scenario is a 21-step descriptive in-memory coordinator over the existing
+The Phase 12E beta scenario is a 23-step descriptive in-memory coordinator over the existing
 protected Game Test. It provides review instructions for spawn, movement, V2 character, remote
 parity, guidance, home, farming, workstation, General Store, progression, furniture, home visits,
-guestbook/appreciation/helper watering, modals, reconnect, asset fallback, Reduced Motion, high
-contrast, and mobile review. Automated fixture application is limited to four linked review surfaces
-and the candidate/participant/accessibility settings; the other steps require owner inspection and
-are not automated gameplay execution.
+guestbook/appreciation/helper watering, modals, audio controls, audio-unavailable fallback,
+reconnect, asset fallback, Reduced Motion, high contrast, and the complete responsive review.
+Automated fixture application is limited to four linked review surfaces and the
+candidate/participant/accessibility settings; the other steps require owner inspection and are not
+automated gameplay execution.
 
 Inspection marks live only in React state. The scenario performs no player, inventory, DUST,
 progression, housing, social, world, analytics, or telemetry write and is never owner acceptance.
@@ -392,7 +397,8 @@ metadata, retention policy, and server-side interpretation.
 
 - Hosted pgTAP/RLS and protected signed-in validation remain owner-controlled and pending.
 - V2 remains a production candidate and has not received owner activation approval.
-- No approved ambient audio media exists in the repository.
+- Current audio is an original procedural `development_safe` foundation, not owner-approved final
+  music or sound design.
 - Browser/GPU memory, CDN/WAN timing, physical touch devices, screen readers, and a real 30-minute
   session require owner evidence.
 - Local load/soak results do not prove production capacity.

@@ -53,7 +53,10 @@ export function assetFileDescriptors(
         asset,
         role: 'source',
         manifestPath: asset.sourcePath,
-        budgetBytes: ASSET_BUDGETS.sourceBytes,
+        budgetBytes:
+          asset.sourceType === 'bundled_raster'
+            ? ASSET_BUDGETS.authoredRasterSourceBytes
+            : ASSET_BUDGETS.sourceBytes,
       },
       {
         asset,
@@ -65,7 +68,10 @@ export function assetFileDescriptors(
         asset,
         role: 'thumbnail',
         manifestPath: asset.thumbnailPath,
-        budgetBytes: ASSET_BUDGETS.thumbnailBytes,
+        budgetBytes:
+          asset.sourceType === 'bundled_raster'
+            ? ASSET_BUDGETS.authoredRasterThumbnailBytes
+            : ASSET_BUDGETS.thumbnailBytes,
       },
     ];
     const variants = asset.variants.flatMap((variant) => [
@@ -94,6 +100,7 @@ export async function generateSources(
 ): Promise<PipelineResult> {
   const writes: WriteResult[] = [];
   for (const descriptor of assetFileDescriptors(manifest).filter(({ role }) => role === 'source')) {
+    if (descriptor.asset.sourceType === 'bundled_raster') continue;
     const content = renderBundledAssetSvg({
       asset: descriptor.asset,
       ...(descriptor.variant === undefined ? {} : { variant: descriptor.variant }),
@@ -115,7 +122,7 @@ export async function generateRuntimeAssets(
   const writes: WriteResult[] = [];
   const descriptors = assetFileDescriptors(manifest);
   for (const runtime of descriptors.filter(({ role }) => role === 'runtime')) {
-    const webp = await renderRuntimeAssetBytes(runtime.asset, runtime.variant);
+    const webp = await renderRuntimeAssetBytes(runtime.asset, runtime.variant, workspaceRoot);
     writes.push(
       await writeFileIfChanged(
         resolveAssetFilesystemPath(workspaceRoot, runtime.manifestPath),
@@ -132,7 +139,7 @@ export async function generateThumbnails(
 ): Promise<PipelineResult> {
   const writes: WriteResult[] = [];
   for (const asset of manifest.assets.filter(({ aliasOf }) => aliasOf === null)) {
-    const webp = await renderThumbnailBytes(asset);
+    const webp = await renderThumbnailBytes(asset, workspaceRoot);
     writes.push(
       await writeFileIfChanged(
         resolveAssetFilesystemPath(workspaceRoot, asset.thumbnailPath),
@@ -312,25 +319,47 @@ export async function buildSizeReport(
 export async function renderRuntimeAssetBytes(
   asset: BundledAssetEntry,
   variant?: BundledAssetVariant,
+  workspaceRoot?: string,
 ): Promise<Buffer> {
-  const source = Buffer.from(
-    renderBundledAssetSvg({ asset, ...(variant === undefined ? {} : { variant }) }),
-  );
-  return sharp(source, { density: 144 })
+  const source =
+    asset.sourceType === 'bundled_raster'
+      ? await readRasterSource(asset, variant, workspaceRoot)
+      : Buffer.from(
+          renderBundledAssetSvg({ asset, ...(variant === undefined ? {} : { variant }) }),
+        );
+  return sharp(source, asset.sourceType === 'bundled_svg' ? { density: 144 } : undefined)
     .resize(asset.width, asset.height, { fit: 'fill' })
     .webp({ lossless: true, effort: 6, alphaQuality: 100 })
     .toBuffer();
 }
 
-export async function renderThumbnailBytes(asset: BundledAssetEntry): Promise<Buffer> {
-  const source = Buffer.from(renderBundledAssetSvg({ asset }));
-  return sharp(source, { density: 144 })
+export async function renderThumbnailBytes(
+  asset: BundledAssetEntry,
+  workspaceRoot?: string,
+): Promise<Buffer> {
+  const source =
+    asset.sourceType === 'bundled_raster'
+      ? await readRasterSource(asset, undefined, workspaceRoot)
+      : Buffer.from(renderBundledAssetSvg({ asset }));
+  return sharp(source, asset.sourceType === 'bundled_svg' ? { density: 144 } : undefined)
     .resize(ASSET_BUDGETS.thumbnailDimension, ASSET_BUDGETS.thumbnailDimension, {
       fit: 'contain',
       background: { r: 0, g: 0, b: 0, alpha: 0 },
     })
     .webp({ lossless: true, effort: 6, alphaQuality: 100 })
     .toBuffer();
+}
+
+async function readRasterSource(
+  asset: BundledAssetEntry,
+  variant: BundledAssetVariant | undefined,
+  workspaceRoot: string | undefined,
+): Promise<Buffer> {
+  if (workspaceRoot === undefined) {
+    throw new Error(`Raster asset rendering requires a workspace root: ${asset.key}`);
+  }
+  const manifestPath = variant?.sourcePath ?? asset.sourcePath;
+  return readFile(resolveAssetFilesystemPath(workspaceRoot, manifestPath));
 }
 
 export async function generateCoverageOutputs(
@@ -377,7 +406,11 @@ function runtimeBudgetFor(asset: BundledAssetEntry): number {
     return ASSET_BUDGETS.terrainRuntimeBytes;
   }
   if (asset.renderLayer === 'interface') return ASSET_BUDGETS.interfaceRuntimeBytes;
-  if (asset.renderLayer === 'structure') return ASSET_BUDGETS.structureRuntimeBytes;
+  if (asset.renderLayer === 'structure') {
+    return asset.sourceType === 'bundled_raster'
+      ? ASSET_BUDGETS.authoredRasterStructureRuntimeBytes
+      : ASSET_BUDGETS.structureRuntimeBytes;
+  }
   return ASSET_BUDGETS.objectRuntimeBytes;
 }
 

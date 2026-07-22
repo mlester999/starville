@@ -1,0 +1,312 @@
+{
+  "schemaVersion": 1,
+  "kind": "starville-release-evidence-bundle",
+  "release": "phase-13d-production-commissioning-candidate",
+  "status": "stage-a-blocked-production-not-commissioned",
+  "productionReady": false,
+  "phase14Recommendation": "NO-GO",
+  "items": [
+    {
+      "id": "approved-source-commit",
+      "owner": "release-manager",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Required release inputs are uncommitted in a shared dirty working tree."
+    },
+    {
+      "id": "working-tree-inventory",
+      "owner": "engineering",
+      "status": "present",
+      "evidence": "docs/deployment/phase-13d-working-tree-inventory.md",
+      "blocker": null
+    },
+    {
+      "id": "production-environment-manifest",
+      "owner": "production-owner",
+      "status": "present",
+      "evidence": "infrastructure/deployment/manifests/production-environment.v1.json",
+      "blocker": null
+    },
+    {
+      "id": "production-domains",
+      "owner": "production-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Exact domains, TLS, provider, cookie scope, Auth redirects, CORS, and CSP origins are not owner-approved."
+    },
+    {
+      "id": "supabase-production-project",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No masked starville-prod target-verification evidence exists."
+    },
+    {
+      "id": "reown-production-project",
+      "owner": "wallet-integration-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production Reown project, origin allowlist, mainnet RPC, mint, program, and decimals require owner approval."
+    },
+    {
+      "id": "migration-manifest",
+      "owner": "database-owner",
+      "status": "present",
+      "evidence": "infrastructure/deployment/manifests/migrations.v1.json",
+      "blocker": null
+    },
+    {
+      "id": "local-clean-chain",
+      "owner": "engineering",
+      "status": "present",
+      "evidence": "docs/deployment/phase-13d-local-validation-report.md",
+      "blocker": null
+    },
+    {
+      "id": "starville-dev-clean-chain",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": "docs/deployment/phase-13b-hosted-validation-report.md",
+      "blocker": "Hosted starville-dev validation remains pending."
+    },
+    {
+      "id": "production-migration-application",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Stage B has not started and no production mutation is authorized."
+    },
+    {
+      "id": "production-database-lint",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production lint output requires owner-run Stage B validation."
+    },
+    {
+      "id": "production-pgtap",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production pgTAP output requires an approved, target-verified run."
+    },
+    {
+      "id": "production-rls-and-grants",
+      "owner": "security-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production RLS, FORCE RLS, grant, function, and role-boundary evidence is absent."
+    },
+    {
+      "id": "reference-seed-manifest",
+      "owner": "database-owner",
+      "status": "present",
+      "evidence": "infrastructure/deployment/manifests/production-reference-seeds.v1.json",
+      "blocker": null
+    },
+    {
+      "id": "reference-catalog-manifest",
+      "owner": "database-owner",
+      "status": "present",
+      "evidence": "infrastructure/deployment/manifests/production-reference-catalogs.v1.json",
+      "blocker": null
+    },
+    {
+      "id": "production-reference-installation",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No production reference installation or exact key/count verification has run."
+    },
+    {
+      "id": "production-administrator-bootstrap",
+      "owner": "security-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No owner-approved production identity, bootstrap output, AAL2 enrollment, audit, or shutdown evidence exists."
+    },
+    {
+      "id": "auth-configuration",
+      "owner": "security-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production Supabase Auth dashboard configuration is not owner-verified."
+    },
+    {
+      "id": "storage-configuration",
+      "owner": "content-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production Storage buckets, restrictions, and RLS are not owner-verified."
+    },
+    {
+      "id": "realtime-configuration",
+      "owner": "operations-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production Realtime publications, private channels, and limits are not owner-verified."
+    },
+    {
+      "id": "approved-world-revision",
+      "owner": "product-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No exact world revision has production approval."
+    },
+    {
+      "id": "production-asset-selection",
+      "owner": "product-owner",
+      "status": "pending-owner",
+      "evidence": "assets/manifests/starville-bundled-v1.json",
+      "blocker": "V1 is the accepted fallback, but the Phase 13D production selection is unsigned; V2/V3 remain excluded."
+    },
+    {
+      "id": "production-audio-selection",
+      "owner": "product-owner",
+      "status": "pending-owner",
+      "evidence": "infrastructure/deployment/manifests/production-audio.v1.json",
+      "blocker": "Provenance is unambiguous; listening and production-classification acceptance remain pending."
+    },
+    {
+      "id": "production-build",
+      "owner": "engineering",
+      "status": "present",
+      "evidence": "docs/deployment/phase-13d-local-validation-report.md",
+      "blocker": null
+    },
+    {
+      "id": "security-scan",
+      "owner": "security-owner",
+      "status": "present",
+      "evidence": "docs/deployment/phase-13d-local-validation-report.md",
+      "blocker": null
+    },
+    {
+      "id": "private-services",
+      "owner": "operations-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No production API, Realtime, Worker, Landing, Game, or Admin deployment occurred."
+    },
+    {
+      "id": "api-health-readiness",
+      "owner": "operations-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production API health and readiness evidence is absent."
+    },
+    {
+      "id": "realtime-health-readiness",
+      "owner": "operations-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production Realtime health, readiness, and capacity evidence is absent."
+    },
+    {
+      "id": "worker-health-readiness",
+      "owner": "operations-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production Worker health, lease, retry, and failure evidence is absent."
+    },
+    {
+      "id": "new-player-journey",
+      "owner": "product-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No production new-player journey has run."
+    },
+    {
+      "id": "returning-player-journey",
+      "owner": "product-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "No production returning-player or persistence journey has run."
+    },
+    {
+      "id": "token-access-validation",
+      "owner": "wallet-integration-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production wallet, denial, RPC-failure, session, and recheck evidence is absent."
+    },
+    {
+      "id": "economy-and-reconciliation",
+      "owner": "economy-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production exact-once settlement and ledger/inventory reconciliation evidence is absent."
+    },
+    {
+      "id": "social-housing-realtime",
+      "owner": "product-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Production social, home-visit, housing, reconnect, and multiplayer-load evidence is absent."
+    },
+    {
+      "id": "browser-device-accessibility",
+      "owner": "product-owner",
+      "status": "pending-owner",
+      "evidence": "docs/deployment/phase-12e-owner-acceptance.md",
+      "blocker": "Browser, physical-device, accessibility, visual, and audio acceptance is deferred and unchecked."
+    },
+    {
+      "id": "qa-data-cleanup",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Stage D has not started; no production QA inventory or cleanup evidence exists."
+    },
+    {
+      "id": "release-freeze",
+      "owner": "release-manager",
+      "status": "missing",
+      "evidence": "infrastructure/deployment/manifests/release-freeze.v1.json",
+      "blocker": "The freeze manifest is explicitly not started while Stage A is blocked."
+    },
+    {
+      "id": "backup-capability",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": "docs/operations/backup-restore-and-rollback.md",
+      "blocker": "No provider backup identifier, retention, or PITR evidence exists."
+    },
+    {
+      "id": "isolated-restore",
+      "owner": "database-owner",
+      "status": "missing",
+      "evidence": "docs/operations/backup-restore-and-rollback.md",
+      "blocker": "No isolated restore or restored-state reconciliation has run."
+    },
+    {
+      "id": "rollback-rehearsal",
+      "owner": "operations-owner",
+      "status": "missing",
+      "evidence": "docs/operations/backup-restore-and-rollback.md",
+      "blocker": "Production-provider, content, application, and database rollback rehearsal is pending."
+    },
+    {
+      "id": "public-access-lock",
+      "owner": "production-owner",
+      "status": "pending-owner",
+      "evidence": "docs/operations/phase-13d-commissioning.md",
+      "blocker": "The exact server-side production lock has not been owner-selected or verified."
+    },
+    {
+      "id": "prior-phase-owner-gates",
+      "owner": "product-owner",
+      "status": "pending-owner",
+      "evidence": "docs/deployment/phase-13c-owner-acceptance.md",
+      "blocker": "Phase 12E, 13A, 13B, and 13C owner and hosted gates remain pending."
+    },
+    {
+      "id": "phase-13d-owner-approval",
+      "owner": "production-owner",
+      "status": "missing",
+      "evidence": null,
+      "blocker": "Stage A cannot request commissioning approval until all critical Stage A gates pass."
+    }
+  ],
+  "rule": "Missing or pending evidence remains blocking. Local evidence never substitutes for production automation, owner manual evidence, physical-device evidence, or subjective acceptance."
+}

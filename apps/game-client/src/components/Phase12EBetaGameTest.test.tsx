@@ -27,7 +27,7 @@ afterEach(async () => {
 
 describe('Phase 12E integrated beta Game Test', () => {
   it('covers the owner-approved systems without a persistence or production claim', () => {
-    expect(PHASE12E_BETA_SCENARIO_STEPS).toHaveLength(21);
+    expect(PHASE12E_BETA_SCENARIO_STEPS).toHaveLength(23);
     expect(phase12EBetaScenarioAreaCoverage()).toEqual(
       new Set([
         'world',
@@ -41,6 +41,7 @@ describe('Phase 12E integrated beta Game Test', () => {
         'housing',
         'home_visit',
         'modal',
+        'audio',
         'recovery',
         'asset_fallback',
         'accessibility',
@@ -79,7 +80,7 @@ describe('Phase 12E integrated beta Game Test', () => {
       (button) => button.textContent?.includes('Mark inspected and continue'),
     );
     await act(async () => mark?.click());
-    expect(modalRoot?.textContent).toContain('1 of 21 fixture steps inspected');
+    expect(modalRoot?.textContent).toContain('1 of 23 fixture steps inspected');
     expect(modalRoot?.textContent).toContain('Move the V2 character');
   });
 });

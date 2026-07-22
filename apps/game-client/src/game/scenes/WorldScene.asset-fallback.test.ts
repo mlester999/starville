@@ -278,4 +278,100 @@ describe('WorldScene production-asset fallback', () => {
     expect(scene.getState()).toEqual(destinationState);
     expect(onMapChanged).toHaveBeenCalledWith(destination);
   });
+
+  it('restores the source world atomically when destination rendering fails', () => {
+    const onMapChanged = vi.fn();
+    const onError = vi.fn();
+    const initialManifest = lanternSquareManifest();
+    const initialState = {
+      mapId: 'lantern-square' as const,
+      x: 12,
+      y: 7.5,
+      facingDirection: 'south' as const,
+    };
+    const scene = new WorldScene({
+      initialState,
+      initialWorld: {
+        manifest: initialManifest,
+        versionId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        checksum: 'b'.repeat(64),
+        assetDeliveries: [],
+      },
+      appearancePreset: 'moss',
+      reducedMotion: false,
+      collisionDebug: false,
+      audioSettings: { masterVolume: 0.8, muted: false },
+      callbacks: {
+        onReady: vi.fn(),
+        onError,
+        onStateChanged: vi.fn(),
+        onCheckpoint: vi.fn(),
+        onInteractionTarget: vi.fn(),
+        onInteractionOpen: vi.fn(),
+        onSettingsRequested: vi.fn(),
+        onExitRequested: vi.fn(),
+        onMapChanged,
+        onWorldAssetFallback: vi.fn(),
+        onRemotePlayerSelected: vi.fn(),
+        onActivityInteraction: vi.fn(),
+      },
+    });
+    const destinationManifest = {
+      ...initialManifest,
+      id: 'moonpetal-meadow' as const,
+      slug: 'moonpetal-meadow' as const,
+      name: 'Destination That Fails',
+    };
+    const destination = {
+      manifest: destinationManifest,
+      versionId: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      checksum: 'd'.repeat(64),
+      assetDeliveries: [],
+    };
+    const renderMap = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error('destination render failed');
+      })
+      .mockImplementationOnce(() => undefined);
+    Object.assign(scene, {
+      clearMap: vi.fn(),
+      renderMap,
+      configureCamera: vi.fn(),
+      updateCulling: vi.fn(),
+      refreshChatBubbles: vi.fn(),
+      refreshInteractionTarget: vi.fn(),
+      updatePlayer: vi.fn(),
+      time: { now: 500 },
+      textures: { exists: vi.fn(() => true) },
+      load: {
+        setCORS: vi.fn(),
+        image: vi.fn(),
+        on: vi.fn(),
+        off: vi.fn(),
+        once: vi.fn(),
+        isLoading: vi.fn(() => false),
+        start: vi.fn(),
+      },
+    });
+
+    expect(() =>
+      scene.loadWorld(destination, {
+        mapId: 'moonpetal-meadow',
+        x: 3,
+        y: 4,
+        facingDirection: 'east',
+      }),
+    ).toThrow('destination render failed');
+
+    expect(renderMap).toHaveBeenCalledTimes(2);
+    expect(scene.getState()).toEqual(initialState);
+    expect(scene.getDiagnostics()).toMatchObject({
+      location: initialManifest.name,
+      mapVersion: initialManifest.version,
+      transitionPending: false,
+    });
+    expect(onMapChanged).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
 });

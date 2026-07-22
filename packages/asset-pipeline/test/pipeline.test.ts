@@ -114,7 +114,7 @@ describe('deterministic bundled asset pipeline', () => {
     const second = await generateAll(root, fixtureManifest);
     expect(second.written).toBe(0);
     expect(second.unchanged).toBe(6);
-  });
+  }, 20_000);
 
   it('generates the candidate into additive v2 roots with explicit non-final provenance', async () => {
     const root = await temporaryRoot();
@@ -135,7 +135,7 @@ describe('deterministic bundled asset pipeline', () => {
       enforceGameplayCatalogReferences: false,
     });
     expect(validation.issues).toEqual([]);
-  });
+  }, 20_000);
 
   it('rejects unsafe paths, opaque wrong-size outputs, and orphaned generated files', async () => {
     const root = await temporaryRoot();

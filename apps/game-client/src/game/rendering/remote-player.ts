@@ -1,12 +1,15 @@
 import type Phaser from 'phaser';
 
-import { avatarAnimationStateFromRealtime } from '@starville/avatar';
+import type { AvatarAnimationState } from '@starville/avatar';
 import {
   STARVILLE_VISUAL_TOKENS,
   depthForFootPosition,
+  movementSpeed,
+  nextFacingDirectionFromVelocity,
   projectWorld,
   resolveWorldLabelDistanceThresholds,
   resolveWorldVisualSettings,
+  type FacingDirection,
   type IsometricProjection,
   type Point,
   type WorldVisualSettings,
@@ -23,6 +26,80 @@ import {
   type VisibleWorldChatBubble,
 } from './chat-bubbles';
 
+const REMOTE_VISUAL_MOVEMENT_EPSILON = 0.0005;
+const REMOTE_PLAYER_CULLING_PADDING = 192;
+const REMOTE_VISUAL_JOG_SPEED_THRESHOLD = (movementSpeed(false) + movementSpeed(true)) / 2;
+
+export interface RemoteVisualSample extends Point {
+  readonly at: number;
+}
+
+export interface RemoteVisualMotion {
+  readonly facingDirection: FacingDirection;
+  readonly animationState: AvatarAnimationState;
+  readonly visualVelocity: Point;
+}
+
+export interface RemotePlayerWorldView {
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+}
+
+/**
+ * Resolves remote presentation from the positions that interpolation actually
+ * produced. Network intent remains useful to the protocol, but it cannot make
+ * a stationary visual walk in place or face against a collision slide.
+ */
+export function resolveRemoteVisualMotion(
+  sample: RemoteVisualSample,
+  previousSample: RemoteVisualSample | undefined,
+  previousFacing: FacingDirection,
+): RemoteVisualMotion {
+  if (previousSample === undefined) {
+    return {
+      facingDirection: previousFacing,
+      animationState: 'idle',
+      visualVelocity: { x: 0, y: 0 },
+    };
+  }
+
+  const elapsedSeconds = (sample.at - previousSample.at) / 1_000;
+  const visualVelocity = {
+    x: sample.x - previousSample.x,
+    y: sample.y - previousSample.y,
+  };
+  const distance = Math.hypot(visualVelocity.x, visualVelocity.y);
+  if (
+    !Number.isFinite(elapsedSeconds) ||
+    elapsedSeconds <= 0 ||
+    distance <= REMOTE_VISUAL_MOVEMENT_EPSILON
+  ) {
+    return { facingDirection: previousFacing, animationState: 'idle', visualVelocity };
+  }
+
+  const speed = distance / elapsedSeconds;
+  return {
+    facingDirection: nextFacingDirectionFromVelocity(visualVelocity, previousFacing),
+    animationState: speed >= REMOTE_VISUAL_JOG_SPEED_THRESHOLD ? 'jog' : 'walk',
+    visualVelocity,
+  };
+}
+
+export function remotePlayerScreenIsVisible(
+  screen: Point,
+  worldView: RemotePlayerWorldView,
+  padding = REMOTE_PLAYER_CULLING_PADDING,
+): boolean {
+  return (
+    screen.x >= worldView.x - padding &&
+    screen.x <= worldView.x + worldView.width + padding &&
+    screen.y >= worldView.y - padding &&
+    screen.y <= worldView.y + worldView.height + padding
+  );
+}
+
 export class RemotePlayerRenderer {
   private readonly player: AvatarPlayerRenderer;
   private readonly nameplate: Phaser.GameObjects.Text;
@@ -33,6 +110,9 @@ export class RemotePlayerRenderer {
   private nameplateRequested = true;
   private visualSettings: WorldVisualSettings;
   private readonly depthTie: number;
+  private lastVisualSample: RemoteVisualSample | undefined;
+  private visualFacing: FacingDirection;
+  private onScreen = true;
 
   public constructor(
     scene: Phaser.Scene,
@@ -44,6 +124,7 @@ export class RemotePlayerRenderer {
     avatarRendererMode: AvatarRendererMode = 'published_v1',
   ) {
     this.visualSettings = visualSettings;
+    this.visualFacing = presence.facingDirection;
     this.depthTie = stablePresenceDepthTie(presence.presenceId);
     this.selection = scene.add.graphics();
     this.player = createAvatarPlayerRenderer(
@@ -79,6 +160,8 @@ export class RemotePlayerRenderer {
       presence.channelId !== this.presence.channelId
     ) {
       this.samples.clear();
+      this.lastVisualSample = undefined;
+      this.visualFacing = presence.facingDirection;
     }
     this.presence = presence;
     this.samples.push(presence, receivedAt);
@@ -105,7 +188,7 @@ export class RemotePlayerRenderer {
 
   public setSelected(selected: boolean): void {
     this.selected = selected;
-    this.selection.setVisible(selected);
+    this.selection.setVisible(selected && this.onScreen);
   }
 
   public setNameplateVisible(visible: boolean): void {
@@ -116,7 +199,7 @@ export class RemotePlayerRenderer {
   public setVisualSettings(settings: WorldVisualSettings): void {
     this.visualSettings = settings;
     this.player.setShadowsEnabled(settings.shadows);
-    this.chatBubble.setEnabled(settings.chatBubbles);
+    this.chatBubble.setEnabled(settings.chatBubbles && this.onScreen);
     if (!settings.remoteLabels) this.nameplate.setVisible(false);
   }
 
@@ -124,16 +207,32 @@ export class RemotePlayerRenderer {
     this.chatBubble.setMessage(message);
   }
 
-  public update(now: number, observer: Point = this.presence, wallNow = Date.now()): void {
+  public update(
+    now: number,
+    observer: Point = this.presence,
+    wallNow = Date.now(),
+    worldView?: RemotePlayerWorldView,
+  ): void {
     const sample = this.samples.sample(now, this.reducedMotion);
     if (sample === undefined) return;
-    this.player.update(
-      sample,
-      sample.facingDirection,
-      avatarAnimationStateFromRealtime(sample.movementState),
-      now,
+    const visualSample = { x: sample.x, y: sample.y, at: now };
+    const motion = resolveRemoteVisualMotion(
+      visualSample,
+      this.lastVisualSample,
+      this.visualFacing,
     );
+    this.lastVisualSample = visualSample;
+    this.visualFacing = motion.facingDirection;
     const screen = projectWorld(sample, this.projection);
+    this.onScreen = worldView === undefined || remotePlayerScreenIsVisible(screen, worldView);
+    this.player.container.setVisible(this.onScreen);
+    this.selection.setVisible(this.selected && this.onScreen);
+    this.chatBubble.setEnabled(this.visualSettings.chatBubbles && this.onScreen);
+    if (!this.onScreen) {
+      this.nameplate.setVisible(false);
+      return;
+    }
+    this.player.update(sample, motion.facingDirection, motion.animationState, now);
     this.selection.clear();
     if (this.selected) {
       this.selection

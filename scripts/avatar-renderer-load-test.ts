@@ -9,6 +9,7 @@ import {
   type ResolvedAvatarProfile,
 } from '../apps/game-client/src/app/avatar-client';
 import { PlayerRenderer } from '../apps/game-client/src/game/rendering/player';
+import { ProductionSlicePlayerRenderer } from '../apps/game-client/src/game/rendering/production-slice-player';
 import { stablePresenceDepthTie } from '../apps/game-client/src/game/rendering/avatar-style';
 
 const PLAYER_COUNT = 40;
@@ -78,7 +79,7 @@ class MeasuredContainer {
   public y = 0;
   public depth = 0;
   public destroyed = false;
-  public constructor(public readonly children: readonly MeasuredGraphics[]) {}
+  public constructor(public readonly children: readonly { destroy(): void }[]) {}
   public setSize() {
     return this;
   }
@@ -97,6 +98,21 @@ class MeasuredContainer {
   public destroy(destroyChildren = false) {
     this.destroyed = true;
     if (destroyChildren) this.children.forEach((child) => child.destroy());
+  }
+}
+
+class MeasuredSprite {
+  public frame = 0;
+  public destroyed = false;
+  public setOrigin() {
+    return this;
+  }
+  public setFrame(frame: number) {
+    this.frame = frame;
+    return this;
+  }
+  public destroy() {
+    this.destroyed = true;
   }
 }
 
@@ -129,6 +145,9 @@ const scene = {
       const value = new MeasuredContainer(children);
       containers.push(value);
       return value;
+    },
+    sprite() {
+      return new MeasuredSprite();
     },
   },
 };
@@ -194,6 +213,77 @@ const heapAfter = process.memoryUsage().heapUsed;
 const presenceIds = Array.from({ length: PLAYER_COUNT }, (_, index) => `presence-${String(index)}`);
 const duplicateEntityCount = presenceIds.length - new Set(presenceIds).size;
 const totalCommands = graphics.reduce((total, layer) => total + layer.totalCommands, 0);
+const rasterGraphics: MeasuredGraphics[] = [];
+const rasterSprites: MeasuredSprite[] = [];
+const rasterContainers: MeasuredContainer[] = [];
+const rasterScene = {
+  add: {
+    graphics() {
+      const value = new MeasuredGraphics();
+      rasterGraphics.push(value);
+      return value;
+    },
+    sprite() {
+      const value = new MeasuredSprite();
+      rasterSprites.push(value);
+      return value;
+    },
+    container(_x: number, _y: number, children: readonly { destroy(): void }[]) {
+      const value = new MeasuredContainer(children);
+      rasterContainers.push(value);
+      return value;
+    },
+  },
+};
+const rasterConstructionStarted = performance.now();
+const rasterRenderers = Array.from(
+  { length: PLAYER_COUNT },
+  (_, index) =>
+    new ProductionSlicePlayerRenderer(
+      rasterScene as never,
+      profile(index),
+      { tileWidth: 96, tileHeight: 48, originX: 960, originY: 120 },
+      false,
+      stablePresenceDepthTie(`production-presence-${String(index)}`),
+    ),
+);
+const rasterConstructionMs = performance.now() - rasterConstructionStarted;
+const rasterFrameTimes: number[] = [];
+for (let frame = 0; frame < FRAME_COUNT; frame += 1) {
+  const frameStarted = performance.now();
+  const state = frame < 80 ? 'idle' : frame < 160 ? 'walk' : 'jog';
+  for (const [index, renderer] of rasterRenderers.entries()) {
+    renderer.update(
+      { x: 8 + (index % 8) * 1.35, y: 7 + Math.floor(index / 8) * 1.2 },
+      directions[(frame + index) % directions.length]!,
+      state,
+      frame * 16.667,
+    );
+  }
+  rasterFrameTimes.push(performance.now() - frameStarted);
+}
+const orderedRasterFrameTimes = [...rasterFrameTimes].sort((left, right) => left - right);
+const rasterPlayerFixtures = [10, 20, 40].map((playerCount) => {
+  const times: number[] = [];
+  for (let frame = 0; frame < 120; frame += 1) {
+    const started = performance.now();
+    for (let index = 0; index < playerCount; index += 1) {
+      rasterRenderers[index]!.update(
+        { x: 8 + (index % 8) * 1.35, y: 7 + Math.floor(index / 8) * 1.2 },
+        directions[(frame + index) % directions.length]!,
+        frame < 40 ? 'idle' : frame < 80 ? 'walk' : 'jog',
+        frame * 16.667,
+      );
+    }
+    times.push(performance.now() - started);
+  }
+  const ordered = [...times].sort((left, right) => left - right);
+  return {
+    playerCount,
+    medianFrameMs: Number(ordered[Math.floor(ordered.length / 2)]!.toFixed(3)),
+    p95FrameMs: Number(ordered[Math.floor(ordered.length * 0.95)]!.toFixed(3)),
+  };
+});
 const metrics = {
   status: 'ok',
   mode: 'local-procedural-renderer',
@@ -213,6 +303,19 @@ const metrics = {
   failedFallbackCount: 0,
   positionResetCount,
   nonFiniteFrames,
+  productionSliceRaster: {
+    constructionMs: Number(rasterConstructionMs.toFixed(3)),
+    medianFrameMs: Number(orderedRasterFrameTimes[Math.floor(FRAME_COUNT / 2)]!.toFixed(3)),
+    p95FrameMs: Number(orderedRasterFrameTimes[Math.floor(FRAME_COUNT * 0.95)]!.toFixed(3)),
+    maximumFrameMs: Number(orderedRasterFrameTimes.at(-1)!.toFixed(3)),
+    spriteCount: rasterSprites.length,
+    shadowGraphicsLayers: rasterGraphics.length,
+    textureCount: 1,
+    animationUpdateMedianPerPlayerMs: Number(
+      (orderedRasterFrameTimes[Math.floor(FRAME_COUNT / 2)]! / PLAYER_COUNT).toFixed(5),
+    ),
+    playerFixtures: rasterPlayerFixtures,
+  },
 };
 
 if (
@@ -222,14 +325,24 @@ if (
   duplicateEntityCount !== 0 ||
   positionResetCount !== 0 ||
   nonFiniteFrames !== 0 ||
-  !frameTimes.every(Number.isFinite)
+  !frameTimes.every(Number.isFinite) ||
+  rasterRenderers.length !== PLAYER_COUNT ||
+  rasterSprites.length !== PLAYER_COUNT ||
+  rasterGraphics.length !== PLAYER_COUNT ||
+  rasterContainers.length !== PLAYER_COUNT ||
+  !rasterFrameTimes.every(Number.isFinite) ||
+  rasterSprites.some(({ frame }) => !Number.isInteger(frame) || frame < 0 || frame >= 96)
 ) {
   throw new Error(`Avatar renderer load test failed: ${JSON.stringify(metrics)}`);
 }
 
 for (const renderer of renderers) renderer.destroy();
+for (const renderer of rasterRenderers) renderer.destroy();
 if (containers.some((container) => !container.destroyed)) {
   throw new Error('Avatar renderer load test leaked a player container.');
+}
+if (rasterContainers.some((container) => !container.destroyed)) {
+  throw new Error('Avatar renderer load test leaked a production-slice container.');
 }
 
 process.stdout.write(`${JSON.stringify(metrics)}\n`);

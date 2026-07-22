@@ -7,8 +7,13 @@ import {
   fetchPlatformConfiguration,
 } from './platform-configuration';
 import { WorldGameTest } from '../components/WorldGameTest';
+import { ProductionSliceReview } from '../components/ProductionSliceReview';
+import {
+  parseProductionSliceReviewVersion,
+  productionSliceReviewRequested,
+} from './production-slice-review';
 
-export function App() {
+function ConnectedApp() {
   const config = parseGameClientPublicConfig(import.meta.env);
   const [platform, setPlatform] = useState(compiledPlatformConfiguration);
   const gameTest = window.location.pathname === '/preview/world';
@@ -60,4 +65,20 @@ export function App() {
       realtimeUrl={config.realtimeUrl}
     />
   );
+}
+
+export function App() {
+  const productionReview = productionSliceReviewRequested({
+    development: import.meta.env.DEV,
+    hostname: window.location.hostname,
+    search: window.location.search,
+  });
+  if (productionReview) {
+    return (
+      <ProductionSliceReview
+        initialVersion={parseProductionSliceReviewVersion(window.location.search)}
+      />
+    );
+  }
+  return <ConnectedApp />;
 }

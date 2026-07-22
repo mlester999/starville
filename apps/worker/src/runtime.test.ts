@@ -68,6 +68,15 @@ describe('worker foundation', () => {
       environment: 'test',
       status: 'ok',
     });
+    expect(Object.fromEntries(health.headers.entries())).toMatchObject({
+      'cache-control': 'no-store',
+      'content-security-policy': expect.stringContaining("default-src 'none'"),
+      'permissions-policy': expect.stringContaining('camera=()'),
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+    });
+    expect(health.headers.get('strict-transport-security')).toBeNull();
     expect(readiness.status).toBe(200);
     expect(await readiness.json()).toMatchObject({ readiness: 'ready', registeredJobs: 1 });
   });

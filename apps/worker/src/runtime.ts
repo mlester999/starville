@@ -29,7 +29,27 @@ function assertRuntimeConfig(config: WorkerRuntimeConfig): void {
   }
 }
 
-function sendJson(response: ServerResponse, statusCode: number, body: unknown): void {
+function sendJson(
+  response: ServerResponse,
+  statusCode: number,
+  body: unknown,
+  production: boolean,
+): void {
+  response.setHeader('cache-control', 'no-store');
+  response.setHeader(
+    'content-security-policy',
+    "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+  );
+  response.setHeader(
+    'permissions-policy',
+    'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+  );
+  response.setHeader('referrer-policy', 'no-referrer');
+  response.setHeader('x-content-type-options', 'nosniff');
+  response.setHeader('x-frame-options', 'DENY');
+  if (production) {
+    response.setHeader('strict-transport-security', 'max-age=31536000; includeSubDomains');
+  }
   response.writeHead(statusCode, { 'content-type': 'application/json; charset=utf-8' });
   response.end(JSON.stringify(body));
 }
@@ -113,33 +133,43 @@ export function createWorkerRuntime({
         timestamp: new Date().toISOString(),
         uptimeSeconds: Math.floor(process.uptime()),
       };
-      sendJson(response, 200, health);
+      sendJson(response, 200, health, config.environment === 'production');
       requestLogger.info('worker.health.completed', { statusCode: 200 });
       return;
     }
 
     if (request.method === 'GET' && path === '/ready') {
       const isReady = state === 'ready';
-      sendJson(response, isReady ? 200 : 503, {
-        service: 'worker',
-        environment: config.environment,
-        status: isReady ? 'ok' : 'degraded',
-        version: SERVICE_VERSION,
-        timestamp: new Date().toISOString(),
-        readiness: isReady ? 'ready' : 'not-ready',
-        registeredJobs: jobs.length,
-      });
+      sendJson(
+        response,
+        isReady ? 200 : 503,
+        {
+          service: 'worker',
+          environment: config.environment,
+          status: isReady ? 'ok' : 'degraded',
+          version: SERVICE_VERSION,
+          timestamp: new Date().toISOString(),
+          readiness: isReady ? 'ready' : 'not-ready',
+          registeredJobs: jobs.length,
+        },
+        config.environment === 'production',
+      );
       requestLogger.info('worker.readiness.completed', {
         statusCode: isReady ? 200 : 503,
       });
       return;
     }
 
-    sendJson(response, 404, {
-      success: false,
-      error: { code: 'NOT_FOUND', message: 'The requested resource was not found.' },
-      requestId,
-    });
+    sendJson(
+      response,
+      404,
+      {
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'The requested resource was not found.' },
+        requestId,
+      },
+      config.environment === 'production',
+    );
     requestLogger.info('worker.health.not_found', { statusCode: 404 });
   };
 

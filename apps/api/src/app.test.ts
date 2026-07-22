@@ -133,6 +133,27 @@ describe('API foundation', () => {
       status: 'ok',
     });
     expect(response.body).not.toContain('SUPABASE');
+    expect(response.headers).toMatchObject({
+      'cache-control': 'no-store',
+      'content-security-policy': expect.stringContaining("default-src 'none'"),
+      'permissions-policy': expect.stringContaining('camera=()'),
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+    });
+    expect(response.headers['strict-transport-security']).toBeUndefined();
+  });
+
+  it('reports process readiness when no external dependency is configured', async () => {
+    const response = await createApp().inject({ method: 'GET', url: '/ready' });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({
+      service: 'api',
+      status: 'ok',
+      readiness: 'ready',
+      dependencies: 'available',
+    });
   });
 
   it('propagates a safe request ID through the versioned status response', async () => {

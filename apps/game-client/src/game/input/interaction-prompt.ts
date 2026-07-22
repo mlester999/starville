@@ -16,7 +16,11 @@ export function interactionPromptLabel(interaction: WorldInteraction): string {
   if (interaction.type === 'cooking_station') return 'Cook';
   if (interaction.type === 'crafting_station') return 'Craft';
   if (interaction.type === 'notice') return 'Read';
-  if (interaction.type === 'home_entrance') return 'Enter home';
+  if (interaction.type === 'home_entrance') {
+    return interaction.id === 'interior-exit' || interaction.title.toLowerCase().startsWith('exit ')
+      ? 'Exit home'
+      : 'Enter home';
+  }
   if (interaction.type === 'starter_npc') return `Talk to ${interaction.title}`;
   if (interaction.type === 'farm_plot') return 'Inspect garden plot';
   return 'Farm this garden tile';

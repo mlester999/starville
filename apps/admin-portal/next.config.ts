@@ -1,8 +1,11 @@
 import type { NextConfig } from 'next';
 
+import { assertProductionRuntimeSafetyGatesClosed } from '@starville/config/server';
+
 import { parseAdminPublicConfig } from './src/lib/public-config';
 import { buildAdminContentSecurityPolicy } from './src/lib/security/content-security-policy';
 
+assertProductionRuntimeSafetyGatesClosed(process.env);
 const publicConfig = parseAdminPublicConfig(process.env);
 const contentSecurityPolicy = buildAdminContentSecurityPolicy({
   apiUrl: publicConfig.apiUrl,
@@ -27,9 +30,21 @@ const nextConfig: NextConfig = {
         source: '/:path*',
         headers: [
           { key: 'Content-Security-Policy', value: contentSecurityPolicy },
+          {
+            key: 'Permissions-Policy',
+            value: 'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+          },
           { key: 'Referrer-Policy', value: 'same-origin' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'DENY' },
+          ...(publicConfig.environment === 'production'
+            ? [
+                {
+                  key: 'Strict-Transport-Security',
+                  value: 'max-age=31536000; includeSubDomains',
+                },
+              ]
+            : []),
         ],
       },
     ];

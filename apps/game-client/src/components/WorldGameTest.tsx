@@ -36,6 +36,7 @@ import {
 } from './phase12c-world-game-test-source';
 import { Phase12EBetaGameTest } from './Phase12EBetaGameTest';
 import type { Phase12EBetaScenarioStep } from './phase12e-beta-game-test';
+import { Phase13AGameplayGameTest } from './Phase13AGameplayGameTest';
 
 interface WorldGameTestProps {
   readonly apiUrl: string;
@@ -93,6 +94,7 @@ function LoadedWorldGameTest(props: {
   const [playerExperienceOpen, setPlayerExperienceOpen] = useState(false);
   const [assetCoverageOpen, setAssetCoverageOpen] = useState(false);
   const [betaScenarioOpen, setBetaScenarioOpen] = useState(false);
+  const [gameplayScenarioOpen, setGameplayScenarioOpen] = useState(false);
   const [debugOpen, setDebugOpen] = useState(false);
   const [visualReviewOpen, setVisualReviewOpen] = useState(true);
   const [sourceMode, setSourceMode] =
@@ -340,6 +342,9 @@ function LoadedWorldGameTest(props: {
           <button type="button" onClick={() => setBetaScenarioOpen(true)}>
             Beta scenario
           </button>
+          <button type="button" onClick={() => setGameplayScenarioOpen(true)}>
+            Gameplay integration
+          </button>
         </div>
         <aside
           className="phase12c-visual-review"
@@ -526,6 +531,7 @@ function LoadedWorldGameTest(props: {
             playerExperienceOpen ||
             assetCoverageOpen ||
             betaScenarioOpen ||
+            gameplayScenarioOpen ||
             hudPopoverOpen
           }
           onCheckpoint={() => undefined}
@@ -575,7 +581,8 @@ function LoadedWorldGameTest(props: {
             progressionOpen ||
             playerExperienceOpen ||
             assetCoverageOpen ||
-            betaScenarioOpen
+            betaScenarioOpen ||
+            gameplayScenarioOpen
           }
           dust={{ status: 'unavailable' }}
           level={{ status: 'unavailable' }}
@@ -601,7 +608,10 @@ function LoadedWorldGameTest(props: {
             <p>{runtimeError}</p>
           </div>
         )}
-        {interaction === null || dialogue !== null || betaScenarioOpen ? null : (
+        {interaction === null ||
+        dialogue !== null ||
+        betaScenarioOpen ||
+        gameplayScenarioOpen ? null : (
           <button
             className="interaction-prompt"
             type="button"
@@ -641,6 +651,9 @@ function LoadedWorldGameTest(props: {
             onApplyStep={applyBetaScenarioStep}
             onClose={() => setBetaScenarioOpen(false)}
           />
+        ) : null}
+        {gameplayScenarioOpen ? (
+          <Phase13AGameplayGameTest onClose={() => setGameplayScenarioOpen(false)} />
         ) : null}
         {debugOpen ? (
           <aside className="world-game-test-debug" aria-label="Game Test debug panel">

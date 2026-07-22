@@ -43,6 +43,11 @@ interface AmbientCandidate {
   readonly effect: WorldObjectAmbienceAnimationPlan['effect'];
 }
 
+interface AmbientAnimationBinding {
+  readonly tweenTargets: Phaser.GameObjects.GameObject | readonly Phaser.GameObjects.GameObject[];
+  readonly angleTargets: readonly Phaser.GameObjects.Container[];
+}
+
 function stableHash(value: string): number {
   let hash = 2_166_136_261;
   for (let index = 0; index < value.length; index += 1) {
@@ -143,7 +148,7 @@ export function renderWorldObjectAmbience(
     : candidates.slice(0, MAXIMUM_OBJECT_AMBIENT_ANIMATIONS);
   const animationPlans = animatedCandidates.map(animationPlan);
   const ownedNodes: Phaser.GameObjects.Graphics[] = [];
-  const animatedTargets: Phaser.GameObjects.GameObject[] = [];
+  const animationBindings: AmbientAnimationBinding[] = [];
 
   for (const candidate of candidates) {
     if (candidate.effect === 'foliage_sway') continue;
@@ -157,9 +162,13 @@ export function renderWorldObjectAmbience(
     if (candidate.effect === 'foliage_sway') {
       const amplitude =
         candidate.object.kind === 'tree' ? 0.42 : candidate.object.kind === 'bush' ? 0.3 : 0.5;
-      candidate.rendered.container.setAngle(-amplitude);
+      const angleTargets =
+        candidate.rendered.foreground === undefined
+          ? [candidate.rendered.container]
+          : [candidate.rendered.container, candidate.rendered.foreground];
+      for (const target of angleTargets) target.setAngle(-amplitude);
       scene.tweens?.add({
-        targets: candidate.rendered.container,
+        targets: angleTargets,
         angle: { from: -amplitude, to: amplitude },
         duration: plan.durationMs,
         delay: plan.delayMs,
@@ -167,7 +176,7 @@ export function renderWorldObjectAmbience(
         yoyo: true,
         repeat: -1,
       });
-      animatedTargets.push(candidate.rendered.container);
+      animationBindings.push({ tweenTargets: angleTargets, angleTargets });
       continue;
     }
 
@@ -185,7 +194,7 @@ export function renderWorldObjectAmbience(
       yoyo: true,
       repeat: -1,
     });
-    animatedTargets.push(glow);
+    animationBindings.push({ tweenTargets: glow, angleTargets: [] });
   }
 
   let destroyed = false;
@@ -198,11 +207,9 @@ export function renderWorldObjectAmbience(
     destroy(): void {
       if (destroyed) return;
       destroyed = true;
-      for (const target of animatedTargets) {
-        scene.tweens?.killTweensOf(target);
-        if (!ownedNodes.includes(target as Phaser.GameObjects.Graphics)) {
-          (target as Phaser.GameObjects.Container).setAngle(0);
-        }
+      for (const binding of animationBindings) {
+        scene.tweens?.killTweensOf(binding.tweenTargets);
+        for (const target of binding.angleTargets) target.setAngle(0);
       }
       for (const node of ownedNodes) node.destroy();
     },

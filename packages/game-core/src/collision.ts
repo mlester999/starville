@@ -34,6 +34,82 @@ export interface CapsuleCollision {
 
 export type CollisionShape = RectangleCollision | CircleCollision | CapsuleCollision;
 
+export interface CollisionSpatialIndex {
+  readonly cellSize: number;
+  readonly totalShapes: number;
+  query(bounds: Bounds): readonly CollisionShape[];
+}
+
+function shapeBounds(shape: CollisionShape): Bounds {
+  if (shape.shape === 'rectangle') {
+    return {
+      minX: shape.x,
+      minY: shape.y,
+      maxX: shape.x + shape.width,
+      maxY: shape.y + shape.height,
+    };
+  }
+  if (shape.shape === 'circle') {
+    return {
+      minX: shape.x - shape.radius,
+      minY: shape.y - shape.radius,
+      maxX: shape.x + shape.radius,
+      maxY: shape.y + shape.radius,
+    };
+  }
+  return {
+    minX: Math.min(shape.startX, shape.endX) - shape.radius,
+    minY: Math.min(shape.startY, shape.endY) - shape.radius,
+    maxX: Math.max(shape.startX, shape.endX) + shape.radius,
+    maxY: Math.max(shape.startY, shape.endY) + shape.radius,
+  };
+}
+
+function cellRange(bounds: Bounds, cellSize: number) {
+  return {
+    minX: Math.floor(bounds.minX / cellSize),
+    minY: Math.floor(bounds.minY / cellSize),
+    maxX: Math.floor(bounds.maxX / cellSize),
+    maxY: Math.floor(bounds.maxY / cellSize),
+  };
+}
+
+/** Deterministic grid buckets avoid scanning the complete expanded map per movement substep. */
+export function buildCollisionSpatialIndex(
+  collisions: readonly CollisionShape[],
+  cellSize = 4,
+): CollisionSpatialIndex {
+  const safeCellSize = Number.isFinite(cellSize) && cellSize > 0 ? cellSize : 4;
+  const buckets = new Map<string, CollisionShape[]>();
+  for (const collision of collisions.filter(({ blocking }) => blocking)) {
+    const range = cellRange(shapeBounds(collision), safeCellSize);
+    for (let y = range.minY; y <= range.maxY; y += 1) {
+      for (let x = range.minX; x <= range.maxX; x += 1) {
+        const key = `${String(x)}:${String(y)}`;
+        const bucket = buckets.get(key) ?? [];
+        bucket.push(collision);
+        buckets.set(key, bucket);
+      }
+    }
+  }
+  return Object.freeze({
+    cellSize: safeCellSize,
+    totalShapes: collisions.length,
+    query(bounds: Bounds) {
+      const range = cellRange(bounds, safeCellSize);
+      const nearby = new Map<string, CollisionShape>();
+      for (let y = range.minY; y <= range.maxY; y += 1) {
+        for (let x = range.minX; x <= range.maxX; x += 1) {
+          for (const collision of buckets.get(`${String(x)}:${String(y)}`) ?? []) {
+            nearby.set(collision.id, collision);
+          }
+        }
+      }
+      return [...nearby.values()];
+    },
+  });
+}
+
 function circleIntersectsRectangle(
   point: Point,
   radius: number,
@@ -210,4 +286,21 @@ export function moveWithCollisions(
   }
 
   return current;
+}
+
+export function moveWithCollisionIndex(
+  position: Point,
+  delta: Point,
+  radius: number,
+  bounds: Bounds,
+  index: CollisionSpatialIndex,
+): Point {
+  const padding = radius + Math.max(Math.abs(delta.x), Math.abs(delta.y)) + 0.1;
+  const nearby = index.query({
+    minX: Math.min(position.x, position.x + delta.x) - padding,
+    minY: Math.min(position.y, position.y + delta.y) - padding,
+    maxX: Math.max(position.x, position.x + delta.x) + padding,
+    maxY: Math.max(position.y, position.y + delta.y) + padding,
+  });
+  return moveWithCollisions(position, delta, radius, bounds, nearby);
 }

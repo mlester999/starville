@@ -35,14 +35,20 @@ class LoadLogger implements ServiceLogger {
 }
 
 interface ScenarioResult {
+  readonly scenario: string;
   readonly players: number;
   readonly channels: number;
   readonly reconnects: number;
+  readonly mobileClients: number;
+  readonly hiddenTabClients: number;
+  readonly hiddenTabDwellMs: number;
+  readonly admittedAfterHiddenDwell: number;
   readonly durationMs: number;
   readonly cpuUserMs: number;
   readonly cpuSystemMs: number;
   readonly heapDeltaBytes: number;
   readonly sentMovements: number;
+  readonly movementBurstMessages: number;
   readonly receivedMovementBroadcasts: number;
   readonly receivedTrailingIdleBroadcasts: number;
   readonly rejectedMovements: number;
@@ -61,6 +67,7 @@ interface ScenarioResult {
   readonly averageCosmeticBroadcastLatencyMs: number;
   readonly maximumCosmeticBroadcastLatencyMs: number;
   readonly sentChatMessages: number;
+  readonly chatBurstMessages: number;
   readonly acceptedChatMessages: number;
   readonly receivedChatBroadcasts: number;
   readonly rejectedChatMessages: number;
@@ -132,6 +139,14 @@ interface ScenarioResult {
   readonly homeVisitMessagesPerSecond: number;
   readonly averageHomeVisitUpdateLatencyMs: number;
   readonly maximumHomeVisitUpdateLatencyMs: number;
+  readonly publicCloseCheckpoints: number;
+}
+
+interface ScenarioOptions {
+  readonly scenario: string;
+  readonly mobileClients?: number;
+  readonly hiddenTabClients?: number;
+  readonly hiddenTabDwellMs?: number;
 }
 
 function waitFor(socket: WebSocket, type: string): Promise<Record<string, unknown>> {
@@ -165,6 +180,7 @@ async function runScenario(
   players: number,
   channelCount: number,
   reconnects: number,
+  options: ScenarioOptions,
 ): Promise<ScenarioResult> {
   const manifest = getWorldManifest('lantern-square');
   if (manifest === undefined) throw new Error('Load fixture manifest is unavailable.');
@@ -172,6 +188,14 @@ async function runScenario(
   let chatSequence = 0;
   let acceptedChatMessages = 0;
   let sentChatMessages = 0;
+  let chatBurstMessages = 0;
+  let sentMovements = 0;
+  let movementBurstMessages = 0;
+  let publicCloseCheckpoints = 0;
+  let admittedAfterHiddenDwell = players;
+  const mobileClients = Math.min(players, options.mobileClients ?? 0);
+  const hiddenTabClients = Math.min(players, options.hiddenTabClients ?? 0);
+  const hiddenTabDwellMs = hiddenTabClients === 0 ? 0 : (options.hiddenTabDwellMs ?? 500);
   const persistenceLatencies: number[] = [];
   const socialPersistenceLatencies: number[] = [];
   const socialRequestLatencies: number[] = [];
@@ -544,6 +568,7 @@ async function runScenario(
       };
     },
     async close() {
+      publicCloseCheckpoints += 1;
       return true;
     },
     async chatBootstrap() {
@@ -1507,7 +1532,15 @@ async function runScenario(
 
   try {
     for (let index = 0; index < players; index += 1) {
-      const socket = new WebSocket(url, { origin: 'http://localhost:3001' });
+      const socket = new WebSocket(url, {
+        origin: 'http://localhost:3001',
+        headers: {
+          'user-agent':
+            index < mobileClients
+              ? 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) Mobile/15E148'
+              : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/126.0',
+        },
+      });
       sockets.push(socket);
       activitySockets.set(index, socket);
       await new Promise<void>((resolve, reject) => {
@@ -1519,6 +1552,18 @@ async function runScenario(
       const admittedPayload = await admittedMessage;
       const admittedSelf = admittedPayload['self'] as Record<string, unknown>;
       socketPresences.push(String(admittedSelf['presenceId']));
+    }
+
+    if (hiddenTabDwellMs > 0) {
+      await new Promise((resolve) => setTimeout(resolve, hiddenTabDwellMs));
+      const readiness = await fetch(`${address}/ready`);
+      const readinessBody = (await readiness.json()) as {
+        readonly connections?: { readonly admitted?: number };
+      };
+      admittedAfterHiddenDwell = readinessBody.connections?.admitted ?? -1;
+      if (readiness.status !== 200 || admittedAfterHiddenDwell !== players) {
+        throw new Error('Hidden-tab dwell did not preserve the authenticated connection set.');
+      }
     }
 
     const connectHomeVisitParticipant = async (): Promise<WebSocket> => {
@@ -1812,6 +1857,7 @@ async function runScenario(
     }
     let sequence = 1;
     for (const socket of sockets) {
+      sentMovements += 1;
       socket.send(
         JSON.stringify({
           version: 1,
@@ -1843,6 +1889,8 @@ async function runScenario(
         facingDirection: 'west',
         movementState: 'jogging',
       });
+      sentMovements += 2;
+      movementBurstMessages += 2;
       socket.send(movement);
       // The duplicate yields the sender's authoritative stale-sequence snapshot even when
       // channel/activity isolation leaves that presence without a remote observer.
@@ -1873,6 +1921,8 @@ async function runScenario(
         facingDirection: 'north',
         movementState: 'jogging',
       });
+      sentMovements += 2;
+      movementBurstMessages += 2;
       socket.send(trailingIdle);
       socket.send(trailingIdle);
       sequence += 1;
@@ -1915,6 +1965,7 @@ async function runScenario(
         const socket = sockets[index];
         if (socket === undefined) continue;
         sentChatMessages += 1;
+        chatBurstMessages += 1;
         socket.send(
           JSON.stringify({
             version: 1,
@@ -1932,6 +1983,7 @@ async function runScenario(
     if (spamSocket !== undefined) {
       for (let index = 0; index < 6; index += 1) {
         sentChatMessages += 1;
+        chatBurstMessages += 1;
         spamSocket.send(
           JSON.stringify({
             version: 1,
@@ -2412,6 +2464,12 @@ async function runScenario(
     await service.stop();
   }
 
+  if (publicCloseCheckpoints < players) {
+    throw new Error(
+      `Disconnect cleanup was incomplete for ${options.scenario} (${String(publicCloseCheckpoints)}/${String(players)} checkpoints).`,
+    );
+  }
+
   const cpu = process.cpuUsage(cpuStart);
   const durationMs = Math.round(performance.now() - startedAt);
   const completedActivityInstances = [...activityStates.values()].filter(
@@ -2429,14 +2487,20 @@ async function runScenario(
     ['preparing', 'waiting_for_players', 'active', 'paused'].includes(snapshot.status),
   ).length;
   return {
+    scenario: options.scenario,
     players,
     channels: channelCount,
     reconnects,
+    mobileClients,
+    hiddenTabClients,
+    hiddenTabDwellMs,
+    admittedAfterHiddenDwell,
     durationMs,
     cpuUserMs: Math.round(cpu.user / 1_000),
     cpuSystemMs: Math.round(cpu.system / 1_000),
     heapDeltaBytes: process.memoryUsage().heapUsed - heapStart,
-    sentMovements: players,
+    sentMovements,
+    movementBurstMessages,
     receivedMovementBroadcasts,
     receivedTrailingIdleBroadcasts,
     rejectedMovements,
@@ -2464,6 +2528,7 @@ async function runScenario(
           ),
     maximumCosmeticBroadcastLatencyMs: Math.round(Math.max(0, ...cosmeticBroadcastLatencies)),
     sentChatMessages,
+    chatBurstMessages,
     acceptedChatMessages,
     receivedChatBroadcasts,
     rejectedChatMessages,
@@ -2599,15 +2664,28 @@ async function runScenario(
           ) / 1_000,
     maximumHomeVisitUpdateLatencyMs:
       Math.round(Math.max(0, ...homeVisitUpdateLatencies) * 1_000) / 1_000,
+    publicCloseCheckpoints,
   };
 }
 
 const results = [
-  await runScenario(10, 1, 0),
-  await runScenario(20, 1, 0),
-  await runScenario(40, 1, 0),
-  await runScenario(40, 2, 0),
-  await runScenario(40, 2, 5),
+  await runScenario(1, 1, 0, { scenario: 'single-client-baseline', mobileClients: 1 }),
+  await runScenario(5, 1, 0, {
+    scenario: 'small-mixed-client-hidden-tab-dwell',
+    mobileClients: 3,
+    hiddenTabClients: 2,
+    hiddenTabDwellMs: 750,
+  }),
+  await runScenario(10, 1, 0, { scenario: 'small-public-channel' }),
+  await runScenario(20, 1, 0, { scenario: 'medium-public-channel', mobileClients: 8 }),
+  await runScenario(40, 1, 0, { scenario: 'capacity-public-channel', mobileClients: 16 }),
+  await runScenario(40, 2, 0, { scenario: 'split-channel-routing', mobileClients: 16 }),
+  await runScenario(40, 2, 5, {
+    scenario: 'split-channel-reconnect-storm',
+    mobileClients: 16,
+    hiddenTabClients: 10,
+    hiddenTabDwellMs: 750,
+  }),
 ];
 
 process.stdout.write(

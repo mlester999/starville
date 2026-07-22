@@ -20,24 +20,63 @@ export function movementSpeed(jogging: boolean): number {
   return WALK_SPEED_TILES_PER_SECOND * (jogging ? JOG_SPEED_MULTIPLIER : 1);
 }
 
-function directionFor(x: number, y: number): FacingDirection | undefined {
-  if (x === 0 && y < 0) return 'north';
-  if (x > 0 && y < 0) return 'northeast';
-  if (x > 0 && y === 0) return 'east';
-  if (x > 0 && y > 0) return 'southeast';
-  if (x === 0 && y > 0) return 'south';
-  if (x < 0 && y > 0) return 'southwest';
-  if (x < 0 && y === 0) return 'west';
-  if (x < 0 && y < 0) return 'northwest';
-  return undefined;
+const OCTANT_DIRECTIONS: readonly FacingDirection[] = [
+  'east',
+  'southeast',
+  'south',
+  'southwest',
+  'west',
+  'northwest',
+  'north',
+  'northeast',
+];
+const OCTANT_ANGLE_RADIANS = Math.PI / 4;
+const OCTANT_HALF_ANGLE_RADIANS = OCTANT_ANGLE_RADIANS / 2;
+
+/**
+ * A small dead band around each octant boundary prevents alternating collision
+ * slide vectors from flipping the visible pose every frame. It only applies
+ * when a prior direction exists; first-frame/input resolution stays exact.
+ */
+export const FACING_DIRECTION_HYSTERESIS_RADIANS = Math.PI / 24;
+
+function screenAngleForWorldVelocity(velocity: Point): number | undefined {
+  const screenX = velocity.x - velocity.y;
+  const screenY = velocity.x + velocity.y;
+  if (
+    !Number.isFinite(screenX) ||
+    !Number.isFinite(screenY) ||
+    Math.hypot(screenX, screenY) <= 1e-6
+  ) {
+    return undefined;
+  }
+  return Math.atan2(screenY, screenX);
+}
+
+function directionForScreenVector(x: number, y: number): FacingDirection | undefined {
+  if (!Number.isFinite(x) || !Number.isFinite(y) || Math.hypot(x, y) <= 1e-6) return undefined;
+  const octant = Math.round(Math.atan2(y, x) / OCTANT_ANGLE_RADIANS);
+  return OCTANT_DIRECTIONS[(octant + 8) % 8];
+}
+
+function angularDistance(left: number, right: number): number {
+  return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
+}
+
+/**
+ * Canonical eight-way direction resolver. World movement is authoritative;
+ * the velocity is projected into screen space once before selecting the atlas
+ * direction, preventing keyboard order, collision sliding, and double mirroring
+ * from reversing east and west.
+ */
+export function facingDirectionForWorldVelocity(velocity: Point): FacingDirection | undefined {
+  return directionForScreenVector(velocity.x - velocity.y, velocity.x + velocity.y);
 }
 
 export function movementIntent(input: MovementInput): MovementIntent {
   const screenX = Number(input.right) - Number(input.left);
   const screenY = Number(input.down) - Number(input.up);
-  const direction = directionFor(screenX, screenY);
-
-  if (direction === undefined) {
+  if (screenX === 0 && screenY === 0) {
     return { moving: false, unit: { x: 0, y: 0 } };
   }
 
@@ -47,10 +86,11 @@ export function movementIntent(input: MovementInput): MovementIntent {
   const worldX = (screenX + screenY) / 2;
   const worldY = (screenY - screenX) / 2;
   const length = Math.hypot(worldX, worldY);
+  const unit = { x: worldX / length, y: worldY / length };
   return {
     moving: true,
-    direction,
-    unit: { x: worldX / length, y: worldY / length },
+    direction: facingDirectionForWorldVelocity(unit)!,
+    unit,
   };
 }
 
@@ -73,4 +113,23 @@ export function nextFacingDirection(
   previous: FacingDirection,
 ): FacingDirection {
   return movementIntent(input).direction ?? previous;
+}
+
+export function nextFacingDirectionFromVelocity(
+  velocity: Point,
+  previous: FacingDirection,
+): FacingDirection {
+  const angle = screenAngleForWorldVelocity(velocity);
+  if (angle === undefined) return previous;
+
+  const previousIndex = OCTANT_DIRECTIONS.indexOf(previous);
+  const previousAngle = previousIndex * OCTANT_ANGLE_RADIANS;
+  if (
+    angularDistance(angle, previousAngle) <=
+    OCTANT_HALF_ANGLE_RADIANS + FACING_DIRECTION_HYSTERESIS_RADIANS
+  ) {
+    return previous;
+  }
+
+  return facingDirectionForWorldVelocity(velocity) ?? previous;
 }

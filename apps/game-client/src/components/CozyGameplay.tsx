@@ -70,6 +70,7 @@ interface CozyGameplayProps {
   readonly portalPanels?: boolean;
   readonly onDustBalanceChange?: (balance: number) => void;
   readonly onDustLoadState?: (state: 'loading' | 'ready' | 'unavailable') => void;
+  readonly onAuthoritativeMutation?: () => void;
   readonly onHomeAccessChange?: (
     location: 'public_world' | 'personal_home',
     view: PlayableVerticalSlice,
@@ -252,6 +253,7 @@ export function CozyGameplay({
   portalPanels = false,
   onDustBalanceChange,
   onDustLoadState,
+  onAuthoritativeMutation,
   onHomeAccessChange,
 }: CozyGameplayProps) {
   const [state, setState] = useState<CozyState>();
@@ -586,6 +588,7 @@ export function CozyGameplay({
         await operation();
         await refreshMutableState();
         setStatus(success);
+        onAuthoritativeMutation?.();
       } catch (cause) {
         if (cause instanceof PlayerRequestError && cause.code === 'GAMEPLAY_STATE_CONFLICT') {
           await refreshMutableState().catch(() => undefined);
@@ -597,7 +600,7 @@ export function CozyGameplay({
         setBusyLabel(undefined);
       }
     },
-    [refreshMutableState, setErrorFromCause],
+    [onAuthoritativeMutation, refreshMutableState, setErrorFromCause],
   );
 
   function closePanel() {
@@ -663,6 +666,7 @@ export function CozyGameplay({
         );
         await refreshMutableState();
         setStatus({ title: 'Progress saved', detail: result.announcement });
+        onAuthoritativeMutation?.();
       } catch (cause) {
         if (
           cause instanceof PlayerRequestError &&
@@ -679,7 +683,7 @@ export function CozyGameplay({
         setBusyLabel(undefined);
       }
     },
-    [refreshMutableState, setErrorFromCause],
+    [onAuthoritativeMutation, refreshMutableState, setErrorFromCause],
   );
 
   return (
@@ -988,6 +992,7 @@ export function CozyGameplay({
                         title: direction === 'buy' ? 'Purchase complete' : 'Sale complete',
                         detail: `${quantity.toLocaleString()} × ${entry.itemName}. Receipt ${result.receipt.receiptId}.`,
                       });
+                      onAuthoritativeMutation?.();
                       return result;
                     } catch (cause) {
                       if (cause instanceof PlayerRequestError && cause.status === 401)
@@ -1017,12 +1022,14 @@ export function CozyGameplay({
                     if (interaction?.type !== 'shop') return;
                     await acceptGeneralStoreTutorial(apiUrl, interaction.id);
                     setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
+                    onAuthoritativeMutation?.();
                   }}
                   onTurnInTutorial={async (stateVersion) => {
                     if (interaction?.type !== 'shop') return;
                     await turnInGeneralStoreTutorial(apiUrl, interaction.id, stateVersion);
                     await refreshMutableState();
                     setGeneralStore(await loadGeneralStore(apiUrl, interaction.id));
+                    onAuthoritativeMutation?.();
                   }}
                 />
               ) : null}
@@ -1081,6 +1088,7 @@ export function CozyGameplay({
                 <HomePanel
                   apiUrl={apiUrl}
                   realtimeUrl={realtimeUrl}
+                  onAuthoritativeMutation={onAuthoritativeMutation}
                   state={state}
                   busy={busy}
                   selectedFarmingItem={selectedFarmingItem}
@@ -1688,6 +1696,7 @@ function WorkstationPanel({
 function HomePanel({
   apiUrl,
   realtimeUrl,
+  onAuthoritativeMutation,
   state,
   busy,
   selectedFarmingItem,
@@ -1697,6 +1706,7 @@ function HomePanel({
 }: {
   readonly apiUrl: string;
   readonly realtimeUrl?: string | undefined;
+  readonly onAuthoritativeMutation?: (() => void) | undefined;
   readonly state: CozyState;
   readonly busy: boolean;
   readonly selectedFarmingItem: 'starter-hoe' | 'starter-watering-can' | 'moonbean-seed' | null;
@@ -1822,7 +1832,11 @@ function HomePanel({
               })}
             </div>
           </section>
-          <HousingWorkspacePanel apiUrl={apiUrl} realtimeUrl={realtimeUrl} />
+          <HousingWorkspacePanel
+            apiUrl={apiUrl}
+            realtimeUrl={realtimeUrl}
+            onAuthoritativeMutation={onAuthoritativeMutation}
+          />
         </>
       ) : null}
     </div>

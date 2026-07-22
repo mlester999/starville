@@ -56,6 +56,11 @@ import {
   runtimeRetryDelay,
   type RuntimeDependency,
 } from '../app/runtime-recovery';
+import {
+  ReleaseCandidateAudioManager,
+  type ReleaseCandidateAudioSettings,
+  type ReleaseCandidateAudioStatus,
+} from '../app/release-candidate-audio';
 
 interface GameWorldProps {
   readonly apiUrl: string;
@@ -117,6 +122,19 @@ function accessInvalid(error: unknown): boolean {
   );
 }
 
+function releaseCandidateAudioSettings(settings: GameSettings): ReleaseCandidateAudioSettings {
+  return {
+    masterVolume: settings.masterVolume,
+    musicVolume: settings.musicVolume,
+    ambienceVolume: settings.ambienceVolume,
+    sfxVolume: settings.sfxVolume,
+    muted: settings.muted,
+    musicMuted: settings.musicMuted,
+    ambienceMuted: settings.ambienceMuted,
+    sfxMuted: settings.sfxMuted,
+  };
+}
+
 function LoadedGameWorld({
   apiUrl,
   landingUrl,
@@ -161,6 +179,11 @@ function LoadedGameWorld({
   const [settings, setSettings] = useState<GameSettings>(() =>
     loadGameSettings(window.localStorage),
   );
+  const audio = useRef<ReleaseCandidateAudioManager | null>(null);
+  const previousAudioSettings = useRef(settings);
+  const previousRealtimeStatus = useRef<string | undefined>(undefined);
+  const [audioStatus, setAudioStatus] = useState<ReleaseCandidateAudioStatus>('locked');
+  const [audioAnnouncement, setAudioAnnouncement] = useState('');
   const [leaving, setLeaving] = useState(false);
   const [interaction, setInteraction] = useState<InteractionPrompt | null>(null);
   const [dialogue, setDialogue] = useState<InteractionDialogue | null>(null);
@@ -210,6 +233,68 @@ function LoadedGameWorld({
   });
 
   useEffect(() => {
+    const manager = new ReleaseCandidateAudioManager({
+      onStatusChange: setAudioStatus,
+      onMeaningfulCue: setAudioAnnouncement,
+    });
+    audio.current = manager;
+    const arm = () => void manager.armFromUserGesture();
+    window.addEventListener('pointerdown', arm, { passive: true });
+    window.addEventListener('keydown', arm);
+    return () => {
+      window.removeEventListener('pointerdown', arm);
+      window.removeEventListener('keydown', arm);
+      manager.dispose();
+      if (audio.current === manager) audio.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    const manager = audio.current;
+    if (manager === null) return;
+    manager.setSettings(releaseCandidateAudioSettings(settings));
+    const previous = previousAudioSettings.current;
+    if (
+      settings.musicVolume !== previous.musicVolume ||
+      (!settings.musicMuted && previous.musicMuted)
+    ) {
+      manager.preview('music');
+    } else if (
+      settings.ambienceVolume !== previous.ambienceVolume ||
+      (!settings.ambienceMuted && previous.ambienceMuted)
+    ) {
+      manager.preview('ambient');
+    } else if (
+      settings.sfxVolume !== previous.sfxVolume ||
+      (!settings.sfxMuted && previous.sfxMuted)
+    ) {
+      manager.preview('sfx');
+    }
+    previousAudioSettings.current = settings;
+  }, [settings]);
+
+  useEffect(() => {
+    audio.current?.setLocation(insidePersonalHome ? 'personal-home' : 'lantern-square');
+  }, [insidePersonalHome]);
+
+  useEffect(() => {
+    const previous = previousRealtimeStatus.current;
+    const current = realtime.state.status;
+    if (
+      current === 'connected' &&
+      (previous === 'reconnecting' || previous === 'disconnected' || previous === 'unavailable')
+    ) {
+      audio.current?.play('sfx.reconnect');
+    } else if (
+      previous === 'connected' &&
+      (current === 'blocked' || current === 'full' || current === 'unavailable')
+    ) {
+      audio.current?.play('sfx.error');
+    }
+    previousRealtimeStatus.current = current;
+  }, [realtime.state.status]);
+
+  useEffect(() => {
     setLocationExpanded(true);
     const timeout = window.setTimeout(() => setLocationExpanded(false), 5_000);
     return () => window.clearTimeout(timeout);
@@ -256,6 +341,11 @@ function LoadedGameWorld({
         if (accessInvalid(error)) onAccessInvalid();
       });
   }, [apiUrl, onAccessInvalid, updateProgressionHud]);
+
+  const handleAuthoritativeGameplayMutation = useCallback(() => {
+    setPlayerExperienceRefresh((value) => value + 1);
+    refreshProgressionHud();
+  }, [refreshProgressionHud]);
 
   useEffect(() => {
     refreshProgressionHud();
@@ -342,6 +432,7 @@ function LoadedGameWorld({
   }, []);
 
   const openInteraction = useCallback((nextInteraction: WorldInteraction) => {
+    audio.current?.play('sfx.interaction');
     if (
       nextInteraction.id === 'phase10b-wardrobe-mirror' ||
       nextInteraction.id === 'phase10b-wardrobe-furniture'
@@ -417,6 +508,7 @@ function LoadedGameWorld({
         phase: 'traveling',
         label: request.destinationLabel ?? 'Traveling through Starville…',
       });
+      audio.current?.play('sfx.transition');
 
       try {
         const expectedGameStateVersion = await persistence.beginTransition();
@@ -459,12 +551,14 @@ function LoadedGameWorld({
         setDialogue(null);
         setCozyInteraction(null);
         setTransition(null);
+        audio.current?.play('sfx.success');
       } catch (error) {
         persistence.cancelTransition();
         runtime.current?.cancelTransition();
         if (accessInvalid(error)) {
           onAccessInvalid();
         } else {
+          audio.current?.play('sfx.error');
           setTransition({
             phase: 'failed',
             label: 'That route could not be opened. You are back at your last safe position.',
@@ -703,7 +797,20 @@ function LoadedGameWorld({
       data-shadows={effectiveShadows ? 'on' : 'off'}
       data-visual-quality={settings.visualQuality}
       data-water-animation={effectiveWaterAnimation ? 'on' : 'off'}
+      onPointerDownCapture={(event) => {
+        if (event.target instanceof Element && event.target.closest('button') !== null) {
+          audio.current?.play('sfx.ui-click');
+        }
+      }}
     >
+      <p aria-live="polite" className="sr-only" role="status">
+        {audioAnnouncement}
+      </p>
+      {audioStatus !== 'unavailable' ? null : (
+        <div className="world-emote-status" role="status">
+          Audio is unavailable. All important Starville feedback remains visible as text.
+        </div>
+      )}
       <header className="world-topbar">
         <div className="world-brand" aria-label="Starville">
           <span aria-hidden="true">✦</span>
@@ -918,6 +1025,7 @@ function LoadedGameWorld({
             externalDustRefreshRequest={dustRefreshRequest}
             onDustBalanceChange={handleDustBalanceChange}
             onDustLoadState={handleDustLoadState}
+            onAuthoritativeMutation={handleAuthoritativeGameplayMutation}
             portalPanels
             showStandaloneHud={false}
             onHomeAccessChange={(location, view) => {

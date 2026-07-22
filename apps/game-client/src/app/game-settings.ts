@@ -1,4 +1,4 @@
-export const GAME_SETTINGS_VERSION = 4 as const;
+export const GAME_SETTINGS_VERSION = 5 as const;
 
 export type GameUiScale = 0.9 | 1 | 1.1 | 1.2;
 export type GameVisualQuality = 'low' | 'balanced' | 'high';
@@ -7,9 +7,13 @@ export type GameHudDensity = 'compact' | 'comfortable';
 export interface GameSettings {
   readonly version: typeof GAME_SETTINGS_VERSION;
   readonly masterVolume: number;
+  readonly musicVolume: number;
   readonly ambienceVolume: number;
   readonly sfxVolume: number;
   readonly muted: boolean;
+  readonly musicMuted: boolean;
+  readonly ambienceMuted: boolean;
+  readonly sfxMuted: boolean;
   readonly visualQuality: GameVisualQuality;
   readonly ambientEffects: boolean;
   readonly shadows: boolean;
@@ -31,9 +35,13 @@ export interface GameSettings {
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
   version: GAME_SETTINGS_VERSION,
   masterVolume: 0.8,
+  musicVolume: 0.45,
   ambienceVolume: 0.6,
   sfxVolume: 0.8,
   muted: false,
+  musicMuted: false,
+  ambienceMuted: false,
+  sfxMuted: false,
   visualQuality: 'balanced',
   ambientEffects: true,
   shadows: true,
@@ -52,7 +60,8 @@ export const DEFAULT_GAME_SETTINGS: GameSettings = {
   increasedTextContrast: false,
 };
 
-export const GAME_SETTINGS_STORAGE_KEY = 'starville.game-settings.v4';
+export const GAME_SETTINGS_STORAGE_KEY = 'starville.game-settings.v5';
+const VERSION_FOUR_STORAGE_KEY = 'starville.game-settings.v4';
 const VERSION_THREE_STORAGE_KEY = 'starville.game-settings.v3';
 const VERSION_TWO_STORAGE_KEY = 'starville.game-settings.v2';
 const LEGACY_STORAGE_KEY = 'starville.game-settings.v1';
@@ -89,11 +98,79 @@ function parseStoredJson(value: string | null): unknown {
   }
 }
 
-function parseVersionFour(value: unknown): GameSettings | undefined {
+function parseVersionFive(value: unknown): GameSettings | undefined {
   if (typeof value !== 'object' || value === null) return undefined;
   const read = (key: keyof GameSettings) => Reflect.get(value, key);
   if (
     read('version') !== GAME_SETTINGS_VERSION ||
+    !validVolume(read('masterVolume')) ||
+    !validVolume(read('musicVolume')) ||
+    !validVolume(read('ambienceVolume')) ||
+    !validVolume(read('sfxVolume')) ||
+    !validBoolean(read('muted')) ||
+    !validBoolean(read('musicMuted')) ||
+    !validBoolean(read('ambienceMuted')) ||
+    !validBoolean(read('sfxMuted')) ||
+    !validVisualQuality(read('visualQuality')) ||
+    !validBoolean(read('ambientEffects')) ||
+    !validBoolean(read('shadows')) ||
+    !validBoolean(read('waterAnimation')) ||
+    !validBoolean(read('chatBubbles')) ||
+    !validBoolean(read('worldLabels')) ||
+    !validHudDensity(read('hudDensity')) ||
+    !validBoolean(read('showInteractionHints')) ||
+    !validBoolean(read('showLocationBanner')) ||
+    !validBoolean(read('confirmBeforeLeavingActivities')) ||
+    !validBoolean(read('chatTimestamps')) ||
+    !validBoolean(read('autoOpenPartyNotifications')) ||
+    !validBoolean(read('reducedMotion')) ||
+    !validUiScale(read('uiScale')) ||
+    !validBoolean(read('largerChatText')) ||
+    !validBoolean(read('increasedTextContrast'))
+  ) {
+    return undefined;
+  }
+  return {
+    version: GAME_SETTINGS_VERSION,
+    masterVolume: read('masterVolume') as number,
+    musicVolume: read('musicVolume') as number,
+    ambienceVolume: read('ambienceVolume') as number,
+    sfxVolume: read('sfxVolume') as number,
+    muted: read('muted') as boolean,
+    musicMuted: read('musicMuted') as boolean,
+    ambienceMuted: read('ambienceMuted') as boolean,
+    sfxMuted: read('sfxMuted') as boolean,
+    visualQuality: read('visualQuality') as GameVisualQuality,
+    ambientEffects: read('ambientEffects') as boolean,
+    shadows: read('shadows') as boolean,
+    waterAnimation: read('waterAnimation') as boolean,
+    chatBubbles: read('chatBubbles') as boolean,
+    worldLabels: read('worldLabels') as boolean,
+    hudDensity: read('hudDensity') as GameHudDensity,
+    showInteractionHints: read('showInteractionHints') as boolean,
+    showLocationBanner: read('showLocationBanner') as boolean,
+    confirmBeforeLeavingActivities: read('confirmBeforeLeavingActivities') as boolean,
+    chatTimestamps: read('chatTimestamps') as boolean,
+    autoOpenPartyNotifications: read('autoOpenPartyNotifications') as boolean,
+    reducedMotion: read('reducedMotion') as boolean,
+    uiScale: read('uiScale') as GameUiScale,
+    largerChatText: read('largerChatText') as boolean,
+    increasedTextContrast: read('increasedTextContrast') as boolean,
+  };
+}
+
+interface VersionFourSettings extends Omit<
+  GameSettings,
+  'version' | 'musicVolume' | 'musicMuted' | 'ambienceMuted' | 'sfxMuted'
+> {
+  readonly version: 4;
+}
+
+function parseVersionFour(value: unknown): VersionFourSettings | undefined {
+  if (typeof value !== 'object' || value === null) return undefined;
+  const read = (key: keyof VersionFourSettings) => Reflect.get(value, key);
+  if (
+    read('version') !== 4 ||
     !validVolume(read('masterVolume')) ||
     !validVolume(read('ambienceVolume')) ||
     !validVolume(read('sfxVolume')) ||
@@ -118,7 +195,7 @@ function parseVersionFour(value: unknown): GameSettings | undefined {
     return undefined;
   }
   return {
-    version: GAME_SETTINGS_VERSION,
+    version: 4,
     masterVolume: read('masterVolume') as number,
     ambienceVolume: read('ambienceVolume') as number,
     sfxVolume: read('sfxVolume') as number,
@@ -142,8 +219,19 @@ function parseVersionFour(value: unknown): GameSettings | undefined {
   };
 }
 
+function migrateVersionFour(value: VersionFourSettings): GameSettings {
+  return {
+    ...value,
+    version: GAME_SETTINGS_VERSION,
+    musicVolume: DEFAULT_GAME_SETTINGS.musicVolume,
+    musicMuted: DEFAULT_GAME_SETTINGS.musicMuted,
+    ambienceMuted: DEFAULT_GAME_SETTINGS.ambienceMuted,
+    sfxMuted: DEFAULT_GAME_SETTINGS.sfxMuted,
+  };
+}
+
 interface VersionThreeSettings extends Omit<
-  GameSettings,
+  VersionFourSettings,
   'version' | 'ambienceVolume' | 'sfxVolume'
 > {
   readonly version: 3;
@@ -202,8 +290,12 @@ function migrateVersionThree(value: VersionThreeSettings): GameSettings {
   return {
     ...value,
     version: GAME_SETTINGS_VERSION,
+    musicVolume: DEFAULT_GAME_SETTINGS.musicVolume,
     ambienceVolume: DEFAULT_GAME_SETTINGS.ambienceVolume,
     sfxVolume: DEFAULT_GAME_SETTINGS.sfxVolume,
+    musicMuted: DEFAULT_GAME_SETTINGS.musicMuted,
+    ambienceMuted: DEFAULT_GAME_SETTINGS.ambienceMuted,
+    sfxMuted: DEFAULT_GAME_SETTINGS.sfxMuted,
   };
 }
 
@@ -294,8 +386,11 @@ function parseLegacy(value: unknown): GameSettings | undefined {
 }
 
 export function loadGameSettings(storage: Pick<Storage, 'getItem'>): GameSettings {
-  const current = parseVersionFour(parseStoredJson(storage.getItem(GAME_SETTINGS_STORAGE_KEY)));
+  const current = parseVersionFive(parseStoredJson(storage.getItem(GAME_SETTINGS_STORAGE_KEY)));
   if (current !== undefined) return current;
+
+  const versionFour = parseVersionFour(parseStoredJson(storage.getItem(VERSION_FOUR_STORAGE_KEY)));
+  if (versionFour !== undefined) return migrateVersionFour(versionFour);
 
   const versionThree = parseVersionThree(
     parseStoredJson(storage.getItem(VERSION_THREE_STORAGE_KEY)),

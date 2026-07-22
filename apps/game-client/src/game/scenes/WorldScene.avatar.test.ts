@@ -4,6 +4,7 @@ const remoteInstances = vi.hoisted(
   () =>
     [] as Array<{
       readonly presenceId: string;
+      readonly rendererMode: string;
       readonly destroy: ReturnType<typeof vi.fn>;
       readonly push: ReturnType<typeof vi.fn>;
       readonly setAppearance: ReturnType<typeof vi.fn>;
@@ -25,9 +26,18 @@ vi.mock('phaser', () => {
 vi.mock('../rendering/remote-player', () => ({
   RemotePlayerRenderer: class {
     public readonly record;
-    public constructor(_scene: unknown, presence: { presenceId: string }) {
+    public constructor(
+      _scene: unknown,
+      presence: { presenceId: string },
+      _projection: unknown,
+      _reducedMotion: boolean,
+      _onSelect: unknown,
+      _visualSettings: unknown,
+      rendererMode: string,
+    ) {
       this.record = {
         presenceId: presence.presenceId,
+        rendererMode,
         destroy: vi.fn(),
         push: vi.fn(),
         setAppearance: vi.fn(),
@@ -71,7 +81,7 @@ import { lanternSquareManifest } from '@starville/game-core';
 
 import { fallbackResolvedAvatar } from '../../app/avatar-client';
 import type { GameRuntimeOptions } from '../contracts';
-import { WorldScene } from './WorldScene';
+import { productionSliceInteriorCameraFrame, WorldScene } from './WorldScene';
 
 const presence = (
   presenceId: string,
@@ -122,6 +132,28 @@ const options: GameRuntimeOptions = {
 };
 
 describe('WorldScene avatar presence boundary', () => {
+  it('fits and centers the rescued interior at desktop and mobile sizes', async () => {
+    const { PRODUCTION_SLICE_V3_INTERIOR_MANIFEST } = await import('@starville/game-content');
+    const desktop = productionSliceInteriorCameraFrame(PRODUCTION_SLICE_V3_INTERIOR_MANIFEST, {
+      width: 1_440,
+      height: 900,
+    });
+    const mobile = productionSliceInteriorCameraFrame(PRODUCTION_SLICE_V3_INTERIOR_MANIFEST, {
+      width: 390,
+      height: 844,
+    });
+
+    expect(desktop.followsPlayer).toBe(false);
+    expect(mobile.followsPlayer).toBe(true);
+    expect(mobile.zoom).toBeGreaterThan(desktop.zoom);
+    expect(mobile.zoom).toBe(1.05);
+    expect(desktop.center.x).toBeCloseTo(mobile.center.x);
+    expect(desktop.center.y).toBeCloseTo(mobile.center.y);
+    expect(desktop.bounds.width * desktop.zoom).toBeCloseTo(1_440);
+    expect(mobile.bounds.width * mobile.zoom).toBeGreaterThan(390);
+    expect(mobile.bounds.height * mobile.zoom).toBeGreaterThan(844);
+  });
+
   it('moves through the normal collision pipeline from touch input when no keyboard exists', () => {
     const scene = new WorldScene(options);
     const player = { update: vi.fn() };
@@ -160,6 +192,34 @@ describe('WorldScene avatar presence boundary', () => {
     scene.setRemoteAvatarProfiles({ [visible.presenceId]: profile });
     expect(remoteInstances).toHaveLength(1);
     expect(remoteInstances[0]?.setAppearance).toHaveBeenLastCalledWith(profile);
+  });
+
+  it('does not reset an active gait when the resolved local appearance refreshes', () => {
+    const scene = new WorldScene(options);
+    const player = { update: vi.fn(), setAppearance: vi.fn() };
+    Reflect.set(scene, 'player', player);
+    Reflect.set(scene, 'wasMoving', true);
+    Reflect.set(scene, 'latestJogging', true);
+    const profile = fallbackResolvedAvatar('marigold');
+
+    scene.setLocalAvatarProfile(profile);
+
+    expect(player.setAppearance).toHaveBeenCalledWith(profile);
+    expect(player.update).toHaveBeenCalledWith(
+      expect.any(Object),
+      expect.any(String),
+      'jog',
+      expect.any(Number),
+    );
+  });
+
+  it('uses the production-slice raster renderer mode for a local remote-player fixture', () => {
+    remoteInstances.length = 0;
+    const scene = new WorldScene({ ...options, avatarRendererMode: 'production_slice_v3' });
+    const visible = presence('10000000-0000-4000-8000-000000000005');
+    scene.setRemotePresences([visible]);
+    expect(remoteInstances).toHaveLength(1);
+    expect(remoteInstances[0]?.rendererMode).toBe('production_slice_v3');
   });
 
   it('resolves low quality to shadow-free settings for existing remote villagers', () => {

@@ -93,6 +93,38 @@ describe('world object ambience', () => {
     ).toBe(true);
   });
 
+  it('sways a split foliage base and foreground as one visual without tearing', () => {
+    const { manifest, rendered, scene, containers } = fixture();
+    const tree = manifest.objects.find(({ kind }) => kind === 'tree')!;
+    const foreground = chainableGameObject();
+    const renderedWithForeground = rendered.map((object) =>
+      object.id === tree.id ? { ...object, foreground } : object,
+    );
+
+    const layer = renderWorldObjectAmbience(
+      scene as never,
+      manifest,
+      renderedWithForeground as never,
+      { quality: 'high' },
+    );
+    const base = containers.get(tree.id)!;
+    const swayTween = scene.tweens.add.mock.calls
+      .map(([config]) => config as { targets?: unknown })
+      .find(
+        ({ targets }) =>
+          Array.isArray(targets) && targets.includes(base) && targets.includes(foreground),
+      );
+
+    expect(swayTween?.targets).toEqual([base, foreground]);
+    expect(Reflect.get(base, 'setAngle')).toHaveBeenCalledWith(-0.42);
+    expect(Reflect.get(foreground, 'setAngle')).toHaveBeenCalledWith(-0.42);
+
+    layer.destroy();
+    expect(scene.tweens.killTweensOf).toHaveBeenCalledWith([base, foreground]);
+    expect(Reflect.get(base, 'setAngle')).toHaveBeenLastCalledWith(0);
+    expect(Reflect.get(foreground, 'setAngle')).toHaveBeenLastCalledWith(0);
+  });
+
   it('creates no ambient nodes in low quality or when ambience is disabled', () => {
     for (const options of [{ quality: 'low' as const }, { enabled: false }]) {
       const { manifest, rendered, scene } = fixture();

@@ -75,15 +75,22 @@ None of these values are browser-safe.
 
 ## Hosted Supabase target and approvals
 
-- `SUPABASE_ENVIRONMENT` must equal `development` for Phase 2 and Phase 3 hosted tooling.
+- `SUPABASE_ENVIRONMENT` is `development` for normal hosted tooling. Phase 13D owner commands may
+  use `production` only with `STARVILLE_DEPLOYMENT_TARGET=starville-prod`, an exact separately
+  approved production ref, a distinct development ref, production runtime identity, and the
+  production target verifier.
 - `SUPABASE_PROJECT_REF` must match both the public Supabase hostname and canonical CLI link.
 - `SUPABASE_REMOTE_WRITES_APPROVED` is a deny-by-default migration, bootstrap, and hosted
   world-asset upload gate. Only the admin portal and API application profiles receive it for runtime
   upload enforcement; it remains server-only.
 - `RUN_HOSTED_SUPABASE_TESTS` is a separate deny-by-default fixture-write gate.
+- Phase 13D comparison-only values bind each production public URL, the Reown project, token mint,
+  token program, token decimals, and environment-manifest version to independently approved values.
+  They do not authorize a network connection or mutation.
 
-The two approval variables are independent. Enabling one does not authorize the other, and neither
-is a permanent deployment approval. Keep both false except during the reviewed operation.
+The migration, hosted-test, and administrator-bootstrap approvals are independent. Enabling one does
+not authorize another, and none is a permanent deployment approval. Keep all three false except in
+the one owner-reviewed command that needs them.
 
 ## Privileged and conditional
 

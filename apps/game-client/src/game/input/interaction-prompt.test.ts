@@ -30,6 +30,16 @@ describe('world interaction prompt verbs', () => {
       },
       'Enter home',
     ],
+    [
+      {
+        ...anchor,
+        id: 'interior-exit',
+        title: 'Exit Amber Cottage',
+        type: 'home_entrance',
+        homeTemplateSlug: 'starter-cottage',
+      },
+      'Exit home',
+    ],
     [{ ...anchor, id: 'phase10b-wardrobe-mirror', type: 'notice' }, 'Customize character'],
   ])('uses %s without claiming the downstream action succeeded', (interaction, expected) => {
     expect(interactionPromptLabel(interaction)).toBe(expected);

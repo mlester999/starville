@@ -2,8 +2,11 @@ import { describe, expect, it } from 'vitest';
 
 import {
   FACING_DIRECTIONS,
+  buildCollisionSpatialIndex,
+  facingDirectionForWorldVelocity,
   isPositionWalkable,
   moveWithCollisions,
+  moveWithCollisionIndex,
   movementDelta,
   movementIntent,
   movementSpeed,
@@ -11,6 +14,7 @@ import {
   PLAYER_FOOT_RADIUS,
   WALK_SPEED_TILES_PER_SECOND,
   nextFacingDirection,
+  nextFacingDirectionFromVelocity,
   projectWorld,
   type CollisionShape,
   type Point,
@@ -48,6 +52,47 @@ describe('movement', () => {
     ).toBe('southwest');
   });
 
+  it('resolves facing from actual projected world velocity', () => {
+    const inputs = [
+      { up: true, down: false, left: false, right: false },
+      { up: true, down: false, left: false, right: true },
+      { up: false, down: false, left: false, right: true },
+      { up: false, down: true, left: false, right: true },
+      { up: false, down: true, left: false, right: false },
+      { up: false, down: true, left: true, right: false },
+      { up: false, down: false, left: true, right: false },
+      { up: true, down: false, left: true, right: false },
+    ];
+    expect(
+      inputs.map((input) => facingDirectionForWorldVelocity(movementIntent(input).unit)),
+    ).toEqual(FACING_DIRECTIONS);
+    expect(facingDirectionForWorldVelocity({ x: -0.5, y: 0.5 })).toBe('west');
+    expect(facingDirectionForWorldVelocity({ x: 0.5, y: -0.5 })).toBe('east');
+  });
+
+  it('holds the prior octant across noisy boundary and collision-slide vectors', () => {
+    const worldVelocityAtScreenAngle = (degrees: number): Point => {
+      const radians = (degrees * Math.PI) / 180;
+      const screenX = Math.cos(radians);
+      const screenY = Math.sin(radians);
+      return {
+        x: (screenX + screenY) / 2,
+        y: (screenY - screenX) / 2,
+      };
+    };
+
+    let facing: Parameters<typeof nextFacingDirectionFromVelocity>[1] = 'east';
+    for (const noisyAngle of [21, 23, 20, 24, 22.6, 18]) {
+      facing = nextFacingDirectionFromVelocity(worldVelocityAtScreenAngle(noisyAngle), facing);
+      expect(facing).toBe('east');
+    }
+
+    expect(nextFacingDirectionFromVelocity(worldVelocityAtScreenAngle(31), facing)).toBe(
+      'southeast',
+    );
+    expect(nextFacingDirectionFromVelocity({ x: 1e-10, y: -1e-10 }, 'northwest')).toBe('northwest');
+  });
+
   it('is frame-rate independent over equivalent bounded frame time', () => {
     const input = { up: false, down: true, left: false, right: true };
     const oneFrame = movementDelta(input, 3.2, 1 / 30);
@@ -78,6 +123,18 @@ describe('movement', () => {
 });
 
 describe('collision', () => {
+  it('uses deterministic nearby buckets without changing collision response', () => {
+    const index = buildCollisionSpatialIndex(obstacles, 2);
+    expect(index.totalShapes).toBe(obstacles.length);
+    expect(index.query({ minX: 3, minY: 2, maxX: 7, maxY: 7 }).map(({ id }) => id)).toEqual(
+      expect.arrayContaining(['building', 'tree']),
+    );
+    const start = { x: 3, y: 4 };
+    const jogDelta = { x: 2.5, y: 0.2 };
+    expect(moveWithCollisionIndex(start, jogDelta, PLAYER_FOOT_RADIUS, bounds, index)).toEqual(
+      moveWithCollisions(start, jogDelta, PLAYER_FOOT_RADIUS, bounds, obstacles),
+    );
+  });
   it('blocks boundaries, buildings, and trees but not nonblocking decoration', () => {
     expect(isPositionWalkable({ x: 0.1, y: 5 }, 0.3, bounds, obstacles)).toBe(false);
     expect(isPositionWalkable({ x: 4.5, y: 4 }, 0.3, bounds, obstacles)).toBe(false);
@@ -226,6 +283,7 @@ describe('collision', () => {
   it('keeps continuous walk and jog approaches on their original cottage side', async () => {
     const { lanternSquareManifest } = await import('../src/index');
     const manifest = lanternSquareManifest();
+    const collisionIndex = buildCollisionSpatialIndex(manifest.collisions);
     const diagonal = Math.SQRT1_2;
     const inputs = {
       right: { up: false, down: false, left: false, right: true },
@@ -313,27 +371,37 @@ describe('collision', () => {
         for (const deltaSeconds of [1 / 60, 1 / 20, 0.1]) {
           for (const approach of approaches) {
             let position = { ...approach.start };
-            for (let frame = 0; frame < 180; frame += 1) {
-              position = moveWithCollisions(
+            let stayedOnApproachSide = true;
+            let stayedWalkable = true;
+            for (let frame = 0; frame < 120; frame += 1) {
+              position = moveWithCollisionIndex(
                 position,
                 movementDelta(approach.input, movementSpeed(jogging), deltaSeconds),
                 PLAYER_FOOT_RADIUS,
                 manifest.safeSaveBounds,
-                manifest.collisions,
+                collisionIndex,
               );
-              expect(
-                approach.remains(position),
-                `${approach.name} crossed at ${jogging ? 'jog' : 'walk'} ${deltaSeconds}s`,
-              ).toBe(true);
-              expect(
-                isPositionWalkable(
-                  position,
-                  PLAYER_FOOT_RADIUS,
-                  manifest.safeSaveBounds,
-                  manifest.collisions,
-                ),
-              ).toBe(true);
+              stayedOnApproachSide &&= approach.remains(position);
+              stayedWalkable &&= isPositionWalkable(
+                position,
+                PLAYER_FOOT_RADIUS,
+                manifest.safeSaveBounds,
+                collisionIndex.query({
+                  minX: position.x - PLAYER_FOOT_RADIUS,
+                  minY: position.y - PLAYER_FOOT_RADIUS,
+                  maxX: position.x + PLAYER_FOOT_RADIUS,
+                  maxY: position.y + PLAYER_FOOT_RADIUS,
+                }),
+              );
             }
+            expect(
+              stayedOnApproachSide,
+              `${approach.name} crossed at ${jogging ? 'jog' : 'walk'} ${deltaSeconds}s`,
+            ).toBe(true);
+            expect(
+              stayedWalkable,
+              `${approach.name} entered collision at ${jogging ? 'jog' : 'walk'} ${deltaSeconds}s`,
+            ).toBe(true);
           }
         }
       }

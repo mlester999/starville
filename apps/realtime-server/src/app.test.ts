@@ -335,9 +335,38 @@ describe('real-time service foundation', () => {
       environment: 'test',
       status: 'ok',
     });
+    expect(health.headers).toMatchObject({
+      'cache-control': 'no-store',
+      'content-security-policy': expect.stringContaining("default-src 'none'"),
+      'permissions-policy': expect.stringContaining('camera=()'),
+      'referrer-policy': 'no-referrer',
+      'x-content-type-options': 'nosniff',
+      'x-frame-options': 'DENY',
+    });
     expect(readiness.json()).toMatchObject({
+      readiness: 'ready',
+      dependencies: 'available',
       connections: { active: 0, limit: 25 },
     });
+  });
+
+  it('fails readiness without leaking a persistence error', async () => {
+    const realtime = buildRealtimeApp({
+      config,
+      logger: new SilentLogger(),
+      persistence: persistence({ revalidate: vi.fn().mockRejectedValue(new Error('db secret')) }),
+    });
+    closeTasks.push(async () => realtime.app.close());
+
+    const readiness = await realtime.app.inject({ method: 'GET', url: '/ready' });
+
+    expect(readiness.statusCode).toBe(503);
+    expect(readiness.json()).toMatchObject({
+      status: 'degraded',
+      readiness: 'not-ready',
+      dependencies: 'unavailable',
+    });
+    expect(readiness.body).not.toContain('db secret');
   });
 
   it('enforces the configured connection limit in the registry', () => {

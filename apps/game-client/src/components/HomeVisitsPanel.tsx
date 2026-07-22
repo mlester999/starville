@@ -68,7 +68,12 @@ function settingsInput(
 export function HomeVisitsPanel({
   apiUrl,
   realtimeUrl,
-}: Readonly<{ apiUrl: string; realtimeUrl?: string | undefined }>) {
+  onAuthoritativeMutation,
+}: Readonly<{
+  apiUrl: string;
+  realtimeUrl?: string | undefined;
+  onAuthoritativeMutation?: (() => void) | undefined;
+}>) {
   const [workspace, setWorkspace] = useState<HomeVisitWorkspace>();
   const [preview, setPreview] = useState<HomeVisitWorkspace>();
   const [busy, setBusy] = useState(false);
@@ -132,6 +137,7 @@ export function HomeVisitsPanel({
       await action();
       await refresh();
       setNotice(success);
+      onAuthoritativeMutation?.();
     } catch (cause) {
       setError(errorMessage(cause));
       await refresh().catch(() => undefined);

@@ -4,10 +4,22 @@ Starville is a premium 2D isometric cozy multiplayer life-simulation game platfo
 contains the public website, player client, administrator portal, authoritative API, dedicated
 real-time service, background worker, shared packages, and Supabase infrastructure.
 
-The active implementation scope is **Phase 12E: V2 World Integration, Environmental Ambience, Visual
-Polish, Production Hardening, and Beta Readiness**. Its repository status is **PHASE 12E BETA
-CANDIDATE READY, HOSTED AND OWNER GATES PENDING**. The local implementation and validation matrix is
-complete; Phase 12E is not hosted validated, owner accepted, deployed, or production ready. The
+The active implementation scope is **Phase 13C: Live Operations Completion and Production
+Configuration Preparation**. Its repository target status is **PHASE 13C PRODUCTION-PREPARATION
+CANDIDATE LOCALLY READY, PHASE 13D COMMISSIONING AND OWNER ACCEPTANCE PENDING**. Phase 13C adds
+fail-closed environment/migration/reference-seed/evidence manifests, deterministic release
+validation, an operator capability matrix, exact Landing/Reown CSP and production source-map
+controls, a protected read-only Release and Live Ops dashboard, and the production
+operations/commissioning handbook. It creates no migration and performs no hosted or production
+connection, write, seed, bootstrap, publish, migration push, deployment, or owner acceptance.
+
+Phase 13B remains a closed-beta hardening candidate locally ready with hosted validation and owner
+acceptance pending. Phase 13A remains a gameplay integration candidate locally ready with hosted
+validation and owner acceptance pending. Their security, RLS, authorization, concurrency,
+multiplayer, abuse, gameplay, and exact-once evidence are required inputs to Phase 13D; Phase 13C
+does not silently advance those gates.
+
+Phase 12E remains a closed-beta visual candidate locally ready with owner acceptance pending. The
 current local candidate preserves the 47-object/36-collision unpublished Lantern Square composition,
 adds a ninth nonblocking semantic interaction, keeps V1 as normal published play, and reviews exact
 V2 candidate media only through explicit local or protected nonpersistent paths. It also brings
@@ -104,6 +116,7 @@ cookie secret without printing either value:
 ```bash
 pnpm env:phase3:prepare
 pnpm env:check
+pnpm release:validate # validate Phase 13C manifests and environment separation without connecting
 ```
 
 Development package scripts load the root files through explicit service profiles. Turbo remains in
@@ -205,6 +218,7 @@ pnpm assets:manifest # rebuild the checked-in runtime manifest
 pnpm assets:thumbnails # rebuild bounded WebP thumbnails
 pnpm assets:coverage # rebuild canonical coverage and size reports
 pnpm assets:check    # fail if checked-in bundled outputs drift from deterministic generation
+pnpm release:validate # validate migration/seed/evidence manifests and deployment-target controls
 ```
 
 Turborepo orders dependency tasks, labels each workspace's output, and caches deterministic results.
@@ -537,10 +551,19 @@ their pages, APIs, or business operations have been implemented.
 ## Architecture references
 
 - [Phase 12E beta-candidate architecture](docs/architecture/phase-12e-beta-readiness.md)
+- [Phase 12E release-candidate audio and licensing](docs/audio/phase-12e-release-candidate-audio.md)
 - [Phase 12E beta trust boundaries](docs/security/phase-12e-beta-trust-boundaries.md)
 - [Phase 12E roadmap and reconciliation](docs/roadmap/phase-12e-reconciliation.md)
 - [Phase 12E owner acceptance checklist](docs/deployment/phase-12e-owner-acceptance.md)
+- [Phase 12E release-candidate final report](docs/deployment/phase-12e-final-report.md)
 - [Phase 12E maintenance drill](docs/deployment/phase-12e-maintenance-drill.md)
+- [Phase 13A gameplay integration architecture](docs/architecture/phase-13a-gameplay-integration.md)
+- [Phase 13A starting working-tree inventory](docs/deployment/phase-13a-working-tree-inventory.md)
+- [Phase 13A owner acceptance checklist](docs/deployment/phase-13a-owner-acceptance.md)
+- [Phase 13A local validation report](docs/deployment/phase-13a-local-validation-report.md)
+- [Phase 13A final report](docs/deployment/phase-13a-final-report.md)
+- [Phase 13A to Phase 13B handoff](docs/deployment/phase-13a-phase-13b-handoff.md)
+- [Phase 13A roadmap reconciliation](docs/roadmap/phase-13a-reconciliation.md)
 - [Phase 12D final-art and character-production architecture](docs/architecture/phase-12d-final-art-and-character-production.md)
 - [Phase 12D visual trust boundaries](docs/security/phase-12d-visual-trust-boundaries.md)
 - [Phase 12D roadmap and reconciliation](docs/roadmap/phase-12d-reconciliation.md)

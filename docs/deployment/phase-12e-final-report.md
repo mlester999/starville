@@ -1,341 +1,366 @@
-# Phase 12E final report
-
-This report covers the local repository candidate only. It deliberately separates deterministic
-local evidence, hosted validation, owner acceptance, activation/publication, deployment approval,
-and production readiness.
-
-1. **Current project-gate status.** Phase 12E passes the required local implementation and
-   validation gates. Hosted lint/pgTAP/RLS/service validation and the wholly manual owner gate
-   remain pending. Operations → Beta Readiness still reports a source-control blocker because the
-   shared worktree is intentionally uncommitted; production readiness is not claimed.
-
-2. **Pre-existing working-tree state.** Work began on `master` at `63a7262` with a materially dirty
-   tree containing user-owned Phase 12C, Phase 12D, runtime-hotfix, pgTAP-repair, asset, SQL, and
-   documentation work. Those changes were preserved and were not relabeled as Phase 12E work.
-
-3. **Systems reused.** Phase 12E reuses immutable World Composer drafts/revisions, protected Game
-   Test, V1/V2 manifests and the shared resolver, production isometric/collision/depth/realtime
-   rendering, Player Experience, farming/workstations/store/progression/housing/home visits, the HUD
-   safe-region system, shared modal layer, live operations, and existing Admin authorization. It
-   creates no parallel authoritative state system.
-
-4. **World-composition audit.** The local Lantern Square source baseline remains 47 modular objects,
-   36 collision shapes, eight interactions, six terrain regions, and 19 authoritative map asset
-   keys. Deterministic checks cover spawn safety, landmark presence, enabled-exit corridors, stable
-   identities, collision clearance, and front/behind depth positions.
-
-5. **Lantern Square improvements.** The immutable Phase 12E local candidate adds one nonblocking
-   photo-garden semantic interaction for nine interactions total, clarifies
-   primary/secondary/support landmark tiers, and adds separate marker dependencies without
-   flattening the map or changing object/collision identity.
-
-6. **World Composer integration.** Existing exact-revision preview, validation, asset pins, Game
-   Test grants, publication controls, and rollback history remain authoritative. The candidate is
-   offered only as the clearly labeled in-memory `LOCAL PHASE 12E DRAFT · UNPUBLISHED · IN MEMORY`
-   Game Test source and cannot publish or edit hosted state.
-
-7. **V1/V2 safety.** V1 manifest `1.0.0` remains the normal published/unpinned default. V2 requires
-   a development loopback candidate gate or protected nonpersistent Game Test plus exact manifest,
-   classification, key, and checksum compatibility. No public query string can silently upgrade
-   normal play.
-
-8. **V2 asset integration.** V2 manifest `2.0.0` remains additive and unpublished with 106 assets,
-   335 files, 19 variants, seven aliases, and `production_candidate` classifications. Lantern Square
-   resolves 26 base texture identities or at most 31 with five optional semantic marker
-   dependencies; failures retain safe V1/diagnostic fallback behavior.
-
-9. **Depth-sorting results.** Shared depth bands, bottom-center origins, foot/depth anchors, contact
-   shadows, local/remote players, structures, props, crops, furniture, labels, ambience, and markers
-   remain deterministic. Focused scene/content tests for front/behind tall-object positions and
-   marker depth pass.
-
-10. **Collision-parity results.** The Phase 12E candidate preserves all 36 authoritative collision
-    shapes and the route fixtures pass without decorative blockage. The ninth photo interaction is
-    explicitly nonblocking; visual fallback, ambience, shadows, and markers never become collision.
-
-11. **Scale and anchor fixes.** Category-driven bounded scale, bottom-center origins, planted foot
-    anchors, footprint/depth anchors, supported rotations, and object positions remain shared across
-    exact V2, V1 fallback, local player, and remote player rendering. No CSS viewport scaling masks
-    bad map metadata.
-
-12. **Environmental ambience.** Deterministic terrain motes, water ripples, foliage/flower movement,
-    lantern flicker, hearth/workbench presentation, contact shadows, and lighting tokens are
-    bounded. Object ambience is capped at 16 simultaneous animations and all owned nodes/tweens are
-    removed on map replacement or scene shutdown.
-
-13. **Ambient audio.** A safe lifecycle supports gesture gating, master/ambience/SFX preferences,
-    mute, visibility pause, location fades, one loop per identity, and disposal. No approved audio
-    file exists, so Phase 12E remains intentionally silent and does not fabricate or download sound.
-
-14. **Reduced Motion.** Continuous ambience is static/suppressed, interaction emphasis remains
-    readable, and the 24-mapping character review pauses on deterministic first frames. Browser
-    checks found zero running character animations under Reduced Motion; the default preview had
-    zero computed animations.
-
-15. **High contrast.** High-contrast tokens preserve outlines, semantic markers, text/status labels,
-    focus indication, and modal boundaries. Phone, narrow-desktop, landscape, zoom-equivalent, and
-    character-matrix browser states loaded with the explicit high-contrast contract and no page
-    overflow.
-
-16. **Farming visual states.** Empty, prepared, selected, planted, dry, watered, growing,
-    harvest-ready, exhausted, and invalid states remain distinct in media and text. Visual state
-    observes server-authoritative farming results and never authors planting, watering, harvest,
-    inventory, or reward success.
-
-17. **Workstation visual states.** Idle, available, active, completed, blocked, missing-ingredient,
-    inventory-full, and delayed-settlement feedback remain explicit for cooking and crafting.
-    Portalled workstation surfaces stay dismissible and do not duplicate settlement.
-
-18. **General Store visual states.** Availability, affordability, DUST, stock, quantity limits,
-    receipts, disabled actions, and stale-catalog conflicts remain readable. The client cannot
-    settle a purchase/sale or infer success from presentation.
-
-19. **Housing visual states.** Placement validity, collision, selection, supported rotation,
-    unsaved/saved status, and revision conflicts remain explicit. The phone Housing dialog owns
-    bounded vertical scrolling; its workspace remains reachable while background input is locked.
-
-20. **Home-visit visual states.** Hosting/closed, join/remove, permissions, guestbook, appreciation,
-    helper watering, and return-to-safe-world feedback retain owner/server authority. Existing
-    maintenance websocket closure and integrated inventory/DUST invariants remain owner-drill work,
-    not an automated pass claim.
-
-21. **Interaction highlights.** One semantic model covers current targets, unavailable targets,
-    quest/onboarding emphasis, landmarks, keyboard/touch prompts, readable labels, disabled reasons,
-    high contrast, and static Reduced Motion presentation without changing range or collision.
-
-22. **Quest and onboarding markers.** Guidance binds to semantic objective/interaction keys rather
-    than temporary filenames. Marker media resolves through exact candidate, V1, then procedural
-    diagnostic fallbacks while retaining text, direction, distance, and unavailable-location
-    meaning.
-
-23. **HUD polish.** Identity/onboarding, location, controls, prompt, chat, quickbar, and status
-    remain in coordinated safe regions. Browser review caught and fixed a tablet/narrow-desktop
-    Status Details overflow; all required and supplemental widths now keep Settings, Chat, and
-    Details in bounds with zero audited same-region collision.
-
-24. **Modal consistency.** Settings, inventory/store/workstations, journey/onboarding, housing,
-    world notices, asset review, beta scenario, and connection details use a body portal with focus
-    trap, Escape where dismissible, focus restoration, body scroll lock, 44-pixel actions, and sharp
-    modal content. Representative phone/tablet/desktop/zoom-equivalent geometry passed.
-
-25. **Connection recovery.** Failures are classified across player API, realtime, persistence,
-    manifest, access, and asset registry. Realtime allows six bounded automatic attempts with the
-    deterministic 0.5/1/2/4/8/10-second schedule, deduplicates equivalent work, disposes the
-    replaced socket/listeners, and never overrides revoked access.
-
-26. **Player-persistence recovery.** The newest collision-safe failed checkpoint remains in memory,
-    is exposed as unsaved, allows one explicit retry, blocks mutation-capable surfaces when
-    authority is unavailable, and reconciles authoritative version/state before normal mutation
-    resumes.
-
-27. **Asset-resolution recovery.** A maximum-512 identity registry suppresses equivalent failures
-    for five minutes, bounds retries, sanitizes request IDs, keeps collision/interaction intact, and
-    selects declared V1 or diagnostic media. Repeated missing media cannot create a request storm.
-
-28. **V2 character hardening.** The candidate exposes 24 canonical mappings: eight idle, eight walk,
-    and eight jog. Direction changes, idle restoration, planted anchors, scale, local/remote factory
-    selection, deterministic Reduced Motion, fallback, and teardown are covered by focused tests and
-    the 40-avatar load fixture.
-
-29. **Remote-player parity.** Local and authenticated remotes share the selected candidate rig,
-    direction/state mapping, interpolation, idle-facing restoration, scale/depth rules, labels, and
-    cleanup. Reconnect replacement and the 10,000-cycle fixture leave zero duplicate/remaining
-    remotes and zero synthetic listeners.
-
-30. **Multiplayer load results.** Realtime load passed 10/20/40 public-player cases and two
-    40-player mixed activity cases, one with five reconnects. Maximum observed public-case visible
-    latency was 25 ms and chat broadcast latency 51 ms; all movement/facing/idle checks passed with
-    zero unsafe cosmetic payloads, remaining reservations, temporary-item leaks, or active-activity
-    leaks.
-
-31. **Soak-test results.** The accelerated deterministic fixture ran 10,000 cycles across
-    1/5/10/20/40 remote loads, reached 40 maximum, and ended with zero duplicate remotes, remaining
-    remotes, or listeners. It is deliberately not a real 30-minute browser, gameplay, audio, GPU, or
-    WAN soak; those owner measurements remain pending.
-
-32. **Performance instrumentation.** Development-only metrics record frames, frames ≥50 ms, maximum
-    frame time, realtime messages, asset requests/cache results, remotes, listeners, modals, HUD
-    panels, animations, particles, de-duplicated active textures, and estimated RGBA texture bytes.
-    No private wallet/player value or production analytics event is emitted.
-
-33. **Performance budgets.** Local guardrails include V2 managed bytes 1,864,389; V2 runtime media
-    859,172 bytes/118 files; at most 31 initial Lantern texture identities within an 8 MiB decoded
-    estimate; 18 motes; 20 ripple groups; 16 object animations; one renderer per player; one primary
-    modal; a 15-second transition hard limit; and one in-flight retry per dependency. They are
-    regression budgets, not production capacity claims.
-
-34. **Mobile performance.** Low quality suppresses continuous ambience, shadows, animated water,
-    distant labels/update work, and nonessential particles without silently changing V2 to V1. The
-    responsive/landscape geometry and 40-avatar procedural fixture pass; physical-device GPU,
-    thermal, memory, and touch evidence remains pending.
-
-35. **Responsive results.** Final browser geometry passes at 360×800, 390×844, 768×1024, 820×1180,
-    1024×768, 1280×800, 1440×900, and 1920×1080, plus 1180/1240 narrow desktop, 844×390 and 800×360
-    landscape, and 720×450 zoom-equivalent reflow. Audited states had no page overflow, HUD
-    collision, or hidden primary action.
-
-36. **Accessibility results.** Automated/browser evidence covers semantic dialogs/regions/status,
-    keyboard focus containment, Escape/focus restoration, 44-pixel actions, non-color text, Reduced
-    Motion, high contrast, deduplicated notices, sanitized connection details, and zoom-equivalent
-    reflow. Screen reader, OS forced contrast, physical touch, and actual browser-chrome 200-percent
-    zoom remain unchecked owner gates.
-
-37. **Visual regression coverage.** Focused source/DOM tests cover renderer policy, V1/V2 delivery,
-    scene composition, depth/collision/markers/ambience, responsive CSS, modal portals, asset
-    coverage, and the 24 character mappings; the live browser adds geometry/state coverage. There is
-    no claim of approved golden-pixel art or subjective owner visual acceptance.
-
-38. **Integrated Game Test.** The protected nonpersistent Phase 12E beta scenario contains 21
-    descriptive steps covering spawn through mobile/recovery review. Four linked review surfaces
-    plus candidate/participant/accessibility fixtures are automated; remaining gameplay steps
-    require owner inspection. Inspection marks stay in React state and perform no production
-    mutation or telemetry.
-
-39. **Beta Readiness Admin area.** Authorized administrators with `operations.read` receive a
-    read-only Operations → Beta Readiness projection for application, database/RLS, assets, world,
-    gameplay, realtime, economy, accessibility, performance, owner, and production gates. Anonymous
-    local smoke redirected the route to login; no public registration or mutation path was added.
-
-40. **Readiness status model.** The computed statuses are Not Started, Local Evidence Ready, Hosted
-    Validation Pending, Owner Review Pending, Blocked, Accepted, and Production Ready. Each gate
-    shows evidence, checked time, environment, responsible gate, blocker, and next action; dirty
-    Git, missing hosted attestations, and owner decisions remain distinct.
-
-41. **Owner acceptance hub.** The exhaustive owner document is present and every checkbox remains
-    intentionally unchecked. Automated evidence cannot write acceptance, hosted validation, V2
-    activation, production approval, or an owner decision.
-
-42. **V2 activation preparation.** A future activation must compare V1/V2 affected keys/worlds,
-    review immutable pins and classification, require narrow permission, active admin identity,
-    AAL2, reason, expected revision, idempotency, audit, runtime verification, and rollback. Phase
-    12E adds no activation control and executes none.
-
-43. **Rollback preparation.** The documented forward-only plan reactivates/repins approved V1,
-    preserves immutable asset/world history and audit, avoids editing published revisions, and
-    preserves player inventory, DUST, progression, housing, visits, and social state. It is
-    prepared, not owner approved or executed.
-
-44. **Maintenance drill.** Focused local code-path tests pass for new-session denial, false-to-true
-    client notice/one bounded flush, cozy-route mutation blocking, single-flight recheck, Admin form
-    validation, and current bounded worker continuation. Integrated signed-in resume, existing
-    socket closure, database settlement/inventory/DUST invariants, and owner/hosted drills remain
-    pending.
-
-45. **Deployment-readiness checklist.** The wholly unexecuted owner checklist covers clean Git,
-    reviewed commit, migration list/dry run, hosted lint/pgTAP/RLS, environment, assets,
-    tests/build, security, deployment, API/realtime/worker health, signed-in review, V1
-    verification, separate V2 decision, rollback, maintenance, monitoring, and recorded approval.
-    Current dirty source control, hosted, and owner gates block deployment.
-
-46. **API and service-health validation.** Built Landing `/` and `/game-status`, Game Client `/`,
-    and Admin `/login` returned HTTP 200; anonymous Beta Readiness returned 307 to login. Isolated
-    built API and realtime `/health` and `/ready` returned 200 with unreachable loopback
-    dependencies and no hosted request. Worker loopback health/readiness passed seven mock-job
-    runtime tests and its production entrypoint was deliberately not started.
-
-47. **Telemetry readiness.** Existing authoritative events retain login/access, world entry,
-    onboarding, gameplay, economy, progression, housing, and social meaning. Candidate usage,
-    fallback, reconnect, modal/runtime failure, and long-frame data are local development
-    diagnostics; Game Test telemetry is suppressed. Production schema/retention/monitoring approval
-    remains pending.
-
-48. **Error-recovery matrix.** The architecture records player profile, database, realtime, worker,
-    manifest, asset, invalid revision, inventory, DUST, workstation, shop, housing, visit, session,
-    and wallet failures with separate player text, retry/mutation authority, cache/fallback policy,
-    and sanitized escalation identity.
-
-49. **Security hardening.** Local-only candidate gates, immutable revision/pins, fail-closed
-    mutation, bounded retry/idempotency, socket/listener/audio disposal, protected read-only Admin
-    access, sanitized connection/fallback detail, CSP/CORS/cookie/rate-limit boundaries, and no
-    browser service-role material remain enforced. The scan passed 1,519 source and 596 browser
-    files.
-
-50. **Database changes.** No Phase 12E database table or migration was needed or created. Existing
-    version/audit/projection mechanisms are sufficient. Three pre-existing, unpushed Phase 12
-    repair, composition, and repository-registry migrations were preserved and passed the local
-    PostgreSQL replay; none was pushed.
-
-51. **Tests added or updated.** Phase 12E adds/updates deterministic content/composition, route,
-    ambience, marker, scene lifecycle, recovery, persistence, asset cooldown, settings/audio,
-    performance/texture estimation, 10,000-cycle soak, 21-step Game Test, HUD/modal/connection,
-    responsive/character, Beta Readiness, maintenance, and production-bundle evidence. Final key
-    totals are Game Client 76 files/346 tests, Admin 70/449, API 50/387, realtime server 2/35, and
-    root scripts 11/112; 69/69 Turbo test tasks passed.
-
-52. **Exact local validation results.** The command, asset, browser, service-health, load, soak, and
-    PostgreSQL results—including the local `plpgsql_check` limitation—are recorded in
-    `docs/deployment/phase-12e-local-validation-report.md`. All required local commands pass after
-    final reconciliation.
-
-53. **Files changed.** Phase 12E-authored paths are: `README.md`; the three `apps/*/tsup.config.ts`
-    server configs; `packages/game-content/src/index.ts`, `src/phase12e-lantern-square.ts`, and its
-    test; Game Client runtime files for audio, asset failure, performance, settings, realtime,
-    persistence, recovery, and soak; Game Client scene/rendering files for contracts, textures,
-    ambience, markers, asset fallback, and `WorldScene`; Game Client UI files for GameWorld,
-    GameSettings, CozyGameplay, GuidedPlayerExperience, PlayerStatusDock, ProgressionPanel,
-    WorldGameTest, shared game UI, the Phase 12E scenario, styles, and visual acceptance; Admin
-    Operations/Beta Readiness page, CSS, route metadata, model/repository/tests; and the Phase 12E
-    documentation listed next. Pre-existing dirty paths are not attributed to this phase.
-
-54. **Documentation added.** Added `phase-12e-beta-readiness.md`,
-    `phase-12e-beta-trust-boundaries.md`, `phase-12e-maintenance-drill.md`,
-    `phase-12e-owner-acceptance.md`, `phase-12e-deployment-readiness.md`,
-    `phase-12e-local-validation-report.md`, and this `phase-12e-final-report.md`; updated the Phase
-    12E roadmap reconciliation and repository README.
-
-55. **Roadmap update.** Phase 12D remains a locally implemented production candidate, not FINAL,
-    with owner/hosted gates pending. Phase 12E is recorded as locally complete and beta-candidate
-    ready with hosted and owner gates pending. V2 is not active, a world is not published, Starville
-    is not production ready, and no animal phase was added.
-
-56. **Remaining limitations.** Hosted pgTAP/RLS/service checks, signed-in cross-role/AAL2 review,
-    owner visual/gameplay/accessibility/audio acceptance, real audio media, physical-device
-    GPU/touch, screen reader/OS contrast, actual browser 200-percent zoom, CDN/WAN behavior, real
-    30-minute memory/listener/audio soak, integrated maintenance resume/socket/database invariants,
-    clean Git, reviewed commit, deployment, monitoring, and production approval remain pending.
-
-57. **Exact owner acceptance steps.** Follow the wholly unchecked
-    `docs/deployment/phase-12e-owner-acceptance.md` in order: establish reviewer/revision evidence;
-    launch exact V1 then explicitly select the unpublished candidate; walk every critical route and
-    inspect depth/collision; review all 24 character mappings and remotes; review ambience/audio;
-    execute farming/workstation/store/XP/housing/home-visit flows; exercise every HUD/modal and
-    recovery failure; run desktop/tablet/mobile/200-percent/30-minute/accessibility checks; complete
-    all 21 Game Test steps; review Admin readiness/rollback/deployment; verify V1/hosted safety;
-    then record ACCEPT, ACCEPT WITH DOCUMENTED LIMITATIONS, or REJECT. Nothing is checked now.
-
-58. **V1 published default confirmation.** V1 manifest `1.0.0` remains the published/unpinned
-    default; normal play was not changed to V2.
-
-59. **V2 activation confirmation.** V2 was not hosted-activated and no activation control was
-    invoked.
-
-60. **World publication confirmation.** No hosted world, Phase 12E revision, or local candidate was
-    published.
-
-61. **Hosted-write confirmation.** No hosted write occurred. Isolated service smokes used
-    unreachable loopback dependencies; database execution used temporary local PostgreSQL only.
-
-62. **Migration-push confirmation.** No migration was pushed. Phase 12E created no migration.
-
-63. **Deployment confirmation.** No application, API, realtime service, worker, database, asset, or
-    world deployment occurred.
-
-64. **Commit/push confirmation.** No commit and no Git push occurred; the preserved shared worktree
-    remains dirty by design.
-
-65. **Animals/livestock confirmation.** No animal care, livestock, breeding, feeding, pet, barn, or
-    related gameplay system was added or enabled.
-
-66. **Fablesol confirmation.** No Fablesol mechanic, data path, UI, reward, integration, or roadmap
+# Phase 12E release-candidate final report
+
+Run date: 2026-07-22 Asia/Manila.
+
+This report covers the local repository candidate only. It separates deterministic local evidence,
+browser-assisted review, hosted validation, owner acceptance, asset activation, publication,
+deployment, and production readiness. Automated evidence is not owner acceptance.
+
+1. **Final status.** **PHASE 12E CLOSED-BETA VISUAL CANDIDATE LOCALLY READY, OWNER ACCEPTANCE
+   PENDING.** Hosted validation is also still pending. This is not a production-readiness claim.
+
+2. **Repository and branch.** Repository:
+   `/Users/marklesteracak/Documents/Marky Files/Programming/starville`; branch: `master`. Work
+   stayed in this existing repository and branch.
+
+3. **Starting HEAD.** This release-candidate pass began at `f9b6a08`
+   (`chore: checkpoint Phase 12E technical beta candidate`).
+
+4. **Pre-existing working-tree state.** The tree was already materially dirty with user-owned,
+   uncommitted Phase 12F/12F-A1 source, asset, test, documentation, and configuration work. That
+   work was preserved, validated with the repository, and is not attributed to Phase 12E. No
+   worktree or branch switch was attempted.
+
+5. **Phase 12D input status.** Phase 12D remains a repository-local `production_candidate`, not
+   `FINAL`. Its local automated gates and runtime integration were the accepted input baseline; V1
+   remains the normal default and V2 remains unpublished and unaccepted.
+
+6. **Remaining Phase 12D blockers.** Zero V2 assets have complete owner final-art acceptance.
+   Protected signed-in product review, hosted validation, physical-device review, subjective visual
+   approval, and the V2 activation decision remain pending. Missing future authored gameplay/action
+   coverage belongs to Phase 13A, and hosted soak/RLS evidence belongs to Phase 13B.
+
+7. **Current Supabase project boundary.** Local environment validation resolved the development
+   boundary (`zsvvivxfqkkkobefqcoa`, documented as `starville-dev`) with hosted-test approval false.
+   The only database execution in this pass used temporary local PostgreSQL.
+
+8. **`starville-prod` confirmation.** `starville-prod` was not selected, connected to, queried, or
+   mutated. No production credential or service-role value was exposed to the browser.
+
+9. **Visual consistency audit.** The candidate retains the modular isometric world, stable map
+   objects/collisions, bottom-center anchors, semantic depth bands, original warm-cozy palette,
+   readable gameplay states, V1 fallback, and 24-direction/state character review. No flattened
+   world background or pixel-art substitution was introduced.
+
+10. **Owner-rejected asset repairs.** No asset key has a recorded owner rejection, so no art was
+    silently replaced or relabeled. All V2 production-candidate art remains eligible for owner
+    accept, refine, replace, or block decisions.
+
+11. **Final color grading.** Shared warm-gold highlights, cool violet/green shadows, semantic status
+    colors, and increased-contrast overrides remain consistent across world, HUD, dialogs, and
+    gameplay feedback. “Final” here describes the local Phase 12E pass, not owner-final art.
+
+12. **Final lighting.** Bounded time-of-day and landmark lighting retain hierarchy without changing
+    collision or interaction authority. Low quality and Reduced Motion can suppress nonessential
+    presentation while leaving readable static states.
+
+13. **Final shadows.** Contact shadows remain bottom-anchored, nonblocking presentation layers for
+    structures, props, local/remote characters, crops, and furniture. Low quality suppresses
+    optional shadows without moving authoritative geometry.
+
+14. **Final ambience.** Terrain motes, water ripples, foliage/flower movement, lantern flicker, and
+    workstation/hearth accents are deterministic and bounded. Object ambience is capped at 16
+    simultaneous animations and owned nodes/tweens are disposed on map replacement or shutdown.
+
+15. **Movement-feel changes.** Existing collision-safe walk/jog movement, diagonal handling,
+    authoritative correction, planted foot anchors, and idle-facing restoration were retained and
+    revalidated. Presentation changes do not author movement success.
+
+16. **Animation smoothing.** The 24 canonical idle/walk/jog mappings retain direction changes,
+    remote interpolation, deterministic idle restoration, fallback, and cleanup. Reduced Motion
+    pauses/suppresses continuous motion while keeping the state legible.
+
+17. **Camera polish.** Responsive isometric framing and bounded terrain apron remain data-driven;
+    CSS viewport scaling is not used to hide incorrect map anchors. World transitions retain safe
+    source position until an authoritative destination is accepted.
+
+18. **Audio architecture.** `ReleaseCandidateAudioManager` is a client-only Web Audio lifecycle
+    outside Phaser. It unlocks only after a user gesture, allows at most one music and one ambient
+    loop, applies group settings immediately, pauses on hidden tabs, prevents duplicate arming,
+    bounds cue rates, and fully disposes timers, nodes, context, and listeners.
+
+19. **Audio assets.** The catalog contains ten original procedural entries: two music identities,
+    two ambient identities, and six sound effects. It embeds no recording or downloaded audio; cues
+    are synthesized from repository-declared oscillator/envelope parameters.
+
+20. **Audio licenses.** Every entry records source `repository_generated_procedural_web_audio`,
+    license `Starville project-owned original; no third-party audio`, an authoring note, and
+    classification `development_safe`. Nothing is called owner-approved final audio.
+
+21. **Music integration.** Restrained, distinct development-safe motifs cover Lantern Square and the
+    personal home. Location changes replace rather than stack the music identity; master/music
+    volume and mute are persisted locally.
+
+22. **Ambient audio.** Quiet village-air and personal-home room-tone identities follow the same
+    single-loop location lifecycle, background suspension, bounded restart, and cleanup rules.
+
+23. **Sound-effect coverage.** Original cues cover UI click, semantic interaction, world transition,
+    success, error, and reconnect. Cooldowns prevent repeated actions or reconnect churn from
+    producing a cue storm.
+
+24. **Audio settings.** Settings storage migrated to V5 and exposes master, music, ambience, and SFX
+    volume plus master and per-group mute. Web Audio denial/unavailability leaves the game playable,
+    displays an unavailable notice, and preserves text equivalents for meaningful events.
+
+25. **Loading architecture.** Existing profile, published-world, character, economy, notice, and
+    world-transition states remain explicit rather than showing false success or fake progress.
+    Loading, empty, unavailable, retryable, and authoritative-ready states stay distinct.
+
+26. **Loading screen.** World and character loading surfaces expose polite status text and labeled
+    loaders. Destination transitions name the target, keep input/modal authority bounded, and use no
+    fabricated percentage.
+
+27. **Transition polish.** Travel has a readable overlay, destination label, cue, abortable request,
+    15-second hard timeout, stale-response protection, authoritative acceptance, safe cancellation,
+    and a dismissible failure state with a sanitized request ID when available.
+
+28. **Error experience.** Player API, persistence, realtime, access, manifest, asset, and route
+    failures retain specific visible copy and never rely on color or sound alone. Technical details
+    are sanitized before display.
+
+29. **Retry and recovery.** Realtime uses one bounded six-attempt 0.5/1/2/4/8/10-second schedule,
+    disposes replaced sockets/listeners, and never overrides revoked access. Persistence keeps the
+    newest collision-safe checkpoint for one explicit retry; asset failures are deduplicated with a
+    bounded registry and safe V1/diagnostic fallback.
+
+30. **HUD final polish.** Identity, objective, location, controls, prompts, chat, quickbar, and
+    status remain assigned to coordinated safe regions. This pass fixed the chat toggle from 42 to
+    at least 44 CSS pixels and made 701–820 px quickbar actions four-column, 44-pixel targets with a
+    shifted prompt so controls no longer collide.
+
+31. **Typography.** Existing readable sans-serif hierarchy, bounded line lengths, high-contrast
+    tokens, non-color labels, and scalable dialog/HUD text remain intact. The zoom-equivalent pass
+    required no horizontal page scrolling.
+
+32. **Responsive results.** The final Chromium geometry pass covered exactly 360×800, 390×844,
+    412×915, 768×1024, 820×1180, 1024×768, 1280×800, 1366×768, 1440×900, 1920×1080, and 2560×1440.
+    Every size had zero page overflow, out-of-viewport audited action, sub-44-pixel audited target,
+    or same-region HUD overlap. A 720×450 200%-zoom-equivalent layout also passed.
+
+33. **Mobile controls.** Touch-facing HUD, chat, settings, quickbar, and prompts retain at least
+    44×44 CSS-pixel actions in the audited fixture. Portrait and tablet geometry passed; physical
+    iOS/Android touch, browser chrome, safe-area, thermal, and virtual-keyboard review remains an
+    owner gate.
+
+34. **Browser validation.** The real local Vite visual fixture was inspected in the in-app Chromium
+    browser. Settings at 390×844 exposed all four volume and four mute controls; Mute Music changed
+    state. Reduced Motion plus high contrast produced the expected classes and zero running
+    animations; the console contained no warning/error. Safari, Firefox, and real devices were not
+    available and are not claimed.
+
+35. **Performance profiling.** Development instrumentation and current local fixtures cover frame
+    timing, remotes/listeners, asset/texture estimates, collision queries, renderer construction,
+    realtime latency, reconnects, and leaks. Results are local synthetic evidence, not production
+    capacity or a browser-GPU profile.
+
+36. **Performance optimizations.** Existing caps, listener/tween/audio teardown, duplicate-request
+    suppression, texture allowlisting, low-quality presentation suppression, spatial collision
+    queries, and bounded transition/retry work remain active. The production build still emits a
+    large ~1.27 MB game chunk and ~764 KB main index before gzip, so further code splitting remains
+    a real optimization target.
+
+37. **Performance modes.** High/medium/low visual quality stays presentation-only. Low quality
+    suppresses continuous ambience, shadows, animated water, distant labels/update work, and
+    nonessential particles without silently changing V2 to V1; Reduced Motion is independent.
+
+38. **Asset payload.** Deterministic registries validate at V1 1,159,625 bytes/335 files, V2
+    1,864,389 bytes/335 files, and the pre-existing Phase 12F V3 worktree at 9,081,413 bytes/138
+    files. Phase 12E V2 runtime media remains 859,172 bytes/118 files, with at most 31 initial
+    Lantern Square texture identities within the existing 8 MiB decoded estimate. These are
+    regression budgets, not network/GPU measurements.
+
+39. **Visual-regression coverage.** Source/DOM tests cover render policy, exact candidate delivery,
+    depth/collision/anchors, ambience/markers, character mappings, loading/recovery, responsive CSS,
+    44-pixel controls, modal behavior, and all eleven required viewport identities. There is no
+    approved golden-pixel or subjective-art pass claim.
+
+40. **Manual visual QA.** Browser-assisted QA inspected the world fixture, settings, phone and
+    zoom-equivalent layouts, responsive geometry, Reduced Motion, high contrast, target sizes, HUD
+    intersections, and console output. It found and drove the two target-size fixes described above.
+    Protected signed-in gameplay and subjective owner visual QA remain pending.
+
+41. **Accessibility results.** Automated/browser evidence covers semantic status/alert/dialog roles,
+    focus containment/restoration, Escape behavior, body scroll lock, visible focus, non-color text,
+    44-pixel audited actions, contrast mode, Reduced Motion, text-equivalent audio cues, and
+    zoom-equivalent reflow. Screen-reader and physical-device review are not claimed.
+
+42. **Reduced-motion results.** The browser applied the Reduced Motion class together with high
+    contrast and found zero running animations. Static interaction, error, focus, and audio text
+    equivalents remain visible.
+
+43. **Game Test release-candidate scenario.** The protected nonpersistent Phase 12E scenario now
+    contains 23 descriptive review steps, adding audio-foundation and audio-unavailable checks to
+    world, character, gameplay, recovery, accessibility, and eleven-viewport review. Inspection
+    marks remain in React state and cannot mutate hosted or authoritative gameplay data.
+
+44. **Admin visual-readiness changes.** Authorized Operations → Beta Readiness now includes an Audio
+    and Licensing gate, audio manifest/validator evidence, and a separate owner audio item. It
+    remains read-only, permission-protected, and incapable of writing acceptance or activation.
+
+45. **Closed-beta visual-readiness result.** Local deterministic and Chromium-assisted gates are
+    ready for exact-revision owner review. It is not closed-beta approved until the owner completes
+    art/audio/gameplay/accessibility/device review, hosted validation, and an explicit V2 decision.
+
+46. **Security review.** Local-only candidate gates, immutable pins, fail-closed mutation, bounded
+    retries, sanitized detail, protected Admin reads, CSP/CORS/cookie/rate-limit boundaries, and
+    server-only secrets remain intact. `pnpm security:scan` passed 1,566 source files, 689 browser
+    files, and six local secret-value checks.
+
+47. **Database migrations.** Phase 12E created no migration. The current head remains
+    `20260718123000_phase12d_repository_authored_bundled_registry.sql`; it was replayed only in
+    temporary local PostgreSQL and was not pushed.
+
+48. **RLS impact.** No RLS policy, table, function, storage policy, auth rule, or public Admin
+    registration path changed in this pass. Existing backend authorization and RLS boundaries stay
+    authoritative; hosted pgTAP/RLS evidence remains pending.
+
+49. **Tests added.** New coverage includes six audio-manager tests and the audio manifest validator;
+    settings V4→V5 migration, dialog controls, 23-step Game Test, 11-view matrix, 44-pixel
+    responsive CSS, and Admin audio-readiness assertions were added or updated. The full run passed
+    Game Client 80 files/387 tests, Admin 70/449, API 50/387, realtime server 2/35, and root scripts
+    11/112.
+
+50. **Format result.** PASS — `pnpm format` completed and the final `pnpm format:check` reported all
+    matched files in Prettier style.
+
+51. **Lint result.** PASS — 39/39 Turbo lint tasks plus root scripts.
+
+52. **Typecheck result.** PASS — 39/39 Turbo strict typecheck tasks plus root script TypeScript.
+
+53. **Test result.** PASS — 69/69 Turbo test/build dependency tasks plus 11 root test files/112
+    tests. The new audio tests and responsive assertions are included.
+
+54. **Build result.** PASS — all three current asset registries validated and 39/39 package/app
+    builds completed, including Landing, Game Client, Admin, API, realtime, and worker artifacts.
+
+55. **Security-scan result.** PASS — 1,566 source files, 689 browser files, and six configured local
+    secret values scanned with no boundary failure.
+
+56. **Local database result.** PASS — PostgreSQL 18.1 replayed the full migration chain and all
+    execution/concurrency fixtures. The local `plpgsql_check` extension was unavailable, so Supabase
+    function lint was skipped and is not represented as passed.
+
+57. **Realtime-load result.** PASS — 10/20/40 public-player fixtures plus two 40-player mixed cases,
+    including five reconnects. The 40-public case observed maximum visible latency 32 ms and chat
+    broadcast latency 41 ms; movement/facing/idle checks passed with zero unsafe cosmetic payloads,
+    remaining reservations, temporary-item leaks, or active-activity leaks.
+
+58. **Visual-QA result.** PASS WITH SCOPE LIMIT — the exact `visuals:qa` script does not exist.
+    In-app Chromium plus automated fixture assertions covered the eleven required viewports,
+    zoom-equivalent reflow, Reduced Motion, high contrast, target size, overlaps, and console. Other
+    engines, signed-in flows, and physical devices remain pending.
+
+59. **Audio-validation result.** PASS — `pnpm audio:validate` found ten entries (music 2, ambient 2,
+    SFX 6), zero embedded audio bytes, complete original project-owned provenance, and only
+    `development_safe` classifications.
+
+60. **Performance-test result.** PASS WITH LOCAL-ONLY QUALIFICATION — the requested generic
+    `performance:test` script does not exist. The current `phase12f:a1:performance` fixture measured
+    8,000 spatial collision samples with 0.00088 ms p95 query and 0.00229 ms p95 movement
+    resolution, 46/46 encoded textures totaling 3,245,366 bytes, and no full-map scan. The avatar
+    fixture passed 40 players/240 frames with 0.165 ms procedural p95 and 0.090 ms raster p95.
+    Neither result includes Phaser/WebGL GPU, WAN, or physical mobile performance.
+
+61. **`git diff --check` result.** PASS — no whitespace errors after final implementation and
+    documentation reconciliation.
+
+62. **Files changed.** The Phase 12E delta touches the audio manager/test and validator; settings,
+    settings dialog, GameWorld, game contracts, Game Test, responsive matrix/styles/tests; Admin
+    Beta Readiness model/repository/tests; package script; README; audio, architecture, readiness,
+    owner, roadmap, and final-report docs. Overlapping files already carrying Phase 12F edits were
+    preserved. The wider dirty-tree diff must not be misreported as exclusively Phase 12E.
+
+63. **Total asset size.** The current checked-in `assets/` tree is 42,575,034 bytes, including
+    source sheets, review references, V1/V2, and the pre-existing Phase 12F V3 worktree. Managed
+    runtime generation totals are itemized in point 38 to avoid confusing source/reference media
+    with an initial download.
+
+64. **Total audio size.** Binary/embedded audio is 0 bytes; decoded audio-file memory is also 0
+    bytes. Runtime oscillator nodes are short-lived and are disconnected when envelopes end.
+
+65. **Largest files.** The five largest checked-in asset files are
+    `assets/source-v3/avatar/starville-production-adventurer.png` (4,793,969 bytes),
+    `assets/references/phase12f/starville-production-walk-sheet-chroma.png` (2,280,473),
+    `assets/references/phase12f/starville-production-environment-sheet-chroma.png` (2,264,931),
+    `assets/references/phase12f-a1/starville-v3-terrain-variation-sheet-chroma.png` (2,253,423), and
+    `assets/references/phase12f-a1/starville-v3-interior-sheet-chroma.png` (2,149,404). These belong
+    to the pre-existing Phase 12F worktree, not the Phase 12E audio delta.
+
+66. **Remaining limitations.** Hosted pgTAP/RLS/service validation; protected signed-in and
+    cross-role/AAL2 review; owner art/audio/gameplay approval; Safari/Firefox; screen reader and OS
+    forced contrast; physical touch/safe-area/thermal/GPU testing; true browser 200% zoom; CDN/WAN;
+    a real 30-minute memory/listener/audio soak; code-split improvement; clean reviewed revision;
+    deployment and monitoring all remain pending.
+
+67. **Remaining owner decisions.** The owner must accept/refine/replace/block each V2 art and
+    character candidate, listen to or replace all ten development-safe audio cues, approve visual
+    hierarchy and controls, accept documented device/accessibility/performance limitations, decide
+    whether V2 may be activated, and separately approve hosted validation and deployment.
+
+68. **Phase 13A handoff.** Phase 13A may take the exact owner-reviewed candidate into missing
+    authored action/gameplay integration and disconnected-system closure. It must not inherit an
+    implication that Phase 12D art or Phase 12E audio is `FINAL`; Phase 13B retains hosted security,
+    RLS, load, and long-soak work. Optional final recorded music/sound design stays post-beta unless
+    explicitly authorized.
+
+69. **Exact owner acceptance steps.** Use `phase-12e-owner-acceptance.md` against one exact reviewed
+    revision: record reviewer/environment; verify normal V1; explicitly open local V2; walk every
+    critical route and collision/depth state; inspect all character mappings/remotes; listen to and
+    exercise every audio setting/fallback; execute gameplay, modal, recovery, responsive,
+    accessibility, browser/device, and real 30-minute checks; complete all 23 Game Test steps;
+    inspect protected Admin readiness and rollback; verify hosted safety; then record ACCEPT, ACCEPT
+    WITH DOCUMENTED LIMITATIONS, or REJECT. Every checkbox remains intentionally unchecked now.
+
+70. **External commercial art confirmation.** No external commercial-game art was copied or imported
+    by this pass.
+
+71. **External commercial audio confirmation.** No external commercial music, sound effect,
+    recording, sample, animal sound, or scraped library audio was copied or imported.
+
+72. **Audio source/license confirmation.** All ten audio identities have explicit source, license,
+    classification, and authoring-note records, enforced by `pnpm audio:validate`.
+
+73. **Visual originality confirmation.** Starville remains an original warm, modular isometric
+    visual system; this pass introduced no copied commercial identity, flattened world, or pixel-art
+    conversion. Final originality judgment still belongs to owner review.
+
+74. **Animals/livestock confirmation.** No animal care, livestock, breeding, feeding, pet, barn, or
+    related content or mechanic was added or enabled.
+
+75. **Fablesol confirmation.** No Fablesol mechanic, data path, UI, reward, integration, or roadmap
     phase was added.
 
-67. **Pokentara confirmation.** No Pokentara mechanic, data path, UI, reward, integration, or
+76. **Pokentara confirmation.** No Pokentara mechanic, data path, UI, reward, integration, or
     roadmap phase was added.
 
-68. **Sailana confirmation.** No Sailana mechanic, data path, UI, reward, integration, or roadmap
+77. **Sailana confirmation.** No Sailana mechanic, data path, UI, reward, integration, or roadmap
     phase was added.
 
-69. **AIvanza confirmation.** No AIvanza mechanic, data path, UI, reward, integration, or roadmap
+78. **AIvanza confirmation.** No AIvanza mechanic, data path, UI, reward, integration, or roadmap
     phase was added.
 
-**PHASE 12E BETA CANDIDATE READY, HOSTED AND OWNER GATES PENDING**
+79. **Hosted-asset confirmation.** No hosted asset version, replacement, or V2 candidate was
+    activated.
+
+80. **Hosted-world confirmation.** No hosted world, draft, revision, or local candidate was
+    published.
+
+81. **Hosted-player confirmation.** No hosted player, wallet, inventory, DUST, progression, farming,
+    housing, onboarding, social, visit, or reward record changed.
+
+82. **Hosted-write confirmation.** No hosted database, storage, auth, realtime, asset, world, Admin,
+    or gameplay write occurred.
+
+83. **Production Supabase confirmation.** No production Supabase connection or `starville-prod`
+    request occurred.
+
+84. **Migration-push confirmation.** No migration was created for Phase 12E and no existing
+    migration was pushed or applied to a hosted project.
+
+85. **Deployment confirmation.** No application, API, realtime service, worker, database, asset, or
+    world deployment occurred.
+
+86. **Commit/push confirmation.** No commit and no Git push occurred. The pre-existing shared dirty
+    worktree remains uncommitted by design.
+
+**PHASE 12E CLOSED-BETA VISUAL CANDIDATE LOCALLY READY, OWNER ACCEPTANCE PENDING**

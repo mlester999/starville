@@ -162,11 +162,44 @@ export const ADMIN_ROUTE_METADATA: readonly {
     },
   },
   {
+    path: '/operations/production-release-candidate',
+    meta: {
+      title: 'Production Release Candidate',
+      description:
+        'Read-only Phase 13D source, target, migration, catalog, commissioning, recovery, owner-gate, and GO or NO-GO evidence.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
+    },
+  },
+  {
+    path: '/operations/release-live-ops',
+    meta: {
+      title: 'Release and Live Ops',
+      description:
+        'Read-only Phase 13C environment, migration, seed, operational capability, evidence, and Phase 13D commissioning gates.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
+    },
+  },
+  {
     path: '/operations/beta-readiness',
     meta: {
-      title: 'Beta Readiness',
+      title: 'Closed-Beta Readiness',
       description:
-        'Read-only local evidence, hosted and owner gates, deployment preparation, and non-destructive rollback preparation.',
+        'Read-only Phase 13B security, capacity, recovery, hosted and owner gates, and non-destructive rollback preparation.',
+      breadcrumbGroup: 'Administration',
+      breadcrumbParent: 'Operations',
+      parentHref: '/operations',
+    },
+  },
+  {
+    path: '/operations/gameplay-health',
+    meta: {
+      title: 'Gameplay Health',
+      description:
+        'Read-only Phase 13A capability, settlement, reconnect, owner-gate, and Phase 13B handoff evidence.',
       breadcrumbGroup: 'Administration',
       breadcrumbParent: 'Operations',
       parentHref: '/operations',

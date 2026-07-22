@@ -299,6 +299,21 @@ export function GameSettingsDialog({
               </label>
               <label className="settings-volume">
                 <span>
+                  <strong>Music Volume</strong>
+                  <output>{Math.round(settings.musicVolume * 100)}%</output>
+                </span>
+                <input
+                  aria-label="Music volume"
+                  max="1"
+                  min="0"
+                  step="0.05"
+                  type="range"
+                  value={settings.musicVolume}
+                  onChange={(event) => update('musicVolume', Number(event.currentTarget.value))}
+                />
+              </label>
+              <label className="settings-volume">
+                <span>
                   <strong>Ambience Volume</strong>
                   <output>{Math.round(settings.ambienceVolume * 100)}%</output>
                 </span>
@@ -333,6 +348,28 @@ export function GameSettingsDialog({
                 title="Mute All Audio"
                 onChange={(value) => update('muted', value)}
               />
+              <PreferenceToggle
+                checked={settings.musicMuted}
+                description="Silence the optional location music foundation."
+                title="Mute Music"
+                onChange={(value) => update('musicMuted', value)}
+              />
+              <PreferenceToggle
+                checked={settings.ambienceMuted}
+                description="Silence environmental room tone and village ambience."
+                title="Mute Ambient Audio"
+                onChange={(value) => update('ambienceMuted', value)}
+              />
+              <PreferenceToggle
+                checked={settings.sfxMuted}
+                description="Silence interface, interaction, recovery, and transition cues."
+                title="Mute Sound Effects"
+                onChange={(value) => update('sfxMuted', value)}
+              />
+              <p className="settings-note" role="note">
+                Current audio is an original procedural development-safe foundation. Every important
+                cue also has a visible text equivalent; owner audio replacement remains pending.
+              </p>
             </SettingsSectionCard>
           ) : null}
 

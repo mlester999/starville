@@ -1,0 +1,3038 @@
+{
+  "assets": [
+    {
+      "accessibilityLabel": "Missing Asset",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1,
+      "assetType": "interaction_marker",
+      "bundledVersion": "3.1.0",
+      "category": "interaction",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": [
+        "lantern_square",
+        "personal_home",
+        "farming",
+        "housing",
+        "interface",
+        "game_test"
+      ],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A safe Starville diagnostic crate used when no eligible visual source can load.",
+      "displayName": "Missing Asset",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "system",
+        "stage": null,
+        "variant": "production-slice-crate"
+      },
+      "height": 192,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "system.missing-asset",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/interaction/system__missing-asset.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/interaction/system__missing-asset.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["system", "missing", "diagnostic"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/interaction/system__missing-asset.webp",
+      "usageLocations": ["Game Client fallback", "World Composer diagnostics", "Admin Portal"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Meadow Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Seam-safe isometric meadow grass with a restrained painted texture.",
+      "displayName": "Meadow Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.base",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__base.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__base.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "walkable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__base.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Clover Grass Variation",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "A compatible grass variation with tiny clover flecks for repeated areas.",
+      "displayName": "Clover Grass Variation",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass_clover"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.clover",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__clover.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__clover.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "variation"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__clover.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Garden Dirt",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Garden Dirt rendered on the canonical 96 by 48 isometric tile plane.",
+      "displayName": "Garden Dirt",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "stone",
+        "stage": null,
+        "variant": "production-slice-dirt"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.dirt",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__dirt.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__dirt.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "dirt"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__dirt.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Lantern Stone Path",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Lantern Stone Path rendered on the canonical 96 by 48 isometric tile plane.",
+      "displayName": "Lantern Stone Path",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "stone",
+        "stage": null,
+        "variant": "production-slice-path"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.path.stone",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__path__stone.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__path__stone.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "path"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__path__stone.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Lantern Plaza Stone",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Lantern Plaza Stone rendered on the canonical 96 by 48 isometric tile plane.",
+      "displayName": "Lantern Plaza Stone",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "stone",
+        "stage": null,
+        "variant": "production-slice-plaza"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.plaza",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__plaza.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__plaza.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "plaza"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__plaza.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Brook Water",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Brook Water rendered on the canonical 96 by 48 isometric tile plane.",
+      "displayName": "Brook Water",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-water"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.water",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "water"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Willow Bridge Deck",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Willow Bridge Deck rendered on the canonical 96 by 48 isometric tile plane.",
+      "displayName": "Willow Bridge Deck",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-bridge"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.bridge",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__bridge.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__bridge.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "bridge"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__bridge.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Amber Cottage",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1,
+      "assetType": "building",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 1.4,
+        "offsetX": -1.1,
+        "offsetY": -0.7,
+        "shape": "rectangle",
+        "width": 2.2
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A warm isometric cottage with a deep roof, lit windows, and readable doorway.",
+      "displayName": "Amber Cottage",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 2.5,
+        "width": 3
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-cottage_amber"
+      },
+      "height": 512,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "interactionRadius": 1.6,
+      "key": "cottage-amber",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.78,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/cottage-amber.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/cottage-amber.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["building", "home", "cottage"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/cottage-amber.webp",
+      "usageLocations": ["Lantern Square", "Personal-home entrance"],
+      "variants": [],
+      "width": 512
+    },
+    {
+      "accessibilityLabel": "Lantern Notice Board",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.8888888888888888,
+      "assetType": "sign",
+      "bundledVersion": "3.1.0",
+      "category": "signage",
+      "collision": {
+        "blocking": true,
+        "height": 0.36,
+        "offsetX": -0.35,
+        "offsetY": -0.18,
+        "shape": "rectangle",
+        "width": 0.7
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Lantern Notice Board with readable sign geometry and no baked interface text.",
+      "displayName": "Lantern Notice Board",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-notice"
+      },
+      "height": 360,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.92
+      },
+      "interactionRadius": 1.5,
+      "key": "notice-board",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/signage/notice-board.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/signage/notice-board.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["signage", "notice"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/signage/notice-board.webp",
+      "usageLocations": ["World guidance", "World Composer"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Star Lantern",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.6666666666666666,
+      "assetType": "lamp",
+      "bundledVersion": "3.1.0",
+      "category": "lighting",
+      "collision": {
+        "blocking": true,
+        "height": 0.36,
+        "offsetX": -0.18,
+        "offsetY": -0.18,
+        "shape": "rectangle",
+        "width": 0.36
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A slender village lantern with warm restrained glow and a stable post base.",
+      "displayName": "Star Lantern",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "hearth",
+        "stage": null,
+        "variant": "production-slice-street"
+      },
+      "height": 384,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "lamp-star",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.9,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/lighting/lamp-star.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/lighting/lamp-star.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["lighting", "lamp", "lantern"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/lighting/lamp-star.webp",
+      "usageLocations": ["Lantern Square", "World paths"],
+      "variants": [],
+      "width": 256
+    },
+    {
+      "accessibilityLabel": "Willow Fence",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "fence",
+      "bundledVersion": "3.1.0",
+      "category": "boundary",
+      "collision": {
+        "blocking": true,
+        "height": 0.4,
+        "offsetX": -1.5,
+        "offsetY": -0.2,
+        "shape": "rectangle",
+        "width": 3
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A low willow fence segment with distinct posts and a narrow collision base.",
+      "displayName": "Willow Fence",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 0.5,
+        "width": 3
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-fence"
+      },
+      "height": 256,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "fence-willow",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.92,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/boundary/fence-willow.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/boundary/fence-willow.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["boundary", "fence", "willow"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/boundary/fence-willow.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 512
+    },
+    {
+      "accessibilityLabel": "Whisper Pine",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.7142857142857143,
+      "assetType": "tree",
+      "bundledVersion": "3.1.0",
+      "category": "nature",
+      "collision": {
+        "blocking": true,
+        "height": 0.48,
+        "offsetX": -0.22,
+        "offsetY": -0.24,
+        "shape": "rectangle",
+        "width": 0.44
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A layered evergreen with a narrow trunk collision and soft canopy highlights.",
+      "displayName": "Whisper Pine",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-pine"
+      },
+      "height": 448,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "tree-pine",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.82,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/nature/tree-pine.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/nature/tree-pine.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["nature", "tree", "evergreen"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/nature/tree-pine.webp",
+      "usageLocations": ["Lantern Square", "Whisperpine Gate"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Star Maple",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.8571428571428571,
+      "assetType": "tree",
+      "bundledVersion": "3.1.0",
+      "category": "nature",
+      "collision": {
+        "blocking": true,
+        "height": 0.48,
+        "offsetX": -0.22,
+        "offsetY": -0.24,
+        "shape": "rectangle",
+        "width": 0.44
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A rounded maple tree with moss, amber, and sage foliage clusters.",
+      "displayName": "Star Maple",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-maple"
+      },
+      "height": 448,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "tree-maple",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.78,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/nature/tree-maple.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/nature/tree-maple.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["nature", "tree", "maple"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/nature/tree-maple.webp",
+      "usageLocations": ["Lantern Square"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Round-leaf Bush",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.25,
+      "assetType": "decoration",
+      "bundledVersion": "3.1.0",
+      "category": "nature",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Round-leaf Bush with a compact readable silhouette and soft upper-left light.",
+      "displayName": "Round-leaf Bush",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-bush"
+      },
+      "height": 256,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "bush-round",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.78,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/nature/bush-round.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/nature/bush-round.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["nature", "bush"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/nature/bush-round.webp",
+      "usageLocations": ["Lantern Square", "World Composer"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Moonbell Flowers",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.25,
+      "assetType": "decoration",
+      "bundledVersion": "3.1.0",
+      "category": "nature",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Moonbell Flowers with a compact readable silhouette and soft upper-left light.",
+      "displayName": "Moonbell Flowers",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-flowers"
+      },
+      "height": 256,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "flowers-moon",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.8,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/nature/flowers-moon.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/nature/flowers-moon.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["nature", "flowers"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/nature/flowers-moon.webp",
+      "usageLocations": ["Lantern Square", "World Composer"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Mossy Waystone",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.2,
+      "assetType": "rock",
+      "bundledVersion": "3.1.0",
+      "category": "nature",
+      "collision": {
+        "blocking": true,
+        "height": 0.5,
+        "offsetX": -0.35,
+        "offsetY": -0.25,
+        "shape": "rectangle",
+        "width": 0.7
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Mossy Waystone with a compact readable silhouette and soft upper-left light.",
+      "displayName": "Mossy Waystone",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-moss"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "rock-moss",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/nature/rock-moss.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/nature/rock-moss.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["nature", "moss"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/nature/rock-moss.webp",
+      "usageLocations": ["Lantern Square", "World Composer"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Willow Chair",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.2,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Willow Chair with four authored isometric directions and a stable placement base.",
+      "displayName": "Willow Chair",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-chair"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "phase7-dev-willow-chair",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.82,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/phase7-dev-willow-chair.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/phase7-dev-willow-chair.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "seating", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/phase7-dev-willow-chair.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Crafting Workbench",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.2,
+      "assetType": "crafting_station",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 0.9,
+        "offsetX": -0.8,
+        "offsetY": -0.45,
+        "shape": "rectangle",
+        "width": 1.6
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "A sturdy willow workbench with visible vice, tools, shelf, and timber grain.",
+      "displayName": "Crafting Workbench",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1.5,
+        "width": 2
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-workbench_idle"
+      },
+      "height": 320,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "interactionRadius": 1.5,
+      "key": "phase7-crafting-workbench-marker",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.82,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/phase7-crafting-workbench-marker.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/phase7-crafting-workbench-marker.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["station", "crafting", "workbench"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/phase7-crafting-workbench-marker.webp",
+      "usageLocations": ["Lantern Square", "Personal home workstation"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Round-leaf Planter",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Round-leaf Planter with four authored isometric directions and a stable placement base.",
+      "displayName": "Round-leaf Planter",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-planter"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "phase7-dev-round-leaf-planter",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/phase7-dev-round-leaf-planter.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/phase7-dev-round-leaf-planter.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "plant", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/phase7-dev-round-leaf-planter.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Light Meadow Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Light Meadow Grass authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Light Meadow Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.light",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__light.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__light.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "walkable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__light.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Deep Meadow Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Deep Meadow Grass authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Deep Meadow Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.dark",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__dark.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__dark.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "walkable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__dark.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Worn Meadow Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Worn Meadow Grass authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Worn Meadow Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.worn",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__worn.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__worn.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "walkable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__worn.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Meadow Flower Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Meadow Flower Grass authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Meadow Flower Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass_clover"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.flowers",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__flowers.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__flowers.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "variation"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__flowers.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Path Edge Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Path Edge Grass authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Path Edge Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.path-edge",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__path-edge.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__path-edge.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "walkable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__path-edge.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Riverbank Grass",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Riverbank Grass authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Riverbank Grass",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "meadow",
+        "stage": null,
+        "variant": "production-slice-grass"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.grass.shore",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__grass__shore.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__grass__shore.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "grass", "walkable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__grass__shore.webp",
+      "usageLocations": ["Lantern Square", "Personal home exterior"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Deep River Water",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Deep River Water authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Deep River Water",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-water"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.water.deep",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__deep.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__deep.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "water"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__deep.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Shallow River Water",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Shallow River Water authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Shallow River Water",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-water"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.water.shallow",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__shallow.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__shallow.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "water"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__shallow.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Natural River Shoreline",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Natural River Shoreline authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Natural River Shoreline",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-water"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.water.shore",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__shore.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__shore.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "water"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__shore.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Bridge Water Disturbance",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Bridge Water Disturbance authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Bridge Water Disturbance",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-water"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "world.terrain.water.disturbance",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/world__terrain__water__disturbance.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/world__terrain__water__disturbance.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "water"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/world__terrain__water__disturbance.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Willow Floor",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "animated": false,
+      "aspectRatio": 2,
+      "assetType": "terrain_tile",
+      "bundledVersion": "3.1.0",
+      "category": "terrain",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home", "farming"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "description": "Amber Cottage Willow Floor authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Willow Floor",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "stone",
+        "stage": null,
+        "variant": "production-slice-plaza"
+      },
+      "height": 96,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.floor",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 1,
+      "renderLayer": "ground",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/terrain/v3__interior__floor.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/terrain/v3__interior__floor.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["terrain", "plaza"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/terrain/v3__interior__floor.webp",
+      "usageLocations": ["World terrain", "Game Test terrain gallery"],
+      "variants": [],
+      "width": 192
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Interior Wall",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.2,
+      "assetType": "building",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 1.4,
+        "offsetX": -1.1,
+        "offsetY": -0.7,
+        "shape": "rectangle",
+        "width": 2.2
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Interior Wall authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Interior Wall",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 2.5,
+        "width": 3
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-cottage_amber"
+      },
+      "height": 320,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "interactionRadius": 1.6,
+      "key": "v3.interior.wall",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__wall.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/v3__interior__wall.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["building", "home", "cottage"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__wall.webp",
+      "usageLocations": ["Lantern Square", "Personal-home entrance"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Interior Door",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.75,
+      "assetType": "home_entrance",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Interior Door authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Interior Door",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 0.5,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-home"
+      },
+      "height": 400,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "interactionRadius": 1.5,
+      "key": "v3.interior.door",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.68,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__door.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/v3__interior__door.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["home", "entrance", "interaction"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__door.webp",
+      "usageLocations": ["Lantern Square", "Guided onboarding"],
+      "variants": [],
+      "width": 300
+    },
+    {
+      "accessibilityLabel": "Star Quilt Bed",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.2,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Star Quilt Bed authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Star Quilt Bed",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-chair"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.bed",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.78,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__bed.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__bed.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "seating", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__bed.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Willow Bedside Table",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Willow Bedside Table authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Willow Bedside Table",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-planter"
+      },
+      "height": 256,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.bedside-table",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.7,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__bedside-table.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__bedside-table.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "plant", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__bedside-table.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 256
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Dining Table",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.2,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Dining Table authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Dining Table",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 2
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-table"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.dining-table",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.74,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__dining-table.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__dining-table.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "table", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__dining-table.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 384
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Dining Chair",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.8,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Dining Chair authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Dining Chair",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-chair"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.dining-chair",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.68,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__dining-chair.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__dining-chair.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "seating", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__dining-chair.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 256
+    },
+    {
+      "accessibilityLabel": "Brass Bound Storage Chest",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.25,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Brass Bound Storage Chest authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Brass Bound Storage Chest",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-shelf"
+      },
+      "height": 256,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.chest",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__chest.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__chest.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "storage", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__chest.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Willow Wardrobe",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.8333333333333334,
+      "assetType": "home_interior_object",
+      "bundledVersion": "3.1.0",
+      "category": "interior",
+      "collision": {
+        "blocking": true,
+        "height": 0.5,
+        "offsetX": -0.45,
+        "offsetY": -0.25,
+        "shape": "rectangle",
+        "width": 0.9
+      },
+      "criticalGroups": ["personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Willow Wardrobe authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Willow Wardrobe",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-wardrobe"
+      },
+      "height": 384,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.wardrobe",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/interior/v3__interior__wardrobe.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/interior/v3__interior__wardrobe.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["interior", "wardrobe"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/interior/v3__interior__wardrobe.webp",
+      "usageLocations": ["Wardrobe workspace"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Moss and Amber Rug",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1.6,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": false,
+        "shape": "none"
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Moss and Amber Rug authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Moss and Amber Rug",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 2
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "moon",
+        "stage": null,
+        "variant": "production-slice-rug"
+      },
+      "height": 160,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.rug",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.74,
+      "renderLayer": "ground_detail",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__rug.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__rug.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "decoration", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__rug.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 256
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Leaded Window",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.9375,
+      "assetType": "building",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 1.4,
+        "offsetX": -1.1,
+        "offsetY": -0.7,
+        "shape": "rectangle",
+        "width": 2.2
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Leaded Window authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Leaded Window",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 2.5,
+        "width": 3
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-cottage_amber"
+      },
+      "height": 320,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.88
+      },
+      "interactionRadius": 1.6,
+      "key": "v3.interior.window",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.64,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__window.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/v3__interior__window.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["building", "home", "cottage"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__window.webp",
+      "usageLocations": ["Lantern Square", "Personal-home entrance"],
+      "variants": [],
+      "width": 300
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Fireplace",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.8333333333333334,
+      "assetType": "cooking_station",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 0.9,
+        "offsetX": -0.75,
+        "offsetY": -0.45,
+        "shape": "rectangle",
+        "width": 1.5
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Fireplace authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Fireplace",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1.5,
+        "width": 2
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "hearth",
+        "stage": null,
+        "variant": "production-slice-hearth_idle"
+      },
+      "height": 384,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "interactionRadius": 1.5,
+      "key": "v3.interior.fireplace",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__fireplace.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/v3__interior__fireplace.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["station", "cooking", "hearth"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__fireplace.webp",
+      "usageLocations": ["Lantern Square", "Personal home workstation"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Cooking Counter",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 1,
+      "assetType": "cooking_station",
+      "bundledVersion": "3.1.0",
+      "category": "structure",
+      "collision": {
+        "blocking": true,
+        "height": 0.9,
+        "offsetX": -0.75,
+        "offsetY": -0.45,
+        "shape": "rectangle",
+        "width": 1.5
+      },
+      "criticalGroups": ["lantern_square", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Cooking Counter authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Cooking Counter",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1.5,
+        "width": 2
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "hearth",
+        "stage": null,
+        "variant": "production-slice-hearth_idle"
+      },
+      "height": 320,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.9
+      },
+      "interactionRadius": 1.5,
+      "key": "v3.interior.cooking-counter",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.72,
+      "renderLayer": "structure",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/structure/v3__interior__cooking-counter.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/structure/v3__interior__cooking-counter.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["station", "cooking", "hearth"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/structure/v3__interior__cooking-counter.webp",
+      "usageLocations": ["Lantern Square", "Personal home workstation"],
+      "variants": [],
+      "width": 320
+    },
+    {
+      "accessibilityLabel": "Framed Meadow Botanical",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.8571428571428571,
+      "assetType": "sign",
+      "bundledVersion": "3.1.0",
+      "category": "signage",
+      "collision": {
+        "blocking": true,
+        "height": 0.36,
+        "offsetX": -0.35,
+        "offsetY": -0.18,
+        "shape": "rectangle",
+        "width": 0.7
+      },
+      "criticalGroups": ["lantern_square"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Framed Meadow Botanical authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Framed Meadow Botanical",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-notice"
+      },
+      "height": 280,
+      "interactionAnchor": {
+        "x": 0.5,
+        "y": 0.92
+      },
+      "interactionRadius": 1.5,
+      "key": "v3.interior.wall-art",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.62,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/signage/v3__interior__wall-art.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/signage/v3__interior__wall-art.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["signage", "notice"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/signage/v3__interior__wall-art.webp",
+      "usageLocations": ["World guidance", "World Composer"],
+      "variants": [],
+      "width": 240
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Floor Lamp",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.625,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Floor Lamp authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Floor Lamp",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "amber",
+        "stage": null,
+        "variant": "production-slice-floor_lamp"
+      },
+      "height": 320,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.floor-lamp",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.66,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__floor-lamp.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__floor-lamp.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "lighting", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__floor-lamp.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 200
+    },
+    {
+      "accessibilityLabel": "Amber Cottage Houseplant",
+      "aliasOf": null,
+      "anchor": {
+        "x": 0.5,
+        "y": 1
+      },
+      "animated": false,
+      "aspectRatio": 0.7857142857142857,
+      "assetType": "furniture",
+      "bundledVersion": "3.1.0",
+      "category": "furniture",
+      "collision": {
+        "blocking": true,
+        "height": 0.6,
+        "offsetX": -0.4,
+        "offsetY": -0.3,
+        "shape": "rectangle",
+        "width": 0.8
+      },
+      "criticalGroups": ["housing", "personal_home"],
+      "defaultRotation": 0,
+      "depthAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "description": "Amber Cottage Houseplant authored for the local unpublished V3 gameplay candidate.",
+      "displayName": "Amber Cottage Houseplant",
+      "footAnchor": {
+        "x": 0.5,
+        "y": 0.94
+      },
+      "footprint": {
+        "height": 1,
+        "width": 1
+      },
+      "frameCount": 1,
+      "frameDurationMs": 160,
+      "frameHeight": null,
+      "frameWidth": null,
+      "generator": {
+        "kind": "authored_raster",
+        "palette": "sage",
+        "stage": null,
+        "variant": "production-slice-planter"
+      },
+      "height": 280,
+      "interactionAnchor": null,
+      "interactionRadius": 0,
+      "key": "v3.interior.houseplant",
+      "loopMode": "none",
+      "qualityStatus": "production_candidate",
+      "recommendedScale": 0.66,
+      "renderLayer": "object",
+      "replacementAllowed": true,
+      "runtimePath": "/assets/starville/bundled/v3/furniture/v3__interior__houseplant.webp",
+      "safeFallbackKey": "system.missing-asset",
+      "sourcePath": "assets/source-v3/furniture/v3__interior__houseplant.png",
+      "sourceType": "bundled_raster",
+      "supportedDirections": [],
+      "supportedRotations": [0],
+      "tags": ["furniture", "plant", "rotatable"],
+      "thumbnailPath": "/assets/starville/bundled/v3/thumbnails/furniture/v3__interior__houseplant.webp",
+      "usageLocations": ["Decoration Mode", "Furniture palette", "Housing Game Test"],
+      "variants": [],
+      "width": 220
+    }
+  ],
+  "game": "starville",
+  "manifestVersion": "3.1.0",
+  "projection": {
+    "lightDirection": "upper_left",
+    "objectBase": "bottom_center",
+    "shadowDirection": "lower_right",
+    "tileHeight": 48,
+    "tileWidth": 96
+  },
+  "schemaVersion": 1
+}

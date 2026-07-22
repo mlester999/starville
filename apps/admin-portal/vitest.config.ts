@@ -11,5 +11,10 @@ export default mergeConfig(
         runtime: 'automatic',
       },
     },
+    test: {
+      hookTimeout: 20_000,
+      maxWorkers: 2,
+      testTimeout: 20_000,
+    },
   },
 );

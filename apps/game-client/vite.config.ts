@@ -1,6 +1,8 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig, loadEnv } from 'vite';
 
+import { assertProductionRuntimeSafetyGatesClosed } from '@starville/config/server';
+
 import { parseGameClientPublicConfig } from './src/app/public-config';
 import { starvilleBundledAssetsPlugin } from './vite-bundled-assets';
 
@@ -27,6 +29,7 @@ export default defineConfig(({ mode }) => {
     ...loadEnv(mode, process.cwd(), ''),
     ...process.env,
   };
+  assertProductionRuntimeSafetyGatesClosed(environment);
   parseGameClientPublicConfig(environment);
   const port = parseGameClientPort(environment['GAME_CLIENT_PORT']);
   const developmentApiProxy = environment['GAME_CLIENT_DEV_API_PROXY_TARGET'];
@@ -38,6 +41,7 @@ export default defineConfig(({ mode }) => {
     envPrefix: ['NEXT_PUBLIC_'],
     build: {
       chunkSizeWarningLimit: 1_600,
+      sourcemap: false,
     },
     server: {
       port,

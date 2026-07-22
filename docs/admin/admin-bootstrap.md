@@ -17,7 +17,9 @@ pnpm admin:bootstrap -- \
   --dry-run
 ```
 
-An apply operation requires the exact verified development project reference:
+An apply operation requires the exact verified hosted project reference. Development uses
+`--confirm-development`; the separately gated Phase 13D production workflow uses
+`--confirm-production`:
 
 ```bash
 pnpm admin:bootstrap -- \
@@ -48,9 +50,11 @@ when every gate passes:
 - `--apply` is present
 - The supplied Auth user UUID identifies an existing Auth user
 
-Production, an ambiguous environment, a mismatched hostname/ref/link, missing approvals, or a
-placeholder configuration causes an immediate refusal. Bootstrap must not accept a project reference
-silently from only one source.
+Production is accepted only when `SUPABASE_ENVIRONMENT=production`, the deployment target is
+`starville-prod`, the configured project equals the separately supplied approved production ref, the
+development ref differs, and `--confirm-production` is used. An ambiguous environment, a mismatched
+hostname/ref/link, missing approvals, or a placeholder configuration causes an immediate refusal.
+Bootstrap must not accept a project reference silently from only one source.
 
 ## Dry-run behavior
 
@@ -118,6 +122,10 @@ inaccessible.
 7. Verify the trusted administrator through the protected portal/API flow.
 8. Return `ADMIN_BOOTSTRAP_ENABLED` to `false`.
 9. Do not commit or print the local environment.
+
+For production, follow `docs/deployment/phase-13d-owner-commands.md` instead: use
+`--confirm-production`, require AAL2, keep values provider-injected, and prove both gates false
+immediately afterward.
 
 ## Manual alternative
 

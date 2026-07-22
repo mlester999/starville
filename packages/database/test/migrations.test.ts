@@ -42,6 +42,36 @@ describe('Supabase migration naming', () => {
   });
 });
 
+describe('Phase 13B closed-beta security hardening migration', () => {
+  const sql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260722130000_phase13b_closed_beta_security_hardening.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  it('parses with the hosted PostgreSQL 17 grammar', async () => {
+    const parser = new Parser({ version: 17 });
+    const result = await parser.parse(sql);
+    expect(result.stmts?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('removes broad table access without replacing authority or adding browser grants', () => {
+    expect(sql.match(/force row level security/gu)).toHaveLength(20);
+    expect(sql).toContain('revoke select, insert, update, delete on table');
+    expect(sql).toContain('public.player_onboarding_states');
+    expect(sql).toContain('public.player_experience_admin_rate_limits');
+    expect(sql).toContain('from service_role');
+    expect(sql).toContain(
+      'private.progression_unlock_requirement_met(uuid, public.progression_unlock_versions)',
+    );
+    expect(sql).not.toMatch(/\bgrant\s+(?:all|execute|select|insert|update|delete)\b/iu);
+    expect(sql).not.toMatch(/create\s+(?:or\s+replace\s+)?function/iu);
+    expect(sql).not.toMatch(/drop\s+(?:table|function|schema)/iu);
+  });
+});
+
 describe('secure World Game Test migration', () => {
   const sql = readFileSync(
     new URL(

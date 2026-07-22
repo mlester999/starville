@@ -35,7 +35,7 @@ export interface RuntimeWorld {
   readonly assetResolutionContext?: AssetResolutionContext;
 }
 
-export type AvatarRendererMode = 'published_v1' | 'phase12d_candidate';
+export type AvatarRendererMode = 'published_v1' | 'phase12d_candidate' | 'production_slice_v3';
 
 export interface ExitTransitionRequest {
   readonly exitId: string;
@@ -84,10 +84,13 @@ export interface GameRuntimeCallbacks {
 
 export interface MasterAudioSettings {
   readonly masterVolume: number;
-  /** Reserved for approved ambient sources; no source is registered by Phase 12E. */
+  readonly musicVolume?: number;
   readonly ambienceVolume?: number;
   readonly sfxVolume?: number;
   readonly muted: boolean;
+  readonly musicMuted?: boolean;
+  readonly ambienceMuted?: boolean;
+  readonly sfxMuted?: boolean;
 }
 
 /**
@@ -109,6 +112,43 @@ export interface GameRuntimeClock {
   readonly now: () => number;
 }
 
+export interface GameRuntimeDiagnostics {
+  readonly location: string;
+  readonly mapVersion: number;
+  readonly position: PlayerStateUpdate;
+  readonly input: MovementInput;
+  readonly worldVelocity: Readonly<{ x: number; y: number }>;
+  readonly jogging: boolean;
+  readonly animation: Readonly<{
+    state: string;
+    direction: string;
+    frame: number;
+    frameInState: number;
+    elapsedMs: number;
+    distanceTiles: number;
+  }> | null;
+  readonly camera: Readonly<{
+    worldView: Readonly<{ x: number; y: number; width: number; height: number }>;
+    bounds: MapManifest['cameraBounds'];
+  }>;
+  readonly culling: Readonly<{
+    activeTerrainChunks: number;
+    totalTerrainChunks: number;
+    visibleTerrainNodes: number;
+    totalTerrainNodes: number;
+    visibleTerrainAuxiliaryNodes: number;
+    totalTerrainAuxiliaryNodes: number;
+    visibleObjects: number;
+    totalObjects: number;
+  }>;
+  readonly collision: Readonly<{
+    nearbyShapes: number;
+    totalShapes: number;
+    playerFootRadius: number;
+  }>;
+  readonly transitionPending: boolean;
+}
+
 export interface GameRuntimeOptions {
   readonly initialState: PlayerStateUpdate;
   readonly initialWorld: RuntimeWorld;
@@ -116,6 +156,8 @@ export interface GameRuntimeOptions {
   readonly avatarProfile?: ResolvedAvatarProfile;
   /** Defaults to the unchanged published V1 renderer. */
   readonly avatarRendererMode?: AvatarRendererMode;
+  /** Local review-only camera override; production callers leave this unset. */
+  readonly cameraZoomOverride?: number;
   readonly reducedMotion: boolean;
   readonly visualSettings?: Partial<WorldVisualSettings>;
   readonly clock?: GameRuntimeClock;
@@ -127,6 +169,8 @@ export interface GameRuntimeOptions {
 export interface GameRuntimeHandle {
   setInputBlocked(blocked: boolean): void;
   setTouchMovementInput(input: MovementInput): void;
+  setTouchJogging(jogging: boolean): void;
+  setCollisionDebug(enabled: boolean): void;
   setAudioSettings(settings: MasterAudioSettings): void;
   setRemotePresences(presences: readonly PublicPresence[]): void;
   setLocalAvatarProfile(profile: ResolvedAvatarProfile): void;
@@ -139,6 +183,7 @@ export interface GameRuntimeHandle {
   setActivityInstance(instance: CooperativeActivityInstanceSnapshot | null): void;
   interact(): void;
   getState(): PlayerStateUpdate;
+  getDiagnostics(): GameRuntimeDiagnostics;
   loadWorld(world: RuntimeWorld, state: PlayerStateUpdate): void;
   cancelTransition(): void;
   destroy(): void;

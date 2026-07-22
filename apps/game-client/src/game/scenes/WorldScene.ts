@@ -1,15 +1,22 @@
 import Phaser from 'phaser';
 
-import { avatarAnimationStateForMovement } from '@starville/avatar';
+import {
+  PRODUCTION_SLICE_AVATAR_FRAME_HEIGHT,
+  PRODUCTION_SLICE_AVATAR_FRAME_WIDTH,
+  PRODUCTION_SLICE_AVATAR_RUNTIME_URL,
+  PRODUCTION_SLICE_AVATAR_TEXTURE_KEY,
+  avatarAnimationStateForMovement,
+} from '@starville/avatar';
 import {
   STARVILLE_VISUAL_TOKENS,
+  buildCollisionSpatialIndex,
   closestInteraction,
   computeWorldCameraFrame,
-  moveWithCollisions,
+  moveWithCollisionIndex,
   movementDelta,
   movementSpeed,
   PLAYER_FOOT_RADIUS,
-  nextFacingDirection,
+  nextFacingDirectionFromVelocity,
   projectWorld,
   sanitizeInteractionText,
   resolveWorldVisualSettings,
@@ -20,10 +27,12 @@ import {
   type PlayerStateUpdate,
   type WorldInteraction,
   type WorldVisualSettings,
+  type CollisionSpatialIndex,
 } from '@starville/game-core';
 
 import type {
   ActivityInteractionTarget,
+  GameRuntimeDiagnostics,
   GameRuntimeOptions,
   RuntimeWorld,
   WorldChatBubbleMessage,
@@ -42,7 +51,12 @@ import {
 import { RemotePlayerRenderer } from '../rendering/remote-player';
 import type { PublicPresence } from '@starville/realtime';
 import { SOCIAL_INTERACTION_DISTANCE, socialDistance } from '@starville/realtime';
-import { bundledTerrainAssetKeysForManifest, renderTerrain } from '../rendering/terrain';
+import {
+  bundledTerrainAssetKeysForManifest,
+  renderTerrain,
+  updateTerrainCulling,
+  type TerrainCullingMetrics,
+} from '../rendering/terrain';
 import {
   renderInteractionMarkerLayer,
   type InteractionMarkerLayer,
@@ -52,7 +66,13 @@ import {
   type WorldObjectAmbienceLayer,
 } from '../rendering/world-ambience';
 import { queueWorldAssetTextures } from '../rendering/world-asset-textures';
-import { renderWorldObjects, type RenderedWorldObject } from '../rendering/world-objects';
+import {
+  renderWorldObjects,
+  updateWorldObjectCulling,
+  updateWorldObjectOcclusion,
+  type RenderedWorldObject,
+  type WorldObjectCullingMetrics,
+} from '../rendering/world-objects';
 import { fallbackResolvedAvatar, type ResolvedAvatarProfile } from '../../app/avatar-client';
 import { WorldChatBubbleRenderer, selectVisibleWorldChatBubbles } from '../rendering/chat-bubbles';
 
@@ -60,6 +80,53 @@ const CHECKPOINT_INTERVAL_MS = 5_000;
 const STATE_REPORT_INTERVAL_MS = 100;
 const FAILED_TRANSITION_COOLDOWN_MS = 750;
 const ARRIVAL_REARM_DELAY_MS = 500;
+
+export function productionSliceInteriorCameraFrame(
+  manifest: Pick<MapManifest, 'width' | 'height' | 'tileWidth' | 'tileHeight' | 'projectionOrigin'>,
+  viewport: Readonly<{ width: number; height: number }>,
+) {
+  const halfTileWidth = manifest.tileWidth / 2;
+  const halfTileHeight = manifest.tileHeight / 2;
+  const floorMinimumX = manifest.projectionOrigin.x - manifest.height * halfTileWidth;
+  const floorMaximumX = manifest.projectionOrigin.x + manifest.width * halfTileWidth;
+  const floorMinimumY = manifest.projectionOrigin.y;
+  const floorMaximumY =
+    manifest.projectionOrigin.y + (manifest.width + manifest.height) * halfTileHeight;
+  const visualBounds = {
+    x: floorMinimumX - manifest.tileWidth * 0.85,
+    y: floorMinimumY - manifest.tileHeight * 5,
+    width: floorMaximumX - floorMinimumX + manifest.tileWidth * 1.7,
+    height: floorMaximumY - floorMinimumY + manifest.tileHeight * 6.1,
+  };
+  const fittedZoom = Math.min(
+    Math.max(
+      Math.min(viewport.width / visualBounds.width, viewport.height / visualBounds.height) * 0.94,
+      0.26,
+    ),
+    1.25,
+  );
+  const followsPlayer = viewport.width <= 600 && viewport.height > viewport.width;
+  const zoom = followsPlayer ? 1.05 : fittedZoom;
+  const center = {
+    x: visualBounds.x + visualBounds.width / 2,
+    y: visualBounds.y + visualBounds.height / 2,
+  };
+  const visibleWidth = viewport.width / zoom;
+  const visibleHeight = viewport.height / zoom;
+  return {
+    zoom,
+    center,
+    followsPlayer,
+    bounds: followsPlayer
+      ? visualBounds
+      : {
+          x: center.x - visibleWidth / 2,
+          y: center.y - visibleHeight / 2,
+          width: visibleWidth,
+          height: visibleHeight,
+        },
+  } as const;
+}
 
 function currentAssetRotations(manifest: MapManifest) {
   return manifest.objects.flatMap((object) =>
@@ -106,6 +173,7 @@ export class WorldScene extends Phaser.Scene {
   private currentInteraction: WorldInteraction | undefined;
   private inputBlocked = false;
   private touchMovementInput: MovementInput = IDLE_TOUCH_MOVEMENT;
+  private touchJogging = false;
   private transitionPending = false;
   private exitArmed = false;
   private rearmAfter = 0;
@@ -118,6 +186,7 @@ export class WorldScene extends Phaser.Scene {
   private interactionMarkers: InteractionMarkerLayer | undefined;
   private objectAmbience: WorldObjectAmbienceLayer | undefined;
   private collisionDebug: CollisionDebugOverlay | undefined;
+  private collisionDebugEnabled: boolean;
   private readonly remotePlayers = new Map<string, RemotePlayerRenderer>();
   private remoteAvatarProfiles: Readonly<Record<string, ResolvedAvatarProfile>> = {};
   private remotePlayerNamesVisible = true;
@@ -129,6 +198,27 @@ export class WorldScene extends Phaser.Scene {
   private currentActivityObject: ActivityInteractionTarget | undefined;
   private normalWorldState: PlayerStateUpdate | undefined;
   private mapLoadGeneration = 0;
+  private collisionIndex: CollisionSpatialIndex;
+  private latestInput: MovementInput = IDLE_TOUCH_MOVEMENT;
+  private latestVelocity = { x: 0, y: 0 };
+  private latestJogging = false;
+  private lastAnimationTime = 0;
+  private nearbyCollisionShapes = 0;
+  private lastCullAt = Number.NEGATIVE_INFINITY;
+  private terrainCulling: TerrainCullingMetrics = {
+    activeChunks: 0,
+    totalChunks: 0,
+    visibleNodes: 0,
+    totalNodes: 0,
+    culledNodes: 0,
+    visibleAuxiliaryNodes: 0,
+    totalAuxiliaryNodes: 0,
+  };
+  private objectCulling: WorldObjectCullingMetrics = {
+    visibleObjects: 0,
+    totalObjects: 0,
+    culledObjects: 0,
+  };
   private activityMarkers: Array<{
     readonly marker: Phaser.GameObjects.Graphics;
     readonly label: Phaser.GameObjects.Text;
@@ -141,11 +231,23 @@ export class WorldScene extends Phaser.Scene {
     this.projection = this.projectionFor(this.manifest);
     this.visualSettings = resolveWorldVisualSettings(options.visualSettings);
     this.reducedMotion = options.reducedMotion;
+    this.collisionDebugEnabled = options.collisionDebug;
     this.state = { ...options.initialState };
     this.lastOutsideExitState = { ...options.initialState };
+    this.collisionIndex = buildCollisionSpatialIndex(this.manifest.collisions);
   }
 
   public preload(): void {
+    if (this.options.avatarRendererMode === 'production_slice_v3') {
+      this.load.spritesheet(
+        PRODUCTION_SLICE_AVATAR_TEXTURE_KEY,
+        PRODUCTION_SLICE_AVATAR_RUNTIME_URL,
+        {
+          frameWidth: PRODUCTION_SLICE_AVATAR_FRAME_WIDTH,
+          frameHeight: PRODUCTION_SLICE_AVATAR_FRAME_HEIGHT,
+        },
+      );
+    }
     queueWorldAssetTextures(
       this,
       this.world.assetDeliveries,
@@ -156,7 +258,6 @@ export class WorldScene extends Phaser.Scene {
 
   public create(): void {
     try {
-      this.cameras.main.setBackgroundColor('#456f55');
       this.renderMap();
 
       this.player = createAvatarPlayerRenderer(
@@ -209,17 +310,34 @@ export class WorldScene extends Phaser.Scene {
       keyboardInput,
       this.inputBlocked || this.transitionPending ? IDLE_TOUCH_MOVEMENT : this.touchMovementInput,
     );
-    const jogging = mayUseKeyboard && keys !== undefined && isJogging(keys);
+    const jogging =
+      (mayUseKeyboard && keys !== undefined && isJogging(keys)) ||
+      (this.touchJogging && Object.values(this.touchMovementInput).some(Boolean));
     const movement = movementDelta(input, movementSpeed(jogging), delta / 1_000);
-    const next = moveWithCollisions(
-      { x: this.state.x, y: this.state.y },
+    const previousPosition = { x: this.state.x, y: this.state.y };
+    const queryPadding =
+      PLAYER_FOOT_RADIUS + Math.max(Math.abs(movement.x), Math.abs(movement.y)) + 0.1;
+    this.nearbyCollisionShapes = this.collisionIndex.query({
+      minX: Math.min(previousPosition.x, previousPosition.x + movement.x) - queryPadding,
+      minY: Math.min(previousPosition.y, previousPosition.y + movement.y) - queryPadding,
+      maxX: Math.max(previousPosition.x, previousPosition.x + movement.x) + queryPadding,
+      maxY: Math.max(previousPosition.y, previousPosition.y + movement.y) + queryPadding,
+    }).length;
+    const next = moveWithCollisionIndex(
+      previousPosition,
       movement,
       PLAYER_FOOT_RADIUS,
       this.manifest.safeSaveBounds,
-      this.manifest.collisions,
+      this.collisionIndex,
     );
     const moving = next.x !== this.state.x || next.y !== this.state.y;
-    const facingDirection = nextFacingDirection(input, this.state.facingDirection);
+    const actualVelocity = { x: next.x - previousPosition.x, y: next.y - previousPosition.y };
+    this.latestInput = input;
+    this.latestVelocity = actualVelocity;
+    this.latestJogging = jogging;
+    const facingDirection = moving
+      ? nextFacingDirectionFromVelocity(actualVelocity, this.state.facingDirection)
+      : this.state.facingDirection;
     const movementStarted = moving && !this.wasMoving;
     const facingChanged = facingDirection !== this.state.facingDirection;
 
@@ -241,10 +359,14 @@ export class WorldScene extends Phaser.Scene {
     const interpolationNow = performance.now();
     const wallNow = this.wallClockNow();
     for (const remote of this.remotePlayers.values()) {
-      remote.update(interpolationNow, this.state, wallNow);
+      remote.update(interpolationNow, this.state, wallNow, this.cameras?.main?.worldView);
     }
     this.localChatBubble?.update(this.state, this.state, wallNow);
     this.checkExit(time);
+    if (time - this.lastCullAt >= 100) {
+      this.lastCullAt = time;
+      this.updateCulling();
+    }
 
     if (this.dirty && !this.transitionPending) {
       this.checkpointElapsed += Math.min(Math.max(delta, 0), 100);
@@ -270,6 +392,19 @@ export class WorldScene extends Phaser.Scene {
           left: input.left === true,
           right: input.right === true,
         };
+  }
+
+  public setTouchJogging(jogging: boolean): void {
+    this.touchJogging = !this.inputBlocked && jogging;
+  }
+
+  public setCollisionDebug(enabled: boolean): void {
+    if (enabled === this.collisionDebugEnabled) return;
+    this.collisionDebugEnabled = enabled;
+    this.collisionDebug?.destroy();
+    this.collisionDebug = enabled
+      ? renderCollisionDebug(this, this.manifest.collisions, this.projection, PLAYER_FOOT_RADIUS)
+      : undefined;
   }
 
   public setRemotePresences(presences: readonly PublicPresence[]): void {
@@ -317,7 +452,7 @@ export class WorldScene extends Phaser.Scene {
 
   public setLocalAvatarProfile(profile: ResolvedAvatarProfile): void {
     this.player?.setAppearance(profile);
-    this.updatePlayer(false, this.time.now, false);
+    this.updatePlayer(this.wasMoving, this.lastAnimationTime, this.latestJogging);
   }
 
   public setRemoteAvatarProfiles(profiles: Readonly<Record<string, ResolvedAvatarProfile>>): void {
@@ -432,12 +567,56 @@ export class WorldScene extends Phaser.Scene {
     return { ...this.state };
   }
 
+  public getDiagnostics(): GameRuntimeDiagnostics {
+    const worldView = this.cameras?.main?.worldView;
+    const animation = this.player?.getAnimationSnapshot?.() ?? null;
+    return {
+      location: this.manifest.name,
+      mapVersion: this.manifest.version,
+      position: this.getState(),
+      input: { ...this.latestInput },
+      worldVelocity: { ...this.latestVelocity },
+      jogging: this.latestJogging,
+      animation,
+      camera: {
+        worldView:
+          worldView === undefined
+            ? { x: 0, y: 0, width: 0, height: 0 }
+            : {
+                x: worldView.x,
+                y: worldView.y,
+                width: worldView.width,
+                height: worldView.height,
+              },
+        bounds: { ...this.manifest.cameraBounds },
+      },
+      culling: {
+        activeTerrainChunks: this.terrainCulling.activeChunks,
+        totalTerrainChunks: this.terrainCulling.totalChunks,
+        visibleTerrainNodes: this.terrainCulling.visibleNodes,
+        totalTerrainNodes: this.terrainCulling.totalNodes,
+        visibleTerrainAuxiliaryNodes: this.terrainCulling.visibleAuxiliaryNodes,
+        totalTerrainAuxiliaryNodes: this.terrainCulling.totalAuxiliaryNodes,
+        visibleObjects: this.objectCulling.visibleObjects,
+        totalObjects: this.objectCulling.totalObjects,
+      },
+      collision: {
+        nearbyShapes: this.nearbyCollisionShapes,
+        totalShapes: this.collisionIndex.totalShapes,
+        playerFootRadius: PLAYER_FOOT_RADIUS,
+      },
+      transitionPending: this.transitionPending,
+    };
+  }
+
   public loadWorld(world: RuntimeWorld, state: PlayerStateUpdate): void {
     if (state.mapId !== world.manifest.id) {
       throw new Error('Destination state does not match the published map.');
     }
 
     const loadGeneration = ++this.mapLoadGeneration;
+    this.transitionPending = true;
+    this.reportStoppedMovement();
     const queuedTextures = queueWorldAssetTextures(
       this,
       world.assetDeliveries,
@@ -459,21 +638,68 @@ export class WorldScene extends Phaser.Scene {
      * materials have either loaded or failed. The destination is then rendered
      * once from the final texture set, avoiding procedural-to-WebP flicker.
      */
-    this.transitionPending = true;
-    this.reportStoppedMovement();
     this.load.once(Phaser.Loader.Events.COMPLETE, commit);
     if (!this.load.isLoading()) this.load.start();
   }
 
   private commitWorld(world: RuntimeWorld, state: PlayerStateUpdate): void {
+    const previous = {
+      world: this.world,
+      manifest: this.manifest,
+      collisionIndex: this.collisionIndex,
+      projection: this.projection,
+      state: { ...this.state },
+      lastOutsideExitState: { ...this.lastOutsideExitState },
+      currentInteraction: this.currentInteraction,
+    };
     this.clearMap();
+    this.world = world;
+    this.manifest = world.manifest;
+    this.collisionIndex = buildCollisionSpatialIndex(this.manifest.collisions);
+    this.projection = this.projectionFor(this.manifest);
+    this.state = { ...state };
+    this.currentInteraction = undefined;
+
+    try {
+      this.renderMap();
+      this.player?.setProjection(this.projection);
+      this.localChatBubble?.setProjection(this.projection);
+      this.updatePlayer(false, this.time.now, false);
+      this.configureCamera();
+      this.updateCulling();
+      this.refreshChatBubbles();
+      this.refreshInteractionTarget();
+    } catch (error) {
+      this.clearMap();
+      this.world = previous.world;
+      this.manifest = previous.manifest;
+      this.collisionIndex = previous.collisionIndex;
+      this.projection = previous.projection;
+      this.state = previous.state;
+      this.lastOutsideExitState = previous.lastOutsideExitState;
+      this.currentInteraction = previous.currentInteraction;
+      try {
+        this.renderMap();
+        this.player?.setProjection(this.projection);
+        this.localChatBubble?.setProjection(this.projection);
+        this.updatePlayer(false, this.time.now, false);
+        this.configureCamera();
+        this.updateCulling();
+        this.refreshChatBubbles();
+        this.refreshInteractionTarget();
+      } catch {
+        this.options.callbacks.onError(
+          `${previous.manifest.name} could not be restored after a failed transition.`,
+        );
+      } finally {
+        this.transitionPending = false;
+      }
+      throw error;
+    }
+
     for (const remote of this.remotePlayers.values()) remote.destroy();
     this.remotePlayers.clear();
     this.selectRemotePlayer(null);
-    this.world = world;
-    this.manifest = world.manifest;
-    this.projection = this.projectionFor(this.manifest);
-    this.state = { ...state };
     this.lastOutsideExitState = { ...state };
     this.transitionPending = false;
     this.exitArmed = false;
@@ -481,15 +707,9 @@ export class WorldScene extends Phaser.Scene {
     this.checkpointElapsed = 0;
     this.dirty = false;
     this.wasMoving = false;
-    this.currentInteraction = undefined;
-
-    this.renderMap();
-    this.player?.setProjection(this.projection);
-    this.localChatBubble?.setProjection(this.projection);
-    this.updatePlayer(false, this.time.now, false);
-    this.configureCamera();
-    this.refreshChatBubbles();
-    this.refreshInteractionTarget();
+    this.latestInput = IDLE_TOUCH_MOVEMENT;
+    this.latestVelocity = { x: 0, y: 0 };
+    this.latestJogging = false;
     this.options.callbacks.onMapChanged(world);
   }
 
@@ -541,8 +761,17 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private renderMap(): void {
+    this.cameras?.main?.setBackgroundColor(
+      this.usesProductionSliceInteriorCamera()
+        ? '#201811'
+        : this.options.avatarRendererMode === 'production_slice_v3'
+          ? '#6d9b6b'
+          : '#456f55',
+    );
     this.terrain = renderTerrain(this, this.manifest, {
-      apronTiles: STARVILLE_VISUAL_TOKENS.camera.maximumApronTiles,
+      apronTiles: this.usesProductionSliceInteriorCamera()
+        ? 3
+        : STARVILLE_VISUAL_TOKENS.camera.maximumApronTiles,
       reducedMotion: this.reducedMotion,
       quality: this.visualSettings.quality,
       animatedWater: this.visualSettings.animatedWater,
@@ -565,7 +794,7 @@ export class WorldScene extends Phaser.Scene {
       quality: this.visualSettings.quality,
       highContrast: highContrastPreference(),
     });
-    if (this.options.collisionDebug) {
+    if (this.collisionDebugEnabled) {
       this.collisionDebug = renderCollisionDebug(
         this,
         this.manifest.collisions,
@@ -586,6 +815,7 @@ export class WorldScene extends Phaser.Scene {
     this.objectAmbience = undefined;
     for (const object of this.worldObjects) {
       object.container.destroy(true);
+      object.foreground?.destroy(true);
       object.shadow?.destroy();
     }
     this.worldObjects = [];
@@ -599,15 +829,46 @@ export class WorldScene extends Phaser.Scene {
   private configureCamera(): void {
     const camera = this.cameras?.main;
     if (camera === undefined) return;
+    if (this.usesProductionSliceInteriorCamera()) {
+      const frame = productionSliceInteriorCameraFrame(this.manifest, {
+        width: camera.width,
+        height: camera.height,
+      });
+      camera.stopFollow();
+      camera.setZoom(frame.zoom);
+      camera.setBounds(frame.bounds.x, frame.bounds.y, frame.bounds.width, frame.bounds.height);
+      if (frame.followsPlayer && this.player !== undefined) {
+        camera.startFollow(this.player.container, true, 0.18, 0.18);
+        camera.setDeadzone(48, 92);
+      } else {
+        camera.centerOn(frame.center.x, frame.center.y);
+        camera.setDeadzone(0, 0);
+      }
+      this.updateCulling();
+      return;
+    }
     const frame = computeWorldCameraFrame({
       manifest: this.manifest,
       viewportWidth: camera.width,
       viewportHeight: camera.height,
       reducedMotion: this.reducedMotion,
+      respectManifestBounds: this.options.avatarRendererMode === 'production_slice_v3',
     });
     const bounds = frame.bounds;
-    camera.setZoom(frame.zoom);
+    const reviewZoom = this.options.cameraZoomOverride;
+    const zoom =
+      reviewZoom === undefined || !Number.isFinite(reviewZoom)
+        ? frame.zoom
+        : Math.min(Math.max(reviewZoom, 0.25), 1.25);
+    camera.setZoom(zoom);
     camera.setBounds(bounds.x, bounds.y, bounds.width, bounds.height);
+    if (reviewZoom !== undefined) {
+      camera.stopFollow();
+      camera.centerOn(bounds.x + bounds.width / 2, bounds.y + bounds.height / 2);
+      camera.setDeadzone(0, 0);
+      this.updateCulling();
+      return;
+    }
     if (this.player !== undefined) {
       camera.startFollow(
         this.player.container,
@@ -617,6 +878,35 @@ export class WorldScene extends Phaser.Scene {
       );
       camera.setDeadzone(frame.deadzone.width, frame.deadzone.height);
     }
+    this.updateCulling();
+  }
+
+  private usesProductionSliceInteriorCamera(): boolean {
+    return (
+      this.options.avatarRendererMode === 'production_slice_v3' &&
+      this.manifest.name === 'Amber Cottage Interior' &&
+      this.manifest.developmentArt.label.includes('Phase 12F-A.1R RESCUE')
+    );
+  }
+
+  private updateCulling(): void {
+    const camera = this.cameras?.main;
+    if (camera === undefined) return;
+    let worldView = camera.worldView;
+    if (worldView.width <= 0 || worldView.height <= 0) {
+      // `worldView` is only refreshed by the renderer's per-frame preRender pass.
+      // Culling can run before the first render (immediately after a map commit)
+      // or while the tab is hidden and rendering is skipped; in both cases the
+      // view is still zero-sized. Refreshing it directly from the camera keeps
+      // culling from blanking the whole room, avoiding an asset-loading flash.
+      camera.preRender();
+      worldView = camera.worldView;
+    }
+    if (worldView.width <= 0 || worldView.height <= 0) return;
+    if (this.terrain !== undefined) {
+      this.terrainCulling = updateTerrainCulling(this.terrain, worldView);
+    }
+    this.objectCulling = updateWorldObjectCulling(this.worldObjects, worldView);
   }
 
   private handleResize(): void {
@@ -668,12 +958,14 @@ export class WorldScene extends Phaser.Scene {
   }
 
   private updatePlayer(moving: boolean, time: number, jogging: boolean): void {
+    this.lastAnimationTime = time;
     this.player?.update(
       { x: this.state.x, y: this.state.y },
       this.state.facingDirection,
       avatarAnimationStateForMovement(moving, jogging),
       time,
     );
+    updateWorldObjectOcclusion(this.worldObjects, this.state);
     this.collisionDebug?.updatePlayer(this.state);
   }
 

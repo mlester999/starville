@@ -211,6 +211,21 @@ export function buildApiApp({
 
   app.addHook('onRequest', async (request, reply) => {
     void reply.header('x-request-id', request.id);
+    void reply.header('cache-control', 'no-store');
+    void reply.header(
+      'content-security-policy',
+      "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    );
+    void reply.header(
+      'permissions-policy',
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=()',
+    );
+    void reply.header('referrer-policy', 'no-referrer');
+    void reply.header('x-content-type-options', 'nosniff');
+    void reply.header('x-frame-options', 'DENY');
+    if (config.environment === 'production') {
+      void reply.header('strict-transport-security', 'max-age=31536000; includeSubDomains');
+    }
   });
 
   if (platformConfiguration !== undefined) {
@@ -230,6 +245,7 @@ export function buildApiApp({
       method: request.method,
       path: requestPath(request.url),
       statusCode: reply.statusCode,
+      durationMs: Math.round(reply.elapsedTime),
     });
   });
 
@@ -240,6 +256,7 @@ export function buildApiApp({
       method: request.method,
       path: requestPath(request.url),
       statusCode: details.statusCode,
+      errorCode: details.body.error.code,
     };
 
     if (details.statusCode >= 500) {
@@ -255,7 +272,16 @@ export function buildApiApp({
     void reply.status(404).send(formatNotFoundError(request.id));
   });
 
-  registerHealthRoutes(app, config);
+  registerHealthRoutes(
+    app,
+    config,
+    logger,
+    tokenAccess === undefined
+      ? undefined
+      : async () => {
+          await tokenAccess.service.getPublicConfig();
+        },
+  );
   registerStatusRoutes(app);
   if (platformConfiguration !== undefined) {
     registerPlatformConfigurationRoutes(app, {

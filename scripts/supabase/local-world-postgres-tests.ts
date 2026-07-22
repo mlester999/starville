@@ -98,6 +98,7 @@ const migrationFiles = [
   '20260718121000_fix_phase12_hosted_validation.sql',
   '20260718122000_phase12c_world_manifest_object_contract.sql',
   '20260718123000_phase12d_repository_authored_bundled_registry.sql',
+  '20260722130000_phase13b_closed_beta_security_hardening.sql',
 ] as const;
 
 interface CommandResult {
@@ -307,6 +308,20 @@ async function main(): Promise<void> {
       ]);
       console.log(`[world-postgres] applied ${migrationFile}`);
     }
+
+    const phase13bSecurityAssertions = join(
+      fixtureDirectory,
+      'phase13b-security-postgres-execution.sql',
+    );
+    const phase13bSecurityResult = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--file',
+      phase13bSecurityAssertions,
+    ]);
+    if (phase13bSecurityResult.stdout.trim()) {
+      console.log(phase13bSecurityResult.stdout.trim());
+    }
+    console.log('[world-postgres] Phase 13B applied-catalog security assertions passed');
 
     if (extensionControlPath !== undefined) {
       const lintResult = await runCommand('pnpm', [

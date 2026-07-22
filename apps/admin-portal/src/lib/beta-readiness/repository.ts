@@ -20,9 +20,18 @@ const EVIDENCE_LABELS: Readonly<Record<BetaReadinessEvidenceKey, string>> = {
   phase12dOwnerReview: 'Phase 12D owner review checklist',
   runtimeHotfixOwnerReview: 'Runtime hotfix owner review checklist',
   phase12eValidation: 'Phase 12E local validation report',
-  hostedValidationRecord: 'Phase 12E hosted validation record',
-  ownerAcceptanceRecord: 'Phase 12E owner acceptance record',
-  productionApprovalRecord: 'Phase 12E production approval record',
+  phase13bValidation: 'Phase 13B local validation report',
+  phase13bSecurityReview: 'Phase 13B closed-beta trust-boundary review',
+  phase13bSecurityMigration: 'Phase 13B forward-only security hardening migration',
+  phase13bSecurityFixture: 'Phase 13B applied-catalog security fixture',
+  phase13bOperationalReadiness: 'Phase 13B operational readiness and recovery runbook',
+  phase13aExactlyOnce: 'Phase 13A exact-once gameplay integration architecture',
+  phase13bLoadHarness: 'Phase 13B bounded realtime load harness',
+  audioManifest: 'Release-candidate procedural audio catalog',
+  audioValidation: 'Release-candidate audio validation command',
+  hostedValidationRecord: 'Phase 13B hosted validation record',
+  ownerAcceptanceRecord: 'Phase 13B owner acceptance record',
+  productionApprovalRecord: 'Phase 13B production approval record',
   v1Manifest: 'V1 bundled manifest',
   v2Manifest: 'V2 unpublished candidate manifest',
   databasePolicyTests: 'World-management database policy tests',
@@ -95,12 +104,47 @@ function recognizedEvidence(key: BetaReadinessEvidenceKey, content: string): boo
       );
     case 'phase12eValidation':
       return content.includes('PHASE 12E LOCALLY COMPLETE');
+    case 'phase13bValidation':
+      return content.includes('PHASE 13B LOCAL AUTOMATED VALIDATION PASSED');
+    case 'phase13bSecurityReview':
+      return content.includes('PHASE 13B CLOSED-BETA TRUST BOUNDARIES');
+    case 'phase13bSecurityMigration':
+      return (
+        content.includes('force row level security') &&
+        content.includes('progression_process_shop_event')
+      );
+    case 'phase13bSecurityFixture':
+      return (
+        content.includes('publicFunctionExecuteFindings') &&
+        content.includes('authenticatedTableGrants')
+      );
+    case 'phase13bOperationalReadiness':
+      return content.includes('PHASE 13B OPERATIONAL READINESS');
+    case 'phase13aExactlyOnce':
+      return content.includes('Exact-once') || content.includes('exact-once');
+    case 'phase13bLoadHarness':
+      return (
+        content.includes('single-client-baseline') &&
+        content.includes('split-channel-reconnect-storm') &&
+        content.includes('publicCloseCheckpoints')
+      );
+    case 'audioManifest':
+      return (
+        content.includes('RELEASE_CANDIDATE_AUDIO_MANIFEST') &&
+        content.includes('repository_generated_procedural_web_audio') &&
+        content.includes('development_safe')
+      );
+    case 'audioValidation':
+      return (
+        content.includes('validateReleaseCandidateAudioManifest') &&
+        content.includes('embeddedAudioBytes')
+      );
     case 'hostedValidationRecord':
-      return content.includes('PHASE 12E HOSTED VALIDATION PASSED');
+      return content.includes('PHASE 13B HOSTED VALIDATION PASSED');
     case 'ownerAcceptanceRecord':
-      return content.includes('PHASE 12E OWNER ACCEPTED');
+      return content.includes('PHASE 13B OWNER ACCEPTED');
     case 'productionApprovalRecord':
-      return content.includes('PHASE 12E PRODUCTION READY');
+      return content.includes('PHASE 13B PRODUCTION READY');
     case 'v1Manifest':
       return recognizedManifest(content, '1.0.0');
     case 'v2Manifest':

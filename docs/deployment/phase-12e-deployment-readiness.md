@@ -12,7 +12,8 @@ item is intentionally unchecked.
 - Hosted lint, pgTAP, RLS, and service validation are not recorded as passed.
 - The Phase 12E owner-acceptance checklist is not started.
 - V2 is still a `production_candidate`; V1 remains the published/unpinned default.
-- No approved ambient-audio media exists.
+- Current procedural audio is `development_safe`; owner listening and any production-audio
+  replacement remain pending.
 - Production monitoring ownership and a reviewed deployment record do not exist for this candidate.
 
 ## Source-control gate
@@ -46,6 +47,7 @@ No hosted database command in this section was run by Phase 12E.
 
 - [ ] Run `pnpm env:check` against the intended deployment environment.
 - [ ] Run `pnpm assets:check` against the reviewed V1 and V2 manifests.
+- [ ] Run `pnpm audio:validate` and review the zero-byte procedural catalog provenance.
 - [ ] Run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, and `pnpm test`.
 - [ ] Run `pnpm build` and start the built API/realtime bundles in an isolated smoke environment.
 - [ ] Run `pnpm security:scan` and review browser output for server-only values.
@@ -67,7 +69,7 @@ No hosted database command in this section was run by Phase 12E.
 ## Signed-in acceptance gate
 
 - [ ] Complete every item in `phase-12e-owner-acceptance.md` against the exact reviewed revision.
-- [ ] Complete the integrated 21-step protected Game Test scenario.
+- [ ] Complete the integrated 23-step protected Game Test scenario.
 - [ ] Complete the required viewport, keyboard, screen-reader, physical touch, 200-percent browser
       zoom, Reduced Motion, and forced/increased-contrast review.
 - [ ] Complete a real 30-minute session with world transitions, reconnects, and repeated modal use.

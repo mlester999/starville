@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const constructors = vi.hoisted(() => ({
   published: vi.fn(),
   candidate: vi.fn(),
+  production: vi.fn(),
 }));
 
 vi.mock('./player', () => ({
@@ -23,12 +24,22 @@ vi.mock('./phase12d-player', () => ({
   },
 }));
 
+vi.mock('./production-slice-player', () => ({
+  ProductionSlicePlayerRenderer: class {
+    public readonly kind = 'production_slice_v3';
+    public constructor(...args: unknown[]) {
+      constructors.production(...args);
+    }
+  },
+}));
+
 import { createAvatarPlayerRenderer } from './avatar-player-renderer';
 
 describe('avatar player renderer selection', () => {
   beforeEach(() => {
     constructors.published.mockClear();
     constructors.candidate.mockClear();
+    constructors.production.mockClear();
   });
 
   it('preserves the published V1 renderer when V2 is not explicitly selected', () => {
@@ -55,5 +66,19 @@ describe('avatar player renderer selection', () => {
     expect(renderer).toMatchObject({ kind: 'phase12d_candidate' });
     expect(constructors.candidate).toHaveBeenCalledOnce();
     expect(constructors.published).not.toHaveBeenCalled();
+  });
+
+  it('uses the raster sprite renderer only for the explicit V3 production slice', () => {
+    const renderer = createAvatarPlayerRenderer(
+      'production_slice_v3',
+      {} as never,
+      {} as never,
+      {} as never,
+      false,
+    );
+    expect(renderer).toMatchObject({ kind: 'production_slice_v3' });
+    expect(constructors.production).toHaveBeenCalledOnce();
+    expect(constructors.published).not.toHaveBeenCalled();
+    expect(constructors.candidate).not.toHaveBeenCalled();
   });
 });

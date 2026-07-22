@@ -1,6 +1,7 @@
 import {
   useEffect,
   useRef,
+  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from 'react';
@@ -51,6 +52,7 @@ interface GameCanvasProps {
   readonly appearancePreset: AppearancePreset;
   readonly avatarProfile?: ResolvedAvatarProfile;
   readonly avatarRendererMode?: AvatarRendererMode;
+  readonly cameraZoomOverride?: number;
   readonly inputBlocked: boolean;
   readonly audioSettings: MasterAudioSettings;
   readonly showRemotePlayerNames?: boolean;
@@ -58,6 +60,7 @@ interface GameCanvasProps {
   readonly chatBubbleMessages?: readonly WorldChatBubbleMessage[];
   readonly reducedMotion?: boolean;
   readonly clock?: GameRuntimeClock;
+  readonly collisionDebug?: boolean;
   readonly onReady: () => void;
   readonly onError: (message: string) => void;
   readonly onStateChanged: (state: PlayerStateUpdate, phase: LocalMovementPhase) => void;
@@ -82,18 +85,22 @@ export function GameCanvas(props: GameCanvasProps) {
   const runtimeRef = useRef<GameRuntimeHandle | undefined>(undefined);
   const touchPointersRef = useRef(new Map<number, TouchMovementDirection>());
   const touchKeysRef = useRef(new Set<TouchMovementDirection>());
+  const touchJoggingRef = useRef(false);
+  const [touchJogging, setTouchJogging] = useState(false);
   const inputBlockedRef = useRef(props.inputBlocked);
   const initialStateRef = useRef(props.initialState);
   const initialWorldRef = useRef(props.initialWorld);
   const appearancePresetRef = useRef(props.appearancePreset);
   const avatarProfileRef = useRef(props.avatarProfile);
   const avatarRendererModeRef = useRef(props.avatarRendererMode ?? 'published_v1');
+  const cameraZoomOverrideRef = useRef(props.cameraZoomOverride);
   const initialAudioSettingsRef = useRef(props.audioSettings);
   const initialReducedMotionRef = useRef(props.reducedMotion ?? false);
   const initialRemoteNamesVisibleRef = useRef(props.showRemotePlayerNames ?? true);
   const initialVisualSettingsRef = useRef(props.visualSettings ?? {});
   const initialChatBubbleMessagesRef = useRef(props.chatBubbleMessages ?? []);
   const initialClockRef = useRef(props.clock);
+  const initialCollisionDebugRef = useRef(props.collisionDebug ?? false);
   const remotePresencesRef = useRef(props.remotePresences ?? []);
   const remoteAvatarProfilesRef = useRef(props.remoteAvatarProfiles ?? {});
   const activityInstanceRef = useRef(props.activityInstance ?? null);
@@ -225,17 +232,23 @@ export function GameCanvas(props: GameCanvasProps) {
             ? {}
             : { avatarProfile: avatarProfileRef.current }),
           avatarRendererMode: avatarRendererModeRef.current,
+          ...(cameraZoomOverrideRef.current === undefined
+            ? {}
+            : { cameraZoomOverride: cameraZoomOverrideRef.current }),
           reducedMotion:
             initialReducedMotionRef.current ||
             window.matchMedia('(prefers-reduced-motion: reduce)').matches,
           visualSettings: initialVisualSettingsRef.current,
           ...(initialClockRef.current === undefined ? {} : { clock: initialClockRef.current }),
-          collisionDebug: import.meta.env['NEXT_PUBLIC_GAME_COLLISION_DEBUG'] === 'true',
+          collisionDebug:
+            initialCollisionDebugRef.current ||
+            import.meta.env['NEXT_PUBLIC_GAME_COLLISION_DEBUG'] === 'true',
           audioSettings: initialAudioSettingsRef.current,
           callbacks: callbackProxy,
         });
         runtimeRef.current.setInputBlocked(inputBlockedRef.current);
         runtimeRef.current.setTouchMovementInput(IDLE_TOUCH_MOVEMENT);
+        runtimeRef.current.setTouchJogging(false);
         runtimeRef.current.setRemotePresences(remotePresencesRef.current);
         runtimeRef.current.setRemoteAvatarProfiles(remoteAvatarProfilesRef.current);
         runtimeRef.current.setRemotePlayerNamesVisible(initialRemoteNamesVisibleRef.current);
@@ -267,6 +280,9 @@ export function GameCanvas(props: GameCanvasProps) {
       touchPointersRef.current.clear();
       touchKeysRef.current.clear();
       runtimeRef.current?.setTouchMovementInput(IDLE_TOUCH_MOVEMENT);
+      touchJoggingRef.current = false;
+      setTouchJogging(false);
+      runtimeRef.current?.setTouchJogging(false);
     }
   }, [props.inputBlocked]);
 
@@ -275,6 +291,9 @@ export function GameCanvas(props: GameCanvasProps) {
       touchPointersRef.current.clear();
       touchKeysRef.current.clear();
       runtimeRef.current?.setTouchMovementInput(IDLE_TOUCH_MOVEMENT);
+      touchJoggingRef.current = false;
+      setTouchJogging(false);
+      runtimeRef.current?.setTouchJogging(false);
     };
     const releaseWhenHidden = () => {
       if (document.visibilityState === 'hidden') releaseTouchMovement();
@@ -290,6 +309,10 @@ export function GameCanvas(props: GameCanvasProps) {
   useEffect(() => {
     runtimeRef.current?.setAudioSettings(props.audioSettings);
   }, [props.audioSettings]);
+
+  useEffect(() => {
+    runtimeRef.current?.setCollisionDebug(props.collisionDebug ?? false);
+  }, [props.collisionDebug]);
 
   useEffect(() => {
     runtimeRef.current?.setRemotePresences(props.remotePresences ?? []);
@@ -339,6 +362,7 @@ export function GameCanvas(props: GameCanvasProps) {
         ref={hostRef}
         className="game-canvas"
         role="img"
+        tabIndex={0}
         aria-label={`${props.initialWorld.manifest.name} isometric game world`}
       />
       <div className="game-touch-movement" role="group" aria-label="Touch movement controls">
@@ -361,6 +385,20 @@ export function GameCanvas(props: GameCanvasProps) {
             <span aria-hidden="true">{symbol}</span>
           </button>
         ))}
+        <button
+          aria-label="Toggle jogging"
+          aria-pressed={touchJogging}
+          className="game-touch-movement__jog"
+          disabled={props.inputBlocked}
+          type="button"
+          onClick={() => {
+            touchJoggingRef.current = !touchJoggingRef.current;
+            setTouchJogging(touchJoggingRef.current);
+            runtimeRef.current?.setTouchJogging(touchJoggingRef.current);
+          }}
+        >
+          Jog
+        </button>
       </div>
     </>
   );

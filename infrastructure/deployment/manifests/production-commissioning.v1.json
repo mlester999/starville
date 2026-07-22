@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "kind": "starville-production-commissioning-manifest",
+  "environment": "starville-prod",
+  "status": "stage-a-blocked",
+  "requiredStatus": "PRODUCTION COMMISSIONING BLOCKED BY UNCOMMITTED RELEASE INPUTS",
+  "productionMutationAuthorized": false,
+  "phase14Recommendation": "NO-GO",
+  "sourceCommit": {
+    "approved": false,
+    "sha": null,
+    "branch": "master",
+    "startingHead": "f9b6a08",
+    "workingTree": "dirty-with-uncommitted-required-release-inputs",
+    "ownerAction": "Review and commit only the approved release inputs; exclude unrelated Phase 12F work. Re-run Stage A from that exact commit."
+  },
+  "environmentManifest": {
+    "path": "infrastructure/deployment/manifests/production-environment.v1.json",
+    "version": 1,
+    "sha256": "222b81f9dd09bbab237a6a8c0f9377eb518c1e19954eda2316a17e57fedd500f",
+    "status": "local-contract-valid-owner-values-missing"
+  },
+  "migrations": {
+    "path": "infrastructure/deployment/manifests/migrations.v1.json",
+    "version": 1,
+    "sha256": "b1fb048febc10dd9d1ab7f2e3728cdbf64dd74650d408bd906aa7c8573b63d18",
+    "count": 85,
+    "head": "20260722130000_phase13b_closed_beta_security_hardening.sql",
+    "status": "local-clean-chain-valid-hosted-and-production-evidence-missing"
+  },
+  "referenceData": {
+    "seedManifest": "infrastructure/deployment/manifests/production-reference-seeds.v1.json",
+    "seedSha256": "fc5f83d71b988443f73deccb82a4389c6f2f6b4817e21628948a32175b95bd2c",
+    "catalogManifest": "infrastructure/deployment/manifests/production-reference-catalogs.v1.json",
+    "catalogSha256": "bcdc2435c9a032e7aedfd168c3a5c9c4a6c7aa52dec67d06f8e181a272706574",
+    "version": 1,
+    "status": "local-validation-only-production-installation-not-authorized"
+  },
+  "world": {
+    "approvalState": "missing",
+    "revisionId": null,
+    "publicationStatus": "not-started",
+    "owner": "product-owner"
+  },
+  "assets": {
+    "approvalState": "pending-owner-selection",
+    "manifestPath": "assets/manifests/starville-bundled-v1.json",
+    "manifestVersion": "1.0.0",
+    "sha256": "e86663780a9f890f97bcb436d1c7bfab5ab84b742b022f62757e357291c395df",
+    "policy": "V1 is the accepted bundled fallback. V2 and V3 remain excluded unless explicitly accepted by the product owner."
+  },
+  "audio": {
+    "manifestPath": "infrastructure/deployment/manifests/production-audio.v1.json",
+    "manifestSha256": "396e75e1e006ce36f0477832a66fc76526ed480958bf2600269d10b62142b723",
+    "status": "provenance-valid-owner-listening-acceptance-pending"
+  },
+  "backup": {
+    "status": "missing-provider-evidence",
+    "restoreStatus": "not-started",
+    "owner": "database-owner"
+  },
+  "administratorBootstrap": {
+    "status": "not-started",
+    "gateDefault": false,
+    "identity": null,
+    "aal2": "not-verified"
+  },
+  "publicAccess": {
+    "status": "closed-owner-verification-pending",
+    "openingAuthorized": false,
+    "phase": "Phase 14 only"
+  },
+  "safetyGates": {
+    "SUPABASE_REMOTE_WRITES_APPROVED": false,
+    "RUN_HOSTED_SUPABASE_TESTS": false,
+    "ADMIN_BOOTSTRAP_ENABLED": false
+  },
+  "blockers": [
+    "Uncommitted required release inputs and no approved source commit",
+    "No verified starville-prod target identity or exact production domains",
+    "No approved production Reown project or token configuration evidence",
+    "No hosted starville-dev Phase 13B validation evidence",
+    "No exact owner-approved production world revision",
+    "No signed Phase 13D asset selection",
+    "No provider backup, PITR, isolated restore, or recovery evidence",
+    "Phase 12E, 13A, 13B, and 13C owner gates remain pending"
+  ]
+}

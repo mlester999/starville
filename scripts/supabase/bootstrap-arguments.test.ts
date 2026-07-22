@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { assertBootstrapProjectRef, parseBootstrapArguments } from './bootstrap-arguments';
+import {
+  assertBootstrapEnvironmentConfirmation,
+  assertBootstrapProjectRef,
+  parseBootstrapArguments,
+} from './bootstrap-arguments';
 
 const userId = '11111111-1111-4111-8111-111111111111';
 const projectRef = 'abcdefghijklmnopqrst';
@@ -24,7 +28,7 @@ describe('administrator bootstrap arguments', () => {
     );
   });
 
-  it('requires an explicit development confirmation for a write', () => {
+  it('requires one environment-specific confirmation for a write', () => {
     const base = [
       `--user-id=${userId}`,
       '--display-name=Foundation Administrator',
@@ -37,6 +41,17 @@ describe('administrator bootstrap arguments', () => {
     expect(
       parseBootstrapArguments([...base, '--confirm-development', '--apply'], false).apply,
     ).toBe(true);
+    const production = parseBootstrapArguments([...base, '--confirm-production', '--apply'], true);
+    expect(() => assertBootstrapEnvironmentConfirmation(production, 'production')).not.toThrow();
+    expect(() => assertBootstrapEnvironmentConfirmation(production, 'development')).toThrow(
+      '--confirm-development',
+    );
+    expect(() =>
+      parseBootstrapArguments(
+        [...base, '--confirm-development', '--confirm-production', '--apply'],
+        false,
+      ),
+    ).toThrow('Exactly one');
     expect(() =>
       parseBootstrapArguments([...base, '--dry-run', '--apply', '--confirm-development'], false),
     ).toThrow('cannot be combined');

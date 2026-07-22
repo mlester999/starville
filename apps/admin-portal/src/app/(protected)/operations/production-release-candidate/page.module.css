@@ -1,0 +1,223 @@
+.page {
+  display: grid;
+  gap: clamp(1.1rem, 2vw, 1.75rem);
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom));
+}
+
+.header {
+  align-items: flex-start;
+  gap: 1.25rem;
+}
+
+.decision,
+.warning,
+.factGrid > div,
+.evidence {
+  border: 1px solid var(--admin-line);
+  border-radius: 1rem;
+  background: var(--admin-surface);
+}
+
+.decision {
+  display: grid;
+  flex: 0 0 min(17rem, 100%);
+  gap: 0.25rem;
+  padding: 0.9rem 1rem;
+}
+
+.decision[data-status='no-go'] {
+  border-color: color-mix(in srgb, #c05252 72%, var(--admin-line));
+  background: color-mix(in srgb, #c05252 12%, var(--admin-surface));
+}
+
+.decision small,
+.decision span,
+.sectionHeading > span,
+.evidence p,
+.evidence footer {
+  color: var(--admin-text-muted);
+}
+
+.decision strong {
+  font-size: clamp(1.2rem, 2vw, 1.55rem);
+}
+
+.warning,
+.sectionHeading,
+.evidence header,
+.evidence footer,
+.links,
+.legend,
+.summary {
+  display: flex;
+}
+
+.warning,
+.sectionHeading,
+.evidence header,
+.evidence footer {
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.warning {
+  border-left: 0.35rem solid #c05252;
+  padding: clamp(1rem, 2vw, 1.35rem);
+}
+
+.warning h2,
+.sectionHeading h2,
+.evidence h3 {
+  margin-top: 0;
+}
+
+.factGrid,
+.evidenceGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.factGrid > div,
+.evidence {
+  min-width: 0;
+  padding: 0.9rem;
+}
+
+.factGrid dt {
+  color: var(--admin-text-muted);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.factGrid dd {
+  margin: 0.35rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.legend,
+.summary,
+.links {
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.legend,
+.summary {
+  margin-bottom: 1rem;
+}
+
+.chip {
+  display: inline-flex;
+  width: fit-content;
+  border: 1px solid var(--admin-line);
+  border-radius: 999px;
+  background: var(--admin-surface-solid);
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1.15;
+  padding: 0.38rem 0.6rem;
+  text-transform: capitalize;
+}
+
+.chip[data-status='passed_local'],
+.chip[data-status='passed_production'],
+.chip[data-status='accepted_owner'] {
+  border-color: color-mix(in srgb, #2c9b64 64%, var(--admin-line));
+  background: color-mix(in srgb, #2c9b64 13%, var(--admin-surface-solid));
+}
+
+.chip[data-status='pending_owner'],
+.chip[data-status='not_started'] {
+  border-color: color-mix(in srgb, #d89c38 64%, var(--admin-line));
+  background: color-mix(in srgb, #d89c38 13%, var(--admin-surface-solid));
+}
+
+.chip[data-status='missing'],
+.chip[data-status='blocked'] {
+  border-color: color-mix(in srgb, #c05252 68%, var(--admin-line));
+  background: color-mix(in srgb, #c05252 13%, var(--admin-surface-solid));
+}
+
+.summary span {
+  border-left: 3px solid var(--admin-forest);
+  padding-left: 0.55rem;
+}
+
+.evidenceGrid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.evidence {
+  display: grid;
+  gap: 0.65rem;
+  border-left-width: 4px;
+}
+
+.evidence[data-status='passed_local'],
+.evidence[data-status='passed_production'],
+.evidence[data-status='accepted_owner'] {
+  border-left-color: #2c9b64;
+}
+
+.evidence[data-status='pending_owner'],
+.evidence[data-status='not_started'] {
+  border-left-color: #d89c38;
+}
+
+.evidence[data-status='missing'],
+.evidence[data-status='blocked'] {
+  border-left-color: #c05252;
+}
+
+.evidence h3,
+.evidence p {
+  margin-bottom: 0;
+}
+
+.evidence footer {
+  flex-wrap: wrap;
+  border-top: 1px solid var(--admin-line);
+  font-size: 0.75rem;
+  padding-top: 0.6rem;
+}
+
+@media (max-width: 1050px) {
+  .factGrid,
+  .evidenceGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 680px) {
+  .header,
+  .warning,
+  .sectionHeading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .decision {
+    flex-basis: auto;
+  }
+
+  .factGrid,
+  .evidenceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}

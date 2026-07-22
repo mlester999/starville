@@ -11,9 +11,13 @@ describe('local game settings', () => {
   it('defaults to a compact, balanced visual experience', () => {
     expect(DEFAULT_GAME_SETTINGS).toEqual(
       expect.objectContaining({
-        version: 4,
+        version: 5,
+        musicVolume: 0.45,
         ambienceVolume: 0.6,
         sfxVolume: 0.8,
+        musicMuted: false,
+        ambienceMuted: false,
+        sfxMuted: false,
         visualQuality: 'balanced',
         ambientEffects: true,
         shadows: true,
@@ -23,6 +27,31 @@ describe('local game settings', () => {
         hudDensity: 'compact',
       }),
     );
+  });
+
+  it('migrates version four settings with music and group-mute defaults', () => {
+    const versionFour = {
+      ...DEFAULT_GAME_SETTINGS,
+      version: 4,
+      masterVolume: 0.5,
+      ambienceVolume: 0.3,
+      sfxVolume: 0.7,
+    };
+    Reflect.deleteProperty(versionFour, 'musicVolume');
+    Reflect.deleteProperty(versionFour, 'musicMuted');
+    Reflect.deleteProperty(versionFour, 'ambienceMuted');
+    Reflect.deleteProperty(versionFour, 'sfxMuted');
+    expect(
+      loadGameSettings({
+        getItem: (key) =>
+          key === 'starville.game-settings.v4' ? JSON.stringify(versionFour) : null,
+      }),
+    ).toEqual({
+      ...DEFAULT_GAME_SETTINGS,
+      masterVolume: 0.5,
+      ambienceVolume: 0.3,
+      sfxVolume: 0.7,
+    });
   });
 
   it('migrates version three settings with separate safe audio defaults', () => {
@@ -129,7 +158,7 @@ describe('local game settings', () => {
     });
     expect(
       loadGameSettings({
-        getItem: (key) => (key === GAME_SETTINGS_STORAGE_KEY ? '{"version":4,"uiScale":4}' : null),
+        getItem: (key) => (key === GAME_SETTINGS_STORAGE_KEY ? '{"version":5,"uiScale":4}' : null),
       }),
     ).toEqual(DEFAULT_GAME_SETTINGS);
   });

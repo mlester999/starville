@@ -54,6 +54,14 @@ describe('game modal layering', () => {
     expect(rule).toContain('width: 2.75rem');
     expect(rule).toContain('height: 2.75rem');
   });
+
+  it('keeps chat and tablet quickbar targets at the 44-pixel boundary', () => {
+    expect(stylesheet).toMatch(/\.chat-panel__toggle\s*\{[^}]*min-height: 2\.75rem;/su);
+    expect(stylesheet).toContain('@media (min-width: 701px) and (max-width: 820px)');
+    expect(stylesheet).toMatch(
+      /\.game-hud-region-anchor--bottom-center > \.cozy-quickbar button\s*\{[^}]*min-width: 2\.75rem;/su,
+    );
+  });
 });
 
 describe('Phase 12D coordinated HUD safe regions', () => {
@@ -102,12 +110,15 @@ describe('Phase 10A avatar responsive acceptance matrix', () => {
     expect(AVATAR_VISUAL_ACCEPTANCE_VIEWPORTS).toEqual([
       [360, 800],
       [390, 844],
+      [412, 915],
       [768, 1024],
       [820, 1180],
       [1024, 768],
       [1280, 800],
+      [1366, 768],
       [1440, 900],
       [1920, 1080],
+      [2560, 1440],
     ]);
     expect(stylesheet).toContain('@media (max-width: 980px)');
     expect(stylesheet).toContain('@media (max-width: 680px)');

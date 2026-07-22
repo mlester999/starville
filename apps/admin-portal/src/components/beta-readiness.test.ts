@@ -35,6 +35,20 @@ describe('Operations Beta Readiness route contract', () => {
     expect(repository).not.toContain('execSync');
   });
 
+  it('surfaces the closed-beta security and operations gates explicitly', () => {
+    expect(page).toContain('Closed-Beta Readiness');
+    for (const label of [
+      'Role Access Matrix',
+      'Abuse Protections',
+      'Realtime Readiness',
+      'Exact-Once Guarantees',
+      'Worker Status',
+      'Rollback Checklist',
+    ]) {
+      expect(model).toContain(label);
+    }
+  });
+
   it('states the local-only boundary and keeps owner controls disabled', () => {
     expect(page).toContain('does not query hosted');
     expect(page).toContain('mark owner acceptance');

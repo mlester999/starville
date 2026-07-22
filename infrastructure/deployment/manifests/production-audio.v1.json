@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "kind": "starville-production-audio-selection-manifest",
+  "version": "1.0.0",
+  "status": "provenance-valid-owner-listening-acceptance-pending",
+  "productionApproved": false,
+  "sourcePath": "apps/game-client/src/app/release-candidate-audio.ts",
+  "sourceSha256": "187cdb0c333803790ad782e7e5347382b88e612c1c728c32ce970837debc744a",
+  "entryCount": 10,
+  "groups": { "music": 2, "ambient": 2, "sfx": 6 },
+  "embeddedAudioBytes": 0,
+  "browserFormat": "Web Audio oscillator synthesis; no binary media codec required",
+  "source": "repository_generated_procedural_web_audio",
+  "license": "Starville project-owned original; no third-party audio",
+  "licenseAmbiguity": false,
+  "classification": "development_safe",
+  "volumeDefaults": "bounded per-group values in Game Settings",
+  "muteBehavior": "master and per-group mute with immediate application",
+  "unavailableFallback": "fail silent with visible non-audio status; gameplay remains available",
+  "ownerGate": "Listening, comfort, repetition, device, originality, and production-classification acceptance required"
+}
