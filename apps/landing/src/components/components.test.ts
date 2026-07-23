@@ -8,10 +8,10 @@ function readSource(fileName: string): string {
 }
 
 describe('landing experience component boundaries', () => {
-  it('renders an original vector Starville identity', () => {
+  it('renders the official Starville identity', () => {
     const mark = readSource('starville-mark.tsx');
 
-    expect(mark).toContain('viewBox="0 0 44 44"');
+    expect(mark).toContain('/images/starville-icon-official.png');
     expect(mark).toContain('STARVILLE');
   });
 

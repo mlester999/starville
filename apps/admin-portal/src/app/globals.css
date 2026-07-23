@@ -2622,9 +2622,21 @@ a {
   object-fit: contain;
 }
 
+.brand-logo--official {
+  width: 3.4rem;
+  max-width: none;
+  height: 3.4rem;
+}
+
 .brand--compact .brand-logo {
   max-width: 6rem;
   height: 2.15rem;
+}
+
+.brand--compact .brand-logo--official {
+  width: 2.65rem;
+  max-width: none;
+  height: 2.65rem;
 }
 
 .brand-mark::before,

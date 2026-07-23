@@ -574,8 +574,7 @@ export function CharacterCustomization({
   ) : (
     <main className="avatar-creator-shell">
       <div className="avatar-creator-brand" aria-label="Starville">
-        <span aria-hidden="true">✦</span>
-        <strong>STARVILLE</strong>
+        <img alt="" src="/images/starville-icon-official.png" />
       </div>
       {content}
     </main>

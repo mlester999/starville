@@ -9,6 +9,10 @@ import type { ReactNode } from 'react';
 export const metadata: Metadata = {
   title: 'Starville Admin',
   description: 'Secure administration for authorized Starville staff.',
+  icons: {
+    icon: '/images/starville-icon-official.png',
+    apple: '/images/starville-icon-official.png',
+  },
   robots: {
     index: false,
     follow: false,

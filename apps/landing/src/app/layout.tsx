@@ -14,9 +14,10 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL(publicConfig.appUrl),
     title: `${platform.configuration.branding.fullGameName} · ${platform.configuration.branding.tagline}`,
     description: platform.configuration.branding.shortDescription,
-    ...(platform.assetUrls.branding.favicon === null
-      ? {}
-      : { icons: { icon: platform.assetUrls.branding.favicon } }),
+    icons: {
+      icon: platform.assetUrls.branding.favicon ?? '/images/starville-icon-official.png',
+      apple: platform.assetUrls.branding.favicon ?? '/images/starville-icon-official.png',
+    },
     ...(platform.assetUrls.branding.social_share_image === null
       ? {}
       : { openGraph: { images: [platform.assetUrls.branding.social_share_image] } }),

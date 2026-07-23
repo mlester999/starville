@@ -25,9 +25,11 @@ function BrandMark({
     return <img alt="" className="brand-logo" src={logoUrl} />;
   }
   return (
-    <span className="brand-mark" aria-hidden="true">
-      <span className="brand-mark__core" />
-    </span>
+    <img
+      alt=""
+      className="brand-logo brand-logo--official"
+      src="/images/starville-icon-official.png"
+    />
   );
 }
 

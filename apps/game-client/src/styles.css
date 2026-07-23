@@ -1268,12 +1268,17 @@
 
 .avatar-creator-brand {
   display: flex;
-  gap: 10px;
   align-items: center;
   max-width: 1540px;
   margin: 0 auto 16px;
   color: #f4ce70;
   letter-spacing: 0.16em;
+}
+
+.avatar-creator-brand img {
+  width: auto;
+  height: 64px;
+  object-fit: contain;
 }
 
 .avatar-editor-modal.game-modal {
@@ -2306,6 +2311,10 @@
   .avatar-creator-brand {
     margin: 3px 7px 10px;
     font-size: 13px;
+  }
+
+  .avatar-creator-brand img {
+    height: 48px;
   }
 
   .avatar-editor-modal.game-modal {

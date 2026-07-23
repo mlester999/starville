@@ -33,7 +33,7 @@ export function initializeStarvilleAppKit(config: StarvilleAppKitConfig): void {
     throw new Error('Starville AppKit was already initialized with different public metadata.');
   }
 
-  const iconUrl = new URL('/images/starville-mark.svg', config.landingUrl).toString();
+  const iconUrl = new URL('/images/starville-icon-official.png', config.landingUrl).toString();
   // AppKit 1.8.22's adapter and network packages can resolve parallel copies of
   // their exact-optional controller types under pnpm. These are the official,
   // matching-version runtime values documented for the Solana integration.
