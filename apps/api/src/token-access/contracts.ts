@@ -225,6 +225,15 @@ export interface TokenBalanceVerifier {
     readonly decimals: number;
     readonly slot: number;
   }>;
+  refreshMint?(
+    mintAddress: string,
+    commitment: 'confirmed' | 'finalized',
+  ): Promise<{
+    readonly mintAddress: string;
+    readonly tokenProgram: 'spl-token' | 'spl-token-2022';
+    readonly decimals: number;
+    readonly slot: number;
+  }>;
   verifyBalance(
     walletAddress: string,
     mintAddress: string,

@@ -133,6 +133,16 @@ Public identifiers used by the API are `SOLANA_NETWORK` (`devnet` or `mainnet-be
 authorization: the validated, versioned `token_gate_configs` row is authoritative. A missing,
 nonexistent, or wrong-network mint remains fail-closed.
 
+Production uses one canonical CA and one human-readable gate:
+
+```text
+GAME_TOKEN_MINT_ADDRESS=<OWNER_APPROVED_PUMP_FUN_CA>
+GAME_TOKEN_GATE_AMOUNT=10000
+```
+
+Do not configure token program or decimals. The API detects the supported owner program and decodes
+decimals from the mint account, then requires the production database row to match.
+
 For an existing ignored `.env.local`, `pnpm env:phase3:prepare` creates the independent cookie
 secret when missing and migrates a legacy browser-safe `REOWN_PROJECT_ID` name without printing
 either value.

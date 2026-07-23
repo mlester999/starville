@@ -22,7 +22,7 @@ describe('game-client trusted token access', () => {
         walletAddress: '11111111111111111111111111111111',
         network: 'solana:devnet',
         symbol: 'STAR',
-        requiredAmount: '1000',
+        requiredAmount: '10000',
         observedAmount: '1250',
         expiresAt: '2026-07-10T12:30:00.000Z',
         recheckAfter: '2026-07-10T12:20:00.000Z',
@@ -36,7 +36,7 @@ describe('game-client trusted token access', () => {
         isTokenHolder: true,
         network: 'solana:devnet',
         symbol: 'STAR',
-        requiredAmount: '1000',
+        requiredAmount: '10000',
       }),
     ).toThrow(GameAccessRequestError);
   });
@@ -45,7 +45,7 @@ describe('game-client trusted token access', () => {
     const baseAccess = {
       network: 'solana:devnet',
       symbol: 'STAR',
-      requiredAmount: '1000',
+      requiredAmount: '10000',
     } as const;
 
     expect(screenForAccess({ ...baseAccess, access: 'granted' })).toBe('granted');
@@ -65,7 +65,7 @@ describe('game-client trusted token access', () => {
               access: 'none',
               network: 'solana:devnet',
               symbol: 'STAR',
-              requiredAmount: '1000',
+              requiredAmount: '10000',
             },
           }),
         ),
@@ -91,7 +91,7 @@ describe('game-client trusted token access', () => {
               access: 'revoked',
               network: 'solana:devnet',
               symbol: 'STAR',
-              requiredAmount: '1000',
+              requiredAmount: '10000',
             },
           }),
         ),

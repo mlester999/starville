@@ -237,7 +237,7 @@ export const walletAndStarPage = defineDocumentationPage({
       'relationship',
       'What STAR does today',
       [
-        'STAR is the configured Solana token used for launch access eligibility. The current network is Solana Mainnet Beta, and the expected threshold is 1,000 STAR unless the live access screen displays a different reviewed configuration. Starville checks the selected wallet’s balance of the configured mint.',
+        'STAR is the configured Solana token used for launch access eligibility. The current network is Solana Mainnet Beta, and the approved threshold is 10,000 STAR display tokens. Starville checks the selected wallet’s balance of the configured mint.',
         'The token remains in the player’s wallet. Ordinary access verification does not automatically spend, transfer, approve, lock, stake, or burn STAR. It does not request SOL, an NFT, or a token payment. Disconnecting the wallet also does not move an asset.',
         'STAR is not DUST. It does not currently provide a DUST multiplier, stronger tools, faster crop growth, guaranteed rewards, income, yield, profit, or investment return. Carefully reviewed non-financial utility may be researched later, but no token reward or on-chain claim flow is active.',
       ],
@@ -443,7 +443,7 @@ export const troubleshootingPage = defineDocumentationPage({
       'Disconnect and reconnect safely if the wrong address is selected. Reject any prompt that asks for a recovery phrase, private key, token transfer, or approval. A supported wallet can still be unavailable in a particular browser environment, so try an officially supported configuration rather than submitting private details to a helper.',
     ]),
     contentSection('access', 'Access is not granted', [
-      'Compare the connected address, Solana Mainnet Beta, configured token mint, and required amount shown by the access screen. The current expected threshold is 1,000 STAR, but the live reviewed configuration is authoritative. Make sure the eligible token belongs to the selected wallet rather than another address.',
+      'Compare the connected address, Solana Mainnet Beta, configured token mint, and required amount shown by the access screen. The approved threshold is 10,000 STAR display tokens, and the live reviewed configuration is authoritative. Make sure the eligible token belongs to the selected wallet rather than another address.',
       'Use Check Again after confirming the state. A recent token-account update can take time to become visible. A temporary network or balance-check error is not the same as insufficient balance; wait and retry rather than assuming Starville measured zero.',
       'If a signed message expired, request a fresh access attempt. Do not reuse an old wallet prompt, change browser eligibility values, or send tokens to someone claiming they can activate the account.',
     ]),

@@ -7,7 +7,10 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   assertDatabaseUrlMatchesProjectRef,
   loadHostedSupabaseSafetyConfig,
+  validateConfiguredTokenMintAddress,
 } from '@starville/config/server';
+import { createSolanaTokenVerifier, type SupportedTokenProgram } from '@starville/solana';
+import { decimalAmountToRaw } from '@starville/wallet-access';
 
 import {
   validateDeploymentEnvironment,
@@ -82,9 +85,7 @@ export function validateProductionCommissioningTarget(
     'SUPABASE_DATABASE_URL',
     'STARVILLE_PRODUCTION_REOWN_PROJECT_ID',
     'STARVILLE_DEVELOPMENT_REOWN_PROJECT_ID',
-    'STARVILLE_PRODUCTION_TOKEN_MINT_ADDRESS',
-    'STARVILLE_PRODUCTION_TOKEN_PROGRAM',
-    'STARVILLE_PRODUCTION_TOKEN_DECIMALS',
+    'GAME_TOKEN_GATE_AMOUNT',
     'STARVILLE_PRODUCTION_ENVIRONMENT_MANIFEST_VERSION',
     'STARVILLE_PRODUCTION_LANDING_URL',
     'STARVILLE_PRODUCTION_GAME_URL',
@@ -114,22 +115,25 @@ export function validateProductionCommissioningTarget(
   ) {
     errors.push('Production and development Reown project identifiers must differ');
   }
-  if (
-    value(environment, 'GAME_TOKEN_MINT_ADDRESS') !==
-    value(environment, 'STARVILLE_PRODUCTION_TOKEN_MINT_ADDRESS')
-  ) {
-    errors.push('Configured token mint is not the approved production mint');
+  const configuredMint = value(environment, 'GAME_TOKEN_MINT_ADDRESS');
+  if (configuredMint !== undefined) {
+    try {
+      validateConfiguredTokenMintAddress(configuredMint);
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'Production token mint is invalid');
+    }
   }
-  if (
-    !['spl-token', 'spl-token-2022'].includes(
-      value(environment, 'STARVILLE_PRODUCTION_TOKEN_PROGRAM') ?? '',
-    )
-  ) {
-    errors.push('Approved production token program is invalid');
+  if (value(environment, 'GAME_TOKEN_GATE_AMOUNT') !== '10000') {
+    errors.push('GAME_TOKEN_GATE_AMOUNT must be exactly 10000 display tokens');
   }
-  const decimals = Number(value(environment, 'STARVILLE_PRODUCTION_TOKEN_DECIMALS'));
-  if (!Number.isInteger(decimals) || decimals < 0 || decimals > 18) {
-    errors.push('Approved production token decimals must be an integer between 0 and 18');
+  for (const obsolete of [
+    'STARVILLE_PRODUCTION_TOKEN_MINT_ADDRESS',
+    'STARVILLE_PRODUCTION_TOKEN_PROGRAM',
+    'STARVILLE_PRODUCTION_TOKEN_DECIMALS',
+  ]) {
+    if (value(environment, obsolete) !== undefined) {
+      errors.push(`${obsolete} is obsolete and must be removed`);
+    }
   }
   if (value(environment, 'STARVILLE_PRODUCTION_ENVIRONMENT_MANIFEST_VERSION') !== '1') {
     errors.push('Production environment manifest version must be 1');
@@ -167,6 +171,48 @@ export function validateProductionCommissioningTarget(
   }
 
   return { ok: errors.length === 0, errors: [...new Set(errors)] };
+}
+
+export interface VerifiedProductionTokenConfiguration {
+  readonly mintAddress: string;
+  readonly tokenProgram: SupportedTokenProgram;
+  readonly decimals: number;
+  readonly requiredDisplayAmount: '10000';
+  readonly requiredBaseUnits: string;
+  readonly slot: number;
+}
+
+export async function verifyProductionTokenConfiguration(
+  environment: NodeJS.ProcessEnv,
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+): Promise<VerifiedProductionTokenConfiguration> {
+  const validation = validateProductionCommissioningTarget(environment);
+  if (!validation.ok) {
+    throw new Error('Production token configuration failed static validation');
+  }
+
+  const rpcUrl = value(environment, 'SOLANA_RPC_URL');
+  const mintAddress = value(environment, 'GAME_TOKEN_MINT_ADDRESS');
+  if (rpcUrl === undefined || mintAddress === undefined) {
+    throw new Error('Production token configuration is incomplete');
+  }
+
+  const verifier = createSolanaTokenVerifier({
+    rpcUrl,
+    network: 'solana:mainnet-beta',
+    commitment: 'finalized',
+    fetch,
+  });
+  const mint = await verifier.refreshMint(mintAddress, 'finalized');
+
+  return {
+    mintAddress: mint.mintAddress,
+    tokenProgram: mint.tokenProgram,
+    decimals: mint.decimals,
+    requiredDisplayAmount: '10000',
+    requiredBaseUnits: decimalAmountToRaw('10000', mint.decimals).toString(),
+    slot: mint.slot,
+  };
 }
 
 export interface RemoteMigrationState {
@@ -310,13 +356,29 @@ async function verifyTarget(): Promise<void> {
       'reown_project_classification=production',
       'solana_network=mainnet-beta',
       `token_mint=${maskIdentifier(value(process.env, 'GAME_TOKEN_MINT_ADDRESS'))}`,
-      `token_program=${value(process.env, 'STARVILLE_PRODUCTION_TOKEN_PROGRAM')}`,
-      `token_decimals=${value(process.env, 'STARVILLE_PRODUCTION_TOKEN_DECIMALS')}`,
+      'token_metadata=derived-on-chain',
+      'token_gate_display_amount=10000',
       'environment_manifest_version=1',
       'remote_write_gate=false',
       'admin_bootstrap_gate=false',
       'hosted_test_gate=false',
       'PRODUCTION TARGET VERIFIED',
+    ].join('\n') + '\n',
+  );
+}
+
+async function verifyToken(): Promise<void> {
+  const token = await verifyProductionTokenConfiguration(process.env);
+  process.stdout.write(
+    [
+      `token_mint=${maskIdentifier(token.mintAddress)}`,
+      `token_program=${token.tokenProgram}`,
+      `token_decimals=${token.decimals}`,
+      `token_gate_display_amount=${token.requiredDisplayAmount}`,
+      `token_gate_base_units=${token.requiredBaseUnits}`,
+      `validated_slot=${token.slot}`,
+      'verification_mode=read-only',
+      'PRODUCTION TOKEN VERIFIED',
     ].join('\n') + '\n',
   );
 }
@@ -374,8 +436,9 @@ async function main(): Promise<void> {
   const operation = process.argv[2] ?? 'audit';
   if (operation === 'audit') return auditRepository();
   if (operation === 'verify-target') return verifyTarget();
+  if (operation === 'verify-token') return verifyToken();
   if (operation === 'compare-migrations') return compareMigrations();
-  throw new Error('Expected audit, verify-target, or compare-migrations');
+  throw new Error('Expected audit, verify-target, verify-token, or compare-migrations');
 }
 
 const entryPath =

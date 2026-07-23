@@ -85,8 +85,8 @@ const grantedView: TokenAccessSessionView = {
   walletAddress: WALLET_ADDRESS,
   network: 'solana:mainnet-beta',
   symbol: 'STAR',
-  requiredAmount: '1000',
-  observedAmount: '1000',
+  requiredAmount: '10000',
+  observedAmount: '10000',
   expiresAt: '2026-07-13T02:00:00.000Z',
   recheckAfter: '2026-07-13T01:05:00.000Z',
 };
@@ -100,8 +100,8 @@ function tokenService(view: TokenAccessSessionView = grantedView): TokenAccessSe
     tokenProgram: 'spl-token',
     symbol: 'STAR',
     decimals: 6,
-    requiredAmountRaw: '1000000000',
-    requiredAmount: '1000',
+    requiredAmountRaw: '10000000000',
+    requiredAmount: '10000',
     enabled: true,
     availability: 'available',
     commitment: 'confirmed',
@@ -119,7 +119,7 @@ function tokenService(view: TokenAccessSessionView = grantedView): TokenAccessSe
       network: 'solana:mainnet-beta' as const,
       symbol: 'STAR',
       mintAddress: runtimeConfig.mintAddress,
-      requiredAmount: '1000',
+      requiredAmount: '10000',
       recheckIntervalSeconds: 300,
     })),
     createChallenge: vi.fn(async () => ({
@@ -287,7 +287,7 @@ describe('protected cozy gameplay routes', () => {
           access,
           network: 'solana:mainnet-beta',
           symbol: 'STAR',
-          requiredAmount: '1000',
+          requiredAmount: '10000',
         }),
       });
       const response = await app.inject({
@@ -348,7 +348,7 @@ describe('protected cozy gameplay routes', () => {
         access: 'none',
         network: 'solana:mainnet-beta',
         symbol: 'STAR',
-        requiredAmount: '1000',
+        requiredAmount: '10000',
       }),
     });
     const response = await app.inject({

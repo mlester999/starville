@@ -67,8 +67,8 @@ reference currently documents WASD movement, Shift jogging, E interaction, 1–8
 and Escape close/back. Do not add a binding because it appears in a concept document.
 
 Before changing wallet copy, inspect the current public wallet configuration and access flow. The
-Phase 9A.1 content describes Solana Mainnet Beta and an expected threshold of 1,000 configured STAR,
-while clearly stating that the live reviewed access screen is authoritative. Never hardcode or
+Phase 9A.1 content describes Solana Mainnet Beta and an expected threshold of 10,000 configured
+STAR, while clearly stating that the live reviewed access screen is authoritative. Never hardcode or
 expose a private RPC, secret, or unpublished mint.
 
 Before changing rewards, limits, prices, or cooldowns:

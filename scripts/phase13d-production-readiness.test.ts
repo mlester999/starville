@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   compareRemoteMigrationState,
@@ -9,6 +9,7 @@ import {
   parseRemoteMigrationState,
   validatePhase13DRepository,
   validateProductionCommissioningTarget,
+  verifyProductionTokenConfiguration,
 } from './phase13d-production-readiness';
 
 const root = resolve(import.meta.dirname, '..');
@@ -39,10 +40,8 @@ const production = (): NodeJS.ProcessEnv => ({
   STARVILLE_DEVELOPMENT_REOWN_PROJECT_ID: 'development-reown-project',
   SOLANA_NETWORK: 'mainnet-beta',
   SOLANA_RPC_URL: 'https://rpc.starville.example',
-  GAME_TOKEN_MINT_ADDRESS: '11111111111111111111111111111111',
-  STARVILLE_PRODUCTION_TOKEN_MINT_ADDRESS: '11111111111111111111111111111111',
-  STARVILLE_PRODUCTION_TOKEN_PROGRAM: 'spl-token',
-  STARVILLE_PRODUCTION_TOKEN_DECIMALS: '6',
+  GAME_TOKEN_MINT_ADDRESS: 'So11111111111111111111111111111111111111112',
+  GAME_TOKEN_GATE_AMOUNT: '10000',
   STARVILLE_PRODUCTION_ENVIRONMENT_MANIFEST_VERSION: '1',
   CORS_ALLOWED_ORIGINS:
     'https://www.starville.example,https://play.starville.example,https://admin.starville.example',
@@ -60,7 +59,9 @@ describe('Phase 13D production target validation', () => {
   it.each([
     ['development project', { SUPABASE_PROJECT_REF: 'bbbbbbbbbbbbbbbbbbbb' }],
     ['development Reown project', { NEXT_PUBLIC_REOWN_PROJECT_ID: 'development-reown-project' }],
-    ['wrong mint', { GAME_TOKEN_MINT_ADDRESS: '22222222222222222222222222222222' }],
+    ['invalid mint', { GAME_TOKEN_MINT_ADDRESS: 'not-a-solana-public-key' }],
+    ['placeholder mint', { GAME_TOKEN_MINT_ADDRESS: '11111111111111111111111111111111' }],
+    ['wrong gate', { GAME_TOKEN_GATE_AMOUNT: '1000' }],
     ['wrong game domain', { NEXT_PUBLIC_GAME_URL: 'https://wrong.starville.example' }],
     [
       'wrong database',
@@ -82,6 +83,68 @@ describe('Phase 13D production target validation', () => {
       SUPABASE_DATABASE_URL: `postgresql://postgres.wrongprojectrefxxxx:placeholder@pooler.supabase.com:5432/${secret}`,
     });
     expect(result.errors.join('\n')).not.toContain(secret);
+  });
+
+  it('rejects obsolete manual mint metadata without requiring it', () => {
+    expect(validateProductionCommissioningTarget(production())).toEqual({ ok: true, errors: [] });
+    const stale = validateProductionCommissioningTarget({
+      ...production(),
+      STARVILLE_PRODUCTION_TOKEN_PROGRAM: 'spl-token',
+      STARVILLE_PRODUCTION_TOKEN_DECIMALS: '6',
+    });
+
+    expect(stale.ok).toBe(false);
+    expect(stale.errors.join('\n')).toContain('is obsolete and must be removed');
+  });
+
+  it('derives program, decimals, and 10,000-token base units using read-only Mainnet RPC calls', async () => {
+    const mintData = Buffer.alloc(82);
+    mintData.writeUInt8(6, 44);
+    mintData.writeUInt8(1, 45);
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 1,
+            result: '5eykt4UsFv8P8NJdTREpY1vzqKqZKvdpKuc147dw2N9d',
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: 2,
+            result: {
+              context: { slot: 123 },
+              value: {
+                executable: false,
+                lamports: 1_461_600,
+                owner: 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+                rentEpoch: 100,
+                data: [mintData.toString('base64'), 'base64'],
+              },
+            },
+          }),
+        ),
+      );
+
+    await expect(verifyProductionTokenConfiguration(production(), fetch)).resolves.toEqual({
+      mintAddress: production()['GAME_TOKEN_MINT_ADDRESS'],
+      tokenProgram: 'spl-token-2022',
+      decimals: 6,
+      requiredDisplayAmount: '10000',
+      requiredBaseUnits: '10000000000',
+      slot: 123,
+    });
+    const methods = fetch.mock.calls.map(([, request]) => {
+      const body = JSON.parse(String(request?.body)) as { method: string };
+      return body.method;
+    });
+    expect(methods).toEqual(['getGenesisHash', 'getAccountInfo']);
+    expect(methods).not.toContain('sendTransaction');
   });
 
   it('masks release identifiers', () => {
@@ -120,6 +183,23 @@ describe('Phase 13D repository commissioning package', () => {
         expect(template).not.toContain(`${gate}=true`);
       }
     }
+  });
+
+  it('ships a CA-only API template and no obsolete token metadata placeholders', () => {
+    const apiTemplate = readFileSync(
+      join(root, 'infrastructure/deployment/templates/api.production.env.example'),
+      'utf8',
+    );
+    const environmentManifest = readFileSync(
+      join(root, 'infrastructure/deployment/manifests/production-environment.v1.json'),
+      'utf8',
+    );
+
+    expect(apiTemplate).toContain('GAME_TOKEN_MINT_ADDRESS=OWNER_REQUIRED_PUMP_FUN_CA');
+    expect(apiTemplate).toContain('GAME_TOKEN_GATE_AMOUNT=10000');
+    expect(`${apiTemplate}\n${environmentManifest}`).not.toMatch(
+      /STARVILLE_PRODUCTION_TOKEN_(?:MINT_ADDRESS|PROGRAM|DECIMALS)|OWNER_REQUIRED_(?:SPL_TOKEN_PROGRAM|TOKEN_DECIMALS)/u,
+    );
   });
 
   it('keeps the world, release freeze, production mutation, and public launch blocked', () => {

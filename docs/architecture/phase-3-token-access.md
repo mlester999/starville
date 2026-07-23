@@ -111,16 +111,16 @@ privileges. The service role receives execute permission only on reviewed `SECUR
 functions with empty search paths. Administrator functions re-evaluate the active admin session and
 required permission inside PostgreSQL; the API check is not the only check.
 
-The development seed is intentionally `unconfigured`: symbol `STAR`, display threshold `1000`,
-15-minute session TTL, five-minute recheck, no mint/program/decimals/raw threshold. It cannot issue
-a challenge until an authorized administrator validates and saves a real Devnet mint.
+The development seed is intentionally `unconfigured`: symbol `STAR`, a legacy non-authoritative
+display placeholder, 15-minute session TTL, five-minute recheck, no mint/program/decimals/raw
+threshold. It cannot issue a challenge until an authorized administrator validates and saves a real
+Devnet mint.
 
 ## Configuration and invalidation
 
-The active token requirement comes from `token_gate_configs`, not from the landing bundle and not
-from a wallet response. Server environment values select the private RPC, fixed Devnet boundary,
-startup limits, cookie secret, and process defaults. They are not a substitute for a validated
-database row.
+The active token requirement comes from `token_gate_configs`, not from the landing bundle or a
+wallet response. Production additionally pins `GAME_TOKEN_MINT_ADDRESS` and the 10,000 display-token
+requirement; the validated database row must match those values and on-chain-derived metadata.
 
 Every accepted admin update:
 

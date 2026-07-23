@@ -1,5 +1,5 @@
-import { TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { PublicKey } from '@solana/web3.js';
+import { MINT_SIZE, TOKEN_2022_PROGRAM_ID, TOKEN_PROGRAM_ID, unpackMint } from '@solana/spl-token';
+import { PublicKey, type AccountInfo } from '@solana/web3.js';
 import nacl from 'tweetnacl';
 import { z } from 'zod';
 
@@ -15,6 +15,7 @@ const SUPPORTED_PROGRAMS = new Map([
   [TOKEN_PROGRAM_ID.toBase58(), 'spl-token'],
   [TOKEN_2022_PROGRAM_ID.toBase58(), 'spl-token-2022'],
 ] as const);
+const MAX_MINT_CACHE_ENTRIES = 128;
 
 export type SupportedTokenProgram = 'spl-token' | 'spl-token-2022';
 export type SolanaCommitment = 'confirmed' | 'finalized';
@@ -43,6 +44,8 @@ export interface SolanaRpcOptions {
   readonly commitment: SolanaCommitment;
   readonly timeoutMs?: number;
   readonly maximumAttempts?: number;
+  readonly mintCacheTtlMs?: number;
+  readonly clock?: () => number;
   readonly fetch?: typeof globalThis.fetch;
 }
 
@@ -76,22 +79,10 @@ const mintResultSchema = z
     value: z
       .object({
         executable: z.boolean(),
+        lamports: z.number().int().nonnegative(),
         owner: z.string(),
-        data: z
-          .object({
-            parsed: z
-              .object({
-                type: z.literal('mint'),
-                info: z
-                  .object({
-                    decimals: z.number().int().min(0).max(18),
-                    isInitialized: z.boolean().optional(),
-                  })
-                  .passthrough(),
-              })
-              .passthrough(),
-          })
-          .passthrough(),
+        rentEpoch: z.number().int().nonnegative().optional(),
+        data: z.tuple([z.string().min(1), z.literal('base64')]),
       })
       .passthrough()
       .nullable(),
@@ -181,7 +172,14 @@ class SolanaRpcClient {
   readonly #commitment: SolanaCommitment;
   readonly #timeoutMs: number;
   readonly #maximumAttempts: number;
+  readonly #mintCacheTtlMs: number;
+  readonly #clock: () => number;
   readonly #fetch: typeof globalThis.fetch;
+  readonly #mintCache = new Map<
+    string,
+    { readonly expiresAt: number; readonly mint: VerifiedMint }
+  >();
+  readonly #mintRequests = new Map<string, Promise<VerifiedMint>>();
   #requestId = 0;
 
   constructor(options: SolanaRpcOptions) {
@@ -196,10 +194,20 @@ class SolanaRpcClient {
     this.#commitment = options.commitment;
     this.#timeoutMs = options.timeoutMs ?? 5_000;
     this.#maximumAttempts = options.maximumAttempts ?? 2;
+    this.#mintCacheTtlMs = options.mintCacheTtlMs ?? 60_000;
+    this.#clock = options.clock ?? Date.now;
     this.#fetch = options.fetch ?? globalThis.fetch;
 
-    if (this.#maximumAttempts < 1 || this.#maximumAttempts > 3 || this.#timeoutMs < 100) {
-      throw new Error('Solana RPC retry and timeout configuration is outside safe bounds');
+    if (
+      this.#maximumAttempts < 1 ||
+      this.#maximumAttempts > 3 ||
+      this.#timeoutMs < 100 ||
+      this.#mintCacheTtlMs < 1_000 ||
+      this.#mintCacheTtlMs > 3_600_000
+    ) {
+      throw new Error(
+        'Solana RPC retry, timeout, or mint-cache configuration is outside safe bounds',
+      );
     }
   }
 
@@ -271,14 +279,10 @@ class SolanaRpcClient {
     }
   }
 
-  async validateMint(
-    mintAddress: string,
-    commitment: SolanaCommitment = this.#commitment,
-  ): Promise<VerifiedMint> {
+  async #readMint(canonicalMint: string, commitment: SolanaCommitment): Promise<VerifiedMint> {
     await this.assertNetwork();
-    const canonicalMint = validateSolanaAddress(mintAddress);
     const result = mintResultSchema.safeParse(
-      await this.request('getAccountInfo', [canonicalMint, { commitment, encoding: 'jsonParsed' }]),
+      await this.request('getAccountInfo', [canonicalMint, { commitment, encoding: 'base64' }]),
     );
 
     if (!result.success) {
@@ -296,7 +300,36 @@ class SolanaRpcClient {
       throw new SolanaVerificationError('UNSUPPORTED_TOKEN_PROGRAM');
     }
 
-    if (account.executable || account.data.parsed.info.isInitialized === false) {
+    if (account.executable || account.lamports === 0) {
+      throw new SolanaVerificationError('MALFORMED_RPC_RESPONSE');
+    }
+
+    const encodedData = account.data[0];
+    const data = Buffer.from(encodedData, 'base64');
+    if (
+      data.length === 0 ||
+      data.toString('base64') !== encodedData ||
+      (tokenProgram === 'spl-token' && data.length !== MINT_SIZE)
+    ) {
+      throw new SolanaVerificationError('MALFORMED_RPC_RESPONSE');
+    }
+
+    const programId = tokenProgram === 'spl-token' ? TOKEN_PROGRAM_ID : TOKEN_2022_PROGRAM_ID;
+    const accountInfo: AccountInfo<Buffer> = {
+      executable: account.executable,
+      lamports: account.lamports,
+      owner: programId,
+      data,
+      ...(account.rentEpoch === undefined ? {} : { rentEpoch: account.rentEpoch }),
+    };
+    let mint;
+    try {
+      mint = unpackMint(new PublicKey(canonicalMint), accountInfo, programId);
+    } catch {
+      throw new SolanaVerificationError('MALFORMED_RPC_RESPONSE');
+    }
+
+    if (!mint.isInitialized || mint.decimals < 0 || mint.decimals > 18) {
       throw new SolanaVerificationError('MALFORMED_RPC_RESPONSE');
     }
 
@@ -304,9 +337,61 @@ class SolanaRpcClient {
       mintAddress: canonicalMint,
       tokenProgram,
       tokenProgramAddress: account.owner,
-      decimals: account.data.parsed.info.decimals,
+      decimals: mint.decimals,
       slot: result.data.context.slot,
     };
+  }
+
+  async #resolveMint(
+    mintAddress: string,
+    commitment: SolanaCommitment,
+    refresh: boolean,
+  ): Promise<VerifiedMint> {
+    const canonicalMint = validateSolanaAddress(mintAddress);
+    const cacheKey = `${commitment}:${canonicalMint}`;
+    const cached = this.#mintCache.get(cacheKey);
+    if (!refresh && cached !== undefined && cached.expiresAt > this.#clock()) {
+      return cached.mint;
+    }
+
+    const pending = refresh ? undefined : this.#mintRequests.get(cacheKey);
+    if (pending !== undefined) return pending;
+
+    const request = this.#readMint(canonicalMint, commitment);
+    if (!refresh) this.#mintRequests.set(cacheKey, request);
+
+    try {
+      const mint = await request;
+      const now = this.#clock();
+      for (const [key, entry] of this.#mintCache) {
+        if (entry.expiresAt <= now) this.#mintCache.delete(key);
+      }
+      if (!this.#mintCache.has(cacheKey) && this.#mintCache.size >= MAX_MINT_CACHE_ENTRIES) {
+        const oldestKey = this.#mintCache.keys().next().value;
+        if (oldestKey !== undefined) this.#mintCache.delete(oldestKey);
+      }
+      this.#mintCache.set(cacheKey, {
+        expiresAt: now + this.#mintCacheTtlMs,
+        mint,
+      });
+      return mint;
+    } finally {
+      if (this.#mintRequests.get(cacheKey) === request) this.#mintRequests.delete(cacheKey);
+    }
+  }
+
+  validateMint(
+    mintAddress: string,
+    commitment: SolanaCommitment = this.#commitment,
+  ): Promise<VerifiedMint> {
+    return this.#resolveMint(mintAddress, commitment, false);
+  }
+
+  refreshMint(
+    mintAddress: string,
+    commitment: SolanaCommitment = this.#commitment,
+  ): Promise<VerifiedMint> {
+    return this.#resolveMint(mintAddress, commitment, true);
   }
 
   async verifyBalance(
@@ -384,6 +469,8 @@ export function createSolanaTokenVerifier(options: SolanaRpcOptions) {
   return {
     validateMint: (mintAddress: string, commitment?: SolanaCommitment) =>
       client.validateMint(mintAddress, commitment),
+    refreshMint: (mintAddress: string, commitment?: SolanaCommitment) =>
+      client.refreshMint(mintAddress, commitment),
     verifyBalance: (walletAddress: string, mintAddress: string, commitment?: SolanaCommitment) =>
       client.verifyBalance(walletAddress, mintAddress, commitment),
   };

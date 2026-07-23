@@ -29,7 +29,7 @@ const config: TokenAccessServerConfig = {
   gateEnabled: true,
   mintAddress: 'So11111111111111111111111111111111111111112',
   symbol: 'STAR',
-  requiredAmount: '1000',
+  requiredAmount: '10000',
   challengeTtlSeconds: 300,
   sessionTtlSeconds: 900,
   recheckIntervalSeconds: 300,
@@ -53,8 +53,8 @@ const runtime: RuntimeTokenGateConfig = {
   tokenProgram: 'spl-token',
   symbol: 'STAR',
   decimals: 6,
-  requiredAmountRaw: '1000000000',
-  requiredAmount: '1000',
+  requiredAmountRaw: '10000000000',
+  requiredAmount: '10000',
   enabled: true,
   availability: 'available',
   commitment: 'confirmed',
@@ -78,6 +78,7 @@ class SilentLogger implements ServiceLogger {
 }
 
 class MemoryGateway implements TokenAccessGateway {
+  currentConfig: RuntimeTokenGateConfig = runtime;
   challenge?: PersistedChallenge;
   consumed = false;
   consumedCommitment: 'confirmed' | 'finalized' = 'confirmed';
@@ -103,7 +104,7 @@ class MemoryGateway implements TokenAccessGateway {
   events: WalletAccessEventInput[] = [];
 
   async getRuntimeConfig(): Promise<RuntimeTokenGateConfig> {
-    return runtime;
+    return this.currentConfig;
   }
 
   async createChallenge(input: ChallengePersistenceInput): Promise<PersistenceStatus> {
@@ -147,8 +148,8 @@ class MemoryGateway implements TokenAccessGateway {
       tokenProgram: 'spl-token',
       symbol: 'STAR',
       decimals: 6,
-      requiredAmountRaw: '1000000000',
-      requiredAmount: '1000',
+      requiredAmountRaw: '10000000000',
+      requiredAmount: '10000',
       commitment: this.consumedCommitment,
       sessionTtlSeconds: 900,
       recheckIntervalSeconds: 300,
@@ -194,12 +195,18 @@ class MemoryGateway implements TokenAccessGateway {
   }
 }
 
-function fixture(rawAmount = 1_000_000_000n) {
+function fixture(rawAmount = 10_000_000_000n, environment: 'test' | 'production' = 'test') {
   const keypair = nacl.sign.keyPair();
   const walletAddress = new PublicKey(keypair.publicKey).toBase58();
   const gateway = new MemoryGateway();
   const verifier = {
     validateMint: vi.fn(async () => ({
+      mintAddress: config.mintAddress,
+      tokenProgram: 'spl-token' as const,
+      decimals: 6,
+      slot: 100,
+    })),
+    refreshMint: vi.fn(async () => ({
       mintAddress: config.mintAddress,
       tokenProgram: 'spl-token' as const,
       decimals: 6,
@@ -215,7 +222,7 @@ function fixture(rawAmount = 1_000_000_000n) {
     })),
   };
   const service = createTokenAccessService({
-    environment: 'test',
+    environment,
     config,
     gateway,
     verifier,
@@ -228,7 +235,7 @@ function fixture(rawAmount = 1_000_000_000n) {
   return { service, gateway, verifier, keypair, walletAddress };
 }
 
-async function signedChallenge(rawAmount = 1_000_000_000n) {
+async function signedChallenge(rawAmount = 10_000_000_000n) {
   const value = fixture(rawAmount);
   const challenge = await value.service.createChallenge({
     walletAddress: value.walletAddress,
@@ -258,12 +265,12 @@ function persistedSession(
     tokenProgram: 'spl-token',
     symbol: 'STAR',
     decimals: 6,
-    requiredAmountRaw: '1000000000',
-    requiredAmount: '1000',
+    requiredAmountRaw: '10000000000',
+    requiredAmount: '10000',
     commitment,
     sessionTtlSeconds: 900,
     recheckIntervalSeconds: 300,
-    observedAmountRaw: '1000000000',
+    observedAmountRaw: '10000000000',
     checkedSlot: '100',
     lastBalanceCheckAt: '2026-07-10T11:55:00.000Z',
     recheckDue: true,
@@ -296,7 +303,7 @@ describe('server-controlled wallet authentication', () => {
       ipHash: 'c'.repeat(64),
     });
 
-    expect(result.view).toMatchObject({ access: 'granted', observedAmount: '1000' });
+    expect(result.view).toMatchObject({ access: 'granted', observedAmount: '10000' });
     expect(result.sessionToken).toBe('a'.repeat(43));
     expect(value.gateway.sessionInput?.sessionTokenHash).toBe(
       hashAccessSessionToken('a'.repeat(43), config.cookieSecret),
@@ -306,6 +313,25 @@ describe('server-controlled wallet authentication', () => {
       walletAddress: value.walletAddress,
       ipHash: 'c'.repeat(64),
       verificationLimit: 10,
+    });
+  });
+
+  it('accepts a wallet above the 10,000-token threshold without precision loss', async () => {
+    const value = await signedChallenge(10_000_000_001n);
+    const result = await value.service.verify({
+      challengeId: value.challenge.challengeId,
+      walletAddress: value.walletAddress,
+      network: 'solana:devnet',
+      message: value.challenge.message,
+      signature: value.signature,
+      requestId: 'request-above-threshold',
+      ipHash: 'c'.repeat(64),
+    });
+
+    expect(result.view).toMatchObject({
+      access: 'granted',
+      observedAmount: '10000.000001',
+      requiredAmount: '10000',
     });
   });
 
@@ -331,7 +357,7 @@ describe('server-controlled wallet authentication', () => {
   });
 
   it('denies one raw unit below the requirement without creating a session', async () => {
-    const value = await signedChallenge(999_999_999n);
+    const value = await signedChallenge(9_999_999_999n);
     const result = await value.service.verify({
       challengeId: value.challenge.challengeId,
       walletAddress: value.walletAddress,
@@ -344,7 +370,7 @@ describe('server-controlled wallet authentication', () => {
 
     expect(result.view).toMatchObject({
       access: 'insufficient_balance',
-      observedAmount: '999.999999',
+      observedAmount: '9999.999999',
     });
     expect(value.gateway.sessionInput).toBeUndefined();
   });
@@ -421,7 +447,7 @@ describe('server-controlled wallet authentication', () => {
       config.mintAddress,
       'finalized',
     );
-    expect(result.view).toMatchObject({ access: 'granted', observedAmount: '1000' });
+    expect(result.view).toMatchObject({ access: 'granted', observedAmount: '10000' });
   });
 
   it('does not amplify RPC work when an explicit recheck claim is rate limited', async () => {
@@ -442,7 +468,7 @@ describe('server-controlled wallet authentication', () => {
 
     const result = await value.service.getCurrentSession('a'.repeat(43), 'session-request');
 
-    expect(result.view).toMatchObject({ access: 'granted', observedAmount: '1000' });
+    expect(result.view).toMatchObject({ access: 'granted', observedAmount: '10000' });
     expect(value.verifier.verifyBalance).not.toHaveBeenCalled();
   });
 
@@ -457,6 +483,33 @@ describe('server-controlled wallet authentication', () => {
     expect(value.gateway.events).toContainEqual(
       expect.objectContaining({ reasonCode: 'STALE_BALANCE_SLOT', result: 'error' }),
     );
+  });
+
+  it('pins production eligibility to the CA and 10,000-token on-chain metadata', async () => {
+    const exact = fixture(10_000_000_000n, 'production');
+    await expect(exact.service.getPublicConfig()).resolves.toMatchObject({
+      mintAddress: config.mintAddress,
+      requiredAmount: '10000',
+    });
+
+    const staleProgram = fixture(10_000_000_000n, 'production');
+    staleProgram.gateway.currentConfig = {
+      ...runtime,
+      tokenProgram: 'spl-token-2022',
+    };
+    await expect(staleProgram.service.getPublicConfig()).rejects.toMatchObject({
+      code: 'TOKEN_GATE_UNAVAILABLE',
+    });
+
+    const staleDecimals = fixture(10_000_000_000n, 'production');
+    staleDecimals.gateway.currentConfig = {
+      ...runtime,
+      decimals: 9,
+      requiredAmountRaw: '10000000000000',
+    };
+    await expect(staleDecimals.service.getPublicConfig()).rejects.toMatchObject({
+      code: 'TOKEN_GATE_UNAVAILABLE',
+    });
   });
 
   it('uses the administrator-selected commitment for standalone mint validation', async () => {
@@ -474,7 +527,7 @@ describe('server-controlled wallet authentication', () => {
       'admin-validation',
     );
 
-    expect(value.verifier.validateMint).toHaveBeenCalledWith(config.mintAddress, 'finalized');
+    expect(value.verifier.refreshMint).toHaveBeenCalledWith(config.mintAddress, 'finalized');
     expect(validation.commitment).toBe('finalized');
   });
 
@@ -494,7 +547,7 @@ describe('server-controlled wallet authentication', () => {
         network: 'solana:devnet',
         mintAddress: config.mintAddress,
         symbol: 'STAR',
-        requiredAmount: '1000',
+        requiredAmount: '10000',
         commitment: 'finalized',
         sessionTtlSeconds: 900,
         recheckIntervalSeconds: 300,
@@ -503,7 +556,7 @@ describe('server-controlled wallet authentication', () => {
       'admin-update',
     );
 
-    expect(value.verifier.validateMint).toHaveBeenCalledWith(config.mintAddress, 'finalized');
+    expect(value.verifier.refreshMint).toHaveBeenCalledWith(config.mintAddress, 'finalized');
     expect(value.gateway.adminUpdate).toMatchObject({
       commitment: 'finalized',
       requestId: 'admin-update',

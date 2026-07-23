@@ -66,14 +66,28 @@ describe('canonical Starville wallet message', () => {
 });
 
 describe('exact token amounts', () => {
-  it('converts thresholds without floating-point arithmetic', () => {
-    expect(decimalAmountToRaw('1000', 6)).toBe(1_000_000_000n);
-    expect(decimalAmountToRaw('999.999999', 6)).toBe(999_999_999n);
-    expect(rawAmountToDecimal(1_000_000_000n, 6)).toBe('1000');
+  it.each([
+    { decimals: 0, raw: 10_000n },
+    { decimals: 6, raw: 10_000_000_000n },
+    { decimals: 9, raw: 10_000_000_000_000n },
+  ])('converts 10,000 display tokens with $decimals decimals exactly', ({ decimals, raw }) => {
+    expect(decimalAmountToRaw('10000', decimals)).toBe(raw);
+    expect(rawAmountToDecimal(raw, decimals)).toBe('10000');
   });
 
-  it('rejects precision that the mint cannot represent', () => {
+  it('preserves thresholds and balances beyond Number.MAX_SAFE_INTEGER', () => {
+    const display = '9007199254740993000000';
+    const raw = 9_007_199_254_740_993_000_000_000_000n;
+
+    expect(decimalAmountToRaw(display, 6)).toBe(raw);
+    expect(rawAmountToDecimal(raw, 6)).toBe(display);
+  });
+
+  it('rejects malformed, negative, and unrepresentable thresholds', () => {
     expect(() => decimalAmountToRaw('1.0000001', 6)).toThrow();
+    for (const amount of ['-10000', 'NaN', 'Infinity', '10000.1']) {
+      expect(() => decimalAmountToRaw(amount, 0)).toThrow();
+    }
   });
 });
 

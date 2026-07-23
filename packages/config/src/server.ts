@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import { z } from 'zod';
 
 import type { EnvironmentName } from '@starville/shared-types';
+import { validateSolanaAddress } from '@starville/solana';
 import {
   assertSecureUrlForEnvironment,
   environmentNameSchema,
@@ -508,15 +509,34 @@ const privateRpcUrlSchema = z
     }
   });
 
-const base58AddressSchema = z
+const TOKEN_MINT_PLACEHOLDERS = new Set(['11111111111111111111111111111111']);
+const tokenMintAddressSchema = z
   .string({ error: 'GAME_TOKEN_MINT_ADDRESS is required by the API' })
   .trim()
   .min(32)
   .max(44)
-  .regex(/^[1-9A-HJ-NP-Za-km-z]+$/u, 'GAME_TOKEN_MINT_ADDRESS must be base58 encoded');
+  .superRefine((address, context) => {
+    if (address.includes('OWNER_REQUIRED') || TOKEN_MINT_PLACEHOLDERS.has(address)) {
+      context.addIssue({
+        code: 'custom',
+        message: 'GAME_TOKEN_MINT_ADDRESS must not be a placeholder',
+      });
+      return;
+    }
+
+    try {
+      validateSolanaAddress(address);
+    } catch {
+      context.addIssue({
+        code: 'custom',
+        message: 'GAME_TOKEN_MINT_ADDRESS must be a valid canonical Solana public key',
+      });
+    }
+  });
 const decimalTokenAmountSchema = z
   .string()
   .trim()
+  .max(64, 'GAME_TOKEN_GATE_AMOUNT is too large')
   .regex(/^\d+(?:\.\d+)?$/u, 'GAME_TOKEN_GATE_AMOUNT must be a positive decimal string')
   .refine((value) => /[1-9]/u.test(value), 'GAME_TOKEN_GATE_AMOUNT must be greater than zero');
 const boundedInteger = (minimum: number, maximum: number, label: string) =>
@@ -525,6 +545,9 @@ const boundedInteger = (minimum: number, maximum: number, label: string) =>
 export function loadTokenAccessServerConfig(env: EnvironmentVariables): TokenAccessServerConfig {
   const environment = loadEnvironment(env);
   const networkName = z.enum(['devnet', 'mainnet-beta']).parse(env['SOLANA_NETWORK']);
+  if (environment === 'production' && networkName !== 'mainnet-beta') {
+    throw new Error('SOLANA_NETWORK must be mainnet-beta in production');
+  }
   const challengeTtlSeconds = boundedInteger(60, 600, 'WALLET_CHALLENGE_TTL_SECONDS').parse(
     env['WALLET_CHALLENGE_TTL_SECONDS'] ?? 300,
   );
@@ -555,15 +578,19 @@ export function loadTokenAccessServerConfig(env: EnvironmentVariables): TokenAcc
 
   const rpcUrl = privateRpcUrlSchema.parse(env['SOLANA_RPC_URL']);
   const landingUrl = httpUrlSchema.parse(env['NEXT_PUBLIC_LANDING_URL']);
+  const requiredAmount = decimalTokenAmountSchema.parse(env['GAME_TOKEN_GATE_AMOUNT'] ?? '10000');
   assertSecureUrlForEnvironment(rpcUrl, environment, 'SOLANA_RPC_URL');
   assertSecureUrlForEnvironment(landingUrl, environment, 'NEXT_PUBLIC_LANDING_URL');
+  if (environment === 'production' && requiredAmount !== '10000') {
+    throw new Error('GAME_TOKEN_GATE_AMOUNT must be exactly 10000 in production');
+  }
 
   return {
     network: `solana:${networkName}`,
     rpcUrl,
     landingUrl,
     gateEnabled: safeBoolean(env['TOKEN_GATE_ENABLED'] ?? 'true', 'TOKEN_GATE_ENABLED'),
-    mintAddress: base58AddressSchema.parse(env['GAME_TOKEN_MINT_ADDRESS']),
+    mintAddress: tokenMintAddressSchema.parse(env['GAME_TOKEN_MINT_ADDRESS']),
     symbol: z
       .string()
       .trim()
@@ -571,7 +598,7 @@ export function loadTokenAccessServerConfig(env: EnvironmentVariables): TokenAcc
       .max(16)
       .regex(/^[A-Z0-9]+$/u)
       .parse(env['GAME_TOKEN_SYMBOL'] ?? 'STAR'),
-    requiredAmount: decimalTokenAmountSchema.parse(env['GAME_TOKEN_GATE_AMOUNT'] ?? '1000'),
+    requiredAmount,
     challengeTtlSeconds,
     sessionTtlSeconds,
     recheckIntervalSeconds,
@@ -600,6 +627,10 @@ export function loadTokenAccessServerConfig(env: EnvironmentVariables): TokenAcc
       ).parse(env['TOKEN_GATE_ADMIN_VALIDATE_RATE_LIMIT'] ?? 5),
     },
   };
+}
+
+export function validateConfiguredTokenMintAddress(address: string): string {
+  return tokenMintAddressSchema.parse(address);
 }
 
 export function loadHostedSupabaseSafetyConfig(

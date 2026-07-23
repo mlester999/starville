@@ -17,7 +17,7 @@
   "environmentManifest": {
     "path": "infrastructure/deployment/manifests/production-environment.v1.json",
     "version": 1,
-    "sha256": "222b81f9dd09bbab237a6a8c0f9377eb518c1e19954eda2316a17e57fedd500f",
+    "sha256": "ad24f2ba84d0bad389c7abf3742a7ed8311c1c09a67f087a34660e3cd43f59bd",
     "status": "local-contract-valid-owner-values-missing"
   },
   "migrations": {

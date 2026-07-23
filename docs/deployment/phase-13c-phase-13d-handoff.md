@@ -24,6 +24,10 @@ backup/PITR and restore access, hosted clean-chain evidence, first-admin identit
 accepted world/assets, and all owner sign-offs. Bind every result to the exact approved commit and
 artifact hashes.
 
+The production token profile uses only `GAME_TOKEN_MINT_ADDRESS=<PUMP_FUN_CA>` and
+`GAME_TOKEN_GATE_AMOUNT=10000`. The API derives program and decimals from the mint; duplicate
+commissioning aliases and manual metadata fields are not part of the handoff.
+
 Do not replace placeholders in tracked manifests with secrets. Record safe configuration evidence
 and store values in provider secret systems. Keep safety gates false except for the single verified
 command they protect, then disable them immediately.

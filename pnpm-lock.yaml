@@ -35,6 +35,9 @@ importers:
       '@starville/shared-validation':
         specifier: workspace:*
         version: link:packages/shared-validation
+      '@starville/solana':
+        specifier: workspace:*
+        version: link:packages/solana
       '@starville/supabase':
         specifier: workspace:*
         version: link:packages/supabase
@@ -777,6 +780,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@starville/solana':
+        specifier: workspace:*
+        version: link:../solana
       '@starville/shared-types':
         specifier: workspace:*
         version: link:../shared-types

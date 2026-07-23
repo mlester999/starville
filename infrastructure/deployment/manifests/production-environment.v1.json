@@ -454,7 +454,7 @@
       "requirement": "required-or-defaulted-by-owning-service",
       "exposure": "owning-service",
       "owner": "wallet-integration-owner",
-      "expected": "validated by the owning package schema and owner-approved production plan",
+      "expected": "exactly 10000 whole display tokens; converted to base units using verified on-chain mint decimals",
       "failureMode": "configuration validation failure",
       "rotation": "on approved configuration change"
     },
@@ -464,7 +464,7 @@
       "requirement": "required-or-defaulted-by-owning-service",
       "exposure": "owning-service",
       "owner": "wallet-integration-owner",
-      "expected": "validated by the owning package schema and owner-approved production plan",
+      "expected": "exact owner-approved canonical Mainnet mint public key; token program and decimals are derived on-chain",
       "failureMode": "configuration validation failure",
       "rotation": "on approved configuration change"
     },
@@ -1417,36 +1417,6 @@
       "expected": "exact development Reown project identifier; must differ from production",
       "failureMode": "fail-closed",
       "rotation": "on approved Reown project change"
-    },
-    {
-      "name": "STARVILLE_PRODUCTION_TOKEN_MINT_ADDRESS",
-      "classification": "commissioning-identity",
-      "requirement": "commissioning-only",
-      "exposure": "authorized-commissioning-process-only",
-      "owner": "wallet-integration-owner",
-      "expected": "exact owner-approved mainnet mint; must match GAME_TOKEN_MINT_ADDRESS",
-      "failureMode": "fail-closed",
-      "rotation": "on approved token configuration change"
-    },
-    {
-      "name": "STARVILLE_PRODUCTION_TOKEN_PROGRAM",
-      "classification": "commissioning-identity",
-      "requirement": "commissioning-only",
-      "exposure": "authorized-commissioning-process-only",
-      "owner": "wallet-integration-owner",
-      "expected": "spl-token or spl-token-2022",
-      "failureMode": "fail-closed",
-      "rotation": "on approved token configuration change"
-    },
-    {
-      "name": "STARVILLE_PRODUCTION_TOKEN_DECIMALS",
-      "classification": "commissioning-identity",
-      "requirement": "commissioning-only",
-      "exposure": "authorized-commissioning-process-only",
-      "owner": "wallet-integration-owner",
-      "expected": "integer from 0 through 18 matching the mainnet mint",
-      "failureMode": "fail-closed",
-      "rotation": "on approved token configuration change"
     }
   ],
   "approvalOnlyVariables": [

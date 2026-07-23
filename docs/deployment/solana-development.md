@@ -13,16 +13,16 @@ networks are not enabled.
 - `SOLANA_RPC_MAX_ATTEMPTS` is 1–3.
 - `GAME_TOKEN_MINT_ADDRESS`, `GAME_TOKEN_SYMBOL`, and `GAME_TOKEN_GATE_AMOUNT` are public
   identifiers/defaults, not authority.
+- Production requires the owner-approved Pump.fun CA and `GAME_TOKEN_GATE_AMOUNT=10000`; token
+  program and decimals are derived from the raw mint account and are not environment inputs.
 - The versioned `token_gate_configs` row becomes authoritative only after protected server
   validation and an audited administrator update.
 
 ## Current status
 
-The current Phase 3 environment uses a temporary Mainnet Pump.fun token for live validation. It is
-not the official `$STAR` mint. The server confirmed that the configured address is an existing,
-non-executable Token-2022 mint with six decimals, and the protected administrator path persisted its
-validated metadata. The address remains environment/database-driven and must be replaced before
-production launch.
+Development may use an owner-approved test mint. Production must use the exact owner-approved
+Pump.fun CA. The protected administrator path performs a fresh read-only validation and persists the
+derived metadata; it never asks for a wallet signature or sends a transaction.
 
 ## Safe validation order
 

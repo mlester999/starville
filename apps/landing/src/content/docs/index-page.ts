@@ -60,7 +60,7 @@ export const docsIndexPage = defineDocumentationPage({
       'quick-start',
       'Quick start overview',
       [
-        'Prepare a supported Solana wallet on Mainnet Beta and confirm that the selected address meets the access requirement shown by Starville. The current expected threshold is 1,000 of the configured STAR token. Choose Play Now, connect through the Reown wallet selector, and sign the one-time human-readable ownership message. This is an eligibility check, not a transaction or transfer.',
+        'Prepare a supported Solana wallet on Mainnet Beta and confirm that the selected address meets the access requirement shown by Starville. The approved threshold is 10,000 display tokens of the configured STAR mint. Choose Play Now, connect through the Reown wallet selector, and sign the one-time human-readable ownership message. This is an eligibility check, not a transaction or transfer.',
         'Create your public display name and appearance when prompted, then enter Lantern Square. Move with WASD, hold Shift to jog, press E near a valid interaction, select quickbar slots with 1–8, open chat with Enter, and close the topmost safe panel with Escape. Typing and open panels suppress conflicting movement input.',
         'Explore the four roads from Lantern Square to Moonpetal Meadow, Brooklight Crossing, Hearthfield Road, and Whisperpine Gate. Match both world and channel when meeting another player. Use Nearby Players for proximity actions, Friends & Party for persistent social state, and Activities after a party of at least two eligible players is prepared.',
       ],

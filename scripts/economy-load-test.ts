@@ -484,8 +484,8 @@ async function runControlledApiLoad() {
     walletAddress,
     network: 'solana:mainnet-beta',
     symbol: 'STAR',
-    requiredAmount: '1000',
-    observedAmount: '1000',
+    requiredAmount: '10000',
+    observedAmount: '10000',
     expiresAt: '2026-07-15T01:00:00.000Z',
     recheckAfter: '2026-07-15T00:05:00.000Z',
   });

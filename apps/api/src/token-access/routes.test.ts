@@ -35,7 +35,7 @@ function createTokenService(): TokenAccessService {
     network: 'solana:devnet',
     symbol: 'STAR',
     mintAddress: 'So11111111111111111111111111111111111111112',
-    requiredAmount: '1000',
+    requiredAmount: '10000',
     recheckIntervalSeconds: 300,
   } as const;
   const view = {
@@ -43,8 +43,8 @@ function createTokenService(): TokenAccessService {
     walletAddress: '11111111111111111111111111111111',
     network: 'solana:devnet',
     symbol: 'STAR',
-    requiredAmount: '1000',
-    observedAmount: '1000',
+    requiredAmount: '10000',
+    observedAmount: '10000',
     expiresAt: '2026-07-10T12:15:00.000Z',
     recheckAfter: '2026-07-10T12:05:00.000Z',
   } as const;
@@ -70,8 +70,8 @@ function createTokenService(): TokenAccessService {
           tokenProgram: 'spl-token',
           symbol: 'STAR',
           decimals: 6,
-          requiredAmountRaw: '1000000000',
-          requiredAmount: '1000',
+          requiredAmountRaw: '10000000000',
+          requiredAmount: '10000',
           enabled: true,
           availability: 'available',
           commitment: 'confirmed',
@@ -144,7 +144,7 @@ describe('token-access HTTP boundary', () => {
     expect(response.headers['cache-control']).toBe('no-store');
     expect(response.json()).toMatchObject({
       success: true,
-      data: { availability: 'available', requiredAmount: '1000' },
+      data: { availability: 'available', requiredAmount: '10000' },
     });
   });
 
@@ -227,6 +227,29 @@ describe('token-access HTTP boundary', () => {
     expect(service.verify).toHaveBeenCalledWith(
       expect.objectContaining({ ipHash: expect.stringMatching(/^[0-9a-f]{64}$/u) }),
     );
+  });
+
+  it('rejects client-supplied mint metadata before server verification', async () => {
+    const service = createTokenService();
+    const response = await createApp(service).inject({
+      method: 'POST',
+      url: '/api/v1/token-access/verify',
+      headers: { origin: 'http://localhost:3000' },
+      payload: {
+        challengeId: '11111111-1111-4111-8111-111111111111',
+        walletAddress: '11111111111111111111111111111111',
+        network: 'solana:devnet',
+        message: 'canonical-message',
+        signature: Buffer.alloc(64).toString('base64'),
+        mintAddress: '22222222222222222222222222222222',
+        tokenProgram: 'spl-token',
+        decimals: 0,
+        requiredAmount: '1',
+      },
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(service.verify).not.toHaveBeenCalled();
   });
 
   it('supports credentialed allowlisted CORS and PATCH preflight without wildcards', async () => {

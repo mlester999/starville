@@ -16,6 +16,7 @@
     "clean": "rimraf coverage .turbo"
   },
   "dependencies": {
+    "@starville/solana": "workspace:*",
     "@starville/shared-types": "workspace:*",
     "@starville/shared-validation": "workspace:*",
     "@starville/wallet-access": "workspace:*",

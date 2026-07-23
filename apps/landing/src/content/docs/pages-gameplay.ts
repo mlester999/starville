@@ -18,7 +18,7 @@ export const gettingStartedPage = defineDocumentationPage({
       'before-you-enter',
       'Before you enter the village',
       [
-        'Starville is a browser-based cozy multiplayer game. The launch access flow uses a supported Solana wallet to prove that you control an eligible address. The configured network is Solana Mainnet Beta, and the current expected threshold is 1,000 of the configured STAR token. The active configuration shown by the access screen is authoritative if it differs from this guide.',
+        'Starville is a browser-based cozy multiplayer game. The launch access flow uses a supported Solana wallet to prove that you control an eligible address. The configured network is Solana Mainnet Beta, and the approved threshold is 10,000 display tokens of the configured STAR mint. The active configuration shown by the access screen is authoritative.',
         'Wallet verification is an ownership check, not a payment. Connecting, signing the one-time access message, and checking eligibility do not ask you to send STAR, SOL, an NFT, or any other asset. Read the message before approving it and make sure you are on the official Starville route.',
       ],
       [

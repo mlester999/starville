@@ -63,8 +63,8 @@ const grantedView: TokenAccessSessionView = {
   walletAddress: '11111111111111111111111111111111',
   network: 'solana:mainnet-beta',
   symbol: 'STAR',
-  requiredAmount: '1000',
-  observedAmount: '1000',
+  requiredAmount: '10000',
+  observedAmount: '10000',
   expiresAt: '2026-07-11T05:00:00.000Z',
   recheckAfter: '2026-07-11T04:05:00.000Z',
 };
@@ -79,8 +79,8 @@ function tokenService(view: TokenAccessSessionView = grantedView): TokenAccessSe
     tokenProgram: 'spl-token' as const,
     symbol: 'STAR',
     decimals: 6,
-    requiredAmountRaw: '1000000000',
-    requiredAmount: '1000',
+    requiredAmountRaw: '10000000000',
+    requiredAmount: '10000',
     enabled: true,
     availability: 'available' as const,
     commitment: 'confirmed' as const,
@@ -100,7 +100,7 @@ function tokenService(view: TokenAccessSessionView = grantedView): TokenAccessSe
           network: 'solana:mainnet-beta',
           symbol: 'STAR',
           mintAddress,
-          requiredAmount: '1000',
+          requiredAmount: '10000',
           recheckIntervalSeconds: 300,
         }) as const,
     ),
@@ -175,7 +175,7 @@ describe('protected player routes', () => {
       access: 'none',
       network: 'solana:mainnet-beta',
       symbol: 'STAR',
-      requiredAmount: '1000',
+      requiredAmount: '10000',
     });
     const response = await createApp(service, playerService(), undefined, overrides).inject({
       method: 'POST',
@@ -235,7 +235,7 @@ describe('protected player routes', () => {
         access,
         network: 'solana:mainnet-beta',
         symbol: 'STAR',
-        requiredAmount: '1000',
+        requiredAmount: '10000',
       });
       const response = await createApp(service, players).inject({
         method: 'GET',

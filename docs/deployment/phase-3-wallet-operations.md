@@ -55,6 +55,10 @@ Public identifiers used by the API are `SOLANA_NETWORK`, `GAME_TOKEN_MINT_ADDRES
 values do not activate the gate: the authoritative database row must be validated and saved by an
 authorized administrator.
 
+For production, the only owner-supplied token identity and threshold fields are
+`GAME_TOKEN_MINT_ADDRESS=<OWNER_APPROVED_PUMP_FUN_CA>` and `GAME_TOKEN_GATE_AMOUNT=10000`. Program
+and decimals are read from the mint account by the server.
+
 For a local `.env.local` that already contains a legacy `REOWN_PROJECT_ID`, prepare the Phase 3
 aliases and an independent cookie secret without printing secret values:
 

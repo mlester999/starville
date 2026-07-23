@@ -25,9 +25,12 @@ separation of duties.
 2. Complete the evidence bundle. Every item must be `present` or `accepted`; no missing blocker may
    remain.
 3. Supply exact production domains, deployment provider, Supabase project ref, Reown project, Solana
-   network/RPC/mint, and secret owners through approved secret channels.
+   network/RPC, `GAME_TOKEN_MINT_ADDRESS=<PUMP_FUN_CA>`, `GAME_TOKEN_GATE_AMOUNT=10000`, and secret
+   owners through approved secret channels. Do not supply token program or decimals.
 4. Validate the candidate configuration offline with all write/bootstrap gates false. Independently
-   compare URL host, configured project ref, database host, and approved production ref.
+   compare URL host, configured project ref, database host, and approved production ref. Then run
+   the separate read-only token verification and record its derived program, decimals, base-unit
+   threshold, and slot without exposing RPC credentials.
 5. Confirm provider backup retention, point-in-time recovery availability, restoration permissions,
    recovery objectives, and a fresh recoverable point.
 6. Rehearse the exact 85-entry manifest from empty state in `starville-dev`. Compare names, order,

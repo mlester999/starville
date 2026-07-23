@@ -63,13 +63,13 @@ The default ticker is:
 
 $STAR
 
-The administrator must be able to update:
+The administrator must be able to manage or review, as appropriate:
 
 - Token display name
 - Token display symbol
 - Token mint address
-- Token decimals
-- Token program
+- Verified token decimals
+- Verified token program
 - Solana network
 - Explorer configuration
 - Token-gate amount
@@ -118,7 +118,7 @@ Default configuration:
 
 - Blockchain: Solana
 - Token symbol: $STAR
-- Required balance: 1,000
+- Required balance: 10,000
 - Token mint address: configured by an administrator
 - Solana network: configurable
 - Token gate: enabled by default
@@ -133,8 +133,8 @@ Authorized administrators must be able to:
 - Change the token mint address
 - Change the token symbol
 - Change the token display name
-- Change token decimals
-- Change the token program
+- Review token decimals derived from the configured mint
+- Review the token program derived from the configured mint
 - Change the Solana network
 - Change RPC configuration
 - Change warning messages
@@ -3434,7 +3434,7 @@ The first complete vertical slice must include:
 18. Signed wallet challenge
 19. Backend signature verification
 20. Configurable token mint address
-21. Configurable 1,000-token gate
+21. Configurable 10,000-token gate
 22. Server-side token-balance verification
 23. Successful game-access session
 24. Insufficient-token warning

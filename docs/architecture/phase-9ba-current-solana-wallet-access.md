@@ -29,16 +29,17 @@ override a validated database row and must not be described as independent acces
 
 The ignored local development environment currently selects:
 
-| Selector            | Current local value                                                                                                                         | Meaning                                                                 |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Solana network      | `solana:mainnet-beta`                                                                                                                       | API RPC/genesis boundary and landing AppKit network                     |
-| Mint selector       | `GAME_TOKEN_MINT_ADDRESS` is present in ignored local configuration; its exact value is intentionally not copied into tracked documentation | Public expected temporary mint selector, not database authority         |
-| Display symbol      | `STAR`                                                                                                                                      | Presentation only                                                       |
-| Display requirement | `1000`                                                                                                                                      | Expected access threshold; raw authority is stored in the validated row |
+| Selector            | Current local value                                                                                                                         | Meaning                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| Solana network      | `solana:mainnet-beta`                                                                                                                       | API RPC/genesis boundary and landing AppKit network                       |
+| Mint selector       | `GAME_TOKEN_MINT_ADDRESS` is present in ignored local configuration; its exact value is intentionally not copied into tracked documentation | Public expected temporary mint selector, not database authority           |
+| Display symbol      | `STAR`                                                                                                                                      | Presentation only                                                         |
+| Display requirement | `10000`                                                                                                                                     | Production access threshold; raw authority is stored in the validated row |
 
 Fresh local migrations deliberately seed Devnet and Mainnet development rows as `unconfigured`. They
-include the `1000` display requirement but no mint, program, decimals, or raw requirement, so a
-fresh database fails closed until an authorized administrator validates and saves a mint.
+include only a legacy non-authoritative display placeholder and no mint, program, decimals, or raw
+requirement, so a fresh database fails closed until an authorized administrator validates and saves
+a mint.
 
 Earlier hosted-operation records state that the development Mainnet row was validated against the
 temporary locally selected mint, owned by Token-2022 with six decimals. Phase 9B-A did not perform a
@@ -296,10 +297,10 @@ Public responses do not expose the RPC URL, provider credential, raw requirement
 decimals, config version, checked slot, cookie, cookie hash, challenge hashes, signature, nonce, or
 internal session ID. The Reown project ID is browser-public by design.
 
-Current public guides accurately state that Mainnet Beta and an expected 1,000-token threshold are
-used unless the reviewed live screen differs. They also state that the token remains in the wallet,
-the ownership signature is not a transaction, no seed phrase/private key is requested, no token
-claim or payout is active, no withdrawal exists, and DUST cannot convert to `$STAR` or SOL.
+Current public guides accurately state that Mainnet Beta and a 10,000-token threshold are used
+unless the reviewed live screen differs. They also state that the token remains in the wallet, the
+ownership signature is not a transaction, no seed phrase/private key is requested, no token claim or
+payout is active, no withdrawal exists, and DUST cannot convert to `$STAR` or SOL.
 
 ## Current tests and remaining acceptance
 
@@ -319,9 +320,10 @@ Existing tests cover:
 - game-client fail-closed mounting, periodic reconciliation, revocation, and wallet replacement.
 
 Phase 9B-A should add explicit regression assertions for the current Mainnet selector, configured
-mint validation, decimals, and unchanged 1,000 requirement, plus source-level tests for Reown
-account/network/disconnect behavior. Live supported-wallet, live RPC, and hosted-row confirmation
-remain owner-gated external acceptance; offline architecture work does not substitute for them.
+mint validation, verified decimals, and approved 10,000 display-token requirement, plus source-level
+tests for Reown account/network/disconnect behavior. Live supported-wallet, live RPC, and hosted-row
+confirmation remain owner-gated external acceptance; offline architecture work does not substitute
+for them.
 
 ## Phase 9B-A conclusion
 

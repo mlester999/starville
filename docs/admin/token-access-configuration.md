@@ -6,10 +6,11 @@ Phase 3 adds one focused protected page at `/token-access`. It displays real tru
 or an explicit unavailable state; it does not show placeholder data, charts, players, wallets,
 economy metrics, or Phase 5 operational tools.
 
-The migration creates the development row as `unconfigured`. Its non-authoritative display defaults
-are `STAR`, `1000`, `confirmed`, a 900-second session TTL, and a 300-second recheck interval. It has
-no mint, token program, decimals, raw requirement, or validation slot until an authorized admin
-validates and saves a real mint on the selected network.
+The migration creates the development row as `unconfigured`. Its legacy non-authoritative display
+default does not control production. Production requires `STAR`, `10000`, a validated commitment,
+and the configured session/recheck intervals. An unconfigured row has no mint, token program,
+decimals, raw requirement, or validation slot until an authorized admin validates and saves a real
+mint on the selected network.
 
 The hosted Mainnet row currently contains a validated temporary Token-2022 mint for Phase 3 live
 testing. It is not the official `$STAR` mint and must be replaced before production.
@@ -98,8 +99,8 @@ selected network.
 3. Obtain the mint address from an approved owner source. Do not copy it from a user, screenshot, or
    untrusted chat message without independent confirmation.
 4. Open `/token-access` and confirm it shows the real current configuration version.
-5. Enter the mint and select **Validate proposed mint**. Verify program, decimals, and slot against
-   the expected token design.
+5. Enter the mint and select **Validate proposed mint**. The server derives program and decimals
+   from the account and reports them with the observed slot.
 6. Enter the intended display symbol and amount. Independently calculate the expected raw threshold
    and compare it with the page after saving.
 7. Review TTL, recheck interval, commitment, and enabled state.

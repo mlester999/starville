@@ -39,7 +39,7 @@ const fixtureEnvironment = {
   SOLANA_RPC_URL: 'https://api.devnet.solana.com/private-provider-path',
   GAME_TOKEN_MINT_ADDRESS: 'So11111111111111111111111111111111111111112',
   GAME_TOKEN_SYMBOL: 'STAR',
-  GAME_TOKEN_GATE_AMOUNT: '1000',
+  GAME_TOKEN_GATE_AMOUNT: '10000',
   TOKEN_GATE_ENABLED: 'true',
   TOKEN_ACCESS_COOKIE_SECRET: 'independent-token-access-cookie-secret',
 };

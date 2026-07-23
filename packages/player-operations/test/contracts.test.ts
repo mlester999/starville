@@ -46,7 +46,7 @@ describe('player operations contracts', () => {
         enabled: true,
         network: 'solana:mainnet-beta',
         symbol: 'STAR',
-        requiredAmount: '1000',
+        requiredAmount: '10000',
         configVersion: 1,
         validationState: 'validated',
       },

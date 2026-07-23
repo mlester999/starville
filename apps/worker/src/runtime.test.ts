@@ -108,6 +108,34 @@ describe('worker foundation', () => {
     });
   });
 
+  it('still fails startup after a genuine job failure exhausts all retries', async () => {
+    let executions = 0;
+    const startupError = new Error('genuine startup job failure');
+    const startupJob: WorkerJob = {
+      name: 'failing-startup-job',
+      async execute() {
+        executions += 1;
+        throw startupError;
+      },
+    };
+    const runtime = createWorkerRuntime({
+      config: {
+        environment: 'test',
+        host: '127.0.0.1',
+        healthPort: 0,
+        concurrency: 1,
+        retry: { maxAttempts: 3, baseDelayMs: 0 },
+      },
+      jobs: [startupJob],
+      logger: new SilentLogger(),
+    });
+    runtimes.push(runtime);
+
+    await expect(runtime.start()).rejects.toBe(startupError);
+    expect(executions).toBe(3);
+    expect(runtime.state).toBe('stopped');
+  });
+
   it('rejects an invalid concurrency before opening a health port', () => {
     expect(() =>
       createWorkerRuntime({

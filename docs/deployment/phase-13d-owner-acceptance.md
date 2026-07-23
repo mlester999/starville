@@ -4,8 +4,9 @@ Status: **NOT STARTED — Stage A is blocked and every checkbox is intentionally
 
 - [ ] Release manager records one exact reviewed commit and clean/inventoried tree.
 - [ ] Production and database owners verify the masked `starville-prod` target and exact domains.
-- [ ] Wallet owner verifies the distinct production Reown project, mainnet RPC, mint, program, and
-      decimals.
+- [ ] Wallet owner configures `GAME_TOKEN_MINT_ADDRESS=<PUMP_FUN_CA>` and
+      `GAME_TOKEN_GATE_AMOUNT=10000`, then verifies the distinct production Reown project, Mainnet
+      RPC, and read-only on-chain-derived program and decimals.
 - [ ] Database owner records provider backup/PITR, restore permissions, and an isolated restore plan
       before migration approval.
 - [ ] Security owner accepts hosted Phase 13B pgTAP/RLS/grant/function evidence.

@@ -33,7 +33,7 @@ describe('landing token-access API client', () => {
           network: 'solana:devnet',
           symbol: 'STAR',
           mintAddress: '11111111111111111111111111111111',
-          requiredAmount: '1000',
+          requiredAmount: '10000',
           recheckIntervalSeconds: 300,
         },
       }),
@@ -41,7 +41,7 @@ describe('landing token-access API client', () => {
 
     await expect(fetchPublicTokenAccessConfig('http://localhost:4000')).resolves.toMatchObject({
       availability: 'available',
-      requiredAmount: '1000',
+      requiredAmount: '10000',
     });
     expect(globalThis.fetch).toHaveBeenCalledWith(
       new URL('http://localhost:4000/api/v1/token-access/config'),
@@ -57,7 +57,7 @@ describe('landing token-access API client', () => {
         data: {
           network: 'solana:devnet',
           symbol: 'STAR',
-          requiredAmount: '1000',
+          requiredAmount: '10000',
         },
       }),
     );
@@ -94,7 +94,7 @@ describe('landing token-access API client', () => {
           access: 'none',
           network: 'solana:devnet',
           symbol: 'STAR',
-          requiredAmount: '1000',
+          requiredAmount: '10000',
         },
       }),
     );

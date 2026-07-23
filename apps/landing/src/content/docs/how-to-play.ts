@@ -84,7 +84,7 @@ export const howToPlayPage = defineDocumentationPage({
             },
             {
               title: 'Confirm Mainnet Beta and eligibility',
-              text: 'Use the selected address and the configured STAR mint. The current expected threshold is 1,000 STAR unless the live screen says otherwise.',
+              text: 'Use the selected address and the configured STAR mint. The approved threshold is 10,000 STAR display tokens.',
             },
             {
               title: 'Connect through Play Now',
@@ -145,7 +145,7 @@ export const howToPlayPage = defineDocumentationPage({
       'Connect and verify wallet access safely',
       [
         'Starville uses Reown AppKit as the Solana wallet connection layer. The exact compatible wallet choices depend on the browser, device, installed wallet, and current connection capabilities, so do not rely on an unofficial provider list. Choose only a wallet you control and verify the shortened address in the access panel.',
-        'The configured network is Solana Mainnet Beta. The trusted access boundary checks the configured STAR mint and current required amount, expected to be 1,000 STAR unless the live reviewed configuration changes. A token with the same symbol but a different mint does not satisfy the check.',
+        'The configured network is Solana Mainnet Beta. The trusted access boundary checks the configured STAR mint and the approved 10,000 display-token requirement. A token with the same symbol but a different mint does not satisfy the check.',
         'After connection, Starville creates a one-time challenge with the wallet address, official domain, intended action, network, timestamps, and unique value. Signing proves control for that access attempt. It does not transfer STAR, approve a token account, spend SOL, stake, claim a reward, or expose a private key.',
         'The token remains in the wallet. Disconnecting changes the connection state but does not move an asset. Eligibility may be refreshed after a session interval, expiry, or configuration update. A temporary balance-check outage is shown as a verification error rather than an inaccurate zero balance.',
         'Token claims and payouts remain disabled: there is no Claim button, connected treasury, live signer, withdrawal, DUST conversion, wallet transaction, or token reward. Any future direction still requires product, security, treasury, legal, and compliance review.',

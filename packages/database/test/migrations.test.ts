@@ -2525,6 +2525,33 @@ describe('Phase 9A off-chain economy migrations', () => {
     expect(readinessSql).not.toMatch(/grant execute[^;]+to (?:public|anon|authenticated)/iu);
   });
 
+  it('activates only approved scheduled economy versions after publishing them', () => {
+    const activationSql = readinessSql.slice(
+      readinessSql.indexOf('create or replace function public.activate_approved_economy_versions('),
+      readinessSql.indexOf(
+        'create or replace function public.get_player_economy(',
+        readinessSql.indexOf(
+          'create or replace function public.activate_approved_economy_versions(',
+        ),
+      ),
+    );
+
+    expect(activationSql).toContain(
+      "where lifecycle_status='in_review' and approved_at is not null and scheduled_at is not null",
+    );
+    expect(activationSql).toContain(
+      "where version.lifecycle_status='in_review' and version.approved_at is not null",
+    );
+    expect(activationSql.match(/effective_at<=now\(\)/gu)).toHaveLength(2);
+    expect(activationSql.match(/lifecycle_status='published'/gu)).toHaveLength(2);
+    expect(activationSql.indexOf("lifecycle_status='published'")).toBeLessThan(
+      activationSql.indexOf('insert into public.economy_active_policy'),
+    );
+    expect(activationSql.lastIndexOf("lifecycle_status='published'")).toBeLessThan(
+      activationSql.indexOf('insert into public.economy_active_shop_versions'),
+    );
+  });
+
   it('aligns reward and purchase lock order before account mutation', () => {
     const settlementRepair = readinessSql.slice(
       readinessSql.indexOf('create or replace function private.cozy_apply_dust_delta('),

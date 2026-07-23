@@ -149,8 +149,8 @@ describe('GameWorld controls and settings boundary', () => {
             walletAddress: '11111111111111111111111111111111',
             network: 'solana:mainnet-beta',
             symbol: 'STAR',
-            requiredAmount: '1000',
-            observedAmount: '1000',
+            requiredAmount: '10000',
+            observedAmount: '10000',
             expiresAt: '2099-07-11T05:00:00.000Z',
           }}
           rechecking={false}
@@ -213,8 +213,8 @@ describe('GameWorld controls and settings boundary', () => {
             walletAddress: '11111111111111111111111111111111',
             network: 'solana:mainnet-beta',
             symbol: 'STAR',
-            requiredAmount: '1000',
-            observedAmount: '1000',
+            requiredAmount: '10000',
+            observedAmount: '10000',
             expiresAt: '2099-07-11T05:00:00.000Z',
           }}
           apiUrl="http://localhost:4000"
@@ -317,8 +317,8 @@ describe('GameWorld controls and settings boundary', () => {
       walletAddress: '11111111111111111111111111111111',
       network: 'solana:mainnet-beta' as const,
       symbol: 'STAR',
-      requiredAmount: '1000',
-      observedAmount: '1000',
+      requiredAmount: '10000',
+      observedAmount: '10000',
       expiresAt: '2099-07-11T05:00:00.000Z',
     };
 
@@ -388,8 +388,8 @@ describe('GameWorld controls and settings boundary', () => {
             walletAddress: '11111111111111111111111111111111',
             network: 'solana:mainnet-beta',
             symbol: 'STAR',
-            requiredAmount: '1000',
-            observedAmount: '1000',
+            requiredAmount: '10000',
+            observedAmount: '10000',
             expiresAt: '2099-07-11T05:00:00.000Z',
           }}
           rechecking={false}
@@ -508,8 +508,8 @@ describe('GameWorld controls and settings boundary', () => {
             walletAddress: '11111111111111111111111111111111',
             network: 'solana:mainnet-beta',
             symbol: 'STAR',
-            requiredAmount: '1000',
-            observedAmount: '1000',
+            requiredAmount: '10000',
+            observedAmount: '10000',
             expiresAt: '2099-07-11T05:00:00.000Z',
           }}
           rechecking={false}

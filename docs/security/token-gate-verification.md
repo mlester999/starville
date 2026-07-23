@@ -18,11 +18,11 @@ checks:
 1. Parse the wallet and mint as canonical Solana public keys. Noncanonical base58 values fail.
 2. Call `getGenesisHash` and require the immutable genesis hash for the configured Devnet or Mainnet
    cluster. A mismatched RPC cannot be used accidentally.
-3. Call `getAccountInfo` for the exact mint with `jsonParsed` and the configured `confirmed` or
+3. Call `getAccountInfo` for the exact mint with base64 encoding and the configured `confirmed` or
    `finalized` commitment.
-4. Require an existing, non-executable, initialized mint owned by either the SPL Token program or
-   Token-2022 program. Read decimals from this account, not from the browser or an environment
-   guess.
+4. Select SPL Token or Token-2022 from the account owner, decode the raw account with that program's
+   mint layout, and require an existing, funded, non-executable, initialized mint. Read decimals
+   from this decoded account, not from the browser or an environment guess.
 5. Call `getTokenAccountsByOwner` for the exact wallet with the exact mint filter and the validated
    mint slot as `minContextSlot`; reject a response context below it.
 6. De-duplicate returned accounts by account public key.
@@ -68,8 +68,8 @@ rejected.
 Example for a six-decimal mint:
 
 ```text
-display requirement: 1000
-raw requirement:     1000000000
+display requirement: 10000
+raw requirement:     10000000000
 ```
 
 The comparison is `observedRaw >= requiredRaw`. A wallet one raw unit below is denied. Display
@@ -110,21 +110,26 @@ not amplify provider work.
 
 ## Configuration validation
 
-An administrator with `token_gate.configure` can ask the API to validate a proposed mint. The
-browser submits only network and mint address. The API uses its private RPC, returns the verified
-program, decimals, and slot, and rate-limits requests. Saving a configuration performs validation
-again, converts the threshold exactly, checks the expected version, and writes an audited update.
+Mint metadata is cached for 60 seconds per mint and commitment so player checks do not repeat an
+immutable mint read unnecessarily. An administrator with `token_gate.configure` can ask the API to
+force a fresh validation of a proposed mint. The browser submits only network and mint address. The
+API uses its private RPC, returns the verified program, decimals, and slot, and rate-limits
+requests. Saving a configuration performs validation again, converts the threshold exactly, checks
+the expected version, and writes an audited update.
+
+In production, `GAME_TOKEN_MINT_ADDRESS` and `GAME_TOKEN_GATE_AMOUNT=10000` pin the expected
+identity and display threshold. The database row must match the on-chain-derived program, decimals,
+and exact raw threshold or the gate fails closed. Browser-supplied metadata cannot override them.
 
 The environment variable `SOLANA_RPC_URL` is server-only. A provider key embedded in it is secret.
 No admin form, public configuration response, browser bundle, error, or event may contain it.
 
 ## Current live limitation
 
-The configured temporary Mainnet mint exists, is owned by Token-2022, has six decimals, and was
-validated through the protected administrator API. It is not the official `$STAR` mint and remains
-configuration-driven so it can be replaced before production. Live eligible approval still requires
-an owner-controlled wallet holding the configured threshold; automated tests do not substitute for
-that wallet-controlled proof.
+The production owner supplies the approved Pump.fun mint CA through `GAME_TOKEN_MINT_ADDRESS`.
+Program and decimals are deliberately absent from owner configuration and are derived by the server.
+Live eligible approval still requires an owner-controlled wallet holding the configured threshold;
+automated tests do not substitute for that wallet-controlled proof.
 
 ## External validation checklist
 

@@ -7,9 +7,11 @@ repository result is **Stage A blocked**; no later stage has started.
 
 `starville-dev` remains the development/closed-beta target. `starville-prod` must be a distinct
 Supabase project and a distinct Reown project with exact HTTPS/WSS domains, mainnet RPC, token mint,
-program, decimals, and a version-1 environment contract. `production:verify-target` validates and
-masks those identities, checks the linked Supabase workdir and database URL, and requires all three
-mutation gates to be false. It does not contact the database.
+and a version-1 environment contract. The sole token CA is `GAME_TOKEN_MINT_ADDRESS`; the display
+gate is exactly `GAME_TOKEN_GATE_AMOUNT=10000`. Program and decimals are derived from the mint.
+`production:verify-target` validates and masks static identities, while `production:verify-token`
+performs a separate read-only Mainnet mint verification. Neither sends a transaction or contacts
+Supabase data.
 
 Production templates under `infrastructure/deployment/templates/` cover Landing, Game Client, Admin
 Portal, API, Realtime Server, and Worker. They contain owner-required placeholders only. Secrets

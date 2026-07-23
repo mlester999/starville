@@ -25,12 +25,21 @@ const metricsSchema = z
     calculatedAt: z.iso.datetime({ offset: true }),
   })
   .strict();
+const activationFields = {
+  policiesActivated: z.number().int().nonnegative(),
+  shopsActivated: z.number().int().nonnegative(),
+  requestId: z.string().min(1).max(128),
+};
+const activationRpcSchema = z
+  .object({
+    ...activationFields,
+    publishedOnly: z.literal(true).optional(),
+  })
+  .strict();
 const activationSchema = z
   .object({
-    policiesActivated: z.number().int().nonnegative(),
-    shopsActivated: z.number().int().nonnegative(),
+    ...activationFields,
     publishedOnly: z.literal(true),
-    requestId: z.string().min(1).max(128),
   })
   .strict();
 const shopRestockSchema = z
@@ -62,6 +71,16 @@ function previousUtcDate(): string {
   return date.toISOString().slice(0, 10);
 }
 
+function parseApprovedActivation(value: unknown) {
+  const activation = activationRpcSchema.parse(value);
+
+  // This fixed RPC activates only approved, scheduled versions; reject conflicting attestations.
+  return activationSchema.parse({
+    ...activation,
+    publishedOnly: activation.publishedOnly ?? true,
+  });
+}
+
 export function createEconomyMaintenanceGateway(client: SupabaseClient): EconomyMaintenanceGateway {
   return {
     async execute(reconciliationBatchSize, riskBatchSize) {
@@ -84,7 +103,7 @@ export function createEconomyMaintenanceGateway(client: SupabaseClient): Economy
           p_request_id: requestId,
         }),
       );
-      const activation = activationSchema.parse(
+      const activation = parseApprovedActivation(
         await rpc(client, 'activate_approved_economy_versions', {
           p_batch_size: Math.min(riskBatchSize, 100),
           p_request_id: requestId,

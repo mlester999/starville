@@ -131,22 +131,51 @@ export function createTokenAccessService({
   const domain = new URL(landingUri).host;
 
   async function runtimeConfig(): Promise<RuntimeTokenGateConfig> {
+    let current;
     try {
-      const current = await gateway.getRuntimeConfig(environmentKey, config.network);
+      current = await gateway.getRuntimeConfig(environmentKey, config.network);
 
       if (current === undefined) {
         throw new PublicApiError(503, 'TOKEN_GATE_UNAVAILABLE');
       }
-
-      return config.gateEnabled
-        ? current
-        : { ...current, enabled: false, availability: 'disabled' as const };
     } catch (error) {
       if (error instanceof PublicApiError) {
         throw error;
       }
       return mapPersistenceError(error);
     }
+
+    if (!config.gateEnabled) {
+      return { ...current, enabled: false, availability: 'disabled' as const };
+    }
+
+    if (environmentKey === 'production') {
+      let mint;
+      try {
+        mint = await verifier.validateMint(config.mintAddress, config.commitment);
+      } catch (error) {
+        return mapRpcError(error);
+      }
+
+      let requiredAmountRaw;
+      try {
+        requiredAmountRaw = decimalAmountToRaw(config.requiredAmount, mint.decimals).toString();
+      } catch {
+        throw new PublicApiError(503, 'TOKEN_GATE_UNAVAILABLE');
+      }
+
+      if (
+        current.mintAddress !== mint.mintAddress ||
+        current.tokenProgram !== mint.tokenProgram ||
+        current.decimals !== mint.decimals ||
+        current.requiredAmount !== config.requiredAmount ||
+        current.requiredAmountRaw !== requiredAmountRaw
+      ) {
+        throw new PublicApiError(503, 'TOKEN_GATE_UNAVAILABLE');
+      }
+    }
+
+    return current;
   }
 
   async function recordEvent(event: WalletAccessEventInput): Promise<void> {
@@ -696,7 +725,10 @@ export function createTokenAccessService({
       }
 
       try {
-        const mint = await verifier.validateMint(mintAddress, commitment);
+        const mint =
+          verifier.refreshMint === undefined
+            ? await verifier.validateMint(mintAddress, commitment)
+            : await verifier.refreshMint(mintAddress, commitment);
         return {
           network: config.network,
           mintAddress: mint.mintAddress,
@@ -713,6 +745,12 @@ export function createTokenAccessService({
     async updateAdminConfig(identity, input, requestId) {
       if (input.network !== config.network) {
         throw new PublicApiError(400, 'NETWORK_MISMATCH');
+      }
+      if (
+        environmentKey === 'production' &&
+        (input.mintAddress !== config.mintAddress || input.requiredAmount !== config.requiredAmount)
+      ) {
+        throw new PublicApiError(422, 'INVALID_REQUEST');
       }
 
       const mint = await this.validateAdminMint(

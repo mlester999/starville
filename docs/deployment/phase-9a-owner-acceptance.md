@@ -35,8 +35,8 @@ This checklist remains pending until hosted deployment and a signed-in owner ses
   cooldown changes.
 - Review Candidates A–D and the conservative Candidate D recommendation; confirm it remains
   unpublished unless the owner separately chooses and explicitly publishes a reviewed version.
-- Confirm the existing STAR access threshold remains 1,000 unless separately owner-configured, the
-  mint remains environment-driven, and no approval/transfer/claim is requested.
+- Confirm the approved STAR access threshold is 10,000 display tokens, the mint remains
+  environment-driven, and no approval/transfer/claim is requested.
 
 Phase 8 final hosted RLS and owner acceptance for moderation edge cases, inspect privacy, gifting,
 trading, friendship/party lifecycle, ready checks, reconnect/leadership, and the complete Moonpetal

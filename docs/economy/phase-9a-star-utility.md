@@ -2,9 +2,8 @@
 
 The current `$STAR` role is unchanged: a non-custodial, read-only Solana Mainnet wallet eligibility
 check for Starville access. The configured mint remains environment-driven and is never hardcoded.
-The configured display threshold is 1,000 STAR unless an owner explicitly changes the existing token
-gate through its reviewed operation. Verification signs a message and reads token accounts; it does
-not request a token approval or transfer.
+The approved configured display threshold is 10,000 STAR. Verification signs a message and reads
+token accounts; it does not request a token approval or transfer.
 
 The versioned utility framework records product policy only. The active definition permits verified
 village access. Cosmetic entitlement signals are future design. DUST reward multipliers are

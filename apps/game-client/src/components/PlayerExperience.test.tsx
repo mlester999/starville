@@ -86,8 +86,8 @@ const access = {
   walletAddress: '11111111111111111111111111111111',
   network: 'solana:mainnet-beta' as const,
   symbol: 'STAR',
-  requiredAmount: '1000',
-  observedAmount: '1000',
+  requiredAmount: '10000',
+  observedAmount: '10000',
   expiresAt: '2099-07-11T05:00:00.000Z',
   recheckAfter: '2099-07-11T04:05:00.000Z',
 };

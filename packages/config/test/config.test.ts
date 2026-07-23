@@ -242,7 +242,7 @@ describe('private server configuration', () => {
     NEXT_PUBLIC_LANDING_URL: 'http://localhost:3000',
     GAME_TOKEN_MINT_ADDRESS: 'So11111111111111111111111111111111111111112',
     GAME_TOKEN_SYMBOL: 'STAR',
-    GAME_TOKEN_GATE_AMOUNT: '1000',
+    GAME_TOKEN_GATE_AMOUNT: '10000',
     TOKEN_ACCESS_COOKIE_SECRET: 'independent-token-access-secret-value',
   } as const;
 
@@ -337,7 +337,7 @@ describe('private server configuration', () => {
       network: 'solana:devnet',
       rpcUrl: 'https://api.devnet.solana.com/provider-key',
       gateEnabled: true,
-      requiredAmount: '1000',
+      requiredAmount: '10000',
       challengeTtlSeconds: 300,
       sessionTtlSeconds: 900,
       recheckIntervalSeconds: 300,
@@ -358,6 +358,29 @@ describe('private server configuration', () => {
     });
   });
 
+  it('rejects a non-Mainnet token boundary in production', () => {
+    expect(() =>
+      loadTokenAccessServerConfig({
+        ...tokenAccessEnvironment,
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_LANDING_URL: 'https://starville.example',
+      }),
+    ).toThrow('SOLANA_NETWORK must be mainnet-beta in production');
+  });
+
+  it('requires exactly 10,000 display tokens in production', () => {
+    expect(() =>
+      loadTokenAccessServerConfig({
+        ...tokenAccessEnvironment,
+        NODE_ENV: 'production',
+        SOLANA_NETWORK: 'mainnet-beta',
+        NEXT_PUBLIC_LANDING_URL: 'https://starville.example',
+        SOLANA_RPC_URL: 'https://mainnet.example.invalid/provider-key',
+        GAME_TOKEN_GATE_AMOUNT: '1000',
+      }),
+    ).toThrow('GAME_TOKEN_GATE_AMOUNT must be exactly 10000 in production');
+  });
+
   it('rejects an invalid mint, unsafe TTL, missing secret, and secret reuse', () => {
     expect(() =>
       loadTokenAccessServerConfig({
@@ -365,6 +388,12 @@ describe('private server configuration', () => {
         GAME_TOKEN_MINT_ADDRESS: 'not-a-public-key',
       }),
     ).toThrow();
+    expect(() =>
+      loadTokenAccessServerConfig({
+        ...tokenAccessEnvironment,
+        GAME_TOKEN_MINT_ADDRESS: '11111111111111111111111111111111',
+      }),
+    ).toThrow('must not be a placeholder');
     expect(() =>
       loadTokenAccessServerConfig({
         ...tokenAccessEnvironment,
@@ -383,17 +412,35 @@ describe('private server configuration', () => {
     ).toThrow('independent secret');
   });
 
+  it('derives the 10,000-token contract without manual program or decimal inputs', () => {
+    const loaded = loadTokenAccessServerConfig({
+      ...tokenAccessEnvironment,
+      GAME_TOKEN_GATE_AMOUNT: undefined,
+      STARVILLE_PRODUCTION_TOKEN_PROGRAM: 'stale-wrong-program',
+      STARVILLE_PRODUCTION_TOKEN_DECIMALS: '99',
+    });
+
+    expect(loaded).toMatchObject({
+      mintAddress: tokenAccessEnvironment.GAME_TOKEN_MINT_ADDRESS,
+      requiredAmount: '10000',
+    });
+    expect(loaded).not.toHaveProperty('tokenProgram');
+    expect(loaded).not.toHaveProperty('decimals');
+  });
+
   it('rejects cleartext production landing and RPC transports', () => {
     expect(() =>
       loadTokenAccessServerConfig({
         ...tokenAccessEnvironment,
         NODE_ENV: 'production',
+        SOLANA_NETWORK: 'mainnet-beta',
       }),
     ).toThrow('NEXT_PUBLIC_LANDING_URL must use HTTPS');
     expect(() =>
       loadTokenAccessServerConfig({
         ...tokenAccessEnvironment,
         NODE_ENV: 'production',
+        SOLANA_NETWORK: 'mainnet-beta',
         NEXT_PUBLIC_LANDING_URL: 'https://starville.example',
         SOLANA_RPC_URL: 'http://rpc.starville.example',
       }),

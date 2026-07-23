@@ -24,12 +24,31 @@ function jsonResponse(result: unknown): Response {
 }
 
 function mintResult(decimals = 6, owner = TOKEN_PROGRAM, slot = 100) {
+  const data = Buffer.alloc(82);
+  data.writeBigUInt64LE(0n, 36);
+  data.writeUInt8(decimals, 44);
+  data.writeUInt8(1, 45);
   return {
     context: { slot },
     value: {
       executable: false,
+      lamports: 1_461_600,
       owner,
-      data: { parsed: { type: 'mint', info: { decimals, isInitialized: true } } },
+      rentEpoch: 100,
+      data: [data.toString('base64'), 'base64'],
+    },
+  };
+}
+
+function accountInfoResult(data: Buffer, options: { owner?: string; lamports?: number } = {}) {
+  return {
+    context: { slot: 100 },
+    value: {
+      executable: false,
+      lamports: options.lamports ?? 1_461_600,
+      owner: options.owner ?? TOKEN_PROGRAM,
+      rentEpoch: 100,
+      data: [data.toString('base64'), 'base64'],
     },
   };
 }
@@ -136,6 +155,7 @@ describe('server-authoritative token verification', () => {
     });
 
     await expect(verifier.verifyBalance(WALLET, MINT)).resolves.toMatchObject({
+      tokenProgram: 'spl-token',
       rawAmount: 1_000_000_000n,
       tokenAccountCount: 2,
       decimals: 6,
@@ -182,7 +202,7 @@ describe('server-authoritative token verification', () => {
           jsonrpc: '2.0',
           id: 2,
           method: 'getAccountInfo',
-          params: [MINT, { commitment: 'finalized', encoding: 'jsonParsed' }],
+          params: [MINT, { commitment: 'finalized', encoding: 'base64' }],
         }),
       }),
     );
@@ -371,6 +391,88 @@ describe('server-authoritative token verification', () => {
     await expect(malformed.verifyBalance(WALLET, MINT)).rejects.toMatchObject({
       code: 'MALFORMED_RPC_RESPONSE',
     });
+  });
+
+  it('rejects missing, closed, uninitialized, and non-mint accounts', async () => {
+    const missing = createSolanaTokenVerifier({
+      rpcUrl: 'https://rpc.example.test',
+      network: 'solana:devnet',
+      commitment: 'confirmed',
+      fetch: vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse(DEVNET_GENESIS_HASH))
+        .mockResolvedValueOnce(jsonResponse({ context: { slot: 100 }, value: null })),
+    });
+    await expect(missing.validateMint(MINT)).rejects.toMatchObject({ code: 'MINT_NOT_FOUND' });
+
+    const closed = createSolanaTokenVerifier({
+      rpcUrl: 'https://rpc.example.test',
+      network: 'solana:devnet',
+      commitment: 'confirmed',
+      fetch: vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse(DEVNET_GENESIS_HASH))
+        .mockResolvedValueOnce(jsonResponse(accountInfoResult(Buffer.alloc(82), { lamports: 0 }))),
+    });
+    await expect(closed.validateMint(MINT)).rejects.toMatchObject({
+      code: 'MALFORMED_RPC_RESPONSE',
+    });
+
+    const uninitializedData = Buffer.alloc(82);
+    uninitializedData.writeUInt8(6, 44);
+    const uninitialized = createSolanaTokenVerifier({
+      rpcUrl: 'https://rpc.example.test',
+      network: 'solana:devnet',
+      commitment: 'confirmed',
+      fetch: vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse(DEVNET_GENESIS_HASH))
+        .mockResolvedValueOnce(jsonResponse(accountInfoResult(uninitializedData))),
+    });
+    await expect(uninitialized.validateMint(MINT)).rejects.toMatchObject({
+      code: 'MALFORMED_RPC_RESPONSE',
+    });
+
+    const tokenAccount = createSolanaTokenVerifier({
+      rpcUrl: 'https://rpc.example.test',
+      network: 'solana:devnet',
+      commitment: 'confirmed',
+      fetch: vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(jsonResponse(DEVNET_GENESIS_HASH))
+        .mockResolvedValueOnce(jsonResponse(accountInfoResult(Buffer.alloc(165)))),
+    });
+    await expect(tokenAccount.validateMint(MINT)).rejects.toMatchObject({
+      code: 'MALFORMED_RPC_RESPONSE',
+    });
+  });
+
+  it('caches immutable mint metadata and supports an explicit read-only refresh', async () => {
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(jsonResponse(DEVNET_GENESIS_HASH))
+      .mockResolvedValueOnce(jsonResponse(mintResult()))
+      .mockResolvedValueOnce(jsonResponse(DEVNET_GENESIS_HASH))
+      .mockResolvedValueOnce(jsonResponse(mintResult()));
+    const verifier = createSolanaTokenVerifier({
+      rpcUrl: 'https://rpc.example.test',
+      network: 'solana:devnet',
+      commitment: 'confirmed',
+      fetch,
+    });
+
+    await verifier.validateMint(MINT);
+    await verifier.validateMint(MINT);
+    expect(fetch).toHaveBeenCalledTimes(2);
+
+    await verifier.refreshMint(MINT);
+    expect(fetch).toHaveBeenCalledTimes(4);
+    expect(
+      fetch.mock.calls.map(([, request]) => {
+        const body = JSON.parse(String(request?.body)) as { method: string };
+        return body.method;
+      }),
+    ).toEqual(['getGenesisHash', 'getAccountInfo', 'getGenesisHash', 'getAccountInfo']);
   });
 
   it('bounds retry attempts and returns no provider detail', async () => {

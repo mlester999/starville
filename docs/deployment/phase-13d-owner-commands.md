@@ -20,12 +20,16 @@ direct every later command at the wrong project.
 cd -- '/Users/marklesteracak/Documents/Marky Files/Programming/starville'
 pnpm exec supabase --workdir infrastructure link --project-ref "${SUPABASE_PROJECT_REF:?set approved production project ref}"
 pnpm production:verify-target | tee "${PHASE13D_EVIDENCE_DIR:?set an owner-controlled evidence directory}/01-target.txt"
+pnpm production:verify-token | tee "${PHASE13D_EVIDENCE_DIR:?set an owner-controlled evidence directory}/01-token.txt"
 ```
 
-Expected: masked identity lines ending `PRODUCTION TARGET VERIFIED`; all three gates are `false`.
-Stop on any mismatch or missing owner value. Rollback: none; this is local/read-only verification.
-The link command changes only the canonical local CLI target and does not mutate database contents.
-Evidence: `01-target.txt`, exact commit, linked-project review, and two-owner target approval.
+Expected: masked identity lines ending `PRODUCTION TARGET VERIFIED`; all three gates are `false`;
+the configured mint is a valid Mainnet SPL Token or Token-2022 mint; program, decimals, and the
+10,000 display-token raw threshold are reported as derived on-chain. Stop on any mismatch, missing
+owner value, unsupported owner, undecodable mint, or RPC failure. Rollback: none; both verifiers are
+read-only. The link command changes only the canonical local CLI target and does not mutate database
+contents. Evidence: `01-target.txt`, `01-token.txt`, exact commit, linked-project review, and
+two-owner target approval.
 
 ## 2. Migration inspection
 
