@@ -5,12 +5,14 @@ import {
   closestInteraction,
   depthForFootPosition,
   lanternSquareManifest,
+  mapExitSchema,
   rawLanternSquareManifest,
   sanitizeInteractionText,
   terrainAssetDependencyKeys,
   validateMapManifest,
   worldAssetDependencyKeys,
   normalizeMapManifestAssetDependencies,
+  type MapExit,
 } from '../src/index';
 
 describe('Lantern Square manifest', () => {
@@ -113,6 +115,66 @@ describe('Lantern Square manifest', () => {
       ...terrainDependencies.filter((key) => !parsed.assets.includes(key)),
     ]);
     expect(normalized.assets).toEqual(worldAssetDependencyKeys(parsed));
+  });
+
+  it('keeps serialized exit keys required while allowing explicit nulls for disabled drafts', () => {
+    const enabled = rawLanternSquareManifest.exits[0];
+    if (enabled === undefined) throw new Error('Lantern Square north exit is missing');
+
+    const parsedEnabled: MapExit = mapExitSchema.parse(enabled);
+    expect(parsedEnabled.enabled).toBe(true);
+    expect(parsedEnabled.destinationMapId).not.toBeNull();
+    expect(parsedEnabled.destinationSpawnId).not.toBeNull();
+
+    expect(mapExitSchema.safeParse({ ...enabled, destinationMapId: undefined }).success).toBe(
+      false,
+    );
+    expect(mapExitSchema.safeParse({ ...enabled, destinationSpawnId: undefined }).success).toBe(
+      false,
+    );
+
+    const disabled = {
+      ...enabled,
+      destinationMapId: null,
+      destinationSpawnId: null,
+      enabled: false,
+      transitionLabel: null,
+    };
+    const parsedDisabled: MapExit = mapExitSchema.parse(disabled);
+    expect(parsedDisabled).toMatchObject({
+      destinationMapId: null,
+      destinationSpawnId: null,
+      enabled: false,
+    });
+    expect(
+      validateMapManifest(
+        {
+          ...rawLanternSquareManifest,
+          exits: [disabled, ...rawLanternSquareManifest.exits.slice(1)],
+        },
+        LANTERN_SQUARE_ASSET_IDS,
+      ).exits[0],
+    ).toMatchObject(parsedDisabled);
+  });
+
+  it('rejects enabled exits without complete destination data', () => {
+    const enabled = rawLanternSquareManifest.exits[0];
+    if (enabled === undefined) throw new Error('Lantern Square north exit is missing');
+
+    for (const incomplete of [
+      { ...enabled, destinationMapId: null },
+      { ...enabled, destinationSpawnId: null },
+    ]) {
+      expect(() =>
+        validateMapManifest(
+          {
+            ...rawLanternSquareManifest,
+            exits: [incomplete, ...rawLanternSquareManifest.exits.slice(1)],
+          },
+          LANTERN_SQUARE_ASSET_IDS,
+        ),
+      ).toThrow(/inconsistent enabled destination data/u);
+    }
   });
 });
 

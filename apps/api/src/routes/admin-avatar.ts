@@ -34,13 +34,15 @@ const reasonSchema = z
   .max(500)
   .regex(/^[^<>\p{Cc}]+$/u);
 
-const auditQuerySchema = z
+type AdminAvatarAuditQuery = Parameters<AdminAvatarGateway['audit']>[1];
+
+const auditQuerySchema: z.ZodType<AdminAvatarAuditQuery> = z
   .object({
     page: z.coerce.number().int().min(1).max(10_000).default(1),
-    pageSize: z.preprocess(
-      (value) => value ?? 50,
-      z.coerce.number().pipe(z.union([z.literal(20), z.literal(50), z.literal(100)])),
-    ),
+    pageSize: z.coerce
+      .number()
+      .pipe(z.union([z.literal(20), z.literal(50), z.literal(100)]))
+      .default(50),
   })
   .strict();
 

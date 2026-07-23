@@ -148,7 +148,17 @@ export const mapSpawnSchema = z
   })
   .strict();
 
-export const mapExitSchema = z
+export interface MapExit {
+  readonly id: string;
+  readonly direction: MapDirection;
+  readonly trigger: Readonly<{ x: number; y: number; width: number; height: number }>;
+  readonly destinationMapId: MapId | null;
+  readonly destinationSpawnId: string | null;
+  readonly enabled: boolean;
+  readonly transitionLabel: string | null;
+}
+
+export const mapExitSchema: z.ZodType<MapExit> = z
   .object({
     id: identifierSchema,
     direction: mapDirectionSchema,
@@ -238,16 +248,6 @@ export interface MapSpawn {
   readonly facingDirection: FacingDirection;
   readonly purpose: SpawnPurpose;
   readonly enabled: boolean;
-}
-
-export interface MapExit {
-  readonly id: string;
-  readonly direction: MapDirection;
-  readonly trigger: Readonly<{ x: number; y: number; width: number; height: number }>;
-  readonly destinationMapId: MapId | null;
-  readonly destinationSpawnId: string | null;
-  readonly enabled: boolean;
-  readonly transitionLabel: string | null;
 }
 
 type ParsedMapManifest = z.infer<typeof mapManifestSchema>;
