@@ -158,7 +158,7 @@ export interface MapExit {
   readonly transitionLabel: string | null;
 }
 
-export const mapExitSchema = z
+const mapExitInputSchema = z
   .object({
     id: identifierSchema,
     direction: mapDirectionSchema,
@@ -170,6 +170,22 @@ export const mapExitSchema = z
   })
   .strict()
   .required();
+
+export const mapExitSchema = mapExitInputSchema.transform<MapExit>((exit) => ({
+  id: exit.id,
+  direction: exit.direction,
+  trigger: exit.trigger,
+  destinationMapId: exit.destinationMapId,
+  destinationSpawnId: exit.destinationSpawnId,
+  enabled: exit.enabled,
+  transitionLabel: exit.transitionLabel,
+}));
+
+export type ParsedMapExit = z.output<typeof mapExitSchema>;
+type Assert<T extends true> = T;
+export type MapExitSchemaContract = Assert<
+  ParsedMapExit extends MapExit ? (MapExit extends ParsedMapExit ? true : false) : false
+>;
 
 export const worldAssetStatuses = ['approved', 'deprecated', 'draft'] as const;
 export const worldAssetStatusSchema = z.enum(worldAssetStatuses);

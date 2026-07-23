@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
   LANTERN_SQUARE_ASSET_IDS,
@@ -13,7 +13,16 @@ import {
   worldAssetDependencyKeys,
   normalizeMapManifestAssetDependencies,
   type MapExit,
+  type ParsedMapExit,
 } from '../src/index';
+
+expectTypeOf<ParsedMapExit>().toEqualTypeOf<MapExit>();
+
+function withoutKey(value: object, key: PropertyKey): object {
+  const clone = structuredClone(value);
+  Reflect.deleteProperty(clone, key);
+  return clone;
+}
 
 describe('Lantern Square manifest', () => {
   it('validates its assets, spawn, collisions, objects, and interaction data', () => {
@@ -126,12 +135,16 @@ describe('Lantern Square manifest', () => {
     expect(parsedEnabled.destinationMapId).not.toBeNull();
     expect(parsedEnabled.destinationSpawnId).not.toBeNull();
 
-    expect(mapExitSchema.safeParse({ ...enabled, destinationMapId: undefined }).success).toBe(
-      false,
-    );
-    expect(mapExitSchema.safeParse({ ...enabled, destinationSpawnId: undefined }).success).toBe(
-      false,
-    );
+    for (const requiredKey of [
+      'id',
+      'direction',
+      'trigger',
+      'enabled',
+      'destinationMapId',
+      'destinationSpawnId',
+    ] as const) {
+      expect(mapExitSchema.safeParse(withoutKey(enabled, requiredKey)).success).toBe(false);
+    }
 
     const disabled = {
       ...enabled,
