@@ -1,0 +1,6 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "vite",
+  "buildCommand": "cd ../.. && pnpm turbo run build --filter=@starville/game-client",
+  "outputDirectory": "dist"
+}

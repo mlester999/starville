@@ -37,7 +37,7 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react(), starvilleBundledAssetsPlugin()],
-    publicDir: false,
+    publicDir: 'public',
     envPrefix: ['NEXT_PUBLIC_'],
     build: {
       chunkSizeWarningLimit: 1_600,
