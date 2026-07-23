@@ -57,6 +57,7 @@
     },
     "@starville/api#build": {
       "dependsOn": ["^build"],
+      "env": ["CORS_ALLOWED_ORIGINS"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },

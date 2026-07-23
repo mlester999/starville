@@ -158,7 +158,7 @@ export interface MapExit {
   readonly transitionLabel: string | null;
 }
 
-export const mapExitSchema: z.ZodType<MapExit> = z
+export const mapExitSchema = z
   .object({
     id: identifierSchema,
     direction: mapDirectionSchema,
@@ -168,7 +168,8 @@ export const mapExitSchema: z.ZodType<MapExit> = z
     enabled: z.boolean(),
     transitionLabel: safeTextSchema(80).nullable(),
   })
-  .strict();
+  .strict()
+  .required();
 
 export const worldAssetStatuses = ['approved', 'deprecated', 'draft'] as const;
 export const worldAssetStatusSchema = z.enum(worldAssetStatuses);
