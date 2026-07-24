@@ -1,7 +1,14 @@
+import { readFileSync } from 'node:fs';
+
 import { describe, expect, it } from 'vitest';
 
 import { PHASE13E_CLEANUP_HOSTED_PLAN } from './phase13e-hosted-cleanup-validation';
 import { parseHostedHarnessMode } from './phase13e-hosted-realtime-validation';
+
+const harnessSource = readFileSync(
+  new URL('./phase13e-hosted-cleanup-validation.ts', import.meta.url),
+  'utf8',
+);
 
 describe('Phase 13E hosted cleanup-function harness', () => {
   it('is dry-run-only by default and does not silently execute', () => {
@@ -22,7 +29,7 @@ describe('Phase 13E hosted cleanup-function harness', () => {
       ]),
     );
     expect(PHASE13E_CLEANUP_HOSTED_PLAN.migrationState.preApplication).toContain('85 applied');
-    expect(PHASE13E_CLEANUP_HOSTED_PLAN.migrationState.behavioralExecution).toContain('88 applied');
+    expect(PHASE13E_CLEANUP_HOSTED_PLAN.migrationState.behavioralExecution).toContain('89 applied');
     expect(PHASE13E_CLEANUP_HOSTED_PLAN.fixtures).toEqual(
       expect.arrayContaining([
         'expired-eligible',
@@ -49,5 +56,8 @@ describe('Phase 13E hosted cleanup-function harness', () => {
     expect(PHASE13E_CLEANUP_HOSTED_PLAN.isolation).toContain('abort');
     expect(PHASE13E_CLEANUP_HOSTED_PLAN.isolation).toContain('pre-existing');
     expect(PHASE13E_CLEANUP_HOSTED_PLAN.cleanup).toContain('finally rollback');
+    expect(harnessSource).toContain("process.stdout.write('cleanup-behavior-ok");
+    expect(harnessSource).toContain("process.stdout.write('cleanup-fixture-cleanup-ok");
+    expect(harnessSource).toContain("fixtureTag: 'masked'");
   });
 });

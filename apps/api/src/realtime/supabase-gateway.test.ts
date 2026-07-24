@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createSupabaseRealtimeAuthorizationGateway } from './supabase-gateway.js';
 
 describe('Supabase Realtime authorization gateway', () => {
-  it('issues a one-use non-anonymous player token after database binding', async () => {
+  it('issues a one-use non-anonymous player token with the generated verification type', async () => {
     const rpc = vi
       .fn()
       .mockResolvedValueOnce({
@@ -18,7 +18,7 @@ describe('Supabase Realtime authorization gateway', () => {
     const generateLink = vi.fn(async () => ({
       data: {
         user: { id: '22222222-2222-4222-8222-222222222222' },
-        properties: { hashed_token: 'h'.repeat(64) },
+        properties: { hashed_token: 'h'.repeat(64), verification_type: 'signup' },
       },
       error: null,
     }));
@@ -35,7 +35,7 @@ describe('Supabase Realtime authorization gateway', () => {
     ).resolves.toEqual({
       status: 'issued',
       tokenHash: 'h'.repeat(64),
-      tokenType: 'magiclink',
+      tokenType: 'signup',
     });
     expect(generateLink).toHaveBeenCalledWith({
       type: 'magiclink',

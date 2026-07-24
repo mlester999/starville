@@ -52,6 +52,7 @@ const playerIdentityBindingSchema = z
     status: z.enum(['bound', 'auth_identity_invalid', 'auth_identity_conflict']),
   })
   .strict();
+const playerTokenTypeSchema = z.enum(['magiclink', 'signup']);
 
 export class SupabaseRealtimePersistenceError extends Error {
   public constructor() {
@@ -102,7 +103,7 @@ export function createSupabaseRealtimeAuthorizationGateway(
       return {
         status: 'issued',
         tokenHash: generated.data.properties.hashed_token,
-        tokenType: 'magiclink',
+        tokenType: playerTokenTypeSchema.parse(generated.data.properties.verification_type),
       };
     },
     async verifyPlayerIdentity(accessToken) {

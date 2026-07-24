@@ -265,7 +265,7 @@ describe('Supabase realtime browser transport', () => {
         Response.json({
           success: true,
           requestId: 'session-request',
-          data: { tokenHash: 'h'.repeat(64), tokenType: 'magiclink' },
+          data: { tokenHash: 'h'.repeat(64), tokenType: 'signup' },
         }),
       )
       .mockResolvedValueOnce(
@@ -302,7 +302,7 @@ describe('Supabase realtime browser transport', () => {
     expect(fetchMock.mock.calls[0]?.[0]).toContain('/supabase-realtime/session');
     expect(verifyOtp).toHaveBeenCalledWith({
       token_hash: 'h'.repeat(64),
-      type: 'magiclink',
+      type: 'signup',
     });
     expect(client.realtime.setAuth).toHaveBeenCalledWith('p'.repeat(64));
     transport.dispose();

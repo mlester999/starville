@@ -32,10 +32,20 @@ import {
   verifyCanonicalHostedTarget,
 } from './safety';
 import {
+  hostedHarnessStageError,
+  runHostedHarnessStage,
+  runWithCriticalCleanup,
+  sanitizeHostedHarnessFailure,
+  type HostedHarnessCleanupFailure,
+} from './phase13e-hosted-harness-diagnostics';
+import {
+  PHASE13E_HOSTED_VALIDATION_WORKTREE_PATHS,
   assertPhase13eBehavioralExecutionReady,
   assertPhase13eRepositoryBaseline,
 } from './phase13e-hosted-retry-safety';
 import { summarizeRealtimeManagementSettings } from './verify-realtime-settings';
+
+export { runWithCriticalCleanup } from './phase13e-hosted-harness-diagnostics';
 
 export type HostedHarnessMode = 'dry-run' | 'execute';
 
@@ -43,7 +53,7 @@ export const PHASE13E_REALTIME_HOSTED_PLAN = {
   target: 'exact starville-dev project ref and URL; production rejected',
   migrationState: {
     preApplication: '85 applied, exactly three reviewed pending, zero remote-only',
-    behavioralExecution: '88 applied, zero pending, zero remote-only',
+    behavioralExecution: '89 applied, zero pending, zero remote-only after the forward cleanup fix',
   },
   fixtures: 'unique run-tagged wallet players plus bound, unbound, and anonymous Auth identities',
   publicChannel: {
@@ -200,30 +210,6 @@ export function classifyNegativeSubscriptionStatus(status: string): NegativeSubs
   return 'pending';
 }
 
-export async function runWithCriticalCleanup(
-  validation: () => Promise<void>,
-  cleanup: () => Promise<readonly string[]>,
-): Promise<void> {
-  let validationError: unknown;
-  try {
-    await validation();
-  } catch (error) {
-    validationError = error;
-  }
-  let cleanupErrors: readonly string[];
-  try {
-    cleanupErrors = await cleanup();
-  } catch {
-    cleanupErrors = ['cleanup-exception'];
-  }
-  if (cleanupErrors.length > 0) {
-    throw new Error(
-      `Phase 13E hosted cleanup failed for ${[...new Set(cleanupErrors)].join(', ')}`,
-    );
-  }
-  if (validationError !== undefined) throw validationError;
-}
-
 function sha256(value: string): string {
   return createHash('sha256').update(value).digest('hex');
 }
@@ -236,6 +222,21 @@ export function corruptAuthToken(token: string): string {
   }
   const replacement = signature.startsWith('a') ? 'b' : 'a';
   return `${segments[0]}.${segments[1]}.${replacement}${signature.slice(1)}`;
+}
+
+export type PlayerAuthVerificationType = 'magiclink' | 'signup';
+
+export function parsePlayerAuthVerificationType(input: unknown): PlayerAuthVerificationType {
+  if (input === 'magiclink' || input === 'signup') return input;
+  throw new Error('Generated player Auth verification type is not allowed');
+}
+
+export function isAnonymousAuthProviderDisabled(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false;
+  return (
+    Reflect.get(error, 'status') === 422 &&
+    Reflect.get(error, 'code') === 'anonymous_provider_disabled'
+  );
 }
 
 function requiredEnvironment(name: string): string {
@@ -263,12 +264,17 @@ function delay(milliseconds: number): Promise<void> {
 
 async function waitFor(
   condition: () => boolean,
-  label: string,
+  stage: string,
   timeoutMilliseconds = 10_000,
 ): Promise<void> {
   const deadline = Date.now() + timeoutMilliseconds;
   while (!condition()) {
-    if (Date.now() >= deadline) throw new Error(`Timed out waiting for ${label}`);
+    if (Date.now() >= deadline) {
+      throw hostedHarnessStageError(stage, 'timeout', 'STAGE_TIMEOUT', {
+        timeoutMilliseconds,
+        retryable: true,
+      });
+    }
     await delay(25);
   }
 }
@@ -303,6 +309,7 @@ export async function expectSubscriptionRejected(
     readonly label: string;
     readonly private: boolean;
     readonly publicChannelProbe?: boolean;
+    readonly stage: string;
     readonly timeoutMilliseconds?: number;
   },
 ): Promise<void> {
@@ -324,7 +331,13 @@ export async function expectSubscriptionRejected(
       const timeout = setTimeout(
         () =>
           finish(() =>
-            reject(new Error(`Timed out waiting for ${options.label} subscription rejection`)),
+            reject(
+              hostedHarnessStageError(options.stage, 'timeout', 'CHANNEL_DENIAL_TIMEOUT', {
+                timeoutMilliseconds: options.timeoutMilliseconds ?? 10_000,
+                expectedStatus: 'REJECTED',
+                retryable: true,
+              }),
+            ),
           ),
         options.timeoutMilliseconds ?? 10_000,
       );
@@ -337,10 +350,26 @@ export async function expectSubscriptionRejected(
           if (options.publicChannelProbe === true) {
             process.stdout.write('PUBLIC_CHANNEL_UNEXPECTEDLY_ALLOWED\n');
           }
-          finish(() => reject(new Error(`${options.label} subscription was unexpectedly allowed`)));
+          finish(() =>
+            reject(
+              hostedHarnessStageError(options.stage, 'realtime', 'CHANNEL_UNEXPECTEDLY_ALLOWED', {
+                channelStatus: 'SUBSCRIBED',
+                expectedStatus: 'REJECTED',
+                receivedStatus: 'SUBSCRIBED',
+              }),
+            ),
+          );
         } else if (outcome === 'inconclusive') {
           finish(() =>
-            reject(new Error(`${options.label} subscription timed out without a denial`)),
+            reject(
+              hostedHarnessStageError(options.stage, 'timeout', 'CHANNEL_STATUS_TIMEOUT', {
+                channelStatus: 'TIMED_OUT',
+                expectedStatus: 'REJECTED',
+                receivedStatus: 'TIMED_OUT',
+                timeoutMilliseconds: options.timeoutMilliseconds ?? 10_000,
+                retryable: true,
+              }),
+            ),
           );
         }
       });
@@ -352,10 +381,14 @@ export async function expectSubscriptionRejected(
     channelCleanupFailed = removed !== 'ok';
   }
   if (channelCleanupFailed) {
-    throw new Error(`${options.label} test channel cleanup failed`);
+    throw hostedHarnessStageError(`${options.stage}-cleanup`, 'cleanup', 'CHANNEL_CLEANUP_FAILED');
   }
   if (subscriptionError !== undefined) throw subscriptionError;
-  if (!rejectionProven) throw new Error(`${options.label} subscription rejection was not proven`);
+  if (!rejectionProven) {
+    throw hostedHarnessStageError(options.stage, 'validation', 'CHANNEL_REJECTION_NOT_PROVEN', {
+      expectedStatus: 'REJECTED',
+    });
+  }
   if (options.publicChannelProbe === true) {
     process.stdout.write('PUBLIC_CHANNEL_REJECTED\n');
   }
@@ -472,81 +505,126 @@ async function createAuthFixture(
   verifyOneUse: boolean,
 ): Promise<AuthFixture> {
   const requestTag = `${fixtureTag}:${fixtureCase}`;
-  const prepared = await service.rpc('prepare_supabase_realtime_player_identity', {
-    p_access_session_token_hash: player.accessSessionHash,
-    p_request_id: `${requestTag}:prepare`,
-  });
-  if (prepared.error !== null) throw prepared.error;
-  const email = (prepared.data as { readonly email?: unknown }).email;
-  if (typeof email !== 'string')
-    throw new Error('Wallet-bound Auth preparation did not return email');
-
-  const generated = await service.auth.admin.generateLink({
-    type: 'magiclink',
-    email,
-    options: {
-      data: {
-        starville_identity: 'player',
-        fixture_tag: fixtureTag,
-        fixture_case: fixtureCase,
-      },
-    },
-  });
-  if (generated.error !== null || generated.data.properties === null) {
-    throw generated.error ?? new Error('Auth fixture link generation failed');
-  }
-  trackAuthUser(generated.data.user.id);
-  if (generated.data.user.is_anonymous === true) {
-    throw new Error('Phase 13E Auth fixture must be non-anonymous');
-  }
-
-  const bound = await service.rpc('bind_supabase_realtime_player_identity', {
-    p_auth_user_id: generated.data.user.id,
-    p_access_session_token_hash: player.accessSessionHash,
-    p_request_id: `${requestTag}:bind`,
-  });
-  if (bound.error !== null || (bound.data as { readonly status?: unknown }).status !== 'bound') {
-    throw bound.error ?? new Error('Exact Auth-to-player binding failed');
-  }
-
-  const verified = await browser.auth.verifyOtp({
-    token_hash: generated.data.properties.hashed_token,
-    type: 'magiclink',
-  });
-  if (
-    verified.error !== null ||
-    verified.data.session === null ||
-    verified.data.user === null ||
-    verified.data.user.is_anonymous === true
-  ) {
-    throw verified.error ?? new Error('Non-anonymous fixture session verification failed');
-  }
-  if (verifyOneUse) {
-    const replayed = await replayBrowser.auth.verifyOtp({
-      token_hash: generated.data.properties.hashed_token,
-      type: 'magiclink',
+  const prepared = await runHostedHarnessStage(`valid-auth-prepare-${fixtureCase}`, async () => {
+    const result = await service.rpc('prepare_supabase_realtime_player_identity', {
+      p_access_session_token_hash: player.accessSessionHash,
+      p_request_id: `${requestTag}:prepare`,
     });
-    if (replayed.error === null || replayed.data.session !== null) {
-      throw new Error('One-use player magic-link token replay unexpectedly succeeded');
-    }
-  }
-  await browser.realtime.setAuth(verified.data.session.access_token);
-
-  const authorized = await service.rpc('authorize_supabase_realtime_player', {
-    p_auth_user_id: verified.data.user.id,
-    p_access_session_token_hash: player.accessSessionHash,
-    p_environment_key: 'development',
-    p_requested_channel_id: channelId,
-    p_request_id: `${requestTag}:authorize`,
+    if (result.error !== null) throw result.error;
+    return result;
   });
-  if (authorized.error !== null) throw authorized.error;
+  const email = (prepared.data as { readonly email?: unknown }).email;
+  if (typeof email !== 'string') {
+    throw hostedHarnessStageError(
+      `valid-auth-prepare-${fixtureCase}`,
+      'validation',
+      'AUTH_PREPARATION_EMAIL_MISSING',
+    );
+  }
+
+  const generated = await runHostedHarnessStage(`fixture-create-auth-${fixtureCase}`, async () => {
+    const result = await service.auth.admin.generateLink({
+      type: 'magiclink',
+      email,
+      options: {
+        data: {
+          starville_identity: 'player',
+          fixture_tag: fixtureTag,
+          fixture_case: fixtureCase,
+        },
+      },
+    });
+    if (result.error !== null || result.data.properties === null) {
+      throw result.error ?? new Error('Auth fixture link generation failed');
+    }
+    return result;
+  });
+  trackAuthUser(generated.data.user.id);
+  const verificationType = parsePlayerAuthVerificationType(
+    generated.data.properties.verification_type,
+  );
+  if (generated.data.user.is_anonymous === true) {
+    throw hostedHarnessStageError(
+      `fixture-create-auth-${fixtureCase}`,
+      'validation',
+      'AUTH_FIXTURE_WAS_ANONYMOUS',
+    );
+  }
+
+  await runHostedHarnessStage(`valid-auth-bind-${fixtureCase}`, async () => {
+    const result = await service.rpc('bind_supabase_realtime_player_identity', {
+      p_auth_user_id: generated.data.user.id,
+      p_access_session_token_hash: player.accessSessionHash,
+      p_request_id: `${requestTag}:bind`,
+    });
+    if (
+      result.error !== null ||
+      (result.data as { readonly status?: unknown }).status !== 'bound'
+    ) {
+      throw result.error ?? new Error('Exact Auth-to-player binding failed');
+    }
+  });
+
+  const verified = await runHostedHarnessStage(`magic-link-first-use-${fixtureCase}`, async () => {
+    const result = await browser.auth.verifyOtp({
+      token_hash: generated.data.properties!.hashed_token,
+      type: verificationType,
+    });
+    if (
+      result.error !== null ||
+      result.data.session === null ||
+      result.data.user === null ||
+      result.data.user.is_anonymous === true
+    ) {
+      throw result.error ?? new Error('Non-anonymous fixture session verification failed');
+    }
+    return result;
+  });
+  if (verifyOneUse) {
+    await runHostedHarnessStage('magic-link-second-use-denial', async () => {
+      const replayed = await replayBrowser.auth.verifyOtp({
+        token_hash: generated.data.properties!.hashed_token,
+        type: verificationType,
+      });
+      if (replayed.error === null || replayed.data.session !== null) {
+        throw hostedHarnessStageError(
+          'magic-link-second-use-denial',
+          'validation',
+          'MAGIC_LINK_REPLAY_ALLOWED',
+          { expectedStatus: 'REJECTED', receivedStatus: 'VERIFIED' },
+        );
+      }
+    });
+  }
+  await runHostedHarnessStage(`set-auth-${fixtureCase}`, async () => {
+    await browser.realtime.setAuth(verified.data.session!.access_token);
+  });
+
+  const authorized = await runHostedHarnessStage(
+    `valid-auth-authorize-${fixtureCase}`,
+    async () => {
+      const result = await service.rpc('authorize_supabase_realtime_player', {
+        p_auth_user_id: verified.data.user!.id,
+        p_access_session_token_hash: player.accessSessionHash,
+        p_environment_key: 'development',
+        p_requested_channel_id: channelId,
+        p_request_id: `${requestTag}:authorize`,
+      });
+      if (result.error !== null) throw result.error;
+      return result;
+    },
+  );
   const authorization = parseAuthorizedView(authorized.data);
   if (authorization.topic !== `starville:development:world:lantern-square:channel:${channelId}`) {
-    throw new Error('Authorization returned an unexpected private world topic');
+    throw hostedHarnessStageError(
+      `valid-auth-authorize-${fixtureCase}`,
+      'validation',
+      'AUTHORIZATION_TOPIC_MISMATCH',
+    );
   }
   return {
-    userId: verified.data.user.id,
-    accessToken: verified.data.session.access_token,
+    userId: verified.data.user!.id,
+    accessToken: verified.data.session!.access_token,
     authorization,
   };
 }
@@ -558,37 +636,48 @@ async function createTaggedNonAnonymousAuthSession(
   fixtureCase: string,
   trackAuthUser: (userId: string) => void,
 ): Promise<AuthSessionFixture> {
-  const generated = await service.auth.admin.generateLink({
-    type: 'magiclink',
-    email: `${fixtureTag}-${fixtureCase}@auth.starville.game`,
-    options: {
-      data: {
-        starville_identity: 'negative-test',
-        fixture_tag: fixtureTag,
-        fixture_case: fixtureCase,
+  const generated = await runHostedHarnessStage(`fixture-create-auth-${fixtureCase}`, async () => {
+    const result = await service.auth.admin.generateLink({
+      type: 'magiclink',
+      email: `${fixtureTag}-${fixtureCase}@auth.starville.game`,
+      options: {
+        data: {
+          starville_identity: 'negative-test',
+          fixture_tag: fixtureTag,
+          fixture_case: fixtureCase,
+        },
       },
-    },
+    });
+    if (result.error !== null || result.data.properties === null) {
+      throw result.error ?? new Error('Tagged Auth denial fixture generation failed');
+    }
+    return result;
   });
-  if (generated.error !== null || generated.data.properties === null) {
-    throw generated.error ?? new Error('Tagged Auth denial fixture generation failed');
-  }
   trackAuthUser(generated.data.user.id);
-  const verified = await browser.auth.verifyOtp({
-    token_hash: generated.data.properties.hashed_token,
-    type: 'magiclink',
+  const verificationType = parsePlayerAuthVerificationType(
+    generated.data.properties.verification_type,
+  );
+  const verified = await runHostedHarnessStage(`magic-link-first-use-${fixtureCase}`, async () => {
+    const result = await browser.auth.verifyOtp({
+      token_hash: generated.data.properties!.hashed_token,
+      type: verificationType,
+    });
+    if (
+      result.error !== null ||
+      result.data.session === null ||
+      result.data.user === null ||
+      result.data.user.is_anonymous === true
+    ) {
+      throw result.error ?? new Error('Tagged non-anonymous Auth denial fixture failed');
+    }
+    return result;
   });
-  if (
-    verified.error !== null ||
-    verified.data.session === null ||
-    verified.data.user === null ||
-    verified.data.user.is_anonymous === true
-  ) {
-    throw verified.error ?? new Error('Tagged non-anonymous Auth denial fixture failed');
-  }
-  await browser.realtime.setAuth(verified.data.session.access_token);
+  await runHostedHarnessStage(`set-auth-${fixtureCase}`, async () => {
+    await browser.realtime.setAuth(verified.data.session!.access_token);
+  });
   return {
-    userId: verified.data.user.id,
-    accessToken: verified.data.session.access_token,
+    userId: verified.data.user!.id,
+    accessToken: verified.data.session!.access_token,
   };
 }
 
@@ -596,6 +685,7 @@ async function subscribe(
   client: BrowserClient,
   authorization: SupabaseRealtimeAuthorizationView,
   onMovement: (payload: unknown) => void,
+  stage: string,
 ): Promise<SubscribedChannel> {
   const events = { sync: 0, join: 0, leave: 0 };
   const channel = client.channel(authorization.topic, {
@@ -618,7 +708,14 @@ async function subscribe(
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') resolve();
         if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
-          reject(new Error(`Private Realtime subscription failed: ${status}`));
+          reject(
+            hostedHarnessStageError(stage, 'realtime', 'CHANNEL_STATUS_FAILURE', {
+              channelStatus: status,
+              expectedStatus: 'SUBSCRIBED',
+              receivedStatus: status,
+              retryable: status === 'TIMED_OUT',
+            }),
+          );
         }
       });
     });
@@ -630,13 +727,19 @@ async function subscribe(
     };
     supabasePresencePayloadSchema.parse(presence);
     if ((await channel.track(presence)) !== 'ok') {
-      throw new Error('Private Presence track failed');
+      throw hostedHarnessStageError(stage, 'realtime', 'PRESENCE_TRACK_FAILED');
     }
     return { channel, events };
   } catch (error) {
     const removed = await client.removeChannel(channel);
     if (removed !== 'ok') {
-      throw new Error('Private Realtime failed-subscription cleanup failed', { cause: error });
+      throw hostedHarnessStageError(
+        `${stage}-cleanup`,
+        'cleanup',
+        'FAILED_SUBSCRIPTION_CLEANUP_FAILED',
+        {},
+        error,
+      );
     }
     throw error;
   }
@@ -705,55 +808,76 @@ async function validateAuthNegativeCases(options: {
 }): Promise<void> {
   const [playerA, playerB] = options.fixtures.players;
   const channelId = options.fixtures.world.channelIds[0];
-  const unbound = await createTaggedNonAnonymousAuthSession(
-    options.service,
-    options.clients.unbound,
-    options.fixtureTag,
-    'unbound',
-    options.trackAuthUser,
-  );
-  const unboundBind = await options.service.rpc('bind_supabase_realtime_player_identity', {
-    p_auth_user_id: unbound.userId,
-    p_access_session_token_hash: playerA.accessSessionHash,
-    p_request_id: `${options.fixtureTag}:unbound:bind-denial`,
-  });
-  assertRpcStatus(unboundBind, 'auth_identity_invalid', 'Unbound Auth binding');
-  const unboundAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
-    p_auth_user_id: unbound.userId,
-    p_access_session_token_hash: playerA.accessSessionHash,
-    p_environment_key: 'development',
-    p_requested_channel_id: channelId,
-    p_request_id: `${options.fixtureTag}:unbound:authorization-denial`,
-  });
-  assertRpcStatus(unboundAuthorization, 'auth_identity_invalid', 'Unbound Auth authorization');
-  await expectSubscriptionRejected(options.clients.unbound, options.authA.authorization.topic, {
-    label: 'unbound authenticated private channel',
-    private: true,
+  await runHostedHarnessStage('unbound-auth-denial', async () => {
+    const unbound = await createTaggedNonAnonymousAuthSession(
+      options.service,
+      options.clients.unbound,
+      options.fixtureTag,
+      'unbound',
+      options.trackAuthUser,
+    );
+    const unboundBind = await options.service.rpc('bind_supabase_realtime_player_identity', {
+      p_auth_user_id: unbound.userId,
+      p_access_session_token_hash: playerA.accessSessionHash,
+      p_request_id: `${options.fixtureTag}:unbound:bind-denial`,
+    });
+    assertRpcStatus(unboundBind, 'auth_identity_invalid', 'Unbound Auth binding');
+    const unboundAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
+      p_auth_user_id: unbound.userId,
+      p_access_session_token_hash: playerA.accessSessionHash,
+      p_environment_key: 'development',
+      p_requested_channel_id: channelId,
+      p_request_id: `${options.fixtureTag}:unbound:authorization-denial`,
+    });
+    assertRpcStatus(unboundAuthorization, 'auth_identity_invalid', 'Unbound Auth authorization');
+    await expectSubscriptionRejected(options.clients.unbound, options.authA.authorization.topic, {
+      label: 'unbound authenticated private channel',
+      private: true,
+      stage: 'unbound-auth-denial',
+    });
   });
 
-  const wrongPlayerBind = await options.service.rpc('bind_supabase_realtime_player_identity', {
-    p_auth_user_id: options.authA.userId,
-    p_access_session_token_hash: playerB.accessSessionHash,
-    p_request_id: `${options.fixtureTag}:wrong-player:bind-denial`,
+  await runHostedHarnessStage('wrong-player-denial', async () => {
+    const wrongPlayerBind = await options.service.rpc('bind_supabase_realtime_player_identity', {
+      p_auth_user_id: options.authA.userId,
+      p_access_session_token_hash: playerB.accessSessionHash,
+      p_request_id: `${options.fixtureTag}:wrong-player:bind-denial`,
+    });
+    assertRpcStatus(wrongPlayerBind, 'auth_identity_invalid', 'Wrong-player binding');
+    const wrongPlayerAuthorization = await options.service.rpc(
+      'authorize_supabase_realtime_player',
+      {
+        p_auth_user_id: options.authA.userId,
+        p_access_session_token_hash: playerB.accessSessionHash,
+        p_environment_key: 'development',
+        p_requested_channel_id: channelId,
+        p_request_id: `${options.fixtureTag}:wrong-player:authorization-denial`,
+      },
+    );
+    assertRpcStatus(
+      wrongPlayerAuthorization,
+      'auth_identity_invalid',
+      'Wrong-player authorization',
+    );
+    await expectSubscriptionRejected(
+      options.browserA,
+      playerRealtimeTopic('development', options.authB.authorization.self.presenceId),
+      { label: 'wrong-player private player topic', private: true, stage: 'wrong-player-denial' },
+    );
   });
-  assertRpcStatus(wrongPlayerBind, 'auth_identity_invalid', 'Wrong-player binding');
-  const wrongPlayerAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
-    p_auth_user_id: options.authA.userId,
-    p_access_session_token_hash: playerB.accessSessionHash,
-    p_environment_key: 'development',
-    p_requested_channel_id: channelId,
-    p_request_id: `${options.fixtureTag}:wrong-player:authorization-denial`,
-  });
-  assertRpcStatus(wrongPlayerAuthorization, 'auth_identity_invalid', 'Wrong-player authorization');
-  await expectSubscriptionRejected(
-    options.browserA,
-    playerRealtimeTopic('development', options.authB.authorization.self.presenceId),
-    { label: 'wrong-player private player topic', private: true },
-  );
 
-  let suspended = false;
-  try {
-    const updated = await options.sql<{ id: string }[]>`
+  await runHostedHarnessStage('wrong-world-denial', async () => {
+    await expectSubscriptionRejected(
+      options.browserA,
+      worldRealtimeTopic('development', 'other-world', channelId),
+      { label: 'wrong-world private topic', private: true, stage: 'wrong-world-denial' },
+    );
+  });
+
+  await runHostedHarnessStage('suspended-player-denial', async () => {
+    let suspended = false;
+    try {
+      const updated = await options.sql<{ id: string }[]>`
       update public.player_moderation_states
       set status = 'suspended',
           suspension_reason = 'Phase 13E isolated hosted authorization test.',
@@ -762,157 +886,196 @@ async function validateAuthNegativeCases(options: {
       where player_profile_id = ${playerB.playerId}::uuid
       returning player_profile_id::text as id
     `;
-    if (updated.length !== 1) throw new Error('Suspended-player fixture state was not isolated');
-    suspended = true;
-    const suspendedPreparation = await options.service.rpc(
-      'prepare_supabase_realtime_player_identity',
-      {
-        p_access_session_token_hash: playerB.accessSessionHash,
-        p_request_id: `${options.fixtureTag}:suspended:prepare-denial`,
-      },
-    );
-    assertRpcStatus(suspendedPreparation, 'player_suspended', 'Suspended-player Auth exchange');
-    const suspendedAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
-      p_auth_user_id: options.authB.userId,
-      p_access_session_token_hash: playerB.accessSessionHash,
-      p_environment_key: 'development',
-      p_requested_channel_id: channelId,
-      p_request_id: `${options.fixtureTag}:suspended:authorization-denial`,
-    });
-    assertRpcStatus(suspendedAuthorization, 'player_suspended', 'Suspended-player authorization');
-    await expectSubscriptionRejected(options.browserB, options.authB.authorization.topic, {
-      label: 'suspended-player private channel',
-      private: true,
-    });
-  } finally {
-    if (suspended) {
-      await options.sql`
+      if (updated.length !== 1) throw new Error('Suspended-player fixture state was not isolated');
+      suspended = true;
+      const suspendedPreparation = await options.service.rpc(
+        'prepare_supabase_realtime_player_identity',
+        {
+          p_access_session_token_hash: playerB.accessSessionHash,
+          p_request_id: `${options.fixtureTag}:suspended:prepare-denial`,
+        },
+      );
+      assertRpcStatus(suspendedPreparation, 'player_suspended', 'Suspended-player Auth exchange');
+      const suspendedAuthorization = await options.service.rpc(
+        'authorize_supabase_realtime_player',
+        {
+          p_auth_user_id: options.authB.userId,
+          p_access_session_token_hash: playerB.accessSessionHash,
+          p_environment_key: 'development',
+          p_requested_channel_id: channelId,
+          p_request_id: `${options.fixtureTag}:suspended:authorization-denial`,
+        },
+      );
+      assertRpcStatus(suspendedAuthorization, 'player_suspended', 'Suspended-player authorization');
+      await expectSubscriptionRejected(options.browserB, options.authB.authorization.topic, {
+        label: 'suspended-player private channel',
+        private: true,
+        stage: 'suspended-player-denial',
+      });
+    } finally {
+      if (suspended) {
+        await options.sql`
         update public.player_moderation_states
         set status = 'active', suspension_reason = null, suspended_at = null,
             suspended_by_admin_id = null
         where player_profile_id = ${playerB.playerId}::uuid
       `;
+      }
     }
-  }
+  });
 
-  const anonymousSignIn = await options.clients.anonymous.auth.signInAnonymously({
-    options: {
-      data: {
-        fixture_tag: options.fixtureTag,
-        fixture_case: 'anonymous',
+  await runHostedHarnessStage('anonymous-user-denial', async () => {
+    const anonymousSignIn = await options.clients.anonymous.auth.signInAnonymously({
+      options: {
+        data: {
+          fixture_tag: options.fixtureTag,
+          fixture_case: 'anonymous',
+        },
       },
-    },
+    });
+    if (isAnonymousAuthProviderDisabled(anonymousSignIn.error)) {
+      process.stdout.write('anonymous-user-denial-ok\n');
+      return;
+    }
+    if (
+      anonymousSignIn.error !== null ||
+      anonymousSignIn.data.user === null ||
+      anonymousSignIn.data.session === null ||
+      anonymousSignIn.data.user.is_anonymous !== true
+    ) {
+      throw anonymousSignIn.error ?? new Error('Anonymous Auth fixture creation failed');
+    }
+    options.trackAuthUser(anonymousSignIn.data.user.id);
+    await options.clients.anonymous.realtime.setAuth(anonymousSignIn.data.session.access_token);
+    const anonymousAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
+      p_auth_user_id: anonymousSignIn.data.user.id,
+      p_access_session_token_hash: playerA.accessSessionHash,
+      p_environment_key: 'development',
+      p_requested_channel_id: channelId,
+      p_request_id: `${options.fixtureTag}:anonymous:authorization-denial`,
+    });
+    assertRpcStatus(
+      anonymousAuthorization,
+      'auth_identity_invalid',
+      'Anonymous Auth authorization',
+    );
+    await expectSubscriptionRejected(options.clients.anonymous, options.authA.authorization.topic, {
+      label: 'anonymous private channel',
+      private: true,
+      stage: 'anonymous-user-denial',
+    });
   });
-  if (
-    anonymousSignIn.error !== null ||
-    anonymousSignIn.data.user === null ||
-    anonymousSignIn.data.session === null ||
-    anonymousSignIn.data.user.is_anonymous !== true
-  ) {
-    throw anonymousSignIn.error ?? new Error('Anonymous Auth fixture creation failed');
-  }
-  options.trackAuthUser(anonymousSignIn.data.user.id);
-  await options.clients.anonymous.realtime.setAuth(anonymousSignIn.data.session.access_token);
-  const anonymousAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
-    p_auth_user_id: anonymousSignIn.data.user.id,
-    p_access_session_token_hash: playerA.accessSessionHash,
-    p_environment_key: 'development',
-    p_requested_channel_id: channelId,
-    p_request_id: `${options.fixtureTag}:anonymous:authorization-denial`,
-  });
-  assertRpcStatus(anonymousAuthorization, 'auth_identity_invalid', 'Anonymous Auth authorization');
-  await expectSubscriptionRejected(options.clients.anonymous, options.authA.authorization.topic, {
-    label: 'anonymous private channel',
-    private: true,
+
+  await runHostedHarnessStage('missing-token-denial', async () => {
+    const missing = await options.clients.missingToken.auth.getUser();
+    if (missing.error === null || missing.data.user !== null) {
+      throw new Error('Missing Auth token did not fail closed');
+    }
+    await expectSubscriptionRejected(
+      options.clients.missingToken,
+      options.authA.authorization.topic,
+      { label: 'missing-token private channel', private: true, stage: 'missing-token-denial' },
+    );
   });
 
-  const missing = await options.clients.missingToken.auth.getUser();
-  if (missing.error === null || missing.data.user !== null) {
-    throw new Error('Missing Auth token did not fail closed');
-  }
-  await expectSubscriptionRejected(
-    options.clients.missingToken,
-    options.authA.authorization.topic,
-    { label: 'missing-token private channel', private: true },
-  );
+  await runHostedHarnessStage('malformed-token-denial', async () => {
+    const malformedToken = 'not-a-valid-jwt';
+    const malformed = await options.clients.malformedToken.auth.getUser(malformedToken);
+    if (malformed.error === null || malformed.data.user !== null) {
+      throw new Error('Malformed Auth token did not fail closed');
+    }
+    await options.clients.malformedToken.realtime.setAuth(malformedToken);
+    await expectSubscriptionRejected(
+      options.clients.malformedToken,
+      options.authA.authorization.topic,
+      {
+        label: 'malformed-token private channel',
+        private: true,
+        stage: 'malformed-token-denial',
+      },
+    );
+  });
 
-  const malformedToken = 'not-a-valid-jwt';
-  const malformed = await options.clients.malformedToken.auth.getUser(malformedToken);
-  if (malformed.error === null || malformed.data.user !== null) {
-    throw new Error('Malformed Auth token did not fail closed');
-  }
-  await options.clients.malformedToken.realtime.setAuth(malformedToken);
-  await expectSubscriptionRejected(
-    options.clients.malformedToken,
-    options.authA.authorization.topic,
-    { label: 'malformed-token private channel', private: true },
-  );
+  await runHostedHarnessStage('corrupted-token-denial', async () => {
+    const corruptedToken = corruptAuthToken(options.authA.accessToken);
+    const corrupted = await options.clients.corruptedToken.auth.getUser(corruptedToken);
+    if (corrupted.error === null || corrupted.data.user !== null) {
+      throw new Error('Corrupted Auth token did not fail closed');
+    }
+    await options.clients.corruptedToken.realtime.setAuth(corruptedToken);
+    await expectSubscriptionRejected(
+      options.clients.corruptedToken,
+      options.authA.authorization.topic,
+      {
+        label: 'corrupted-token private channel',
+        private: true,
+        stage: 'corrupted-token-denial',
+      },
+    );
+  });
 
-  const corruptedToken = corruptAuthToken(options.authA.accessToken);
-  const corrupted = await options.clients.corruptedToken.auth.getUser(corruptedToken);
-  if (corrupted.error === null || corrupted.data.user !== null) {
-    throw new Error('Corrupted Auth token did not fail closed');
-  }
-  await options.clients.corruptedToken.realtime.setAuth(corruptedToken);
-  await expectSubscriptionRejected(
-    options.clients.corruptedToken,
-    options.authA.authorization.topic,
-    { label: 'corrupted-token private channel', private: true },
-  );
-
-  let accessExpired = false;
-  try {
-    const expired = await options.sql<{ id: string }[]>`
+  await runHostedHarnessStage('expired-session-denial', async () => {
+    let accessExpired = false;
+    try {
+      const expired = await options.sql<{ id: string }[]>`
       update public.wallet_access_sessions
       set expires_at = now() - interval '1 second'
       where id = ${playerB.accessSessionId}::uuid
       returning id::text
     `;
-    if (expired.length !== 1) throw new Error('Expired access-session fixture was not isolated');
-    accessExpired = true;
-    const expiredPreparation = await options.service.rpc(
-      'prepare_supabase_realtime_player_identity',
-      {
+      if (expired.length !== 1) throw new Error('Expired access-session fixture was not isolated');
+      accessExpired = true;
+      const expiredPreparation = await options.service.rpc(
+        'prepare_supabase_realtime_player_identity',
+        {
+          p_access_session_token_hash: playerB.accessSessionHash,
+          p_request_id: `${options.fixtureTag}:expired:prepare-denial`,
+        },
+      );
+      assertRpcStatus(expiredPreparation, 'access_revoked', 'Expired player access token exchange');
+      const expiredAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
+        p_auth_user_id: options.authB.userId,
         p_access_session_token_hash: playerB.accessSessionHash,
-        p_request_id: `${options.fixtureTag}:expired:prepare-denial`,
-      },
-    );
-    assertRpcStatus(expiredPreparation, 'access_revoked', 'Expired player access token exchange');
-    const expiredAuthorization = await options.service.rpc('authorize_supabase_realtime_player', {
-      p_auth_user_id: options.authB.userId,
-      p_access_session_token_hash: playerB.accessSessionHash,
-      p_environment_key: 'development',
-      p_requested_channel_id: channelId,
-      p_request_id: `${options.fixtureTag}:expired:authorization-denial`,
-    });
-    assertRpcStatus(expiredAuthorization, 'access_revoked', 'Expired player authorization');
-    await expectSubscriptionRejected(options.browserB, options.authB.authorization.topic, {
-      label: 'expired-access private channel',
-      private: true,
-    });
-  } finally {
-    if (accessExpired) {
-      await options.sql`
+        p_environment_key: 'development',
+        p_requested_channel_id: channelId,
+        p_request_id: `${options.fixtureTag}:expired:authorization-denial`,
+      });
+      assertRpcStatus(expiredAuthorization, 'access_revoked', 'Expired player authorization');
+      await expectSubscriptionRejected(options.browserB, options.authB.authorization.topic, {
+        label: 'expired-access private channel',
+        private: true,
+        stage: 'expired-session-denial',
+      });
+    } finally {
+      if (accessExpired) {
+        await options.sql`
         update public.wallet_access_sessions
         set expires_at = now() + interval '30 minutes'
         where id = ${playerB.accessSessionId}::uuid
       `;
+      }
     }
-  }
-
-  const crossEnvironment = await options.service.rpc('authorize_supabase_realtime_player', {
-    p_auth_user_id: options.authA.userId,
-    p_access_session_token_hash: playerA.accessSessionHash,
-    p_environment_key: 'production',
-    p_requested_channel_id: channelId,
-    p_request_id: `${options.fixtureTag}:cross-environment:authorization-denial`,
   });
-  assertRpcStatus(crossEnvironment, 'environment_mismatch', 'Cross-environment authorization');
-  await expectSubscriptionRejected(
-    options.browserA,
-    worldRealtimeTopic('production', options.fixtures.world.worldId, channelId),
-    { label: 'cross-environment private channel', private: true },
-  );
+
+  await runHostedHarnessStage('cross-environment-denial', async () => {
+    const crossEnvironment = await options.service.rpc('authorize_supabase_realtime_player', {
+      p_auth_user_id: options.authA.userId,
+      p_access_session_token_hash: playerA.accessSessionHash,
+      p_environment_key: 'production',
+      p_requested_channel_id: channelId,
+      p_request_id: `${options.fixtureTag}:cross-environment:authorization-denial`,
+    });
+    assertRpcStatus(crossEnvironment, 'environment_mismatch', 'Cross-environment authorization');
+    await expectSubscriptionRejected(
+      options.browserA,
+      worldRealtimeTopic('production', options.fixtures.world.worldId, channelId),
+      {
+        label: 'cross-environment private channel',
+        private: true,
+        stage: 'cross-environment-denial',
+      },
+    );
+  });
 
   process.stdout.write(
     `${JSON.stringify({
@@ -978,15 +1141,33 @@ async function assertNoTaggedAuthFixtures(
 }
 
 async function executeHostedValidation(): Promise<void> {
-  const target = await verifyCanonicalHostedTarget(process.env);
-  assertHostedDevelopmentFixtureWritesApproved(target, process.env);
-  await assertPhase13eRepositoryBaseline();
-  const privateConfig = loadPrivateSupabaseConfig(process.env);
-  const databaseUrl = privateConfig.databaseUrl;
-  if (databaseUrl === undefined) throw new Error('SUPABASE_DATABASE_URL is required');
-  assertDatabaseUrlMatchesProjectRef(databaseUrl, target.projectRef);
-  const anonKey = requiredEnvironment('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  await verifyPrivateRealtimeSettings(target.projectRef);
+  const target = await runHostedHarnessStage('target-preflight', async () => {
+    const verified = await verifyCanonicalHostedTarget(process.env);
+    assertHostedDevelopmentFixtureWritesApproved(verified, process.env);
+    return verified;
+  });
+  await runHostedHarnessStage('repository-baseline', async () => {
+    await assertPhase13eRepositoryBaseline({
+      allowedWorktreePaths: PHASE13E_HOSTED_VALIDATION_WORKTREE_PATHS,
+    });
+  });
+  const { privateConfig, databaseUrl, anonKey } = await runHostedHarnessStage(
+    'target-preflight',
+    async () => {
+      const loaded = loadPrivateSupabaseConfig(process.env);
+      const loadedDatabaseUrl = loaded.databaseUrl;
+      if (loadedDatabaseUrl === undefined) throw new Error('SUPABASE_DATABASE_URL is required');
+      assertDatabaseUrlMatchesProjectRef(loadedDatabaseUrl, target.projectRef);
+      return {
+        privateConfig: loaded,
+        databaseUrl: loadedDatabaseUrl,
+        anonKey: requiredEnvironment('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+      };
+    },
+  );
+  await runHostedHarnessStage('realtime-settings-preflight', () =>
+    verifyPrivateRealtimeSettings(target.projectRef),
+  );
   process.stdout.write(`${JSON.stringify(safeHostedTargetSummary(target))}\n`);
 
   const sql = postgres(databaseUrl, { max: 2, ssl: 'require' });
@@ -1005,6 +1186,13 @@ async function executeHostedValidation(): Promise<void> {
     malformedToken: createSupabaseServerClient({ url: privateConfig.url, anonKey }),
     corruptedToken: createSupabaseServerClient({ url: privateConfig.url, anonKey }),
   };
+  const browserClients = [
+    browserA,
+    browserB,
+    browserReplay,
+    browserPublic,
+    ...Object.values(negativeClients),
+  ];
   const runId = randomUUID();
   const tag = createFixtureTag(runId);
   const authUserIds = new Set<string>();
@@ -1015,185 +1203,207 @@ async function executeHostedValidation(): Promise<void> {
         readonly world: WorldFixture;
       }
     | undefined;
-  const cleanupErrors: string[] = [];
+  const cleanupErrors: HostedHarnessCleanupFailure[] = [];
 
   await runWithCriticalCleanup(
-    async () => {
-      await assertPhase13eBehavioralExecutionReady(sql);
-      await expectSubscriptionRejected(browserPublic, `${tag}:public-channel-negative`, {
-        label: 'public-channel access',
-        private: false,
-        publicChannelProbe: true,
-      });
-      fixtures = await sql.begin((transaction) => createDatabaseFixtures(transaction, tag));
-      const [playerA, playerB] = fixtures.players;
-      const trackAuthUser = (userId: string) => authUserIds.add(userId);
-      const authA = await createAuthFixture(
-        service,
-        browserA,
-        browserReplay,
-        playerA,
-        fixtures.world.channelIds[0],
-        tag,
-        'player-a',
-        trackAuthUser,
-        true,
-      );
-      const authB = await createAuthFixture(
-        service,
-        browserB,
-        browserReplay,
-        playerB,
-        fixtures.world.channelIds[0],
-        tag,
-        'player-b',
-        trackAuthUser,
-        false,
-      );
-      await validateAuthNegativeCases({
-        service,
-        sql,
-        fixtures,
-        authA,
-        authB,
-        browserA,
-        browserB,
-        clients: negativeClients,
-        fixtureTag: tag,
-        trackAuthUser,
-      });
+    () =>
+      runHostedHarnessStage('behavioral-validation', async () => {
+        await runHostedHarnessStage('hosted-database-baseline', () =>
+          assertPhase13eBehavioralExecutionReady(sql),
+        );
+        await expectSubscriptionRejected(browserPublic, `${tag}:public-channel-negative`, {
+          label: 'public-channel access',
+          private: false,
+          publicChannelProbe: true,
+          stage: 'public-channel-rejection',
+        });
+        fixtures = await runHostedHarnessStage('fixture-create-players', () =>
+          sql.begin((transaction) => createDatabaseFixtures(transaction, tag)),
+        );
+        const [playerA, playerB] = fixtures.players;
+        const trackAuthUser = (userId: string) => authUserIds.add(userId);
+        const authA = await createAuthFixture(
+          service,
+          browserA,
+          browserReplay,
+          playerA,
+          fixtures.world.channelIds[0],
+          tag,
+          'player-a',
+          trackAuthUser,
+          true,
+        );
+        const authB = await createAuthFixture(
+          service,
+          browserB,
+          browserReplay,
+          playerB,
+          fixtures.world.channelIds[0],
+          tag,
+          'player-b',
+          trackAuthUser,
+          false,
+        );
+        await validateAuthNegativeCases({
+          service,
+          sql,
+          fixtures,
+          authA,
+          authB,
+          browserA,
+          browserB,
+          clients: negativeClients,
+          fixtureTag: tag,
+          trackAuthUser,
+        });
 
-      const messageRowsBefore = await sql<{ count: number }[]>`
+        const messageRowsBefore = await sql<{ count: number }[]>`
       select count(*)::integer as count from realtime.messages
       where topic = ${authA.authorization.topic}
     `;
-      let previousSequence = -1;
-      const accepted: SupabaseMovementBroadcast[] = [];
-      const receiveAtB = (payload: unknown) => {
-        const movement = acceptMovementBroadcast(
-          payload,
-          {
-            membershipId: authA.authorization.membershipId,
-            presenceId: authA.authorization.self.presenceId,
-            worldId: fixtures!.world.worldId,
-            worldVersionId: fixtures!.world.worldVersionId,
-            channelId: fixtures!.world.channelIds[0],
-            now: Date.now(),
-          },
-          previousSequence,
+        let previousSequence = -1;
+        const accepted: SupabaseMovementBroadcast[] = [];
+        const receiveAtB = (payload: unknown) => {
+          const movement = acceptMovementBroadcast(
+            payload,
+            {
+              membershipId: authA.authorization.membershipId,
+              presenceId: authA.authorization.self.presenceId,
+              worldId: fixtures!.world.worldId,
+              worldVersionId: fixtures!.world.worldVersionId,
+              channelId: fixtures!.world.channelIds[0],
+              now: Date.now(),
+            },
+            previousSequence,
+          );
+          if (movement !== undefined) {
+            previousSequence = movement.sequence;
+            accepted.push(movement);
+          }
+        };
+
+        const subscribedA = await subscribe(
+          browserA,
+          authA.authorization,
+          () => undefined,
+          'private-channel-player-a-subscribe',
         );
-        if (movement !== undefined) {
-          previousSequence = movement.sequence;
-          accepted.push(movement);
+        channels.push({ client: browserA, channel: subscribedA.channel });
+        const subscribedB = await subscribe(
+          browserB,
+          authB.authorization,
+          receiveAtB,
+          'private-channel-player-b-subscribe',
+        );
+        channels.push({ client: browserB, channel: subscribedB.channel });
+        process.stdout.write('private-channel-authorization-ok\n');
+        await waitFor(
+          () =>
+            presenceKeyCount(subscribedA.channel, authB.authorization.membershipId) === 1 &&
+            presenceKeyCount(subscribedB.channel, authA.authorization.membershipId) === 1,
+          'presence-sync',
+        );
+
+        await subscribedA.channel.untrack();
+        await waitFor(() => subscribedB.events.leave > 0, 'presence-leave-player-a');
+        await subscribedA.channel.track({
+          version: SUPABASE_REALTIME_PROTOCOL_VERSION,
+          membershipId: authA.authorization.membershipId,
+          player: authA.authorization.self,
+          status: 'online',
+        });
+        await waitFor(() => subscribedB.events.join > 0, 'presence-join-player-a');
+        await subscribedB.channel.untrack();
+        await waitFor(() => subscribedA.events.leave > 0, 'presence-leave-player-b');
+        await subscribedB.channel.track({
+          version: SUPABASE_REALTIME_PROTOCOL_VERSION,
+          membershipId: authB.authorization.membershipId,
+          player: authB.authorization.self,
+          status: 'online',
+        });
+        await waitFor(() => subscribedA.events.join > 0, 'presence-join-player-b');
+        if (subscribedA.events.sync === 0 || subscribedB.events.sync === 0) {
+          throw hostedHarnessStageError(
+            'presence-sync',
+            'validation',
+            'PRESENCE_SYNC_NOT_OBSERVED',
+          );
         }
-      };
+        process.stdout.write('presence-behavior-ok\n');
 
-      const subscribedA = await subscribe(browserA, authA.authorization, () => undefined);
-      channels.push({ client: browserA, channel: subscribedA.channel });
-      const subscribedB = await subscribe(browserB, authB.authorization, receiveAtB);
-      channels.push({ client: browserB, channel: subscribedB.channel });
-      await waitFor(
-        () =>
-          presenceKeyCount(subscribedA.channel, authB.authorization.membershipId) === 1 &&
-          presenceKeyCount(subscribedB.channel, authA.authorization.membershipId) === 1,
-        'two-client Presence sync',
-      );
+        const baseMovement: SupabaseMovementBroadcast = {
+          version: SUPABASE_REALTIME_PROTOCOL_VERSION,
+          membershipId: authA.authorization.membershipId,
+          presenceId: authA.authorization.self.presenceId,
+          worldId: fixtures.world.worldId,
+          worldVersionId: fixtures.world.worldVersionId,
+          channelId: fixtures.world.channelIds[0],
+          sequence: 1,
+          timestamp: Date.now(),
+          x: 12.25,
+          y: 7.5,
+          facingDirection: 'east',
+          movementState: 'walking',
+          animationState: 'walk-east',
+        };
+        const throttle = new MovementThrottle();
+        const firstSentAt = Date.now();
+        throttle.record(firstSentAt);
+        if (
+          (await subscribedA.channel.send({
+            type: 'broadcast',
+            event: 'movement',
+            payload: supabaseMovementBroadcastSchema.parse(baseMovement),
+          })) !== 'ok'
+        ) {
+          throw new Error('Movement Broadcast send failed');
+        }
+        await waitFor(() => accepted.length === 1, 'broadcast-valid-receive');
+        const throttleDelay = throttle.remaining(Date.now());
+        if (throttleDelay > 0) await delay(throttleDelay);
+        const secondSentAt = Date.now();
+        throttle.record(secondSentAt);
+        if (secondSentAt - firstSentAt < SUPABASE_REALTIME_MOVEMENT_INTERVAL_MS) {
+          throw new Error('Movement Broadcast throttle interval was shorter than 100 ms');
+        }
+        if (
+          (await subscribedA.channel.send({
+            type: 'broadcast',
+            event: 'movement',
+            payload: { ...baseMovement, sequence: 2, timestamp: secondSentAt, x: 12.5 },
+          })) !== 'ok'
+        ) {
+          throw new Error('Throttled movement Broadcast send failed');
+        }
+        await waitFor(() => accepted.length === 2, 'broadcast-throttled-receive');
+        receiveAtB({ ...baseMovement, sequence: 2, timestamp: secondSentAt, x: 12.5 });
+        receiveAtB({ ...baseMovement, sequence: 1 });
+        receiveAtB({ ...baseMovement, sequence: 3, x: Number.NaN });
+        receiveAtB({ ...baseMovement, sequence: 3, inventory: ['forbidden'] });
+        receiveAtB({ ...baseMovement, sequence: 3, version: 2 });
+        receiveAtB({ ...baseMovement, sequence: 3, worldId: 'other-world' });
+        receiveAtB({
+          ...baseMovement,
+          sequence: 3,
+          animationState: 'x'.repeat(SUPABASE_REALTIME_MAX_PAYLOAD_BYTES),
+        });
+        if (accepted.length !== 2) throw new Error('Strict movement validation failed');
 
-      await subscribedA.channel.untrack();
-      await waitFor(() => subscribedB.events.leave > 0, 'Player B Presence leave observation');
-      await subscribedA.channel.track({
-        version: SUPABASE_REALTIME_PROTOCOL_VERSION,
-        membershipId: authA.authorization.membershipId,
-        player: authA.authorization.self,
-        status: 'online',
-      });
-      await waitFor(() => subscribedB.events.join > 0, 'Player B Presence join observation');
-      await subscribedB.channel.untrack();
-      await waitFor(() => subscribedA.events.leave > 0, 'Player A Presence leave observation');
-      await subscribedB.channel.track({
-        version: SUPABASE_REALTIME_PROTOCOL_VERSION,
-        membershipId: authB.authorization.membershipId,
-        player: authB.authorization.self,
-        status: 'online',
-      });
-      await waitFor(() => subscribedA.events.join > 0, 'Player A Presence join observation');
-      if (subscribedA.events.sync === 0 || subscribedB.events.sync === 0) {
-        throw new Error('Both clients must observe Presence sync');
-      }
-
-      const baseMovement: SupabaseMovementBroadcast = {
-        version: SUPABASE_REALTIME_PROTOCOL_VERSION,
-        membershipId: authA.authorization.membershipId,
-        presenceId: authA.authorization.self.presenceId,
-        worldId: fixtures.world.worldId,
-        worldVersionId: fixtures.world.worldVersionId,
-        channelId: fixtures.world.channelIds[0],
-        sequence: 1,
-        timestamp: Date.now(),
-        x: 12.25,
-        y: 7.5,
-        facingDirection: 'east',
-        movementState: 'walking',
-        animationState: 'walk-east',
-      };
-      const throttle = new MovementThrottle();
-      const firstSentAt = Date.now();
-      throttle.record(firstSentAt);
-      if (
-        (await subscribedA.channel.send({
-          type: 'broadcast',
-          event: 'movement',
-          payload: supabaseMovementBroadcastSchema.parse(baseMovement),
-        })) !== 'ok'
-      ) {
-        throw new Error('Movement Broadcast send failed');
-      }
-      await waitFor(() => accepted.length === 1, 'Player B movement receipt');
-      const throttleDelay = throttle.remaining(Date.now());
-      if (throttleDelay > 0) await delay(throttleDelay);
-      const secondSentAt = Date.now();
-      throttle.record(secondSentAt);
-      if (secondSentAt - firstSentAt < SUPABASE_REALTIME_MOVEMENT_INTERVAL_MS) {
-        throw new Error('Movement Broadcast throttle interval was shorter than 100 ms');
-      }
-      if (
-        (await subscribedA.channel.send({
-          type: 'broadcast',
-          event: 'movement',
-          payload: { ...baseMovement, sequence: 2, timestamp: secondSentAt, x: 12.5 },
-        })) !== 'ok'
-      ) {
-        throw new Error('Throttled movement Broadcast send failed');
-      }
-      await waitFor(() => accepted.length === 2, 'Player B throttled movement receipt');
-      receiveAtB({ ...baseMovement, sequence: 2, timestamp: secondSentAt, x: 12.5 });
-      receiveAtB({ ...baseMovement, sequence: 1 });
-      receiveAtB({ ...baseMovement, sequence: 3, x: Number.NaN });
-      receiveAtB({ ...baseMovement, sequence: 3, inventory: ['forbidden'] });
-      receiveAtB({ ...baseMovement, sequence: 3, version: 2 });
-      receiveAtB({ ...baseMovement, sequence: 3, worldId: 'other-world' });
-      receiveAtB({
-        ...baseMovement,
-        sequence: 3,
-        animationState: 'x'.repeat(SUPABASE_REALTIME_MAX_PAYLOAD_BYTES),
-      });
-      if (accepted.length !== 2) throw new Error('Strict movement validation failed');
-
-      await removeChannel(browserB, subscribedB.channel);
-      channels.splice(
-        channels.findIndex((entry) => entry.channel === subscribedB.channel),
-        1,
-      );
-      const switchedResult = await service.rpc('authorize_supabase_realtime_player', {
-        p_auth_user_id: authB.userId,
-        p_access_session_token_hash: playerB.accessSessionHash,
-        p_environment_key: 'development',
-        p_requested_channel_id: fixtures.world.channelIds[1],
-        p_request_id: `${tag}:b:channel-switch`,
-      });
-      if (switchedResult.error !== null) throw switchedResult.error;
-      const switchedAuthorization = parseAuthorizedView(switchedResult.data);
-      const membershipSwitch = await sql<{ active: number; closed_previous: number }[]>`
+        await removeChannel(browserB, subscribedB.channel);
+        channels.splice(
+          channels.findIndex((entry) => entry.channel === subscribedB.channel),
+          1,
+        );
+        const switchedResult = await service.rpc('authorize_supabase_realtime_player', {
+          p_auth_user_id: authB.userId,
+          p_access_session_token_hash: playerB.accessSessionHash,
+          p_environment_key: 'development',
+          p_requested_channel_id: fixtures.world.channelIds[1],
+          p_request_id: `${tag}:b:channel-switch`,
+        });
+        if (switchedResult.error !== null) throw switchedResult.error;
+        const switchedAuthorization = parseAuthorizedView(switchedResult.data);
+        const membershipSwitch = await sql<{ active: number; closed_previous: number }[]>`
       select
         count(*) filter (
           where status = 'active' and channel_id = ${fixtures.world.channelIds[1]}::uuid
@@ -1206,53 +1416,86 @@ async function executeHostedValidation(): Promise<void> {
       from public.supabase_realtime_memberships
       where auth_user_id = ${authB.userId}::uuid
     `;
-      if (membershipSwitch[0]?.active !== 1 || membershipSwitch[0].closed_previous < 1) {
-        throw new Error('Channel switch did not close the previous membership exactly');
-      }
-      const crossTopicReceived: unknown[] = [];
-      const switchedB = await subscribe(browserB, switchedAuthorization, (payload) => {
-        crossTopicReceived.push(payload);
-      });
-      channels.push({ client: browserB, channel: switchedB.channel });
-      await delay(150);
-      if (
-        (await subscribedA.channel.send({
-          type: 'broadcast',
-          event: 'movement',
-          payload: { ...baseMovement, sequence: 3, timestamp: Date.now() },
-        })) !== 'ok'
-      ) {
-        throw new Error('Cross-topic isolation probe send failed');
-      }
-      await delay(300);
-      if (crossTopicReceived.length !== 0) throw new Error('Movement leaked across private topics');
+        if (membershipSwitch[0]?.active !== 1 || membershipSwitch[0].closed_previous < 1) {
+          throw new Error('Channel switch did not close the previous membership exactly');
+        }
+        const crossTopicReceived: unknown[] = [];
+        const switchedB = await subscribe(
+          browserB,
+          switchedAuthorization,
+          (payload) => {
+            crossTopicReceived.push(payload);
+          },
+          'presence-channel-switch',
+        );
+        channels.push({ client: browserB, channel: switchedB.channel });
+        await delay(150);
+        if (
+          (await subscribedA.channel.send({
+            type: 'broadcast',
+            event: 'movement',
+            payload: { ...baseMovement, sequence: 3, timestamp: Date.now() },
+          })) !== 'ok'
+        ) {
+          throw new Error('Cross-topic isolation probe send failed');
+        }
+        await delay(300);
+        if (crossTopicReceived.length !== 0)
+          throw new Error('Movement leaked across private topics');
 
-      await removeChannel(browserA, subscribedA.channel);
-      channels.splice(
-        channels.findIndex((entry) => entry.channel === subscribedA.channel),
-        1,
-      );
-      const reconnectedA = await subscribe(browserA, authA.authorization, () => undefined);
-      channels.push({ client: browserA, channel: reconnectedA.channel });
-      await waitFor(
-        () => presenceKeyCount(reconnectedA.channel, authA.authorization.membershipId) === 1,
-        'reconnected Presence key',
-      );
+        await removeChannel(browserA, subscribedA.channel);
+        channels.splice(
+          channels.findIndex((entry) => entry.channel === subscribedA.channel),
+          1,
+        );
+        const reconnectedA = await subscribe(
+          browserA,
+          authA.authorization,
+          () => undefined,
+          'presence-reconnect',
+        );
+        channels.push({ client: browserA, channel: reconnectedA.channel });
+        await waitFor(
+          () => presenceKeyCount(reconnectedA.channel, authA.authorization.membershipId) === 1,
+          'presence-reconnect',
+        );
 
-      const messageRowsAfter = await sql<{ count: number }[]>`
+        const messageRowsAfter = await sql<{ count: number }[]>`
       select count(*)::integer as count from realtime.messages
       where topic = ${authA.authorization.topic}
     `;
-      if (messageRowsAfter[0]?.count !== messageRowsBefore[0]?.count) {
-        throw new Error('Movement Broadcast unexpectedly persisted PostgreSQL message rows');
-      }
-    },
+        if (messageRowsAfter[0]?.count !== messageRowsBefore[0]?.count) {
+          throw hostedHarnessStageError(
+            'broadcast-non-persistence',
+            'validation',
+            'BROADCAST_PERSISTED_DATABASE_ROWS',
+          );
+        }
+        process.stdout.write('realtime-behavior-ok\n');
+      }),
     async () => {
       for (const tracked of channels.reverse()) {
         try {
           await removeChannel(tracked.client, tracked.channel);
-        } catch {
-          cleanupErrors.push('channel');
+        } catch (error) {
+          cleanupErrors.push({ stage: 'cleanup-realtime', error });
+        }
+      }
+      for (const client of browserClients) {
+        try {
+          const statuses = await client.removeAllChannels();
+          if (statuses.some((status: string) => status !== 'ok')) {
+            cleanupErrors.push({
+              stage: 'cleanup-realtime',
+              error: hostedHarnessStageError(
+                'cleanup-realtime',
+                'cleanup',
+                'REALTIME_CLIENT_SHUTDOWN_FAILED',
+              ),
+            });
+          }
+        } catch (error) {
+          cleanupErrors.push({ stage: 'cleanup-realtime', error });
         }
       }
       try {
@@ -1265,15 +1508,24 @@ async function executeHostedValidation(): Promise<void> {
             found.data.user === null ||
             found.data.user.user_metadata['fixture_tag'] !== tag
           ) {
-            cleanupErrors.push('auth-user-ownership');
+            cleanupErrors.push({
+              stage: 'cleanup-auth',
+              error: hostedHarnessStageError(
+                'cleanup-auth',
+                'cleanup',
+                'AUTH_FIXTURE_OWNERSHIP_FAILED',
+              ),
+            });
             continue;
           }
           const deleted = await service.auth.admin.deleteUser(userId);
-          if (deleted.error !== null) cleanupErrors.push('auth-user');
+          if (deleted.error !== null) {
+            cleanupErrors.push({ stage: 'cleanup-auth', error: deleted.error });
+          }
         }
         await assertNoTaggedAuthFixtures(service, tag);
-      } catch {
-        cleanupErrors.push('auth-user');
+      } catch (error) {
+        cleanupErrors.push({ stage: 'cleanup-auth', error });
       }
       try {
         if (fixtures !== undefined) {
@@ -1352,18 +1604,28 @@ async function executeHostedValidation(): Promise<void> {
                where player_profile_id = any(${playerIds}::uuid[]))
           )::integer as count
         `;
-          if (remaining[0]?.count !== 0) cleanupErrors.push('database-fixture');
+          if (remaining[0]?.count !== 0) {
+            cleanupErrors.push({
+              stage: 'cleanup-database',
+              error: hostedHarnessStageError(
+                'cleanup-database',
+                'cleanup',
+                'DATABASE_FIXTURE_REMAINED',
+              ),
+            });
+          }
         }
-      } catch {
-        cleanupErrors.push('database-fixture');
+      } catch (error) {
+        cleanupErrors.push({ stage: 'cleanup-database', error });
       } finally {
         await sql.end();
       }
       return cleanupErrors;
     },
   );
+  process.stdout.write('realtime-fixture-cleanup-ok\n');
   process.stdout.write(
-    `${JSON.stringify({ status: 'ok', harness: 'phase13e-realtime', fixtureTag: tag })}\n`,
+    `${JSON.stringify({ status: 'ok', harness: 'phase13e-realtime', fixtureTag: 'masked' })}\n`,
   );
 }
 
@@ -1380,8 +1642,7 @@ async function main(): Promise<void> {
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
   main().catch((error: unknown) => {
-    const message = error instanceof Error ? error.message : 'Hosted Realtime validation failed';
-    process.stderr.write(`${message}\n`);
+    process.stderr.write(`${JSON.stringify(sanitizeHostedHarnessFailure(error))}\n`);
     process.exitCode = 1;
   });
 }

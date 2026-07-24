@@ -7,7 +7,9 @@ import type postgres from 'postgres';
 import type { RemoteMigrationState } from '../phase13d-production-readiness';
 import {
   PHASE13B_APPLIED_MIGRATION_TIMESTAMP,
+  PHASE13E_CLEANUP_CORRECTION_MIGRATION,
   PHASE13E_HOSTED_PENDING_MIGRATIONS,
+  reviewPhase13eCleanupCorrectionMigrationState,
   reviewPhase13ePendingMigrationState,
 } from './phase13e-pending-migration-review';
 
@@ -15,8 +17,33 @@ export const PHASE13E_REVIEWED_HASHES = {
   realtimeAuthorization: '20532eb6c659da4d3d93a6f3183ed4a8719921e26efb0822049fae065bb51b84',
   permissionRepair: '4fd80b511879c62c70a5fe9e89c452bd025ca1ac9bcc9da6011131d493e16723',
   cleanupFoundation: '147cccccf7930dab7d17557746b28422059ace1550f23d2ddd626fe2865dae97',
-  migrationManifest: '54b2136ea9e06755a7452e308611d283bb9b32429142c77ffb8a2dd487322bce',
+  cleanupAmbiguityFix: 'e31e1872fe444c879195ef98bdfd283e261c371817600f87f0db8e39e75a9fa9',
+  migrationManifest: '358133036e451608a5e99eeb20f8680d7d8945787abb12f88cb72eb13dea9304',
 } as const;
+
+export const PHASE13E_HOSTED_VALIDATION_WORKTREE_PATHS = [
+  'apps/api/src/realtime/supabase-contracts.ts',
+  'apps/api/src/realtime/supabase-gateway.test.ts',
+  'apps/api/src/realtime/supabase-gateway.ts',
+  'apps/game-client/src/app/supabase-realtime-client.test.ts',
+  'apps/game-client/src/app/supabase-realtime-client.ts',
+  'docs/deployment/phase-13e-a-hosted-behavioral-validation.md',
+  'infrastructure/deployment/manifests/migrations.v1.json',
+  'infrastructure/deployment/manifests/production-commissioning.v1.json',
+  'infrastructure/supabase/migrations/20260724101500_phase13e_cleanup_started_at_ambiguity_fix.sql',
+  'infrastructure/supabase/tests/phase13e_supabase_first_foundation.test.sql',
+  'packages/database/test/migrations.test.ts',
+  'scripts/supabase/phase13e-hosted-cleanup-validation.test.ts',
+  'scripts/supabase/phase13e-hosted-cleanup-validation.ts',
+  'scripts/supabase/phase13e-hosted-harness-diagnostics.test.ts',
+  'scripts/supabase/phase13e-hosted-harness-diagnostics.ts',
+  'scripts/supabase/phase13e-hosted-realtime-validation.test.ts',
+  'scripts/supabase/phase13e-hosted-realtime-validation.ts',
+  'scripts/supabase/phase13e-hosted-retry-safety.test.ts',
+  'scripts/supabase/phase13e-hosted-retry-safety.ts',
+  'scripts/supabase/phase13e-pending-migration-review.test.ts',
+  'scripts/supabase/phase13e-pending-migration-review.ts',
+] as const;
 
 const REVIEWED_FILES = [
   {
@@ -41,6 +68,13 @@ const REVIEWED_FILES = [
     ),
   },
   {
+    key: 'cleanupAmbiguityFix',
+    url: new URL(
+      '../../infrastructure/supabase/migrations/20260724101500_phase13e_cleanup_started_at_ambiguity_fix.sql',
+      import.meta.url,
+    ),
+  },
+  {
     key: 'migrationManifest',
     url: new URL('../../infrastructure/deployment/manifests/migrations.v1.json', import.meta.url),
   },
@@ -52,13 +86,38 @@ export interface Phase13eRepositorySnapshot {
   readonly hashes: Readonly<Record<keyof typeof PHASE13E_REVIEWED_HASHES, string>>;
 }
 
-export function assertPhase13eRepositorySnapshot(snapshot: Phase13eRepositorySnapshot): void {
+export interface Phase13eRepositoryBaselineOptions {
+  readonly allowedWorktreePaths?: readonly string[];
+}
+
+function assertExpectedWorktreeStatus(
+  worktreeStatus: string,
+  allowedWorktreePaths: readonly string[] | undefined,
+): void {
+  if (worktreeStatus === '') return;
+  if (allowedWorktreePaths === undefined || allowedWorktreePaths.length === 0) {
+    throw new Error('Phase 13E hosted execution requires a clean worktree');
+  }
+  const allowed = new Set(allowedWorktreePaths);
+  const paths = worktreeStatus.split('\n').map((line) => {
+    if (line.length < 4 || line.includes(' -> ')) {
+      throw new Error('Phase 13E hosted execution found an unsupported worktree status');
+    }
+    return line.slice(3).trim();
+  });
+  if (paths.some((path) => path === '' || !allowed.has(path))) {
+    throw new Error('Phase 13E hosted execution found an unrelated worktree change');
+  }
+}
+
+export function assertPhase13eRepositorySnapshot(
+  snapshot: Phase13eRepositorySnapshot,
+  options: Phase13eRepositoryBaselineOptions = {},
+): void {
   if (snapshot.branch !== 'phase-13e-supabase-first') {
     throw new Error('Phase 13E hosted execution requires branch phase-13e-supabase-first');
   }
-  if (snapshot.worktreeStatus !== '') {
-    throw new Error('Phase 13E hosted execution requires a clean worktree');
-  }
+  assertExpectedWorktreeStatus(snapshot.worktreeStatus, options.allowedWorktreePaths);
   for (const [key, expected] of Object.entries(PHASE13E_REVIEWED_HASHES)) {
     if (snapshot.hashes[key as keyof typeof PHASE13E_REVIEWED_HASHES] !== expected) {
       throw new Error(`Phase 13E reviewed checksum is stale for ${key}`);
@@ -66,26 +125,38 @@ export function assertPhase13eRepositorySnapshot(snapshot: Phase13eRepositorySna
   }
 }
 
-export async function assertPhase13eRepositoryBaseline(): Promise<void> {
+export async function assertPhase13eRepositoryBaseline(
+  options: Phase13eRepositoryBaselineOptions = {},
+): Promise<void> {
   const hashes = {} as Record<keyof typeof PHASE13E_REVIEWED_HASHES, string>;
   for (const reviewed of REVIEWED_FILES) {
     hashes[reviewed.key] = createHash('sha256')
       .update(await readFile(reviewed.url))
       .digest('hex');
   }
-  assertPhase13eRepositorySnapshot({
-    branch: execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim(),
-    worktreeStatus: execFileSync('git', ['status', '--short'], { encoding: 'utf8' }).trim(),
-    hashes,
-  });
+  assertPhase13eRepositorySnapshot(
+    {
+      branch: execFileSync('git', ['branch', '--show-current'], { encoding: 'utf8' }).trim(),
+      // Preserve the leading index/worktree status column on the first porcelain line.
+      worktreeStatus: execFileSync('git', ['status', '--short'], {
+        encoding: 'utf8',
+      }).trimEnd(),
+      hashes,
+    },
+    options,
+  );
 }
 
 export function reviewPhase13ePreApplicationState(state: RemoteMigrationState) {
   return reviewPhase13ePendingMigrationState(state);
 }
 
+export function reviewPhase13eCleanupCorrectionPreApplicationState(state: RemoteMigrationState) {
+  return reviewPhase13eCleanupCorrectionMigrationState(state);
+}
+
 export function reviewPhase13eBehavioralExecutionState(state: RemoteMigrationState): {
-  readonly applied: 88;
+  readonly applied: 89;
   readonly pending: 0;
   readonly remoteOnly: 0;
 } {
@@ -97,18 +168,19 @@ export function reviewPhase13eBehavioralExecutionState(state: RemoteMigrationSta
     (migration) => migration.timestamp,
   );
   if (
-    local.size !== 88 ||
-    remote.size !== 88 ||
+    local.size !== 89 ||
+    remote.size !== 89 ||
     pending.length !== 0 ||
     remoteOnly.length !== 0 ||
     !remote.has(PHASE13B_APPLIED_MIGRATION_TIMESTAMP) ||
+    !remote.has(PHASE13E_CLEANUP_CORRECTION_MIGRATION.timestamp) ||
     requiredPhase13e.some((timestamp) => !remote.has(timestamp))
   ) {
     throw new Error(
-      'Behavioral execution requires exactly 88 matching migrations after the reviewed Phase 13E application',
+      'Behavioral execution requires exactly 89 matching migrations after the reviewed Phase 13E cleanup correction',
     );
   }
-  return { applied: 88, pending: 0, remoteOnly: 0 };
+  return { applied: 89, pending: 0, remoteOnly: 0 };
 }
 
 export async function readHostedMigrationState(sql: postgres.Sql): Promise<RemoteMigrationState> {

@@ -1411,6 +1411,22 @@
       "hostedValidation": "Pending owner-approved starville-dev pg_cron concurrency and failure-observability validation",
       "productionReadiness": "Phase 13E parity incomplete; custom Worker remains active",
       "knownLimitations": "Only social-interaction expiry cleanup is represented; no hosted schedule is enabled."
+    },
+    {
+      "sequence": 89,
+      "filename": "20260724101500_phase13e_cleanup_started_at_ambiguity_fix.sql",
+      "timestamp": "20260724101500",
+      "sha256": "e31e1872fe444c879195ef98bdfd283e261c371817600f87f0db8e39e75a9fa9",
+      "phaseOrigin": "13E-A",
+      "dependsOn": "20260724101000_phase13e_social_cleanup_cron_foundation.sql",
+      "schemaImpact": "Forward-fixes the cleanup wrapper's PL/pgSQL started-at variable ambiguity without changing its signature, ACL, lock, batch cap, or fixed search path",
+      "dataImpact": "None; replaces only the cleanup function definition and does not register or execute a hosted Cron job",
+      "requiredExtensions": [],
+      "estimatedRisk": "low",
+      "reversibility": "Keep the custom Worker selected and apply any further correction through a new forward-only migration",
+      "hostedValidation": "Required on starville-dev through the isolated cleanup behavioral harness with transactional fixture rollback",
+      "productionReadiness": "Phase 13E parity incomplete; custom Worker remains active",
+      "knownLimitations": "Only the proven local-variable ambiguity is corrected; no hosted schedule is enabled."
     }
   ]
 }

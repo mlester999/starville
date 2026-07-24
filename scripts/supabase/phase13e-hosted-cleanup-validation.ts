@@ -14,6 +14,7 @@ import {
   parseHostedHarnessMode,
 } from './phase13e-hosted-realtime-validation';
 import {
+  PHASE13E_HOSTED_VALIDATION_WORKTREE_PATHS,
   assertPhase13eBehavioralExecutionReady,
   assertPhase13eRepositoryBaseline,
 } from './phase13e-hosted-retry-safety';
@@ -27,7 +28,7 @@ export const PHASE13E_CLEANUP_HOSTED_PLAN = {
   target: 'exact starville-dev project ref and URL; production rejected',
   migrationState: {
     preApplication: '85 applied, exactly three reviewed pending, zero remote-only',
-    behavioralExecution: '88 applied, zero pending, zero remote-only',
+    behavioralExecution: '89 applied, zero pending, zero remote-only after the forward cleanup fix',
   },
   companionRealtimeCoverage: [
     'public-channel-rejection',
@@ -89,6 +90,24 @@ async function assertNoPreexistingEligibleInteractions(sql: postgres.Sql): Promi
       'Hosted cleanup harness refuses to run while non-fixture eligible interactions exist',
     );
   }
+}
+
+async function assertNoTaggedCleanupFixtures(sql: postgres.Sql, tag: string): Promise<void> {
+  const forcedFailureTag = `${tag.slice(0, -1)}f`;
+  const rows = await sql<{ count: number }[]>`
+    select (
+      (select count(*) from public.player_profiles
+       where display_name like ${`P13E C${tag.slice(-5)} %`}
+          or display_name like ${`P13E C${forcedFailureTag.slice(-5)} %`})
+      + (select count(*) from public.social_interaction_requests
+         where client_request_id like ${`${tag}:%`}
+            or client_request_id like ${`${forcedFailureTag}:%`})
+      + (select count(*) from public.scheduled_job_runs
+         where request_id like ${`${tag}:%`}
+            or request_id like ${`${forcedFailureTag}:%`})
+    )::integer as count
+  `;
+  assertCondition(rows[0]?.count === 0, 'Tagged cleanup fixture remained after rollback');
 }
 
 async function createCleanupFixtures(
@@ -361,7 +380,9 @@ async function validateAdvisoryLock(sql: postgres.Sql, tag: string): Promise<voi
 async function executeHostedValidation(): Promise<void> {
   const target = await verifyCanonicalHostedTarget(process.env);
   assertHostedDevelopmentFixtureWritesApproved(target, process.env);
-  await assertPhase13eRepositoryBaseline();
+  await assertPhase13eRepositoryBaseline({
+    allowedWorktreePaths: PHASE13E_HOSTED_VALIDATION_WORKTREE_PATHS,
+  });
   process.stdout.write(`${JSON.stringify(safeHostedTargetSummary(target))}\n`);
   const privateConfig = loadPrivateSupabaseConfig(process.env);
   if (privateConfig.databaseUrl === undefined) {
@@ -377,8 +398,11 @@ async function executeHostedValidation(): Promise<void> {
     await assertNoPreexistingEligibleInteractions(sql);
     await validateTransactionRollback(sql, tag);
     await validateAdvisoryLock(sql, tag);
+    await assertNoTaggedCleanupFixtures(sql, tag);
+    process.stdout.write('cleanup-behavior-ok\n');
+    process.stdout.write('cleanup-fixture-cleanup-ok\n');
     process.stdout.write(
-      `${JSON.stringify({ status: 'ok', harness: 'phase13e-cleanup', fixtureTag: tag })}\n`,
+      `${JSON.stringify({ status: 'ok', harness: 'phase13e-cleanup', fixtureTag: 'masked' })}\n`,
     );
   } finally {
     await sql.end();

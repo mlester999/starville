@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   PHASE13B_APPLIED_MIGRATION_TIMESTAMP,
+  PHASE13E_CLEANUP_CORRECTION_MIGRATION,
   PHASE13E_HOSTED_PENDING_MIGRATIONS,
+  reviewPhase13eCleanupCorrectionAppliedState,
+  reviewPhase13eCleanupCorrectionMigrationState,
   reviewPhase13ePendingMigrationState,
 } from './phase13e-pending-migration-review';
 
@@ -62,6 +65,35 @@ describe('Phase 13E pending migration review', () => {
         remote: [...matched, '20990101000000'],
       }),
     ).toThrow('Remote-only');
+  });
+
+  it('accepts only the one forward cleanup correction after all original Phase 13E migrations', () => {
+    const applied = [...matched, ...pending];
+    expect(
+      reviewPhase13eCleanupCorrectionMigrationState({
+        local: [...applied, PHASE13E_CLEANUP_CORRECTION_MIGRATION.timestamp],
+        remote: applied,
+      }),
+    ).toEqual({
+      matched: 88,
+      pending: [PHASE13E_CLEANUP_CORRECTION_MIGRATION.filename],
+      remoteOnly: 0,
+    });
+    expect(() =>
+      reviewPhase13eCleanupCorrectionMigrationState({
+        local: [...applied, PHASE13E_CLEANUP_CORRECTION_MIGRATION.timestamp],
+        remote: [...applied, '20990101000000'],
+      }),
+    ).toThrow('Remote-only');
+  });
+
+  it('verifies exactly 89 matching migrations after the forward correction', () => {
+    const all = [...matched, ...pending, PHASE13E_CLEANUP_CORRECTION_MIGRATION.timestamp];
+    expect(reviewPhase13eCleanupCorrectionAppliedState({ local: all, remote: all })).toEqual({
+      matched: 89,
+      pending: [],
+      remoteOnly: 0,
+    });
   });
 
   it('keeps migration repair outside the guarded remote command surface', () => {

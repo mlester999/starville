@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(51);
+select plan(52);
 
 select has_table('public', 'supabase_realtime_settings', 'environment-scoped realtime settings exist');
 select has_table(
@@ -379,6 +379,15 @@ select ok(
     'execute'
   ),
   'scheduled proof is never browser callable'
+);
+select ok(
+  pg_get_functiondef(
+    'public.run_scheduled_social_interaction_cleanup(integer,text)'::regprocedure
+  ) like '%run_started_at%'
+  and pg_get_functiondef(
+    'public.run_scheduled_social_interaction_cleanup(integer,text)'::regprocedure
+  ) like '%clock_timestamp() - run_started_at%',
+  'scheduled proof uses an unambiguous local start timestamp'
 );
 select is(
   (select count(*)::integer from public.scheduled_job_runs),

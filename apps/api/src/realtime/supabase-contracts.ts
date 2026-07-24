@@ -1,5 +1,7 @@
 import type { SupabaseRealtimeAuthorizationView } from '@starville/realtime';
 
+export type SupabaseRealtimePlayerTokenType = 'magiclink' | 'signup';
+
 export type SupabaseRealtimeAuthorizationPersistenceResult =
   | ({ readonly status: 'authorized' } & SupabaseRealtimeAuthorizationView)
   | {
@@ -20,7 +22,7 @@ export type SupabaseRealtimePlayerSessionResult =
   | {
       readonly status: 'issued';
       readonly tokenHash: string;
-      readonly tokenType: 'magiclink';
+      readonly tokenType: SupabaseRealtimePlayerTokenType;
     }
   | {
       readonly status:
@@ -58,7 +60,10 @@ export interface SupabaseRealtimeAuthorizationService {
   issuePlayerSession(input: {
     readonly rawAccessToken: string | undefined;
     readonly requestId: string;
-  }): Promise<{ readonly tokenHash: string; readonly tokenType: 'magiclink' }>;
+  }): Promise<{
+    readonly tokenHash: string;
+    readonly tokenType: SupabaseRealtimePlayerTokenType;
+  }>;
   authorize(input: {
     readonly bearerToken: string | undefined;
     readonly rawAccessToken: string | undefined;

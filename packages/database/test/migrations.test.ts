@@ -3558,6 +3558,13 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     ),
     'utf8',
   );
+  const cleanupAmbiguityFixSql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260724101500_phase13e_cleanup_started_at_ambiguity_fix.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
   const pgtapSql = readFileSync(
     new URL(
       '../../../infrastructure/supabase/tests/phase13e_supabase_first_foundation.test.sql',
@@ -3575,6 +3582,7 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect((await parser.parse(realtimeSql)).stmts?.length ?? 0).toBeGreaterThan(0);
     expect((await parser.parse(permissionFixSql)).stmts?.length ?? 0).toBeGreaterThan(0);
     expect((await parser.parse(cronSql)).stmts?.length ?? 0).toBeGreaterThan(0);
+    expect((await parser.parse(cleanupAmbiguityFixSql)).stmts?.length ?? 0).toBeGreaterThan(0);
     expect((await parser.parse(pgtapSql)).stmts?.length ?? 0).toBeGreaterThan(0);
   });
 
@@ -3651,7 +3659,7 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect(realtimeSql).not.toMatch(/\bexecute\s+format\s*\(/iu);
   });
 
-  it('binds the reviewed migration hashes and explicit three-file pending order', () => {
+  it('binds the reviewed migration hashes, original pending order, and forward correction', () => {
     const hash = (value: string) => createHash('sha256').update(value).digest('hex');
     expect(hash(realtimeSql)).toBe(
       '20532eb6c659da4d3d93a6f3183ed4a8719921e26efb0822049fae065bb51b84',
@@ -3660,6 +3668,9 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
       '4fd80b511879c62c70a5fe9e89c452bd025ca1ac9bcc9da6011131d493e16723',
     );
     expect(hash(cronSql)).toBe('147cccccf7930dab7d17557746b28422059ace1550f23d2ddd626fe2865dae97');
+    expect(hash(cleanupAmbiguityFixSql)).toBe(
+      'e31e1872fe444c879195ef98bdfd283e261c371817600f87f0db8e39e75a9fa9',
+    );
     expect([
       '20260724100000_phase13e_supabase_realtime_authorization.sql',
       '20260724100500_phase13e_realtime_authorization_permission_fix.sql',
@@ -3673,10 +3684,14 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
         ]),
       ].sort(),
     );
+    expect(cleanupAmbiguityFixSql).toContain('declare run_started_at timestamptz');
+    expect(cleanupAmbiguityFixSql).toContain('clock_timestamp() - run_started_at');
+    expect(cleanupAmbiguityFixSql).not.toContain('declare started_at timestamptz');
+    expect(cleanupAmbiguityFixSql).not.toMatch(/\bcron\.schedule\s*\(/iu);
   });
 
   it('covers the exact ACL, policy, owner, role-denial, and behavioral matrix', () => {
-    expect(pgtapSql).toContain('select plan(51);');
+    expect(pgtapSql).toContain('select plan(52);');
     expect(pgtapSql).toContain("'authenticated'");
     expect(pgtapSql).toContain('private.supabase_realtime_topic_authorized(uuid,text,text)');
     expect(pgtapSql).toContain('PUBLIC has no execute privilege');
@@ -3721,5 +3736,18 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect(cronSql).toContain('enabled = false');
     expect(cronSql).not.toMatch(/\bcron\.schedule\s*\(/iu);
     expect(cronSql).not.toMatch(/\bnet\.http_post\s*\(/iu);
+    expect(cleanupAmbiguityFixSql).toContain(
+      'create or replace function public.run_scheduled_social_interaction_cleanup',
+    );
+    expect(cleanupAmbiguityFixSql).toContain('p_batch_size not between 1 and 1000');
+    expect(cleanupAmbiguityFixSql).toContain('pg_try_advisory_xact_lock');
+    expect(cleanupAmbiguityFixSql).toContain("set search_path = ''");
+    expect(cleanupAmbiguityFixSql).toContain(
+      'revoke all on function public.run_scheduled_social_interaction_cleanup(integer,text)',
+    );
+    expect(cleanupAmbiguityFixSql).toContain(
+      'grant execute on function public.run_scheduled_social_interaction_cleanup(integer,text)',
+    );
+    expect(cleanupAmbiguityFixSql).not.toMatch(/\bcron\.schedule\s*\(/iu);
   });
 });

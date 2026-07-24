@@ -28,7 +28,7 @@ const playerSessionEnvelopeSchema = z
     data: z
       .object({
         tokenHash: z.string().trim().min(32).max(1024),
-        tokenType: z.literal('magiclink'),
+        tokenType: z.enum(['magiclink', 'signup']),
       })
       .strict(),
     requestId: z.string().min(1),

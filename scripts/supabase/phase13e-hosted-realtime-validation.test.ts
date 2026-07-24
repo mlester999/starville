@@ -16,7 +16,9 @@ import {
   createFixtureTag,
   expectSubscriptionRejected,
   fixtureWallet,
+  isAnonymousAuthProviderDisabled,
   parseHostedHarnessMode,
+  parsePlayerAuthVerificationType,
   runWithCriticalCleanup,
   type MovementAcceptanceContext,
 } from './phase13e-hosted-realtime-validation';
@@ -108,6 +110,7 @@ describe('Phase 13E hosted Realtime harness', () => {
         label: 'public-channel access',
         private: false,
         publicChannelProbe: true,
+        stage: 'public-channel-rejection',
       }),
     ).resolves.toBeUndefined();
     expect(rejectedClient.channel).toHaveBeenCalledWith('negative-public-topic');
@@ -130,8 +133,9 @@ describe('Phase 13E hosted Realtime harness', () => {
         label: 'public-channel access',
         private: false,
         publicChannelProbe: true,
+        stage: 'public-channel-rejection',
       }),
-    ).rejects.toThrow('unexpectedly allowed');
+    ).rejects.toThrow('CHANNEL_UNEXPECTEDLY_ALLOWED');
     expect(allowedClient.removeChannel).toHaveBeenCalledWith(allowedChannel);
     expect(output).toHaveBeenCalledWith('PUBLIC_CHANNEL_UNEXPECTEDLY_ALLOWED\n');
     output.mockRestore();
@@ -159,6 +163,28 @@ describe('Phase 13E hosted Realtime harness', () => {
     expect(corrupted).toHaveLength(token.length);
   });
 
+  it('uses only the verification type returned for a generated player Auth token', () => {
+    expect(parsePlayerAuthVerificationType('signup')).toBe('signup');
+    expect(parsePlayerAuthVerificationType('magiclink')).toBe('magiclink');
+    expect(() => parsePlayerAuthVerificationType('recovery')).toThrow('not allowed');
+  });
+
+  it('accepts only the explicit disabled-anonymous-provider response as denial proof', () => {
+    expect(
+      isAnonymousAuthProviderDisabled({
+        status: 422,
+        code: 'anonymous_provider_disabled',
+        message: 'private provider detail',
+      }),
+    ).toBe(true);
+    expect(isAnonymousAuthProviderDisabled({ status: 422, code: 'other_validation_error' })).toBe(
+      false,
+    );
+    expect(
+      isAnonymousAuthProviderDisabled({ status: 500, code: 'anonymous_provider_disabled' }),
+    ).toBe(false);
+  });
+
   it('always runs cleanup and treats cleanup failure as critical', async () => {
     const calls: string[] = [];
     await expect(
@@ -172,15 +198,15 @@ describe('Phase 13E hosted Realtime harness', () => {
           return [];
         },
       ),
-    ).rejects.toThrow('negative-case-failure');
+    ).rejects.toThrow('PHASE13E_HOSTED_VALIDATION_FAILED');
     expect(calls).toEqual(['validation', 'cleanup']);
 
     await expect(
       runWithCriticalCleanup(
         async () => undefined,
-        async () => ['database-fixture'],
+        async () => [{ stage: 'cleanup-database', error: new Error('database-fixture') }],
       ),
-    ).rejects.toThrow('cleanup failed');
+    ).rejects.toThrow('PHASE13E_HOSTED_VALIDATION_FAILED');
   });
 
   it('creates unique deterministic safe fixture identities without real player identifiers', () => {
