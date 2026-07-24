@@ -1,30 +1,70 @@
 # Phase 13E-A hosted validation unblock
 
 Date: 2026-07-24  
-Status: repository correction and hosted harnesses implemented; hosted proof not yet run  
-Hosted writes during this correction: **none**
+Status: hosted migration compatibility correction implemented; hosted retry pending Hosted writes
+during this correction: **none**
 
-## Why the first hosted validation stopped
+## Hosted sequence and exact ownership failure
 
-The read-only validation found 84 matching local/remote migrations, no remote-only migration, and no
-need for migration repair. It then stopped before migration application because the pending Realtime
-migration revoked `EXECUTE` on `private.supabase_realtime_topic_authorized(uuid,text,text)` from
-`authenticated`, although all four `realtime.messages` policies call that function. PostgreSQL
-checks the caller's function privilege before the `SECURITY DEFINER` body can evaluate the policy.
-The Phase 13E pgTAP suite was also absent from the hosted runner's reviewed allowlist, and
-private-only Realtime settings, two-client behavior, and cleanup-function behavior were not yet
-proven.
+The first read-only validation found 84 matching local/remote migrations, no remote-only migration,
+and no need for migration repair. The repository then added the exact policy-helper permission
+repair and the missing hosted harness coverage. During the subsequent hosted retry, Phase 13B
+applied successfully. The next migration failed at:
 
-No hosted migration, Auth user, fixture, function invocation, project-setting change, Cron schedule,
-or other hosted write occurred in that validation.
+```sql
+ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+```
 
-## Forward-only correction and exact privilege model
+The connected migration role was `postgres`, while Supabase owns `realtime.messages` as
+`supabase_realtime_admin`. Supabase already enables RLS on this provider-managed table. PostgreSQL
+therefore rejected the redundant ownership-sensitive operation. The failed Phase 13E transaction
+fully rolled back: the Realtime migration is absent from remote migration history and no Phase 13E
+tables, functions, policies, grants, or rows remain on `starville-dev`. Phase 13B remains applied.
+The exact state is 85 applied migrations, three pending migrations, and zero remote-only migrations.
+Migration repair is neither needed nor permitted.
 
-The migration manifest states that committed migrations are never edited in place. Therefore the
-unapplied but committed Realtime migration remains immutable and its SHA-256 remains
-`d6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af`. The immediately following
-migration `20260724100500_phase13e_realtime_authorization_permission_fix.sql` has SHA-256
-`4fd80b511879c62c70a5fe9e89c452bd025ca1ac9bcc9da6011131d493e16723`.
+No hosted write occurred during this repository compatibility correction. It did not contact
+`starville-dev` or `starville-prod`, change a project setting, create an Auth user or fixture, run a
+function, enable Cron, or alter migration history.
+
+## Narrow amendment and migration policy exception
+
+The normal policy is never to edit a migration that exists in remote history. This migration has
+never successfully applied to a shared hosted project, its failed transaction fully rolled back, it
+is absent from remote history, and no Phase 13E object remains remotely. A later repair cannot fix
+an earlier migration that fails before reaching it, so this unapplied migration is eligible for a
+narrow compatibility amendment and checksum review.
+
+The amendment removes the redundant provider-owned operation:
+
+```sql
+ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY;
+```
+
+The ownership review found and also removed the only other ownership-sensitive statement against
+that provider-owned table:
+
+```sql
+GRANT SELECT, INSERT ON TABLE realtime.messages TO authenticated;
+```
+
+Supabase manages the table’s RLS state and base privileges. The migration now changes only
+Starville-owned policies on `realtime.messages`, an operation supported by Supabase Realtime
+Authorization. It adds no `ALTER OWNER`, `SET ROLE`, `SECURITY DEFINER` DDL wrapper, privilege
+escalation, trigger change, column change, manual RLS change, or table-level grant/revoke against
+`realtime.messages`. All four Starville Broadcast/Presence read/write policies remain.
+
+The previous Realtime SHA-256 was
+`d6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af`; the corrected SHA-256 is
+`20532eb6c659da4d3d93a6f3183ed4a8719921e26efb0822049fae065bb51b84`. The previous complete
+migration-manifest SHA-256 was `fcdee9ed405e96c483b88d55e758109dcb5cc42687c803b80964bb2a357daf59`;
+the corrected manifest SHA-256 is
+`54b2136ea9e06755a7452e308611d283bb9b32429142c77ffb8a2dd487322bce`. The permission-repair and
+cleanup hashes remain unchanged at
+`4fd80b511879c62c70a5fe9e89c452bd025ca1ac9bcc9da6011131d493e16723` and
+`147cccccf7930dab7d17557746b28422059ace1550f23d2ddd626fe2865dae97`.
+
+## Exact privilege model
 
 The correction first revokes the exact function from `PUBLIC`, `anon`, `authenticated`, and
 `service_role`, then grants only that exact signature to `authenticated`. It grants no table
@@ -39,17 +79,16 @@ extension, server-managed Auth/player binding and membership, active wallet acce
 moderation, environment, party membership, and home admission/invitation state. Payload fields are
 not authorization inputs.
 
-## Pending migration order and Phase 13B review
+## Pending migration order and applied Phase 13B
 
-The first read-only run correctly found three pre-existing pending migrations. The forward repair
-adds one migration, so the complete retry order is now:
+Phase 13B applied successfully and must not be reverted or included in the pending list. The
+complete remaining order is exactly:
 
-1. `20260722130000_phase13b_closed_beta_security_hardening.sql`
-2. `20260724100000_phase13e_supabase_realtime_authorization.sql`
-3. `20260724100500_phase13e_realtime_authorization_permission_fix.sql`
-4. `20260724101000_phase13e_social_cleanup_cron_foundation.sql`
+1. `20260724100000_phase13e_supabase_realtime_authorization.sql`
+2. `20260724100500_phase13e_realtime_authorization_permission_fix.sql`
+3. `20260724101000_phase13e_social_cleanup_cron_foundation.sql`
 
-The Phase 13B migration is a metadata-only hardening change:
+The applied Phase 13B migration is a metadata-only hardening change:
 
 - it forces RLS on 20 existing admin, wallet, player, moderation, and world tables;
 - it revokes `SELECT`, `INSERT`, `UPDATE`, and `DELETE` from `service_role` on 19 player-experience
@@ -65,10 +104,8 @@ The Phase 13B migration is a metadata-only hardening change:
 - it is compatible with Phase 13E because the latter uses trusted `SECURITY DEFINER` RPCs and adds
   no direct `service_role` table dependency.
 
-No objective Phase 13B defect was found. It does not require a new approval distinct from the
-already required reviewed `starville-dev` migration-write gate, but its lock/ACL impact and all four
-pending filenames must be reported before the later `db push`. Hosted catalog, RLS, API, and
-regression tests remain mandatory after application.
+No objective Phase 13B defect was found. Hosted catalog, RLS, API, and regression tests remain
+mandatory after the three Phase 13E migrations are applied in a separately authorized retry.
 
 ## Hosted test preparation
 
@@ -148,11 +185,11 @@ Realtime and Worker; either Supabase provider keeps `/ready` at
 references.
 
 The next task must re-run read-only target, migration-list, settings, and migration dry-run checks;
-report all four pending migrations; obtain the explicit hosted-write gate; apply only to
-`starville-dev`; then run the Phase 13E pgTAP, Realtime, cleanup, target-protection, lint, and
-regression suites. Until that separate run succeeds, private-channel behavior, Presence capability,
-cleanup behavior, migration application, and Phase 13E parity are unverified. Phase 13E-B remains
-blocked.
+confirm 85 applied migrations, exactly the three pending migrations above, and zero remote-only
+migrations; obtain the explicit hosted-write gate; apply only to `starville-dev`; then run the Phase
+13E pgTAP, Realtime, cleanup, target-protection, lint, and regression suites. Until that separate
+run succeeds, private-channel behavior, Presence capability, cleanup behavior, migration
+application, and Phase 13E parity are unverified. Phase 13E-B remains blocked.
 
 The read-only/pre-write sequence for that separate retry is:
 

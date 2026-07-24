@@ -1368,7 +1368,7 @@
       "sequence": 86,
       "filename": "20260724100000_phase13e_supabase_realtime_authorization.sql",
       "timestamp": "20260724100000",
-      "sha256": "d6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af",
+      "sha256": "20532eb6c659da4d3d93a6f3183ed4a8719921e26efb0822049fae065bb51b84",
       "phaseOrigin": "13E-A",
       "dependsOn": "20260722130000_phase13b_closed_beta_security_hardening.sql",
       "schemaImpact": "Adds wallet-bound non-anonymous player Auth identities, private Supabase Realtime membership authorization, exact topic RLS, and authorization audit storage",

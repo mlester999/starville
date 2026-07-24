@@ -231,10 +231,37 @@ export interface RemoteMigrationState {
 }
 
 export function parseRemoteMigrationState(output: string): RemoteMigrationState {
+  for (const line of output.split(/\r?\n/u)) {
+    const candidate = line.trim();
+    if (!candidate.startsWith('{')) continue;
+    try {
+      const parsed = JSON.parse(candidate) as {
+        readonly migrations?: readonly {
+          readonly local?: unknown;
+          readonly remote?: unknown;
+        }[];
+      };
+      if (!Array.isArray(parsed.migrations)) continue;
+      const local: string[] = [];
+      const remote: string[] = [];
+      for (const migration of parsed.migrations) {
+        if (typeof migration.local === 'string' && /^\d{14}$/u.test(migration.local)) {
+          local.push(migration.local);
+        }
+        if (typeof migration.remote === 'string' && /^\d{14}$/u.test(migration.remote)) {
+          remote.push(migration.remote);
+        }
+      }
+      return { local, remote };
+    } catch {
+      // Non-migration output can precede the CLI table. Fall through to the text parser.
+    }
+  }
+
   const local: string[] = [];
   const remote: string[] = [];
   for (const line of output.split(/\r?\n/u)) {
-    const match = /^\s*(\d{14})?\s*\|\s*(\d{14})?\s*\|/u.exec(line);
+    const match = /^\s*`?(\d{14})?`?\s*\|\s*`?(\d{14})?`?\s*\|/u.exec(line);
     if (match === null) continue;
     if (match[1] !== undefined) local.push(match[1]);
     if (match[2] !== undefined) remote.push(match[2]);

@@ -3577,8 +3577,27 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect((await parser.parse(cronSql)).stmts?.length ?? 0).toBeGreaterThan(0);
   });
 
-  it('uses exact private Realtime policies without public or permissive access', () => {
-    expect(realtimeSql).toContain('alter table realtime.messages enable row level security');
+  it('treats realtime.messages as provider-managed while preserving four exact policies', () => {
+    expect(realtimeSql).not.toMatch(/\balter\s+table\s+realtime\.messages\b/iu);
+    expect(realtimeSql).not.toMatch(/\balter\s+(?:table\s+)?realtime\.messages\s+owner\s+to\b/iu);
+    expect(realtimeSql).not.toMatch(
+      /\balter\s+table\s+realtime\.messages\s+(?:force|enable|disable)\s+row\s+level\s+security\b/iu,
+    );
+    expect(realtimeSql).not.toMatch(
+      /\b(?:grant|revoke)\b[^;]*\bon\s+(?:table\s+)?realtime\.messages\b/iu,
+    );
+    expect(realtimeSql).not.toMatch(
+      /\b(?:create|drop)\s+trigger\b[^;]*\b(?:on\s+)?realtime\.messages\b/iu,
+    );
+    for (const policy of [
+      'starville_private_broadcast_read',
+      'starville_private_broadcast_write',
+      'starville_private_presence_read',
+      'starville_private_presence_write',
+    ]) {
+      expect(realtimeSql).toContain(`drop policy if exists ${policy} on realtime.messages`);
+      expect(realtimeSql).toContain(`create policy ${policy}`);
+    }
     expect(realtimeSql.match(/create policy starville_private_/gu)).toHaveLength(4);
     expect(realtimeSql).toContain('auth.uid(), realtime.topic()');
     expect(realtimeSql).toContain("p_extension not in ('broadcast', 'presence')");
@@ -3605,29 +3624,48 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect(permissionFixSql).not.toMatch(/grant\s+usage\s+on\s+schema/iu);
     expect(permissionFixSql).not.toMatch(/grant\s+.+\s+on\s+(?:all\s+)?tables?/iu);
     expect(permissionFixSql).not.toMatch(/grant\s+execute\s+on\s+all\s+functions/iu);
+    expect(
+      permissionFixSql.match(
+        /grant execute on function private\.supabase_realtime_topic_authorized\(uuid,text,text\)\s+to authenticated/giu,
+      ),
+    ).toHaveLength(1);
+    expect(realtimeSql).not.toMatch(
+      /grant execute on function private\.supabase_realtime_topic_authorized\(uuid,text,text\)\s+to authenticated/iu,
+    );
+    for (const table of [
+      'supabase_realtime_settings',
+      'supabase_realtime_player_identities',
+      'supabase_realtime_memberships',
+      'supabase_realtime_authorization_audit',
+    ]) {
+      expect(realtimeSql).toMatch(
+        new RegExp(
+          `revoke all on table public\\.${table}\\s+from public, anon, authenticated, service_role`,
+          'iu',
+        ),
+      );
+    }
     expect(realtimeSql).toContain('security definer');
     expect(realtimeSql).toContain("set search_path = ''");
     expect(realtimeSql).not.toMatch(/\bexecute\s+format\s*\(/iu);
   });
 
-  it('binds the reviewed migration hashes and explicit four-file pending order', () => {
+  it('binds the reviewed migration hashes and explicit three-file pending order', () => {
     const hash = (value: string) => createHash('sha256').update(value).digest('hex');
     expect(hash(realtimeSql)).toBe(
-      'd6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af',
+      '20532eb6c659da4d3d93a6f3183ed4a8719921e26efb0822049fae065bb51b84',
     );
     expect(hash(permissionFixSql)).toBe(
       '4fd80b511879c62c70a5fe9e89c452bd025ca1ac9bcc9da6011131d493e16723',
     );
     expect(hash(cronSql)).toBe('147cccccf7930dab7d17557746b28422059ace1550f23d2ddd626fe2865dae97');
     expect([
-      '20260722130000_phase13b_closed_beta_security_hardening.sql',
       '20260724100000_phase13e_supabase_realtime_authorization.sql',
       '20260724100500_phase13e_realtime_authorization_permission_fix.sql',
       '20260724101000_phase13e_social_cleanup_cron_foundation.sql',
     ]).toEqual(
       [
         ...new Set([
-          '20260722130000_phase13b_closed_beta_security_hardening.sql',
           '20260724100000_phase13e_supabase_realtime_authorization.sql',
           '20260724100500_phase13e_realtime_authorization_permission_fix.sql',
           '20260724101000_phase13e_social_cleanup_cron_foundation.sql',

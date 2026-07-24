@@ -71,7 +71,7 @@ access.
 ## Current blockers
 
 The source commit is ambiguous; exact production target/domains/Reown/token values are absent; the
-Phase 13B hosted gate is pending; no world revision is approved; the asset selection is unsigned;
-backup/PITR/isolated restore and production monitors are unverified; and all predecessor owner gates
-remain pending. These are release governance and production-evidence blockers, not local-test
-passes.
+Phase 13B migration is applied to development but its production owner gate remains pending; no
+world revision is approved; the asset selection is unsigned; backup/PITR/isolated restore and
+production monitors are unverified; and all predecessor owner gates remain pending. These are
+release governance and production-evidence blockers, not local-test passes.

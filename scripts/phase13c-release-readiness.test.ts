@@ -174,6 +174,45 @@ describe('Phase 13C deterministic manifests', () => {
     );
   });
 
+  it('requires the corrected Realtime checksum and rejects the previous hosted-failing hash', async () => {
+    const expected = '20532eb6c659da4d3d93a6f3183ed4a8719921e26efb0822049fae065bb51b84';
+    const previous = 'd6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af';
+    const sourceManifest = JSON.parse(
+      readFileSync(join(root, 'infrastructure/deployment/manifests/migrations.v1.json'), 'utf8'),
+    ) as { entries: { filename: string; sha256: string }[] };
+    const sourceRealtime = sourceManifest.entries.find((entry) =>
+      entry.filename.includes('phase13e_supabase_realtime_authorization'),
+    );
+    expect(sourceRealtime?.sha256).toBe(expected);
+    expect(validateMigrationManifest(root)).toEqual({ ok: true, errors: [] });
+
+    const candidate = mkdtempSync(join(tmpdir(), 'starville-phase13e-realtime-hash-'));
+    await mkdir(join(candidate, 'infrastructure/deployment/manifests'), { recursive: true });
+    await mkdir(join(candidate, 'infrastructure/supabase'), { recursive: true });
+    await cp(
+      join(root, 'infrastructure/deployment/manifests/migrations.v1.json'),
+      join(candidate, 'infrastructure/deployment/manifests/migrations.v1.json'),
+    );
+    await cp(
+      join(root, 'infrastructure/supabase/migrations'),
+      join(candidate, 'infrastructure/supabase/migrations'),
+      { recursive: true },
+    );
+    const manifestPath = join(candidate, 'infrastructure/deployment/manifests/migrations.v1.json');
+    const staleManifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      entries: { filename: string; sha256: string }[];
+    };
+    const staleRealtime = staleManifest.entries.find((entry) =>
+      entry.filename.includes('phase13e_supabase_realtime_authorization'),
+    );
+    expect(staleRealtime).toBeDefined();
+    staleRealtime!.sha256 = previous;
+    writeFileSync(manifestPath, `${JSON.stringify(staleManifest, null, 2)}\n`);
+    expect(validateMigrationManifest(candidate).errors).toContain(
+      'Migration content hash has drifted at 86',
+    );
+  });
+
   it('keeps production reference seeds deterministic, data-free, and fail-closed', () => {
     expect(validateSeedManifest(root)).toEqual({ ok: true, errors: [] });
   });

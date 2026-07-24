@@ -568,8 +568,6 @@ begin
 end;
 $$;
 
-alter table realtime.messages enable row level security;
-
 drop policy if exists starville_private_broadcast_read on realtime.messages;
 create policy starville_private_broadcast_read
 on realtime.messages for select to authenticated
@@ -632,7 +630,3 @@ grant execute on function public.authorize_supabase_realtime_player(uuid,text,te
   to service_role;
 grant execute on function public.close_supabase_realtime_membership(uuid,uuid,text)
   to service_role;
-
--- These are the only browser table privileges added by Phase 13E-A. RLS and private-channel
--- configuration still gate every message by auth.uid(), exact topic, environment, and membership.
-grant select, insert on table realtime.messages to authenticated;

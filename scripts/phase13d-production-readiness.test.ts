@@ -260,6 +260,29 @@ describe('Phase 13D migration-state parser', () => {
     expect(compareRemoteMigrationState(manifest, exact, 'exact')).toEqual({ ok: true, errors: [] });
   });
 
+  it('parses the guarded command JSON envelope and optional CLI table backticks', () => {
+    expect(
+      parseRemoteMigrationState(
+        [
+          '{"environment":"development","projectRef":"abcd...qrst","linked":true}',
+          '{"migrations":[{"local":"20260710090000","remote":"20260710090000"},' +
+            '{"local":"20260710091000","remote":""}],"message":"Migrations listed"}',
+        ].join('\n'),
+      ),
+    ).toEqual({
+      local: ['20260710090000', '20260710091000'],
+      remote: ['20260710090000'],
+    });
+    expect(
+      parseRemoteMigrationState(
+        '\n `20260710090000` | `20260710090000` | x\n `20260710091000` |  | y\n',
+      ),
+    ).toEqual({
+      local: ['20260710090000', '20260710091000'],
+      remote: ['20260710090000'],
+    });
+  });
+
   it('blocks unknown remote, missing local, and incomplete post-push states', () => {
     const state = parseRemoteMigrationState(
       `\n 20260710090000 | 20260710090000 | x\n | 20260710199999 | y\n`,

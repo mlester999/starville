@@ -23,7 +23,7 @@
   "migrations": {
     "path": "infrastructure/deployment/manifests/migrations.v1.json",
     "version": 1,
-    "sha256": "fcdee9ed405e96c483b88d55e758109dcb5cc42687c803b80964bb2a357daf59",
+    "sha256": "54b2136ea9e06755a7452e308611d283bb9b32429142c77ffb8a2dd487322bce",
     "count": 88,
     "head": "20260724101000_phase13e_social_cleanup_cron_foundation.sql",
     "status": "local-static-chain-valid-local-postgres-hosted-and-production-evidence-missing"

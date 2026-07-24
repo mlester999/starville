@@ -10,10 +10,6 @@ import {
 
 export const PHASE13E_HOSTED_PENDING_MIGRATIONS = [
   {
-    timestamp: '20260722130000',
-    filename: '20260722130000_phase13b_closed_beta_security_hardening.sql',
-  },
-  {
     timestamp: '20260724100000',
     filename: '20260724100000_phase13e_supabase_realtime_authorization.sql',
   },
@@ -26,6 +22,8 @@ export const PHASE13E_HOSTED_PENDING_MIGRATIONS = [
     filename: '20260724101000_phase13e_social_cleanup_cron_foundation.sql',
   },
 ] as const;
+
+export const PHASE13B_APPLIED_MIGRATION_TIMESTAMP = '20260722130000';
 
 export interface Phase13ePendingMigrationReview {
   readonly matched: number;
@@ -44,8 +42,13 @@ export function reviewPhase13ePendingMigrationState(
   const expected = PHASE13E_HOSTED_PENDING_MIGRATIONS.map((migration) => migration.timestamp);
 
   if (remoteOnly.length > 0) throw new Error('Remote-only migration history requires a stop');
-  if (matched.length !== 84 || remote.size !== 84) {
-    throw new Error('Expected exactly 84 matching pre-Phase-13B migrations before hosted retry');
+  if (
+    matched.length !== 85 ||
+    remote.size !== 85 ||
+    !local.has(PHASE13B_APPLIED_MIGRATION_TIMESTAMP) ||
+    !remote.has(PHASE13B_APPLIED_MIGRATION_TIMESTAMP)
+  ) {
+    throw new Error('Expected exactly 85 matching migrations with Phase 13B already applied');
   }
   if (
     pending.length !== expected.length ||

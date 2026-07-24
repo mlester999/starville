@@ -25,14 +25,22 @@ party topics require active membership; home topics require ownership or current
 invitation/admission.
 
 PostgreSQL checks function execution privilege before a policy-invoked `SECURITY DEFINER` body can
-run. The committed foundation migration revoked the policy helper from `authenticated`, so the first
-read-only hosted validation stopped before applying it. Repository policy forbids editing a
-committed migration in place; the immediately following forward migration revokes the exact
+run. The immediately following permission-repair migration revokes the exact
 `private.supabase_realtime_topic_authorized(uuid,text,text)` signature from every client/service
 role and grants only that signature to `authenticated`. `anon`, `PUBLIC`, and `service_role` retain
 no direct execution. The grant adds no table CRUD, no broad private-function execution, and no
 payload authority. The helper stays `STABLE SECURITY DEFINER`, has `search_path=''`, uses qualified
 objects, and is owned by the trusted migration role.
+
+The hosted retry applied Phase 13B, then the Realtime migration failed at
+`ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY` because Supabase owns that
+already-RLS-enabled table as `supabase_realtime_admin`. The Phase 13E transaction fully rolled back
+and remains absent from remote history. Because no Phase 13E object remains and a later repair
+cannot fix an earlier failure, the unapplied migration was narrowly amended. It now performs only
+the four Supabase-supported policy drop/create pairs against `realtime.messages`; the redundant RLS
+`ALTER` and ownership-sensitive table `GRANT` were removed. No owner/role change, privilege
+escalation, manual RLS change, provider trigger/column change, or authenticated access to
+Starville’s private authorization tables was introduced.
 
 Broadcast and Presence payloads are untrusted presentation data. Strict schema, size, topic,
 identity, sequence, timestamp, and frequency checks reduce abuse, but they do not convert a browser

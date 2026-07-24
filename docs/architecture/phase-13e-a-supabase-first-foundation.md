@@ -1,7 +1,7 @@
 # Phase 13E-A — Supabase-first audit, migration foundation, and first vertical slice
 
 Date: 2026-07-24  
-Status: local foundation and hosted-unblock harnesses implemented; hosted proof not yet run
+Status: local foundation and hosted compatibility correction implemented; hosted retry pending
 Production provider state: `custom` realtime + `custom` Worker  
 Supabase parity state: incomplete; API `/ready` deliberately returns 503 in either Supabase mode
 
@@ -133,6 +133,11 @@ Every policy uses `auth.uid()`, `realtime.topic()`, exact `extension`, active sh
 membership, active wallet session, moderation state, maintenance state, current published world, and
 environment. Malformed/cross-environment topics return false. There is no `USING (true)` or
 anonymous access.
+
+`realtime.messages` remains Supabase-managed infrastructure. Its RLS state and base table privileges
+are not altered by Starville. The unapplied migration now performs only the four supported policy
+drop/create pairs against that table; it contains no table alteration, owner or role change,
+trigger/column change, or table-level grant/revoke.
 
 The player-identity and membership tables force RLS and expose no direct `anon`, `authenticated`, or
 `service_role` table privileges. Only service-role RPCs can prepare and bind a non-anonymous
@@ -309,8 +314,9 @@ Not performed:
 - no claim that Phase 13D or Supabase parity is ready.
 
 The owner selected hosted `starville-dev` validation without Docker or a local Supabase runtime.
-Before 13E-B, the separate hosted validation must review and apply the complete four-file pending
-order, run the allowlisted Phase 13E pgTAP suite, prove the wallet-bound two-client harness and
+Phase 13B is already applied. Before 13E-B, a separate hosted retry must verify the exact
+`starville-dev` target and review and apply exactly the three remaining Phase 13E migrations, run
+the allowlisted Phase 13E pgTAP suite, prove the wallet-bound two-client harness and
 cleanup-function harness, and prove private-only channel restrictions. If Management API read-back
 cannot prove the restriction, the owner must use **Dashboard → Realtime → Settings → Channel
 Restrictions → Allow public access** to disable public access and then obtain read-back or
