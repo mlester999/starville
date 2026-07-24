@@ -11,6 +11,18 @@ describe('Phase 13E hosted cleanup-function harness', () => {
   });
 
   it('covers isolated eligibility, boundary, replay, locking, and rollback cases', () => {
+    expect(PHASE13E_CLEANUP_HOSTED_PLAN.companionRealtimeCoverage).toEqual(
+      expect.arrayContaining([
+        'public-channel-rejection',
+        'authorized-private-channel',
+        'Auth-negative-cases',
+        'fixture-cleanup',
+        'Presence',
+        'Broadcast',
+      ]),
+    );
+    expect(PHASE13E_CLEANUP_HOSTED_PLAN.migrationState.preApplication).toContain('85 applied');
+    expect(PHASE13E_CLEANUP_HOSTED_PLAN.migrationState.behavioralExecution).toContain('88 applied');
     expect(PHASE13E_CLEANUP_HOSTED_PLAN.fixtures).toEqual(
       expect.arrayContaining([
         'expired-eligible',

@@ -31,10 +31,11 @@ export function assertExactDevelopmentHostedTarget(
   }
 
   const productionRef = environment['STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF']?.trim();
-  if (productionRef !== undefined && PROJECT_REF_PATTERN.test(productionRef)) {
-    if (productionRef === approvedDevelopmentRef || config.projectRef === productionRef) {
-      throw new Error('Production and development Supabase project references must differ');
-    }
+  if (productionRef === undefined || !PROJECT_REF_PATTERN.test(productionRef)) {
+    throw new Error('A valid distinct production Supabase project reference is required');
+  }
+  if (productionRef === approvedDevelopmentRef || config.projectRef === productionRef) {
+    throw new Error('Production and development Supabase project references must differ');
   }
 }
 
@@ -52,6 +53,9 @@ export function assertHostedDevelopmentFixtureWritesApproved(
 ): void {
   assertHostedDevelopmentTestsApproved(config, environment);
   assertRemoteMigrationWriteApproved(config);
+  if (config.bootstrapEnabled) {
+    throw new Error('Hosted fixture execution requires ADMIN_BOOTSTRAP_ENABLED=false');
+  }
 }
 
 export async function verifyCanonicalHostedTarget(

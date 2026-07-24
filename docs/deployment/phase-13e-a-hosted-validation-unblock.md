@@ -125,10 +125,15 @@ invitation. Hosted execution remains pending.
 `--execute` path:
 
 - requires the exact linked `starville-dev`, both hosted-test and remote-write gates, a matching
-  database URL, and proven private-only settings;
+  database URL, `ADMIN_BOOTSTRAP_ENABLED=false`, the reviewed branch/clean worktree/checksums,
+  post-application 88/0 migration parity, and proven private-only settings;
+- makes one bounded no-payload public-channel subscription attempt and treats success as critical
+  failure, while every normal Starville channel remains `config.private=true`;
 - creates two unique wallet/profile fixtures and two non-anonymous Auth users through the
   wallet-bound preparation/binding flow;
-- creates channels only with `config.private=true`;
+- proves unbound, wrong-player, suspended, anonymous, missing/malformed/corrupted token,
+  deterministic expired wallet-access-session, one-use magic-link replay, and cross-environment
+  denials;
 - checks two-client subscribe, Presence sync/join/leave, untrack, reconnect de-duplication, and
   channel-switch cleanup;
 - sends strict low-frequency movement by Broadcast, enforcing protocol/scope/size/sequence/time and
@@ -136,8 +141,9 @@ invitation. Hosted execution remains pending.
   wrong-world, cross-topic, and gameplay-authority fields;
 - compares matching `realtime.messages` rows before/after to prove movement is not used as a
   PostgreSQL frame bus;
-- removes channels and deletes only tracked Auth, binding, membership, audit, wallet, and player
-  fixtures in `finally`.
+- removes channels, verifies exact Auth/database fixture ownership, deletes only exact tagged or
+  tracked Auth, binding, membership, party/home, audit, wallet, avatar/cosmetic, moderation, and
+  player fixtures in `finally`, and proves zero remain.
 
 Presence contains only the approved public presentation state and is not used for movement.
 Broadcast cannot grant inventory, currency, progression, collision, trade, gift, reward, or
@@ -165,9 +171,9 @@ It never prints the token or raw response. It interprets only documented `suspen
 `private_only` fields. A response field named `presence_enabled` is deliberately not treated as an
 authoritative Presence switch; two-client behavior is the final capability proof.
 
-If `private_only` is omitted, the owner must open **Dashboard → Realtime → Settings → Channel
-Restrictions** and disable **Allow public access**, then repeat read-back or the private-channel
-behavioral test. No setting was changed by this repository task.
+The owner has since configured Realtime enabled, disabled public access, and proven private-only
+mode through Management API read-back. Presence still requires the two-client behavioral harness. No
+setting was changed by the repository harness-completion task.
 
 ## Safety and next validation boundary
 

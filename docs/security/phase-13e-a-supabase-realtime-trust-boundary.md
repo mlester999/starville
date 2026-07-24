@@ -56,6 +56,11 @@ URLs are never returned. The database binding, not client-editable Auth metadata
 authorization source of truth.
 
 Production remains `custom/custom`. Supabase mode is a foundation state and forces API readiness to
-503 until later parity and commissioning approval. The repository now has gated dry-run-by-default
-hosted Realtime and cleanup harnesses, but neither was executed in the unblock task. Private-only
-channel settings, two-client behavior, and Presence capability remain unverified hosted evidence.
+503 until later parity and commissioning approval. The owner has now configured Realtime enabled
+with public access disabled and private-only mode proven through Management API read-back. The gated
+dry-run-by-default harness now includes a no-payload public subscription denial, private-only normal
+channels, unbound/wrong-player/suspended/anonymous/malformed/missing/corrupted/expired/
+cross-environment denials, one-use magic-link replay proof, and exact tagged-fixture cleanup.
+Repository implementation and dry-run proof are not hosted behavioral proof: no hosted channel was
+opened and no hosted fixture was created in the harness-completion task. Two-client behavior,
+Presence capability, migration application, and cleanup execution remain pending.

@@ -47,9 +47,15 @@ describe('hosted starville-dev safety', () => {
         environment,
       ),
     ).not.toThrow();
+    expect(() =>
+      assertHostedDevelopmentFixtureWritesApproved(
+        config({ remoteWritesApproved: true, bootstrapEnabled: true }),
+        environment,
+      ),
+    ).toThrow('ADMIN_BOOTSTRAP_ENABLED=false');
   });
 
-  it('rejects production targets, aliases, and project references', () => {
+  it('rejects production targets, aliases, missing references, and matching references', () => {
     expect(() =>
       assertExactDevelopmentHostedTarget(config(), {
         ...environment,
@@ -68,6 +74,18 @@ describe('hosted starville-dev safety', () => {
         STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF: developmentRef,
       }),
     ).toThrow('must differ');
+    expect(() =>
+      assertExactDevelopmentHostedTarget(config(), {
+        ...environment,
+        STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF: undefined,
+      }),
+    ).toThrow('valid distinct production');
+    expect(() =>
+      assertExactDevelopmentHostedTarget(config(), {
+        ...environment,
+        STARVILLE_PRODUCTION_SUPABASE_PROJECT_REF: 'OWNER_REQUIRED_PRODUCTION_REF',
+      }),
+    ).toThrow('valid distinct production');
   });
 
   it('prints only a masked target summary and no credentials', () => {

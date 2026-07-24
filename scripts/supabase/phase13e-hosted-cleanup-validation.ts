@@ -14,6 +14,10 @@ import {
   parseHostedHarnessMode,
 } from './phase13e-hosted-realtime-validation';
 import {
+  assertPhase13eBehavioralExecutionReady,
+  assertPhase13eRepositoryBaseline,
+} from './phase13e-hosted-retry-safety';
+import {
   assertHostedDevelopmentFixtureWritesApproved,
   safeHostedTargetSummary,
   verifyCanonicalHostedTarget,
@@ -21,6 +25,18 @@ import {
 
 export const PHASE13E_CLEANUP_HOSTED_PLAN = {
   target: 'exact starville-dev project ref and URL; production rejected',
+  migrationState: {
+    preApplication: '85 applied, exactly three reviewed pending, zero remote-only',
+    behavioralExecution: '88 applied, zero pending, zero remote-only',
+  },
+  companionRealtimeCoverage: [
+    'public-channel-rejection',
+    'authorized-private-channel',
+    'Auth-negative-cases',
+    'fixture-cleanup',
+    'Presence',
+    'Broadcast',
+  ],
   fixtures: [
     'expired-eligible',
     'non-expired',
@@ -345,6 +361,7 @@ async function validateAdvisoryLock(sql: postgres.Sql, tag: string): Promise<voi
 async function executeHostedValidation(): Promise<void> {
   const target = await verifyCanonicalHostedTarget(process.env);
   assertHostedDevelopmentFixtureWritesApproved(target, process.env);
+  await assertPhase13eRepositoryBaseline();
   process.stdout.write(`${JSON.stringify(safeHostedTargetSummary(target))}\n`);
   const privateConfig = loadPrivateSupabaseConfig(process.env);
   if (privateConfig.databaseUrl === undefined) {
@@ -354,6 +371,7 @@ async function executeHostedValidation(): Promise<void> {
   const sql = postgres(privateConfig.databaseUrl, { max: 4, ssl: 'require' });
   const tag = createFixtureTag(randomUUID());
   try {
+    await assertPhase13eBehavioralExecutionReady(sql);
     await assertNoPreexistingEligibleInteractions(sql);
     await validateCleanupBehavior(sql, tag);
     await assertNoPreexistingEligibleInteractions(sql);

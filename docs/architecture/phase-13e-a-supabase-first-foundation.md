@@ -1,9 +1,9 @@
 # Phase 13E-A — Supabase-first audit, migration foundation, and first vertical slice
 
 Date: 2026-07-24  
-Status: local foundation and hosted compatibility correction implemented; hosted retry pending
-Production provider state: `custom` realtime + `custom` Worker  
-Supabase parity state: incomplete; API `/ready` deliberately returns 503 in either Supabase mode
+Status: local foundation and hosted harness completion implemented; hosted retry pending<br>
+Production provider state: `custom` realtime + `custom` Worker<br> Supabase parity state:
+incomplete; API `/ready` deliberately returns 503 in either Supabase mode
 
 ## 1. Decision record
 
@@ -302,6 +302,8 @@ Implemented locally:
 - bounded SQL/Cron proof and disabled repository schedule;
 - provider-aware readiness;
 - tests, migration manifest, environment contracts, and rollback plan.
+- controlled public-channel rejection, complete Player Auth negative cases, exact tagged-fixture
+  cleanup, and retry-state/checksum guards in the hosted harnesses.
 
 Not performed:
 
@@ -313,12 +315,13 @@ Not performed:
 - no commit or push;
 - no claim that Phase 13D or Supabase parity is ready.
 
-The owner selected hosted `starville-dev` validation without Docker or a local Supabase runtime.
+The owner selected hosted `starville-dev` validation without Docker or a local Supabase runtime. The
+owner has configured Realtime enabled with public access disabled and private-only mode proven
+through Management API read-back. This configuration evidence does not replace behavioral proof.
 Phase 13B is already applied. Before 13E-B, a separate hosted retry must verify the exact
 `starville-dev` target and review and apply exactly the three remaining Phase 13E migrations, run
 the allowlisted Phase 13E pgTAP suite, prove the wallet-bound two-client harness and
-cleanup-function harness, and prove private-only channel restrictions. If Management API read-back
-cannot prove the restriction, the owner must use **Dashboard → Realtime → Settings → Channel
-Restrictions → Allow public access** to disable public access and then obtain read-back or
-behavioral evidence. Player Auth rate limits, quotas, monitoring/SLOs, and rollback sign-off also
-remain pending.
+cleanup-function harness, and prove private-only channel restrictions with the controlled public
+subscription denial. Player Auth rate limits, quotas, monitoring/SLOs, and rollback sign-off also
+remain pending. Production remains `custom/custom`, Cron remains disabled, and Phase 13E-B is still
+blocked.
