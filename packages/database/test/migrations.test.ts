@@ -3544,6 +3544,13 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     ),
     'utf8',
   );
+  const permissionFixSql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260724100500_phase13e_realtime_authorization_permission_fix.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
   const cronSql = readFileSync(
     new URL(
       '../../../infrastructure/supabase/migrations/20260724101000_phase13e_social_cleanup_cron_foundation.sql',
@@ -3551,10 +3558,22 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     ),
     'utf8',
   );
+  const pgtapSql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/tests/phase13e_supabase_first_foundation.test.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const executionSql = readFileSync(
+    new URL('./fixtures/phase13e-supabase-realtime-postgres-execution.sql', import.meta.url),
+    'utf8',
+  );
 
-  it('parses both forward-only migrations with the hosted PostgreSQL grammar', async () => {
+  it('parses all forward-only migrations with the hosted PostgreSQL grammar', async () => {
     const parser = new Parser({ version: 17 });
     expect((await parser.parse(realtimeSql)).stmts?.length ?? 0).toBeGreaterThan(0);
+    expect((await parser.parse(permissionFixSql)).stmts?.length ?? 0).toBeGreaterThan(0);
     expect((await parser.parse(cronSql)).stmts?.length ?? 0).toBeGreaterThan(0);
   });
 
@@ -3572,6 +3591,70 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect(realtimeSql).toContain('bind_supabase_realtime_player_identity');
     expect(realtimeSql).not.toMatch(/using\s*\(\s*true\s*\)|with check\s*\(\s*true\s*\)/iu);
     expect(realtimeSql).not.toMatch(/grant .+ on table realtime\.messages to (?:public|anon)/iu);
+  });
+
+  it('repairs policy invocation with one exact grant and no broad private authority', () => {
+    expect(permissionFixSql).toContain(
+      'revoke all on function private.supabase_realtime_topic_authorized(uuid,text,text)',
+    );
+    expect(permissionFixSql).toContain(
+      'grant execute on function private.supabase_realtime_topic_authorized(uuid,text,text)',
+    );
+    expect(permissionFixSql).toContain('to authenticated');
+    expect(permissionFixSql).toContain('from public, anon, authenticated, service_role');
+    expect(permissionFixSql).not.toMatch(/grant\s+usage\s+on\s+schema/iu);
+    expect(permissionFixSql).not.toMatch(/grant\s+.+\s+on\s+(?:all\s+)?tables?/iu);
+    expect(permissionFixSql).not.toMatch(/grant\s+execute\s+on\s+all\s+functions/iu);
+    expect(realtimeSql).toContain('security definer');
+    expect(realtimeSql).toContain("set search_path = ''");
+    expect(realtimeSql).not.toMatch(/\bexecute\s+format\s*\(/iu);
+  });
+
+  it('binds the reviewed migration hashes and explicit four-file pending order', () => {
+    const hash = (value: string) => createHash('sha256').update(value).digest('hex');
+    expect(hash(realtimeSql)).toBe(
+      'd6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af',
+    );
+    expect(hash(permissionFixSql)).toBe(
+      '4fd80b511879c62c70a5fe9e89c452bd025ca1ac9bcc9da6011131d493e16723',
+    );
+    expect(hash(cronSql)).toBe('147cccccf7930dab7d17557746b28422059ace1550f23d2ddd626fe2865dae97');
+    expect([
+      '20260722130000_phase13b_closed_beta_security_hardening.sql',
+      '20260724100000_phase13e_supabase_realtime_authorization.sql',
+      '20260724100500_phase13e_realtime_authorization_permission_fix.sql',
+      '20260724101000_phase13e_social_cleanup_cron_foundation.sql',
+    ]).toEqual(
+      [
+        ...new Set([
+          '20260722130000_phase13b_closed_beta_security_hardening.sql',
+          '20260724100000_phase13e_supabase_realtime_authorization.sql',
+          '20260724100500_phase13e_realtime_authorization_permission_fix.sql',
+          '20260724101000_phase13e_social_cleanup_cron_foundation.sql',
+        ]),
+      ].sort(),
+    );
+  });
+
+  it('covers the exact ACL, policy, owner, role-denial, and behavioral matrix', () => {
+    expect(pgtapSql).toContain('select plan(50);');
+    expect(pgtapSql).toContain("'authenticated'");
+    expect(pgtapSql).toContain('private.supabase_realtime_topic_authorized(uuid,text,text)');
+    expect(pgtapSql).toContain('PUBLIC has no execute privilege');
+    expect(pgtapSql).toContain('authenticated cannot enumerate or mutate');
+    expect(pgtapSql).toContain('the policy helper retains its exact empty search_path');
+    expect(pgtapSql).toContain('trusted migration role');
+    expect(pgtapSql).toContain('Presence and Broadcast SELECT');
+    expect(pgtapSql).toContain('Presence and Broadcast INSERT');
+    expect(pgtapSql).toContain('payload values never participate');
+    expect(pgtapSql).toContain('anon invocation is rejected');
+    expect(executionSql).toContain('an invited home visitor is authorized');
+    expect(executionSql).toContain('an expired home invitation fails closed');
+    expect(executionSql).toContain('suspended players fail closed');
+    expect(executionSql).toContain('wrong user, world, environment, malformed');
+    expect(executionSql).toContain('expired memberships fail closed');
+    expect(executionSql).toContain('party topics require active party membership');
+    expect(executionSql).toContain('player topics are self-only');
   });
 
   it('keeps the SQL/Cron proof bounded, locked, auditable, and disabled', () => {

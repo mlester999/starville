@@ -3,7 +3,6 @@ import process from 'node:process';
 
 import {
   assertDatabaseUrlMatchesProjectRef,
-  assertHostedTestsApproved,
   loadPrivateSupabaseConfig,
 } from '@starville/config/server';
 import {
@@ -34,7 +33,11 @@ import {
   withHostedCleanupTimeout,
   type HostedApiLogDiagnostic,
 } from './hosted-rls-diagnostics';
-import { safeHostedTargetSummary, verifyCanonicalHostedTarget } from './safety';
+import {
+  assertHostedDevelopmentFixtureWritesApproved,
+  safeHostedTargetSummary,
+  verifyCanonicalHostedTarget,
+} from './safety';
 
 interface FixtureUser {
   readonly id: string;
@@ -200,7 +203,7 @@ async function main(): Promise<void> {
   const target = await verifyCanonicalHostedTarget(process.env);
   process.stdout.write(`${JSON.stringify(safeHostedTargetSummary(target))}\n`);
 
-  assertHostedTestsApproved(target);
+  assertHostedDevelopmentFixtureWritesApproved(target, process.env);
 
   const privateConfig = loadPrivateSupabaseConfig(process.env);
 

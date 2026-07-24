@@ -23,8 +23,8 @@
   "migrations": {
     "path": "infrastructure/deployment/manifests/migrations.v1.json",
     "version": 1,
-    "sha256": "240ba42c89c004195d92c73aa49d8cf36074a31f349cb0dac414d6df4e3674c9",
-    "count": 87,
+    "sha256": "fcdee9ed405e96c483b88d55e758109dcb5cc42687c803b80964bb2a357daf59",
+    "count": 88,
     "head": "20260724101000_phase13e_social_cleanup_cron_foundation.sql",
     "status": "local-static-chain-valid-local-postgres-hosted-and-production-evidence-missing"
   },
@@ -81,7 +81,7 @@
     "No approved production Reown project or token configuration evidence",
     "No hosted starville-dev Phase 13B validation evidence",
     "Phase 13E Supabase Realtime and SQL/Cron parity is incomplete; custom providers remain required",
-    "Phase 13E migrations have not run locally because Docker is unavailable",
+    "Owner selected hosted starville-dev validation without Docker; Phase 13E hosted proof remains pending",
     "No exact owner-approved production world revision",
     "No signed Phase 13D asset selection",
     "No provider backup, PITR, isolated restore, or recovery evidence",

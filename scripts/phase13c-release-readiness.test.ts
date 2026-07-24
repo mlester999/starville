@@ -146,6 +146,34 @@ describe('Phase 13C deterministic manifests', () => {
     expect(validateMigrationManifest(candidate).ok).toBe(false);
   });
 
+  it('hard-fails a stale Phase 13E correction checksum', async () => {
+    const candidate = mkdtempSync(join(tmpdir(), 'starville-phase13e-hash-'));
+    await mkdir(join(candidate, 'infrastructure/deployment/manifests'), { recursive: true });
+    await mkdir(join(candidate, 'infrastructure/supabase'), { recursive: true });
+    await cp(
+      join(root, 'infrastructure/deployment/manifests/migrations.v1.json'),
+      join(candidate, 'infrastructure/deployment/manifests/migrations.v1.json'),
+    );
+    await cp(
+      join(root, 'infrastructure/supabase/migrations'),
+      join(candidate, 'infrastructure/supabase/migrations'),
+      { recursive: true },
+    );
+    const manifestPath = join(candidate, 'infrastructure/deployment/manifests/migrations.v1.json');
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
+      entries: { filename: string; sha256: string }[];
+    };
+    const correction = manifest.entries.find((entry) =>
+      entry.filename.includes('phase13e_realtime_authorization_permission_fix'),
+    );
+    expect(correction).toBeDefined();
+    correction!.sha256 = '0'.repeat(64);
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+    expect(validateMigrationManifest(candidate).errors).toContain(
+      'Migration content hash has drifted at 87',
+    );
+  });
+
   it('keeps production reference seeds deterministic, data-free, and fail-closed', () => {
     expect(validateSeedManifest(root)).toEqual({ ok: true, errors: [] });
   });

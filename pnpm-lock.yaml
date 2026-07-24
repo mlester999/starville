@@ -32,6 +32,9 @@ importers:
       '@starville/progression-simulation':
         specifier: workspace:*
         version: link:packages/progression-simulation
+      '@starville/realtime':
+        specifier: workspace:*
+        version: link:packages/realtime
       '@starville/shared-validation':
         specifier: workspace:*
         version: link:packages/shared-validation

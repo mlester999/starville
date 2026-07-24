@@ -3,18 +3,22 @@ import process from 'node:process';
 
 import {
   assertDatabaseUrlMatchesProjectRef,
-  assertHostedTestsApproved,
   loadPrivateSupabaseConfig,
 } from '@starville/config/server';
 import postgres from 'postgres';
 
-import { safeHostedTargetSummary, verifyCanonicalHostedTarget } from './safety';
+import { selectHostedDatabaseTestSuites } from './hosted-database-suite-selection';
+import {
+  assertHostedDevelopmentTestsApproved,
+  safeHostedTargetSummary,
+  verifyCanonicalHostedTarget,
+} from './safety';
 import { extractTapLines, parseTapReport } from './tap-report';
 
 async function main(): Promise<void> {
   const target = await verifyCanonicalHostedTarget(process.env);
   process.stdout.write(`${JSON.stringify(safeHostedTargetSummary(target))}\n`);
-  assertHostedTestsApproved(target);
+  assertHostedDevelopmentTestsApproved(target, process.env);
 
   const privateConfig = loadPrivateSupabaseConfig(process.env);
 
@@ -24,23 +28,7 @@ async function main(): Promise<void> {
 
   assertDatabaseUrlMatchesProjectRef(privateConfig.databaseUrl, target.projectRef);
 
-  const reviewedSuites = [
-    'admin_authorization.test.sql',
-    'token_access.test.sql',
-    'player_vertical_slice.test.sql',
-    'secure_player_operations.test.sql',
-    'world_management.test.sql',
-    'live_operations.test.sql',
-    'cozy_gameplay.test.sql',
-    'economy.test.sql',
-    'world_asset_manager.test.sql',
-    'platform_configuration.test.sql',
-    'realtime_presence.test.sql',
-    'multiplayer_chat.test.sql',
-    'social_interactions.test.sql',
-    'social_graph.test.sql',
-    'cooperative_activities.test.sql',
-  ] as const;
+  const reviewedSuites = selectHostedDatabaseTestSuites(process.argv.slice(2));
 
   const sql = postgres(privateConfig.databaseUrl, { max: 1, ssl: 'require' });
 

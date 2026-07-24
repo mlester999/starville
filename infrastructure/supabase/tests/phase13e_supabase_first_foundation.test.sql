@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(36);
+select plan(50);
 
 select has_table('public', 'supabase_realtime_settings', 'environment-scoped realtime settings exist');
 select has_table(
@@ -86,6 +86,187 @@ select ok(
   and has_table_privilege('authenticated', 'realtime.messages', 'insert')
   and not has_table_privilege('anon', 'realtime.messages', 'select'),
   'authenticated clients have only RLS-gated Realtime access'
+);
+select ok(
+  has_schema_privilege('authenticated', 'private', 'usage')
+  and has_function_privilege(
+    'authenticated',
+    'private.supabase_realtime_topic_authorized(uuid,text,text)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'private.supabase_realtime_membership_is_valid(public.supabase_realtime_memberships)',
+    'execute'
+  )
+  and not has_function_privilege(
+    'authenticated',
+    'private.realtime_access_denial(public.wallet_access_sessions,public.player_profiles)',
+    'execute'
+  ),
+  'authenticated has only the exact helper execute required by policy evaluation'
+);
+select ok(
+  not has_function_privilege(
+    'anon',
+    'private.supabase_realtime_topic_authorized(uuid,text,text)',
+    'execute'
+  ),
+  'anon cannot execute the private Realtime authorization entry point'
+);
+select ok(
+  not exists (
+    select 1
+    from pg_proc procedure
+    cross join lateral aclexplode(
+      coalesce(procedure.proacl, acldefault('f', procedure.proowner))
+    ) privilege
+    where procedure.oid =
+      'private.supabase_realtime_topic_authorized(uuid,text,text)'::regprocedure
+      and privilege.grantee = 0
+      and privilege.privilege_type = 'EXECUTE'
+  ),
+  'PUBLIC has no execute privilege on the private Realtime authorization entry point'
+);
+select ok(
+  not has_function_privilege(
+    'service_role',
+    'private.supabase_realtime_topic_authorized(uuid,text,text)',
+    'execute'
+  ),
+  'service_role has no unnecessary direct helper execution privilege'
+);
+select ok(
+  not has_table_privilege('authenticated', 'public.supabase_realtime_memberships', 'select')
+  and not has_table_privilege('authenticated', 'public.supabase_realtime_memberships', 'insert')
+  and not has_table_privilege('authenticated', 'public.supabase_realtime_memberships', 'update')
+  and not has_table_privilege('authenticated', 'public.supabase_realtime_memberships', 'delete'),
+  'authenticated cannot enumerate or mutate private membership authority'
+);
+select ok(
+  not has_table_privilege(
+    'authenticated',
+    'public.supabase_realtime_player_identities',
+    'select'
+  )
+  and not has_table_privilege(
+    'authenticated',
+    'public.supabase_realtime_player_identities',
+    'insert'
+  )
+  and not has_table_privilege(
+    'authenticated',
+    'public.supabase_realtime_authorization_audit',
+    'select'
+  ),
+  'the exact helper grant exposes no identity or authorization-audit tables'
+);
+select ok(
+  (
+    select prosecdef and provolatile = 's'
+    from pg_proc
+    where oid = 'private.supabase_realtime_topic_authorized(uuid,text,text)'::regprocedure
+  ),
+  'the policy helper remains a stable SECURITY DEFINER function'
+);
+select is(
+  (
+    select array_to_string(proconfig, ',')
+    from pg_proc
+    where oid = 'private.supabase_realtime_topic_authorized(uuid,text,text)'::regprocedure
+  ),
+  'search_path=""',
+  'the policy helper retains its exact empty search_path'
+);
+select ok(
+  (
+    select pg_get_userbyid(proowner) in ('postgres', 'supabase_admin')
+    from pg_proc
+    where oid = 'private.supabase_realtime_topic_authorized(uuid,text,text)'::regprocedure
+  ),
+  'the SECURITY DEFINER owner is a trusted migration role, never a client role'
+);
+select is(
+  (
+    select count(*)::integer
+    from pg_policies
+    where schemaname = 'realtime'
+      and tablename = 'messages'
+      and policyname in (
+        'starville_private_broadcast_read',
+        'starville_private_presence_read'
+      )
+      and cmd = 'SELECT'
+      and roles = array['authenticated']::name[]
+  ),
+  2,
+  'Presence and Broadcast SELECT are restricted to authenticated policy evaluation'
+);
+select is(
+  (
+    select count(*)::integer
+    from pg_policies
+    where schemaname = 'realtime'
+      and tablename = 'messages'
+      and policyname in (
+        'starville_private_broadcast_write',
+        'starville_private_presence_write'
+      )
+      and cmd = 'INSERT'
+      and roles = array['authenticated']::name[]
+  ),
+  2,
+  'Presence and Broadcast INSERT are restricted to authenticated policy evaluation'
+);
+select ok(
+  not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'realtime'
+      and tablename = 'messages'
+      and policyname like 'starville_private_%'
+      and (
+        coalesce(qual, '') ilike '%payload%'
+        or coalesce(with_check, '') ilike '%payload%'
+      )
+  ),
+  'client-controlled payload values never participate in topic authorization'
+);
+select ok(
+  (
+    select count(*) = 4
+    from pg_policies
+    where schemaname = 'realtime'
+      and tablename = 'messages'
+      and policyname like 'starville_private_%'
+      and (
+        coalesce(qual, with_check) like '%realtime.topic()%'
+        and coalesce(qual, with_check) like '%auth.uid()%'
+        and coalesce(qual, with_check) like '%messages.extension%'
+      )
+  ),
+  'all four policies derive authority from trusted user, topic, and extension values'
+);
+select lives_ok(
+  $$
+    set local role authenticated;
+    select private.supabase_realtime_topic_authorized(
+      '8e000000-0000-4000-8000-000000000099'::uuid,
+      'starville:development:world:malformed',
+      'broadcast'
+    );
+    reset role;
+  $$,
+  'authenticated can invoke the exact policy entry point and malformed input fails closed'
+);
+select ok(
+  not has_schema_privilege('anon', 'private', 'usage')
+  and not has_function_privilege(
+    'anon',
+    'private.supabase_realtime_topic_authorized(uuid,text,text)',
+    'execute'
+  ),
+  'anon invocation is rejected by both schema and exact function privilege'
 );
 select is(
   (select environment_key from public.supabase_realtime_settings where singleton_key),

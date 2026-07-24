@@ -1,7 +1,7 @@
 # Phase 13E-A — Supabase-first audit, migration foundation, and first vertical slice
 
 Date: 2026-07-24  
-Status: local foundation implemented; hosted and production mutation not authorized  
+Status: local foundation and hosted-unblock harnesses implemented; hosted proof not yet run
 Production provider state: `custom` realtime + `custom` Worker  
 Supabase parity state: incomplete; API `/ready` deliberately returns 503 in either Supabase mode
 
@@ -188,8 +188,9 @@ delivery/retry semantics.
   the first slice works.
 - Responses expose provider names and migration state but never internal URLs or credentials.
 - Legacy variables and deployment templates remain because production still uses custom services.
-- The migration manifest includes both Phase 13E-A migrations, but hosted execution remains
-  unauthorized and the commissioning manifest remains Stage-A blocked.
+- The migration manifest includes the Realtime and disabled-Cron foundations plus the forward-only
+  Realtime policy-permission repair. Hosted execution remains unauthorized and the commissioning
+  manifest remains Stage-A blocked.
 
 ## 7. Capacity, security, and operations risks
 
@@ -215,7 +216,7 @@ Known risks and mitigations:
 
 ## 8. Migration plan
 
-### Phase 13E-B — hosted private-channel shadow
+### Phase 13E-B — hosted private-channel shadow (blocked)
 
 - Scope: apply to owner-approved `starville-dev`, configure environment setting, wallet-bound player
   Auth exchange, private-channel-only Realtime, and shadow world Presence.
@@ -307,7 +308,11 @@ Not performed:
 - no commit or push;
 - no claim that Phase 13D or Supabase parity is ready.
 
-Owner actions before 13E-B are: start local Docker for full migration/pgTAP execution; review the
-player Auth exchange and rate limits; approve a `starville-dev` target and hosted-write gates; set
-the hosted environment row correctly; disable public Realtime channel access; verify plan quotas;
-approve monitoring/SLOs; and sign the rollback procedure.
+The owner selected hosted `starville-dev` validation without Docker or a local Supabase runtime.
+Before 13E-B, the separate hosted validation must review and apply the complete four-file pending
+order, run the allowlisted Phase 13E pgTAP suite, prove the wallet-bound two-client harness and
+cleanup-function harness, and prove private-only channel restrictions. If Management API read-back
+cannot prove the restriction, the owner must use **Dashboard → Realtime → Settings → Channel
+Restrictions → Allow public access** to disable public access and then obtain read-back or
+behavioral evidence. Player Auth rate limits, quotas, monitoring/SLOs, and rollback sign-off also
+remain pending.

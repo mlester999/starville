@@ -25,6 +25,7 @@ declare
   presence_a uuid;
   presence_b uuid;
   home_a uuid;
+  channel_a uuid;
 begin
   select public_presence_id into strict presence_a
   from public.player_profiles where id = player_a_id;
@@ -76,6 +77,28 @@ begin
       ),
     'the correct active member may read and write its exact world channel'
   );
+  select channel_id into strict channel_a
+  from public.supabase_realtime_memberships
+  where auth_user_id = auth_a_id and status = 'active';
+  perform pg_temp.assert_true(
+    has_function_privilege(
+      'authenticated',
+      'private.supabase_realtime_topic_authorized(uuid,text,text)',
+      'execute'
+    )
+      and not has_function_privilege(
+        'anon',
+        'private.supabase_realtime_topic_authorized(uuid,text,text)',
+        'execute'
+      )
+      and not has_table_privilege(
+        'authenticated', 'public.supabase_realtime_memberships', 'select'
+      )
+      and not has_table_privilege(
+        'authenticated', 'public.supabase_realtime_memberships', 'update'
+      ),
+    'only the exact policy helper is executable; private membership storage remains closed'
+  );
   perform pg_temp.assert_true(
     not private.supabase_realtime_topic_authorized(
       auth_b_id, result_a ->> 'topic', 'broadcast'
@@ -90,8 +113,13 @@ begin
       )
       and not private.supabase_realtime_topic_authorized(
         auth_a_id, result_a ->> 'topic', 'postgres_changes'
+      )
+      and not private.supabase_realtime_topic_authorized(
+        auth_a_id,
+        'starville:development:world:other-world:channel:' || channel_a,
+        'broadcast'
       ),
-    'wrong user, cross-environment, malformed, and unsupported-extension access fails closed'
+    'wrong user, world, environment, malformed, and unsupported-extension access fails closed'
   );
 
   perform pg_temp.assert_true(
@@ -131,7 +159,47 @@ begin
         ),
       'home topics allow owners and deny unrelated players'
     );
+    insert into public.home_visit_invitations(
+      player_home_id, owner_player_profile_id, invitee_player_profile_id,
+      invitation_type, status, created_at, expires_at
+    ) values(
+      home_a, player_a_id, player_b_id, 'direct_player', 'pending',
+      now() - interval '1 minute', now() + interval '5 minutes'
+    );
+    perform pg_temp.assert_true(
+      private.supabase_realtime_topic_authorized(
+        auth_b_id, 'starville:development:home:' || home_a, 'presence'
+      ),
+      'an invited home visitor is authorized only while the invitation is active'
+    );
+    update public.home_visit_invitations
+    set expires_at = now() - interval '1 second'
+    where player_home_id = home_a and invitee_player_profile_id = player_b_id
+      and status = 'pending';
+    perform pg_temp.assert_true(
+      not private.supabase_realtime_topic_authorized(
+        auth_b_id, 'starville:development:home:' || home_a, 'presence'
+      ),
+      'an expired home invitation fails closed'
+    );
   end if;
+
+  update public.player_moderation_states
+  set status = 'suspended',
+      suspension_reason = 'Phase 13E authorization denial test.',
+      suspended_at = now(),
+      suspended_by_admin_id = '11111111-1111-4111-8111-111111111111'
+  where player_profile_id = player_a_id;
+  perform pg_temp.assert_true(
+    not private.supabase_realtime_topic_authorized(
+      auth_a_id, result_a ->> 'topic', 'broadcast'
+    ),
+    'suspended players fail closed even with an active membership'
+  );
+  update public.player_moderation_states
+  set status = 'active', suspension_reason = null, suspended_at = null,
+      suspended_by_admin_id = null
+  where player_profile_id = player_a_id;
 
   update public.supabase_realtime_memberships
   set status = 'expired', closed_at = now(), close_reason = 'authorization_expired'
