@@ -28,6 +28,11 @@ import { WorldAssetReconciliationJob } from './jobs/world-asset-reconciliation-j
 import { createWorldAssetReconciliationGateway } from './jobs/world-asset-reconciliation-persistence.js';
 
 const config = loadWorkerConfig(process.env);
+if (config.provider !== 'custom') {
+  throw new Error(
+    'CUSTOM_WORKER_DISABLED_FOR_SUPABASE_PROVIDER: deploy the repository-controlled SQL/Cron schedule only after Phase 13E parity approval',
+  );
+}
 const supabaseConfig = loadPrivateSupabaseConfig(process.env);
 const logger = createLogger({
   service: config.application,

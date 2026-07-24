@@ -2792,7 +2792,16 @@ Implement:
 
 Do not broadcast all players globally.
 
-Supabase Realtime may be used for appropriate database-driven updates but must not replace the dedicated movement server.
+Phase 13E architecture amendment (2026-07-24): Starville is migrating toward a Supabase-first
+backend behind explicit, fail-closed providers. Supabase Realtime may replace dedicated transport
+features only one proven vertical slice at a time. Private channels must use RLS, high-frequency
+movement must use Broadcast rather than PostgreSQL frame writes, and browser movement remains
+untrusted presentation input. Realtime authorization must use a non-anonymous signed player JWT
+bound by trusted server code to the existing wallet-owned player identity; anonymous or unbound Auth
+users fail closed. Speed, collision, zone, reward, inventory, currency, moderation, and all durable
+gameplay authority must retain or replace the dedicated server's validation before that slice can
+cut over. The custom realtime service remains available through migration and rollback until an
+explicit legacy-retirement phase.
 
 ==================================================
 BACKGROUND WORKERS
@@ -2823,6 +2832,13 @@ Jobs must be:
 - Retry-safe
 - Logged
 - Observable
+
+Phase 13E architecture amendment (2026-07-24): low-risk database-only jobs may migrate to bounded,
+advisory-locked SQL/`pg_cron` functions with durable run evidence. Edge Functions are reserved for
+orchestration or external I/O, and Queues require an evidenced durable item-delivery need. Provider
+selection must prevent custom Worker and Supabase schedules from executing the same job
+concurrently. Reward, economy, and other high-risk jobs stay on the custom Worker until
+feature-specific shadow equivalence, rollback, and owner acceptance are complete.
 - Protected from duplicate execution
 
 ==================================================

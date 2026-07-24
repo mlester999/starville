@@ -1,4 +1,8 @@
-import { parsePublicBrowserConfig, parsePublicWalletConfig } from '@starville/config/browser';
+import {
+  parsePublicBrowserConfig,
+  parsePublicRealtimeProvider,
+  parsePublicWalletConfig,
+} from '@starville/config/browser';
 import {
   loadAdminSecurityConfig,
   loadAdminRecoveryConfig,
@@ -32,6 +36,10 @@ const commonPublic = {
   supabaseUrl: required('NEXT_PUBLIC_SUPABASE_URL'),
   supabaseAnonKey: required('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
 };
+const realtimeProvider = parsePublicRealtimeProvider(
+  process.env['NEXT_PUBLIC_REALTIME_PROVIDER'],
+  environment,
+);
 
 const publicConfigurations = [
   parsePublicBrowserConfig({
@@ -43,7 +51,7 @@ const publicConfigurations = [
     ...commonPublic,
     application: 'game-client',
     appUrl: required('NEXT_PUBLIC_GAME_URL'),
-    realtimeUrl: required('NEXT_PUBLIC_REALTIME_URL'),
+    ...(realtimeProvider === 'custom' ? { realtimeUrl: required('NEXT_PUBLIC_REALTIME_URL') } : {}),
   }),
   parsePublicBrowserConfig({
     ...commonPublic,
@@ -96,6 +104,8 @@ process.stdout.write(
       recheckIntervalSeconds: tokenAccess.recheckIntervalSeconds,
     },
     operations: {
+      realtimeProvider: operations.realtimeProvider,
+      backgroundJobsProvider: operations.backgroundJobsProvider,
       healthCheckTimeoutMs: operations.timeoutMs,
       playerActionRateLimit: operations.playerActionRateLimit,
       operationsReadRateLimit: operations.operationsReadRateLimit,

@@ -13,6 +13,7 @@ export interface CreateApiServiceOptions {
   readonly logger: ServiceLogger;
   readonly adminAuthGateway: AdminAuthGateway;
   readonly adminSessionTtlMinutes: number;
+  readonly readiness?: BuildApiAppOptions['readiness'];
   readonly tokenAccess?: ApiTokenAccessOptions;
   readonly adminOperations?: BuildApiAppOptions['adminOperations'];
   readonly adminWorld?: BuildApiAppOptions['adminWorld'];
@@ -40,6 +41,7 @@ export function createApiService({
   logger,
   adminAuthGateway,
   adminSessionTtlMinutes,
+  readiness,
   tokenAccess,
   adminOperations,
   adminWorld,
@@ -66,6 +68,7 @@ export function createApiService({
     logger,
     adminAuthGateway,
     adminSessionTtlMinutes,
+    ...(readiness === undefined ? {} : { readiness }),
     ...(tokenAccess === undefined ? {} : { tokenAccess }),
     ...(adminOperations === undefined ? {} : { adminOperations }),
     ...(adminWorld === undefined ? {} : { adminWorld }),

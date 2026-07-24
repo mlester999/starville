@@ -391,6 +391,9 @@ importers:
       '@starville/realtime':
         specifier: workspace:*
         version: link:../../packages/realtime
+      '@starville/supabase':
+        specifier: workspace:*
+        version: link:../../packages/supabase
       '@starville/wallet-access':
         specifier: workspace:*
         version: link:../../packages/wallet-access
@@ -780,15 +783,18 @@ importers:
 
   packages/config:
     dependencies:
-      '@starville/solana':
+      '@starville/realtime':
         specifier: workspace:*
-        version: link:../solana
+        version: link:../realtime
       '@starville/shared-types':
         specifier: workspace:*
         version: link:../shared-types
       '@starville/shared-validation':
         specifier: workspace:*
         version: link:../shared-validation
+      '@starville/solana':
+        specifier: workspace:*
+        version: link:../solana
       '@starville/wallet-access':
         specifier: workspace:*
         version: link:../wallet-access

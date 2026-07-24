@@ -19,6 +19,7 @@
     "@starville/solana": "workspace:*",
     "@starville/shared-types": "workspace:*",
     "@starville/shared-validation": "workspace:*",
+    "@starville/realtime": "workspace:*",
     "@starville/wallet-access": "workspace:*",
     "zod": "^4.1.12"
   }

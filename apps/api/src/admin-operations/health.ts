@@ -73,20 +73,24 @@ export function createOperationsHealthReader(
 
       const checkedAt = new Date().toISOString();
       const [realtime, worker] = await Promise.all([
-        checkService(
-          'realtime-server',
-          config.realtimeReadyUrl,
-          config.timeoutMs,
-          requestId,
-          fetchImplementation,
-        ),
-        checkService(
-          'worker',
-          config.workerReadyUrl,
-          config.timeoutMs,
-          requestId,
-          fetchImplementation,
-        ),
+        config.realtimeProvider === 'custom'
+          ? checkService(
+              'realtime-server',
+              config.realtimeReadyUrl!,
+              config.timeoutMs,
+              requestId,
+              fetchImplementation,
+            )
+          : operationStatus('realtime-server', 'degraded', checkedAt, null),
+        config.backgroundJobsProvider === 'custom'
+          ? checkService(
+              'worker',
+              config.workerReadyUrl!,
+              config.timeoutMs,
+              requestId,
+              fetchImplementation,
+            )
+          : operationStatus('worker', 'degraded', checkedAt, null),
       ]);
       const value = [operationStatus('api', 'healthy', checkedAt, null), realtime, worker] as const;
       cached = { expiresAt: Date.now() + 5_000, value };

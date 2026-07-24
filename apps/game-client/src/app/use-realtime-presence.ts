@@ -8,6 +8,8 @@ import {
   type RealtimeViewState,
 } from './realtime-client';
 import { runtimeDevelopmentMetrics } from './development-performance';
+import { useRealtimeRuntimeConfig } from './realtime-runtime-context';
+import { SupabaseRealtimeConnection, type CoreRealtimeTransport } from './supabase-realtime-client';
 
 export function useRealtimePresence(options: {
   readonly apiUrl: string;
@@ -17,27 +19,43 @@ export function useRealtimePresence(options: {
   readonly onAccessInvalid: () => void;
   readonly enabled?: boolean;
 }) {
+  const runtime = useRealtimeRuntimeConfig();
   const [state, setState] = useState<RealtimeViewState>(() =>
-    options.realtimeUrl === undefined
+    runtime.provider === 'custom' && options.realtimeUrl === undefined
       ? { ...INITIAL_REALTIME_VIEW, status: 'unavailable' }
       : INITIAL_REALTIME_VIEW,
   );
-  const connection = useRef<RealtimeConnection | undefined>(undefined);
+  const connection = useRef<CoreRealtimeTransport | undefined>(undefined);
+  const customConnection = useRef<RealtimeConnection | undefined>(undefined);
 
   useEffect(() => {
-    if (options.realtimeUrl === undefined || options.enabled === false) {
+    if (
+      options.enabled === false ||
+      (runtime.provider === 'custom' && options.realtimeUrl === undefined)
+    ) {
       setState({ ...INITIAL_REALTIME_VIEW, status: 'unavailable' });
       return;
     }
-    const realtime = new RealtimeConnection({
-      apiUrl: options.apiUrl,
-      realtimeUrl: options.realtimeUrl,
-      worldId: options.worldId,
-      worldVersionId: options.worldVersionId,
-      onState: setState,
-      onAccessInvalid: options.onAccessInvalid,
-    });
+    const realtime =
+      runtime.provider === 'custom'
+        ? new RealtimeConnection({
+            apiUrl: options.apiUrl,
+            realtimeUrl: options.realtimeUrl!,
+            worldId: options.worldId,
+            worldVersionId: options.worldVersionId,
+            onState: setState,
+            onAccessInvalid: options.onAccessInvalid,
+          })
+        : new SupabaseRealtimeConnection({
+            apiUrl: options.apiUrl,
+            supabase: runtime.supabase,
+            worldId: options.worldId,
+            worldVersionId: options.worldVersionId,
+            onState: setState,
+            onAccessInvalid: options.onAccessInvalid,
+          });
     connection.current = realtime;
+    customConnection.current = realtime instanceof RealtimeConnection ? realtime : undefined;
     realtime.start();
     const reconcile = () => realtime.reconcileVisibility();
     window.addEventListener('focus', reconcile);
@@ -49,6 +67,7 @@ export function useRealtimePresence(options: {
       runtimeDevelopmentMetrics.adjustGauge('activeListeners', -2);
       realtime.dispose();
       if (connection.current === realtime) connection.current = undefined;
+      if (customConnection.current === realtime) customConnection.current = undefined;
     };
   }, [
     options.apiUrl,
@@ -57,6 +76,9 @@ export function useRealtimePresence(options: {
     options.realtimeUrl,
     options.worldId,
     options.worldVersionId,
+    runtime.provider,
+    runtime.supabase.anonKey,
+    runtime.supabase.url,
   ]);
 
   const sendMovement = useCallback((playerState: PlayerStateUpdate) => {
@@ -69,141 +91,141 @@ export function useRealtimePresence(options: {
     connection.current?.switchChannel(channelId);
   }, []);
   const reconcile = useCallback(() => connection.current?.retryNow(), []);
-  const refreshAppearance = useCallback(() => connection.current?.refreshAppearance(), []);
+  const refreshAppearance = useCallback(() => customConnection.current?.refreshAppearance(), []);
   const activateEmote = useCallback(
-    (emoteKey: string) => connection.current?.activateEmote(emoteKey),
+    (emoteKey: string) => customConnection.current?.activateEmote(emoteKey),
     [],
   );
 
   const sendChat = useCallback((scope: 'nearby' | 'channel' | 'party', text: string) => {
-    return connection.current?.sendChat(scope, text);
+    return customConnection.current?.sendChat(scope, text);
   }, []);
   const requestChatHistory = useCallback((scope: ChatScope, afterSequence = 0) => {
-    connection.current?.requestChatHistory(scope, afterSequence);
+    customConnection.current?.requestChatHistory(scope, afterSequence);
   }, []);
   const markChatRead = useCallback((scope: ChatScope, throughSequence: number) => {
-    connection.current?.markChatRead(scope, throughSequence);
+    customConnection.current?.markChatRead(scope, throughSequence);
   }, []);
   const setChatPreference = useCallback(
     (
       targetPresenceId: string,
       action: 'mute_player' | 'unmute_player' | 'block_player' | 'unblock_player',
-    ) => connection.current?.setChatPreference(targetPresenceId, action),
+    ) => customConnection.current?.setChatPreference(targetPresenceId, action),
     [],
   );
   const reportChat = useCallback(
     (messageId: string, category: ChatReportCategory, reason: string) =>
-      connection.current?.reportChat(messageId, category, reason),
+      customConnection.current?.reportChat(messageId, category, reason),
     [],
   );
   const inspectPlayer = useCallback(
-    (targetPresenceId: string) => connection.current?.inspectPlayer(targetPresenceId),
+    (targetPresenceId: string) => customConnection.current?.inspectPlayer(targetPresenceId),
     [],
   );
   const createGift = useCallback(
     (targetPresenceId: string, itemSlug: string, quantity: number) =>
-      connection.current?.createGift(targetPresenceId, itemSlug, quantity),
+      customConnection.current?.createGift(targetPresenceId, itemSlug, quantity),
     [],
   );
   const respondGift = useCallback(
     (interactionId: string, action: 'accept' | 'decline' | 'cancel') =>
-      connection.current?.respondGift(interactionId, action),
+      customConnection.current?.respondGift(interactionId, action),
     [],
   );
   const requestTrade = useCallback(
-    (targetPresenceId: string) => connection.current?.requestTrade(targetPresenceId),
+    (targetPresenceId: string) => customConnection.current?.requestTrade(targetPresenceId),
     [],
   );
   const respondTrade = useCallback(
     (interactionId: string, action: 'accept' | 'decline') =>
-      connection.current?.respondTrade(interactionId, action),
+      customConnection.current?.respondTrade(interactionId, action),
     [],
   );
   const updateTradeOffer = useCallback(
     (interactionId: string, expectedRevision: number, items: readonly SocialOfferItemInput[]) =>
-      connection.current?.updateTradeOffer(interactionId, expectedRevision, items),
+      customConnection.current?.updateTradeOffer(interactionId, expectedRevision, items),
     [],
   );
   const confirmTrade = useCallback(
     (interactionId: string, expectedRevision: number) =>
-      connection.current?.confirmTrade(interactionId, expectedRevision),
+      customConnection.current?.confirmTrade(interactionId, expectedRevision),
     [],
   );
   const cancelTrade = useCallback(
-    (interactionId: string) => connection.current?.cancelTrade(interactionId),
+    (interactionId: string) => customConnection.current?.cancelTrade(interactionId),
     [],
   );
   const resumeTrade = useCallback(
-    (interactionId: string) => connection.current?.resumeTrade(interactionId),
+    (interactionId: string) => customConnection.current?.resumeTrade(interactionId),
     [],
   );
   const sendFriendRequest = useCallback(
-    (targetPresenceId: string) => connection.current?.sendFriendRequest(targetPresenceId),
+    (targetPresenceId: string) => customConnection.current?.sendFriendRequest(targetPresenceId),
     [],
   );
   const respondFriendRequest = useCallback(
     (friendRequestId: string, action: 'accept' | 'decline' | 'cancel') =>
-      connection.current?.respondFriendRequest(friendRequestId, action),
+      customConnection.current?.respondFriendRequest(friendRequestId, action),
     [],
   );
   const removeFriend = useCallback(
-    (targetPresenceId: string) => connection.current?.removeFriend(targetPresenceId),
+    (targetPresenceId: string) => customConnection.current?.removeFriend(targetPresenceId),
     [],
   );
-  const createParty = useCallback(() => connection.current?.createParty(), []);
+  const createParty = useCallback(() => customConnection.current?.createParty(), []);
   const inviteToParty = useCallback(
     (targetPresenceId: string, expectedRevision: number) =>
-      connection.current?.inviteToParty(targetPresenceId, expectedRevision),
+      customConnection.current?.inviteToParty(targetPresenceId, expectedRevision),
     [],
   );
   const respondPartyInvitation = useCallback(
     (invitationId: string, expectedRevision: number, action: 'accept' | 'decline' | 'cancel') =>
-      connection.current?.respondPartyInvitation(invitationId, expectedRevision, action),
+      customConnection.current?.respondPartyInvitation(invitationId, expectedRevision, action),
     [],
   );
   const leaveParty = useCallback(
-    (expectedRevision: number) => connection.current?.leaveParty(expectedRevision),
+    (expectedRevision: number) => customConnection.current?.leaveParty(expectedRevision),
     [],
   );
   const kickPartyMember = useCallback(
     (targetPresenceId: string, expectedRevision: number) =>
-      connection.current?.kickPartyMember(targetPresenceId, expectedRevision),
+      customConnection.current?.kickPartyMember(targetPresenceId, expectedRevision),
     [],
   );
   const promotePartyLeader = useCallback(
     (targetPresenceId: string, expectedRevision: number) =>
-      connection.current?.promotePartyLeader(targetPresenceId, expectedRevision),
+      customConnection.current?.promotePartyLeader(targetPresenceId, expectedRevision),
     [],
   );
   const disbandParty = useCallback(
-    (expectedRevision: number) => connection.current?.disbandParty(expectedRevision),
+    (expectedRevision: number) => customConnection.current?.disbandParty(expectedRevision),
     [],
   );
   const startPartyReadyCheck = useCallback(
-    (expectedRevision: number) => connection.current?.startPartyReadyCheck(expectedRevision),
+    (expectedRevision: number) => customConnection.current?.startPartyReadyCheck(expectedRevision),
     [],
   );
   const respondPartyReadyCheck = useCallback(
     (readyCheckId: string, expectedRevision: number, response: 'ready' | 'not_ready') =>
-      connection.current?.respondPartyReadyCheck(readyCheckId, expectedRevision, response),
+      customConnection.current?.respondPartyReadyCheck(readyCheckId, expectedRevision, response),
     [],
   );
   const requestActivityCatalog = useCallback(
-    () => connection.current?.requestActivityCatalog(),
+    () => customConnection.current?.requestActivityCatalog(),
     [],
   );
   const prepareActivityEntry = useCallback(
     (activityKey: string, expectedPartyRevision: number) =>
-      connection.current?.prepareActivityEntry(activityKey, expectedPartyRevision),
+      customConnection.current?.prepareActivityEntry(activityKey, expectedPartyRevision),
     [],
   );
   const respondActivityReady = useCallback(
     (readyCheckId: string, expectedPartyRevision: number, response: 'ready' | 'not_ready') =>
-      connection.current?.respondActivityReady(readyCheckId, expectedPartyRevision, response),
+      customConnection.current?.respondActivityReady(readyCheckId, expectedPartyRevision, response),
     [],
   );
   const enterActivity = useCallback(
-    (preparationId: string) => connection.current?.enterActivity(preparationId),
+    (preparationId: string) => customConnection.current?.enterActivity(preparationId),
     [],
   );
   const interactWithActivity = useCallback(
@@ -212,15 +234,15 @@ export function useRealtimePresence(options: {
       readonly expectedRevision: number;
       readonly objectiveKey: string;
       readonly objectKey: string;
-    }) => connection.current?.interactWithActivity(intent),
+    }) => customConnection.current?.interactWithActivity(intent),
     [],
   );
   const leaveActivity = useCallback(
-    (instanceId: string) => connection.current?.leaveActivity(instanceId),
+    (instanceId: string) => customConnection.current?.leaveActivity(instanceId),
     [],
   );
   const requestActivitySnapshot = useCallback(
-    () => connection.current?.requestActivitySnapshot(),
+    () => customConnection.current?.requestActivitySnapshot(),
     [],
   );
 

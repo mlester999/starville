@@ -156,6 +156,39 @@ describe('API foundation', () => {
     });
   });
 
+  it('keeps Supabase-provider readiness blocked while Phase 13E parity is incomplete', async () => {
+    const app = buildApiApp({
+      config: {
+        environment: 'test',
+        host: '127.0.0.1',
+        port: 4000,
+        corsAllowedOrigins: ['http://localhost:3000'],
+        trustedProxyCidrs: [],
+      },
+      logger: new SilentLogger(),
+      adminAuthGateway: inactiveAdminGateway,
+      adminSessionTtlMinutes: 60,
+      readiness: {
+        architecture: {
+          realtimeProvider: 'supabase',
+          backgroundJobsProvider: 'supabase',
+          migrationState: 'foundation-incomplete',
+        },
+      },
+    });
+    apps.push(app);
+    const response = await app.inject({ method: 'GET', url: '/ready' });
+    expect(response.statusCode).toBe(503);
+    expect(response.json()).toMatchObject({
+      readiness: 'not-ready',
+      reason: 'SUPABASE_MIGRATION_PARITY_INCOMPLETE',
+      architecture: {
+        realtimeProvider: 'supabase',
+        backgroundJobsProvider: 'supabase',
+      },
+    });
+  });
+
   it('propagates a safe request ID through the versioned status response', async () => {
     const response = await createApp().inject({
       method: 'GET',

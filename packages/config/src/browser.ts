@@ -8,6 +8,7 @@ import {
   webSocketUrlSchema,
 } from '@starville/shared-validation';
 import { walletNetworkSchema, type WalletNetwork } from '@starville/wallet-access';
+import { realtimeProviderSchema, type RealtimeProvider } from '@starville/realtime/providers';
 
 const browserApplicationSchema = z.enum(['landing', 'game-client', 'admin-portal']);
 
@@ -45,6 +46,21 @@ export interface PublicBrowserConfig {
     readonly url: string;
     readonly anonKey: string;
   };
+}
+
+export function parsePublicRealtimeProvider(
+  value: unknown,
+  environmentValue: unknown,
+): RealtimeProvider {
+  const environment = environmentNameSchema.parse(environmentValue);
+  if (environment === 'production' && (typeof value !== 'string' || value.trim() === '')) {
+    throw new Error('NEXT_PUBLIC_REALTIME_PROVIDER is required in production');
+  }
+  try {
+    return realtimeProviderSchema.parse(value ?? 'custom');
+  } catch {
+    throw new Error('NEXT_PUBLIC_REALTIME_PROVIDER must be either custom or supabase');
+  }
 }
 
 export function parseAdditionalPublicHttpUrl(

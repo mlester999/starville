@@ -32,6 +32,7 @@
     "@starville/player-experience": "workspace:*",
     "@starville/progression": "workspace:*",
     "@starville/realtime": "workspace:*",
+    "@starville/supabase": "workspace:*",
     "@starville/wallet-access": "workspace:*",
     "phaser": "3.90.0",
     "react": "19.2.7",

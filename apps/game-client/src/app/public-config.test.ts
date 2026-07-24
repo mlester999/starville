@@ -26,6 +26,7 @@ describe('parseGameClientPublicConfig', () => {
       adminUrl: 'http://localhost:3002',
       apiUrl: 'http://localhost:4000',
       buildId: 'game-client:test-build',
+      realtimeProvider: 'custom',
       realtimeUrl: 'ws://localhost:4001',
       supabase: {
         url: 'https://example.supabase.co',
@@ -79,8 +80,33 @@ describe('parseGameClientPublicConfig', () => {
         NEXT_PUBLIC_API_URL: 'https://api.starville.example',
         NEXT_PUBLIC_REALTIME_URL: 'wss://realtime.starville.example',
         NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+        NEXT_PUBLIC_REALTIME_PROVIDER: 'custom',
         NEXT_PUBLIC_GAME_BUILD_ID: '',
       }),
     ).toThrow(/required in production/u);
+  });
+
+  it('accepts Supabase mode without a custom socket and rejects implicit production mode', () => {
+    const supabase = parseGameClientPublicConfig({
+      ...validEnvironment,
+      NEXT_PUBLIC_REALTIME_PROVIDER: 'supabase',
+      NEXT_PUBLIC_REALTIME_URL: undefined,
+    });
+    expect(supabase.realtimeProvider).toBe('supabase');
+    expect(supabase.realtimeUrl).toBeUndefined();
+
+    expect(() =>
+      parseGameClientPublicConfig({
+        ...validEnvironment,
+        NEXT_PUBLIC_APP_ENV: 'production',
+        NEXT_PUBLIC_LANDING_URL: 'https://starville.example',
+        NEXT_PUBLIC_GAME_URL: 'https://game.starville.example',
+        NEXT_PUBLIC_ADMIN_URL: 'https://admin.starville.example',
+        NEXT_PUBLIC_API_URL: 'https://api.starville.example',
+        NEXT_PUBLIC_REALTIME_URL: 'wss://realtime.starville.example',
+        NEXT_PUBLIC_SUPABASE_URL: 'https://example.supabase.co',
+        NEXT_PUBLIC_REALTIME_PROVIDER: undefined,
+      }),
+    ).toThrow('NEXT_PUBLIC_REALTIME_PROVIDER is required in production');
   });
 });

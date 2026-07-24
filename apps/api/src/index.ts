@@ -4,6 +4,7 @@ import {
   loadHostedWriteSafetyConfig,
   loadPrivateSupabaseConfig,
   loadOperationsHealthConfig,
+  loadServiceArchitectureConfig,
   loadTokenAccessServerConfig,
   loadWorldManagementConfig,
 } from '@starville/config/server';
@@ -57,12 +58,15 @@ import { createSupabaseWorldGameTestGateway } from './world/game-test-gateway.js
 import { createWorldGameTestService } from './world/game-test-service.js';
 import { createSupabaseGameplayAssetOverrideGateway } from './player/asset-override-gateway.js';
 import { createGameplayAssetOverrideService } from './player/asset-override-service.js';
+import { createSupabaseRealtimeAuthorizationGateway } from './realtime/supabase-gateway.js';
+import { createSupabaseRealtimeAuthorizationService } from './realtime/supabase-service.js';
 
 const config = loadApiConfig(process.env);
 const adminSecurity = loadAdminSecurityConfig(process.env);
 const supabaseConfig = loadPrivateSupabaseConfig(process.env);
 const tokenAccessConfig = loadTokenAccessServerConfig(process.env);
 const operationsConfig = loadOperationsHealthConfig(process.env);
+const architectureConfig = loadServiceArchitectureConfig(process.env);
 const worldConfig = loadWorldManagementConfig(process.env);
 const hostedWriteSafety = loadHostedWriteSafetyConfig(process.env);
 const logger = createLogger({
@@ -119,12 +123,13 @@ const tokenAccessService = createTokenAccessService({
   }),
   logger,
 });
+const operationsHealthReader = createOperationsHealthReader(operationsConfig);
 const adminOperationsService = createAdminOperationsService({
   gateway: createSupabaseAdminOperationsGateway(privilegedSupabase, {
     environmentKey: config.environment,
     network: tokenAccessConfig.network,
   }),
-  healthReader: createOperationsHealthReader(operationsConfig),
+  healthReader: operationsHealthReader,
   logger,
   actionRateLimit: operationsConfig.playerActionRateLimit,
 });
@@ -150,11 +155,22 @@ const platformConfigurationService = createPlatformConfigurationService({
   logger,
   publicAssetUrl: (path) => assetStorage.publicUrl(path),
 });
-const realtimeTicketService = createRealtimeTicketService({
-  gateway: createSupabaseRealtimeTicketGateway(privilegedSupabase),
-  accessTokenSecret: tokenAccessConfig.cookieSecret,
-  ticketSecret: process.env['REALTIME_TICKET_SECRET'] ?? tokenAccessConfig.cookieSecret,
-});
+const realtimeTicketService =
+  architectureConfig.realtimeProvider === 'custom'
+    ? createRealtimeTicketService({
+        gateway: createSupabaseRealtimeTicketGateway(privilegedSupabase),
+        accessTokenSecret: tokenAccessConfig.cookieSecret,
+        ticketSecret: process.env['REALTIME_TICKET_SECRET'] ?? tokenAccessConfig.cookieSecret,
+      })
+    : undefined;
+const supabaseRealtimeService =
+  architectureConfig.realtimeProvider === 'supabase'
+    ? createSupabaseRealtimeAuthorizationService({
+        gateway: createSupabaseRealtimeAuthorizationGateway(privilegedSupabase),
+        environment: config.environment,
+        accessTokenSecret: tokenAccessConfig.cookieSecret,
+      })
+    : undefined;
 const avatarService = createAvatarService({
   gateway: createSupabaseAvatarGateway(privilegedSupabase),
   logger,
@@ -174,6 +190,15 @@ const service = createApiService({
   logger,
   adminAuthGateway,
   adminSessionTtlMinutes: adminSecurity.sessionTtlMinutes,
+  readiness: {
+    architecture: architectureConfig,
+    checkProviderDependencies: async () => {
+      const statuses = await operationsHealthReader.read('api-readiness');
+      if (statuses.some((status) => status.service !== 'api' && status.status !== 'healthy')) {
+        throw new Error('DEPENDENCY_UNAVAILABLE');
+      }
+    },
+  },
   tokenAccess: {
     service: tokenAccessService,
     cookieHashSecret: tokenAccessConfig.cookieSecret,
@@ -182,7 +207,8 @@ const service = createApiService({
     playerService,
     worldService: playerWorldService,
     cozyGameplayService,
-    realtimeTicketService,
+    ...(realtimeTicketService === undefined ? {} : { realtimeTicketService }),
+    ...(supabaseRealtimeService === undefined ? {} : { supabaseRealtimeService }),
     avatarService,
     cosmeticService,
     cosmeticGateway,

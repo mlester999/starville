@@ -64,6 +64,8 @@ const SAFE_ERROR_MESSAGES = {
   PLAYER_STATE_VERSION_CONFLICT: 'The saved player state changed and must be reloaded.',
   PLAYER_VERSION_CONFLICT: 'The player record changed. Reload and try again.',
   PLAYER_OPERATION_CONFLICT: 'The requested action is not valid for the current player state.',
+  PLAYER_AUTH_IDENTITY_CONFLICT:
+    'The signed-in player identity is already bound to another player.',
   UNSAFE_PLAYER_POSITION: 'The requested player position is not safe to save.',
   RATE_LIMITED: 'Too many requests. Please wait before trying again.',
   RPC_UNAVAILABLE: 'Token balance verification is temporarily unavailable.',

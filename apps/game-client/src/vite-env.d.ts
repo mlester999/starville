@@ -7,6 +7,7 @@ interface ImportMetaEnv {
   readonly NEXT_PUBLIC_API_URL?: string;
   readonly NEXT_PUBLIC_ADMIN_URL?: string;
   readonly NEXT_PUBLIC_REALTIME_URL?: string;
+  readonly NEXT_PUBLIC_REALTIME_PROVIDER?: 'custom' | 'supabase';
   readonly NEXT_PUBLIC_SUPABASE_URL?: string;
   readonly NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   readonly NEXT_PUBLIC_GAME_BUILD_ID?: string;

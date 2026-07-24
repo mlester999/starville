@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { parsePublicBrowserConfig, parsePublicWalletConfig } from '../src/browser';
+import {
+  parsePublicBrowserConfig,
+  parsePublicRealtimeProvider,
+  parsePublicWalletConfig,
+} from '../src/browser';
 import {
   assertAdminBootstrapWriteApproved,
   assertDatabaseUrlMatchesProjectRef,
@@ -15,6 +19,7 @@ import {
   loadOperationsHealthConfig,
   loadPrivateSupabaseConfig,
   loadRealtimeConfig,
+  loadServiceArchitectureConfig,
   loadTokenAccessServerConfig,
   loadWorldManagementConfig,
   loadWorkerConfig,
@@ -296,6 +301,8 @@ describe('private server configuration', () => {
 
   it('loads bounded server-only Phase 5 health and action controls', () => {
     expect(loadOperationsHealthConfig({})).toEqual({
+      realtimeProvider: 'custom',
+      backgroundJobsProvider: 'custom',
       realtimeReadyUrl: 'http://127.0.0.1:4001/ready',
       workerReadyUrl: 'http://127.0.0.1:4002/ready',
       timeoutMs: 1500,
@@ -308,10 +315,51 @@ describe('private server configuration', () => {
     expect(() =>
       loadOperationsHealthConfig({
         NODE_ENV: 'production',
+        NEXT_PUBLIC_REALTIME_PROVIDER: 'custom',
+        STARVILLE_BACKGROUND_JOBS_PROVIDER: 'custom',
         REALTIME_HEALTH_URL: 'http://internal.example/ready',
         WORKER_HEALTH_URL: 'https://worker.example/ready',
       }),
     ).toThrow('must use HTTPS or WSS');
+  });
+
+  it('requires explicit valid providers in production and omits legacy URLs in Supabase mode', () => {
+    expect(loadServiceArchitectureConfig({})).toEqual({
+      realtimeProvider: 'custom',
+      backgroundJobsProvider: 'custom',
+      migrationState: 'custom-active',
+    });
+    expect(() => loadServiceArchitectureConfig({ NODE_ENV: 'production' })).toThrow(
+      'NEXT_PUBLIC_REALTIME_PROVIDER is required in production',
+    );
+    expect(() =>
+      loadServiceArchitectureConfig({
+        NODE_ENV: 'production',
+        NEXT_PUBLIC_REALTIME_PROVIDER: 'invalid',
+        STARVILLE_BACKGROUND_JOBS_PROVIDER: 'supabase',
+      }),
+    ).toThrow('NEXT_PUBLIC_REALTIME_PROVIDER must be either custom or supabase');
+    expect(
+      loadOperationsHealthConfig({
+        NEXT_PUBLIC_REALTIME_PROVIDER: 'supabase',
+        STARVILLE_BACKGROUND_JOBS_PROVIDER: 'supabase',
+        REALTIME_HEALTH_URL: 'not-a-url',
+        WORKER_HEALTH_URL: 'not-a-url',
+      }),
+    ).toMatchObject({
+      realtimeProvider: 'supabase',
+      backgroundJobsProvider: 'supabase',
+    });
+    expect(
+      loadOperationsHealthConfig({
+        NEXT_PUBLIC_REALTIME_PROVIDER: 'supabase',
+        STARVILLE_BACKGROUND_JOBS_PROVIDER: 'supabase',
+      }),
+    ).not.toHaveProperty('realtimeReadyUrl');
+    expect(parsePublicRealtimeProvider(undefined, 'development')).toBe('custom');
+    expect(() => parsePublicRealtimeProvider(undefined, 'production')).toThrow(
+      'NEXT_PUBLIC_REALTIME_PROVIDER is required in production',
+    );
   });
 
   it('loads bounded Phase 6 world-content and transition controls', () => {

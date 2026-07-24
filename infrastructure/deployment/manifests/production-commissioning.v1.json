@@ -17,16 +17,16 @@
   "environmentManifest": {
     "path": "infrastructure/deployment/manifests/production-environment.v1.json",
     "version": 1,
-    "sha256": "ad24f2ba84d0bad389c7abf3742a7ed8311c1c09a67f087a34660e3cd43f59bd",
+    "sha256": "e75c1e6dd44942584f6e10be882b1a41405e1959739f356ecbb618d9c2d58a46",
     "status": "local-contract-valid-owner-values-missing"
   },
   "migrations": {
     "path": "infrastructure/deployment/manifests/migrations.v1.json",
     "version": 1,
-    "sha256": "b1fb048febc10dd9d1ab7f2e3728cdbf64dd74650d408bd906aa7c8573b63d18",
-    "count": 85,
-    "head": "20260722130000_phase13b_closed_beta_security_hardening.sql",
-    "status": "local-clean-chain-valid-hosted-and-production-evidence-missing"
+    "sha256": "240ba42c89c004195d92c73aa49d8cf36074a31f349cb0dac414d6df4e3674c9",
+    "count": 87,
+    "head": "20260724101000_phase13e_social_cleanup_cron_foundation.sql",
+    "status": "local-static-chain-valid-local-postgres-hosted-and-production-evidence-missing"
   },
   "referenceData": {
     "seedManifest": "infrastructure/deployment/manifests/production-reference-seeds.v1.json",
@@ -80,6 +80,8 @@
     "No verified starville-prod target identity or exact production domains",
     "No approved production Reown project or token configuration evidence",
     "No hosted starville-dev Phase 13B validation evidence",
+    "Phase 13E Supabase Realtime and SQL/Cron parity is incomplete; custom providers remain required",
+    "Phase 13E migrations have not run locally because Docker is unavailable",
     "No exact owner-approved production world revision",
     "No signed Phase 13D asset selection",
     "No provider backup, PITR, isolated restore, or recovery evidence",

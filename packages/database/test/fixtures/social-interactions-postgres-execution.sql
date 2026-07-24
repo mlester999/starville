@@ -25,6 +25,8 @@ declare
   moonbean_id uuid; sunroot_id uuid; tool_id uuid;
   result jsonb; replay jsonb; gift_id uuid; trade_id uuid; revision integer;
   cleanup_result jsonb;
+  scheduled_cleanup_result jsonb;
+  scheduled_run_id uuid;
   a_moonbean_before integer; b_moonbean_before integer;
   receipt_mutation_denied boolean := false;
   invalid_batch_rejected boolean := false;
@@ -316,6 +318,41 @@ begin
       and (select receipt_retention_days = 180 and audit_retention_days = 180
         from public.social_interaction_settings where singleton_key),
     'cleanup rejects an out-of-range batch without altering reviewed retention settings'
+  );
+
+  scheduled_cleanup_result := public.run_scheduled_social_interaction_cleanup(
+    100,
+    'phase13e-scheduled-cleanup-one'
+  );
+  perform pg_temp.assert_true(
+    scheduled_cleanup_result ->> 'status' = 'succeeded'
+      and scheduled_cleanup_result -> 'summary' ->> 'outcome' = 'completed'
+      and (scheduled_cleanup_result -> 'summary' ->> 'processed')::integer = 0
+      and exists (
+        select 1 from public.scheduled_job_runs
+        where id = (scheduled_cleanup_result ->> 'runId')::uuid
+          and status = 'succeeded'
+          and batch_size = 100
+      ),
+    'scheduled cleanup records a bounded successful no-op after eligible rows are exhausted'
+  );
+  scheduled_run_id := (scheduled_cleanup_result ->> 'runId')::uuid;
+
+  scheduled_cleanup_result := public.run_scheduled_social_interaction_cleanup(
+    100,
+    'phase13e-scheduled-cleanup-one'
+  );
+  perform pg_temp.assert_true(
+    scheduled_cleanup_result ->> 'status' = 'succeeded'
+      and (scheduled_cleanup_result ->> 'replayed')::boolean
+      and (scheduled_cleanup_result ->> 'runId')::uuid = scheduled_run_id
+      and (scheduled_cleanup_result -> 'summary' ->> 'processed')::integer = 0
+      and (select count(*) = 1 from public.scheduled_job_runs
+        where request_id = 'phase13e-scheduled-cleanup-one')
+      and (select status = 'pending'
+        from public.social_interaction_requests
+        where id = '87000000-0000-4000-8000-000000000013'),
+    'repeated scheduled cleanup is idempotent and leaves ineligible interactions untouched'
   );
 end;
 $$;

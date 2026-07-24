@@ -3535,3 +3535,54 @@ describe('Phase 12D repository-authored bundled registry migration', () => {
     expect(sql).toContain("when 'repository_authored' then 'repository_authored'");
   });
 });
+
+describe('Phase 13E-A Supabase-first migration foundation', () => {
+  const realtimeSql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260724100000_phase13e_supabase_realtime_authorization.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+  const cronSql = readFileSync(
+    new URL(
+      '../../../infrastructure/supabase/migrations/20260724101000_phase13e_social_cleanup_cron_foundation.sql',
+      import.meta.url,
+    ),
+    'utf8',
+  );
+
+  it('parses both forward-only migrations with the hosted PostgreSQL grammar', async () => {
+    const parser = new Parser({ version: 17 });
+    expect((await parser.parse(realtimeSql)).stmts?.length ?? 0).toBeGreaterThan(0);
+    expect((await parser.parse(cronSql)).stmts?.length ?? 0).toBeGreaterThan(0);
+  });
+
+  it('uses exact private Realtime policies without public or permissive access', () => {
+    expect(realtimeSql).toContain('alter table realtime.messages enable row level security');
+    expect(realtimeSql.match(/create policy starville_private_/gu)).toHaveLength(4);
+    expect(realtimeSql).toContain('auth.uid(), realtime.topic()');
+    expect(realtimeSql).toContain("p_extension not in ('broadcast', 'presence')");
+    expect(realtimeSql).toContain('topic_parts[2] <> membership.environment_key');
+    expect(realtimeSql).toContain("topic_scope = 'party'");
+    expect(realtimeSql).toContain("topic_scope = 'home'");
+    expect(realtimeSql).toContain('not coalesce(is_anonymous, false)');
+    expect(realtimeSql).toContain('public.supabase_realtime_player_identities');
+    expect(realtimeSql).toContain('prepare_supabase_realtime_player_identity');
+    expect(realtimeSql).toContain('bind_supabase_realtime_player_identity');
+    expect(realtimeSql).not.toMatch(/using\s*\(\s*true\s*\)|with check\s*\(\s*true\s*\)/iu);
+    expect(realtimeSql).not.toMatch(/grant .+ on table realtime\.messages to (?:public|anon)/iu);
+  });
+
+  it('keeps the SQL/Cron proof bounded, locked, auditable, and disabled', () => {
+    expect(cronSql).toContain('p_batch_size not between 1 and 1000');
+    expect(cronSql).toContain('pg_try_advisory_xact_lock');
+    expect(cronSql).toContain("'replayed', true");
+    expect(cronSql).toContain('on conflict (job_key, request_id) do nothing');
+    expect(cronSql).toContain('public.scheduled_job_runs');
+    expect(cronSql).toContain("'proof-disabled'");
+    expect(cronSql).toContain('enabled = false');
+    expect(cronSql).not.toMatch(/\bcron\.schedule\s*\(/iu);
+    expect(cronSql).not.toMatch(/\bnet\.http_post\s*\(/iu);
+  });
+});

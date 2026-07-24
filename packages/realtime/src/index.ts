@@ -3,5 +3,7 @@ export * from './chat';
 export * from './interpolation';
 export * from './moderation';
 export * from './protocol';
+export * from './providers';
 export * from './social';
 export * from './social-graph';
+export * from './supabase';

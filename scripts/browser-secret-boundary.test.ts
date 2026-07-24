@@ -29,6 +29,23 @@ describe('browser output secret boundary', () => {
     ).toEqual(['PRIVATE_VALUE value appears in browser output fixture.js']);
   });
 
+  it('detects a secret-shaped Supabase key but permits the SDK prefix literal', () => {
+    expect(
+      inspectBrowserOutput({
+        content: Buffer.from('sb_secret_0123456789abcdef'),
+        path: 'fixture.js',
+        secrets: {},
+      }),
+    ).toHaveLength(1);
+    expect(
+      inspectBrowserOutput({
+        content: Buffer.from("const secretPrefix = 'sb_secret_'"),
+        path: 'fixture.js',
+        secrets: {},
+      }),
+    ).toEqual([]);
+  });
+
   it('accepts browser-safe compiled output', () => {
     expect(
       inspectBrowserOutput({

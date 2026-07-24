@@ -561,6 +561,20 @@ async function main(): Promise<void> {
     if (socialResult.stdout.trim()) console.log(socialResult.stdout.trim());
     console.log('[world-postgres] social-interaction setup assertions passed');
 
+    const phase13eRealtimeAssertions = join(
+      fixtureDirectory,
+      'phase13e-supabase-realtime-postgres-execution.sql',
+    );
+    const phase13eRealtimeResult = await runCommand(psql, [
+      ...psqlBaseArguments,
+      '--file',
+      phase13eRealtimeAssertions,
+    ]);
+    if (phase13eRealtimeResult.stdout.trim()) {
+      console.log(phase13eRealtimeResult.stdout.trim());
+    }
+    console.log('[world-postgres] Phase 13E Supabase realtime assertions passed');
+
     const lookup = await runCommand(psql, [
       ...psqlBaseArguments,
       '--tuples-only',

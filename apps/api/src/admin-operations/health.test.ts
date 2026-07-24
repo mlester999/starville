@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from 'vitest';
 import { createOperationsHealthReader } from './health.js';
 
 const config = {
+  realtimeProvider: 'custom',
+  backgroundJobsProvider: 'custom',
   realtimeReadyUrl: 'http://127.0.0.1:4001/ready',
   workerReadyUrl: 'http://127.0.0.1:4002/ready',
   timeoutMs: 250,
@@ -52,6 +54,26 @@ describe('operations health reader', () => {
     expect(statuses).toMatchObject([
       { service: 'api', status: 'healthy' },
       { service: 'realtime-server', status: 'unknown' },
+      { service: 'worker', status: 'degraded' },
+    ]);
+  });
+
+  it('does not parse or fetch legacy service URLs in Supabase foundation mode', async () => {
+    const fetchImplementation = vi.fn() as unknown as typeof fetch;
+    const statuses = await createOperationsHealthReader(
+      {
+        realtimeProvider: 'supabase',
+        backgroundJobsProvider: 'supabase',
+        timeoutMs: config.timeoutMs,
+        playerActionRateLimit: config.playerActionRateLimit,
+        operationsReadRateLimit: config.operationsReadRateLimit,
+      },
+      fetchImplementation,
+    ).read('supabase-foundation');
+    expect(fetchImplementation).not.toHaveBeenCalled();
+    expect(statuses).toMatchObject([
+      { service: 'api', status: 'healthy' },
+      { service: 'realtime-server', status: 'degraded' },
       { service: 'worker', status: 'degraded' },
     ]);
   });

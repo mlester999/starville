@@ -48,6 +48,7 @@
         "NEXT_PUBLIC_ADMIN_URL",
         "NEXT_PUBLIC_API_URL",
         "NEXT_PUBLIC_REALTIME_URL",
+        "NEXT_PUBLIC_REALTIME_PROVIDER",
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "NEXT_PUBLIC_GAME_BUILD_ID"
@@ -57,7 +58,11 @@
     },
     "@starville/api#build": {
       "dependsOn": ["^build"],
-      "env": ["CORS_ALLOWED_ORIGINS"],
+      "env": [
+        "CORS_ALLOWED_ORIGINS",
+        "NEXT_PUBLIC_REALTIME_PROVIDER",
+        "STARVILLE_BACKGROUND_JOBS_PROVIDER"
+      ],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
@@ -68,6 +73,7 @@
     },
     "@starville/worker#build": {
       "dependsOn": ["^build"],
+      "env": ["STARVILLE_BACKGROUND_JOBS_PROVIDER"],
       "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": ["dist/**"]
     },
@@ -101,6 +107,7 @@
         "NEXT_PUBLIC_ADMIN_URL",
         "NEXT_PUBLIC_API_URL",
         "NEXT_PUBLIC_REALTIME_URL",
+        "NEXT_PUBLIC_REALTIME_PROVIDER",
         "NEXT_PUBLIC_SUPABASE_URL",
         "NEXT_PUBLIC_SUPABASE_ANON_KEY",
         "NEXT_PUBLIC_GAME_COLLISION_DEBUG",
@@ -155,6 +162,8 @@
         "TOKEN_GATE_ADMIN_VALIDATE_RATE_LIMIT",
         "REALTIME_HEALTH_URL",
         "WORKER_HEALTH_URL",
+        "NEXT_PUBLIC_REALTIME_PROVIDER",
+        "STARVILLE_BACKGROUND_JOBS_PROVIDER",
         "ADMIN_HEALTH_CHECK_TIMEOUT_MS",
         "ADMIN_PLAYER_ACTION_RATE_LIMIT",
         "ADMIN_OPERATIONS_READ_RATE_LIMIT",
@@ -221,6 +230,7 @@
         "WORKER_CONCURRENCY",
         "WORKER_MAX_ATTEMPTS",
         "WORKER_RETRY_BASE_DELAY_MS",
+        "STARVILLE_BACKGROUND_JOBS_PROVIDER",
         "NEXT_PUBLIC_SUPABASE_URL",
         "SUPABASE_SERVICE_ROLE_KEY"
       ]

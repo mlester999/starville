@@ -30,6 +30,8 @@ const production = (): NodeJS.ProcessEnv => ({
   NEXT_PUBLIC_ADMIN_URL: 'https://admin.starville.example',
   NEXT_PUBLIC_API_URL: 'https://api.starville.example',
   NEXT_PUBLIC_REALTIME_URL: 'wss://realtime.starville.example',
+  NEXT_PUBLIC_REALTIME_PROVIDER: 'custom',
+  STARVILLE_BACKGROUND_JOBS_PROVIDER: 'custom',
   STARVILLE_PRODUCTION_LANDING_URL: 'https://www.starville.example',
   STARVILLE_PRODUCTION_GAME_URL: 'https://play.starville.example',
   STARVILLE_PRODUCTION_ADMIN_URL: 'https://admin.starville.example',
@@ -63,6 +65,8 @@ describe('Phase 13D production target validation', () => {
     ['placeholder mint', { GAME_TOKEN_MINT_ADDRESS: '11111111111111111111111111111111' }],
     ['wrong gate', { GAME_TOKEN_GATE_AMOUNT: '1000' }],
     ['wrong game domain', { NEXT_PUBLIC_GAME_URL: 'https://wrong.starville.example' }],
+    ['premature realtime cutover', { NEXT_PUBLIC_REALTIME_PROVIDER: 'supabase' }],
+    ['premature worker cutover', { STARVILLE_BACKGROUND_JOBS_PROVIDER: 'supabase' }],
     [
       'wrong database',
       {

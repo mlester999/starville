@@ -97,6 +97,16 @@ export function validateProductionCommissioningTarget(
   if (value(environment, 'SUPABASE_ENVIRONMENT') !== 'production') {
     errors.push('SUPABASE_ENVIRONMENT must be production');
   }
+  if (value(environment, 'NEXT_PUBLIC_REALTIME_PROVIDER') !== 'custom') {
+    errors.push(
+      'NEXT_PUBLIC_REALTIME_PROVIDER must remain custom until Supabase Realtime parity is approved',
+    );
+  }
+  if (value(environment, 'STARVILLE_BACKGROUND_JOBS_PROVIDER') !== 'custom') {
+    errors.push(
+      'STARVILLE_BACKGROUND_JOBS_PROVIDER must remain custom until SQL/Cron parity is approved',
+    );
+  }
   for (const name of required) {
     const candidate = value(environment, name);
     if (candidate === undefined || candidate.includes('OWNER_REQUIRED')) {

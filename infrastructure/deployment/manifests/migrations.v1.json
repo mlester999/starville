@@ -1363,6 +1363,38 @@
       "hostedValidation": "Pending starville-dev clean-chain and drift verification",
       "productionReadiness": "Phase 13D commissioning gate",
       "knownLimitations": "Hash describes the current local candidate; bind to an approved commit before production."
+    },
+    {
+      "sequence": 86,
+      "filename": "20260724100000_phase13e_supabase_realtime_authorization.sql",
+      "timestamp": "20260724100000",
+      "sha256": "d6d8058834df5361cda218f19edd1969594e93f0e2cdf573422f09954b52b1af",
+      "phaseOrigin": "13E-A",
+      "dependsOn": "20260722130000_phase13b_closed_beta_security_hardening.sql",
+      "schemaImpact": "Adds wallet-bound non-anonymous player Auth identities, private Supabase Realtime membership authorization, exact topic RLS, and authorization audit storage",
+      "dataImpact": "Seeds only a local-safe environment setting; no membership, presence, movement, or fake production data",
+      "requiredExtensions": [],
+      "estimatedRisk": "high",
+      "reversibility": "Keep the custom provider selected, revoke the four Realtime policies by forward fix, and retain membership audit evidence",
+      "hostedValidation": "Pending owner-approved starville-dev player-Auth exchange and private-channel configuration validation",
+      "productionReadiness": "Phase 13E parity incomplete; production remains custom and /ready remains blocked for Supabase mode",
+      "knownLimitations": "Presence and movement are the only migrated browser slice; all authoritative gameplay remains outside Broadcast."
+    },
+    {
+      "sequence": 87,
+      "filename": "20260724101000_phase13e_social_cleanup_cron_foundation.sql",
+      "timestamp": "20260724101000",
+      "sha256": "147cccccf7930dab7d17557746b28422059ace1550f23d2ddd626fe2865dae97",
+      "phaseOrigin": "13E-A",
+      "dependsOn": "20260724100000_phase13e_supabase_realtime_authorization.sql",
+      "schemaImpact": "Adds disabled repository schedule metadata, bounded run evidence, and an advisory-locked SQL cleanup wrapper",
+      "dataImpact": "Seeds one disabled proof definition; does not register or execute a hosted Cron job",
+      "requiredExtensions": [],
+      "estimatedRisk": "medium",
+      "reversibility": "Keep the custom Worker selected and the SQL/Cron definition disabled; forward-fix metadata or wrapper defects",
+      "hostedValidation": "Pending owner-approved starville-dev pg_cron concurrency and failure-observability validation",
+      "productionReadiness": "Phase 13E parity incomplete; custom Worker remains active",
+      "knownLimitations": "Only social-interaction expiry cleanup is represented; no hosted schedule is enabled."
     }
   ]
 }

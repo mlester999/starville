@@ -22,6 +22,8 @@ const fixtureEnvironment = {
   NEXT_PUBLIC_ADMIN_URL: 'http://localhost:3002',
   NEXT_PUBLIC_API_URL: 'http://localhost:4000',
   NEXT_PUBLIC_REALTIME_URL: 'ws://localhost:4001',
+  NEXT_PUBLIC_REALTIME_PROVIDER: 'custom',
+  STARVILLE_BACKGROUND_JOBS_PROVIDER: 'custom',
   NEXT_PUBLIC_REOWN_PROJECT_ID: 'public-reown-project-id',
   NEXT_PUBLIC_STARVILLE_X_URL: 'https://x.com/starville',
   NEXT_PUBLIC_STARVILLE_DISCORD_URL: 'https://discord.gg/starville',

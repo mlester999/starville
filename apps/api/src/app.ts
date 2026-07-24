@@ -6,7 +6,7 @@ import { isModuleEnabled, type PlatformModuleKey } from '@starville/platform-con
 import type { AdminAuthGateway, ApiRuntimeConfig, ServiceLogger } from './contracts.js';
 import { formatApiError, formatNotFoundError, PublicApiError } from './errors.js';
 import { resolveRequestId } from './request-id.js';
-import { registerHealthRoutes } from './routes/health.js';
+import { registerHealthRoutes, type ApiReadinessArchitecture } from './routes/health.js';
 import { registerAdminRoutes } from './routes/admin.js';
 import { registerAdminTokenGateRoutes } from './routes/admin-token-gate.js';
 import { registerStatusRoutes } from './routes/status.js';
@@ -68,6 +68,7 @@ import { registerHomeVisitRoutes } from './routes/home-visits.js';
 import type { PlayerExperienceGateway } from './player-experience/gateway.js';
 import { registerPlayerExperienceRoutes } from './routes/player-experience.js';
 import type { GameplayAssetOverrideService } from './player/asset-override-contracts.js';
+import type { SupabaseRealtimeAuthorizationService } from './realtime/supabase-contracts.js';
 
 export interface ApiTokenAccessOptions {
   readonly service: TokenAccessService;
@@ -78,6 +79,7 @@ export interface ApiTokenAccessOptions {
   readonly worldService?: PlayerWorldService;
   readonly cozyGameplayService?: CozyGameplayService;
   readonly realtimeTicketService?: RealtimeTicketService;
+  readonly supabaseRealtimeService?: SupabaseRealtimeAuthorizationService;
   readonly avatarService?: AvatarService;
   readonly cosmeticService?: CosmeticService;
   readonly cosmeticGateway?: CosmeticGateway;
@@ -89,6 +91,10 @@ export interface BuildApiAppOptions {
   readonly logger: ServiceLogger;
   readonly adminAuthGateway: AdminAuthGateway;
   readonly adminSessionTtlMinutes: number;
+  readonly readiness?: {
+    readonly architecture: ApiReadinessArchitecture;
+    readonly checkProviderDependencies?: () => Promise<void>;
+  };
   readonly tokenAccess?: ApiTokenAccessOptions;
   readonly adminOperations?: {
     readonly service: AdminOperationsService;
@@ -183,6 +189,7 @@ export function buildApiApp({
   adminAvatar,
   adminCosmetics,
   worldGameTest,
+  readiness,
 }: BuildApiAppOptions): FastifyInstance {
   const allowedOrigins = new Set(config.corsAllowedOrigins);
   const app = Fastify({
@@ -276,10 +283,12 @@ export function buildApiApp({
     app,
     config,
     logger,
+    readiness?.architecture,
     tokenAccess === undefined
       ? undefined
       : async () => {
           await tokenAccess.service.getPublicConfig();
+          await readiness?.checkProviderDependencies?.();
         },
   );
   registerStatusRoutes(app);
@@ -458,6 +467,9 @@ export function buildApiApp({
         ...(tokenAccess.realtimeTicketService === undefined
           ? {}
           : { realtimeTicketService: tokenAccess.realtimeTicketService }),
+        ...(tokenAccess.supabaseRealtimeService === undefined
+          ? {}
+          : { supabaseRealtimeService: tokenAccess.supabaseRealtimeService }),
         ...(tokenAccess.assetOverrideService === undefined
           ? {}
           : { assetOverrideService: tokenAccess.assetOverrideService }),

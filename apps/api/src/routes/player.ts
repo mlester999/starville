@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { homeVisitRealtimeTicketRequestSchema } from '@starville/housing';
+import { z } from 'zod';
 
 import { PublicApiError } from '../errors.js';
 import type { PlayerService } from '../player/contracts.js';
@@ -13,9 +14,22 @@ import type { LiveOperationsService } from '../live-operations/contracts.js';
 import type { RealtimeTicketService } from '../realtime/contracts.js';
 import { readTokenAccessCookie } from '../token-access/http.js';
 import type { GameplayAssetOverrideService } from '../player/asset-override-contracts.js';
+import type { SupabaseRealtimeAuthorizationService } from '../realtime/supabase-contracts.js';
 
 const PLAYER_API_PREFIX = '/api/v1/token-access/player';
 const BODY_LIMIT_BYTES = 4_096;
+const supabaseRealtimeAuthorizationRequestSchema = z
+  .object({
+    worldId: z
+      .string()
+      .trim()
+      .min(1)
+      .max(80)
+      .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/u),
+    worldVersionId: z.uuid(),
+    channelId: z.uuid().optional(),
+  })
+  .strict();
 
 export interface RegisterPlayerRoutesOptions {
   readonly playerService: PlayerService;
@@ -24,6 +38,7 @@ export interface RegisterPlayerRoutesOptions {
   readonly allowedOrigins: ReadonlySet<string>;
   readonly liveOperationsService?: LiveOperationsService;
   readonly realtimeTicketService?: RealtimeTicketService;
+  readonly supabaseRealtimeService?: SupabaseRealtimeAuthorizationService;
   readonly assetOverrideService?: GameplayAssetOverrideService;
 }
 
@@ -43,6 +58,10 @@ export function registerPlayerRoutes(
   options: RegisterPlayerRoutesOptions,
 ): void {
   const { playerService, tokenAccessService, cookie, allowedOrigins } = options;
+  const bearerToken = (authorization: string | undefined): string | undefined => {
+    const match = /^Bearer ([A-Za-z0-9._~-]+)$/u.exec(authorization ?? '');
+    return match?.[1];
+  };
 
   app.get(`${PLAYER_API_PREFIX}/profile`, async (request, reply) => {
     if ((await options.liveOperationsService?.getPublic(request.id))?.maintenance.active === true) {
@@ -147,6 +166,78 @@ export function registerPlayerRoutes(
       });
       return { success: true, data, requestId: request.id };
     });
+  }
+
+  if (options.supabaseRealtimeService !== undefined) {
+    const realtimeService = options.supabaseRealtimeService;
+    app.post(
+      `${PLAYER_API_PREFIX}/supabase-realtime/session`,
+      { bodyLimit: BODY_LIMIT_BYTES },
+      async (request, reply) => {
+        assertTrustedBrowserMutation(request, allowedOrigins);
+        const walletAddress = await authorizePlayerRequest(
+          request,
+          reply,
+          tokenAccessService,
+          cookie,
+        );
+        await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+        const data = await realtimeService.issuePlayerSession({
+          rawAccessToken: readTokenAccessCookie(request),
+          requestId: request.id,
+        });
+        void reply.header('cache-control', 'private, no-store');
+        return { success: true, data, requestId: request.id };
+      },
+    );
+
+    app.post(
+      `${PLAYER_API_PREFIX}/supabase-realtime/authorize`,
+      { bodyLimit: BODY_LIMIT_BYTES },
+      async (request, reply) => {
+        assertTrustedBrowserMutation(request, allowedOrigins);
+        const walletAddress = await authorizePlayerRequest(
+          request,
+          reply,
+          tokenAccessService,
+          cookie,
+        );
+        await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+        const body = supabaseRealtimeAuthorizationRequestSchema.safeParse(request.body);
+        if (!body.success) throw new PublicApiError(400, 'INVALID_REQUEST');
+        const data = await realtimeService.authorize({
+          bearerToken: bearerToken(request.headers.authorization),
+          rawAccessToken: readTokenAccessCookie(request),
+          expectedWorldId: body.data.worldId,
+          expectedWorldVersionId: body.data.worldVersionId,
+          requestedChannelId: body.data.channelId,
+          requestId: request.id,
+        });
+        return { success: true, data, requestId: request.id };
+      },
+    );
+
+    app.post(
+      `${PLAYER_API_PREFIX}/supabase-realtime/close`,
+      { bodyLimit: BODY_LIMIT_BYTES },
+      async (request, reply) => {
+        assertTrustedBrowserMutation(request, allowedOrigins);
+        const walletAddress = await authorizePlayerRequest(
+          request,
+          reply,
+          tokenAccessService,
+          cookie,
+        );
+        await requirePlayerEntry(playerService, walletAddress, request.id, false, false);
+        const body = request.body as { readonly membershipId?: unknown } | undefined;
+        await realtimeService.close({
+          bearerToken: bearerToken(request.headers.authorization),
+          membershipId: body?.membershipId,
+          requestId: request.id,
+        });
+        return { success: true, data: { closed: true }, requestId: request.id };
+      },
+    );
   }
 
   app.post(

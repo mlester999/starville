@@ -12,6 +12,7 @@ import {
   parseProductionSliceReviewVersion,
   productionSliceReviewRequested,
 } from './production-slice-review';
+import { RealtimeRuntimeProvider } from './realtime-runtime-provider';
 
 function ConnectedApp() {
   const config = parseGameClientPublicConfig(import.meta.env);
@@ -58,12 +59,16 @@ function ConnectedApp() {
   }
 
   return (
-    <TokenAccessGate
-      apiUrl={config.apiUrl}
-      gameName={platform.configuration.branding.shortGameName}
-      landingUrl={config.landingUrl}
-      realtimeUrl={config.realtimeUrl}
-    />
+    <RealtimeRuntimeProvider
+      config={{ provider: config.realtimeProvider, supabase: config.supabase }}
+    >
+      <TokenAccessGate
+        apiUrl={config.apiUrl}
+        gameName={platform.configuration.branding.shortGameName}
+        landingUrl={config.landingUrl}
+        realtimeUrl={config.realtimeProvider === 'custom' ? config.realtimeUrl : undefined}
+      />
+    </RealtimeRuntimeProvider>
   );
 }
 

@@ -1,4 +1,8 @@
-import { parseAdditionalPublicHttpUrl, parsePublicBrowserConfig } from '@starville/config/browser';
+import {
+  parseAdditionalPublicHttpUrl,
+  parsePublicBrowserConfig,
+  parsePublicRealtimeProvider,
+} from '@starville/config/browser';
 
 export interface GameClientPublicEnvironment {
   readonly [key: string]: string | undefined;
@@ -7,7 +11,8 @@ export interface GameClientPublicEnvironment {
   readonly NEXT_PUBLIC_GAME_URL?: string;
   readonly NEXT_PUBLIC_API_URL?: string;
   readonly NEXT_PUBLIC_ADMIN_URL?: string;
-  readonly NEXT_PUBLIC_REALTIME_URL?: string;
+  readonly NEXT_PUBLIC_REALTIME_URL?: string | undefined;
+  readonly NEXT_PUBLIC_REALTIME_PROVIDER?: string | undefined;
   readonly NEXT_PUBLIC_SUPABASE_URL?: string;
   readonly NEXT_PUBLIC_SUPABASE_ANON_KEY?: string;
   readonly NEXT_PUBLIC_GAME_COLLISION_DEBUG?: string;
@@ -29,6 +34,15 @@ export function parseGameClientPublicConfig(environment: GameClientPublicEnviron
     supabaseAnonKey: environment.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   });
   const configuredBuildId = environment.NEXT_PUBLIC_GAME_BUILD_ID?.trim();
+  const realtimeProvider = parsePublicRealtimeProvider(
+    environment.NEXT_PUBLIC_REALTIME_PROVIDER,
+    environment.NEXT_PUBLIC_APP_ENV,
+  );
+  if (realtimeProvider === 'custom' && config.realtimeUrl === undefined) {
+    throw new Error(
+      'NEXT_PUBLIC_REALTIME_URL is required when NEXT_PUBLIC_REALTIME_PROVIDER=custom',
+    );
+  }
   if (config.environment === 'production' && !configuredBuildId) {
     throw new Error('NEXT_PUBLIC_GAME_BUILD_ID is required in production');
   }
@@ -39,6 +53,7 @@ export function parseGameClientPublicConfig(environment: GameClientPublicEnviron
 
   return {
     ...config,
+    realtimeProvider,
     landingUrl: parseAdditionalPublicHttpUrl(
       environment.NEXT_PUBLIC_LANDING_URL,
       environment.NEXT_PUBLIC_APP_ENV,

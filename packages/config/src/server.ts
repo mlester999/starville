@@ -16,6 +16,12 @@ import {
   type LogLevel,
 } from '@starville/shared-validation';
 import type { WalletNetwork } from '@starville/wallet-access';
+import {
+  backgroundJobsProviderSchema,
+  realtimeProviderSchema,
+  type BackgroundJobsProvider,
+  type RealtimeProvider,
+} from '@starville/realtime/providers';
 
 export type EnvironmentVariables = Readonly<Record<string, string | undefined>>;
 
@@ -88,6 +94,7 @@ export interface WorkerConfig {
     readonly baseDelayMs: number;
   };
   readonly logLevel: LogLevel;
+  readonly provider: BackgroundJobsProvider;
 }
 
 export interface PrivateSupabaseConfig {
@@ -106,11 +113,19 @@ export interface AdminRecoveryConfig {
 }
 
 export interface OperationsHealthConfig {
-  readonly realtimeReadyUrl: string;
-  readonly workerReadyUrl: string;
+  readonly realtimeProvider: RealtimeProvider;
+  readonly backgroundJobsProvider: BackgroundJobsProvider;
+  readonly realtimeReadyUrl?: string;
+  readonly workerReadyUrl?: string;
   readonly timeoutMs: number;
   readonly playerActionRateLimit: number;
   readonly operationsReadRateLimit: number;
+}
+
+export interface ServiceArchitectureConfig {
+  readonly realtimeProvider: RealtimeProvider;
+  readonly backgroundJobsProvider: BackgroundJobsProvider;
+  readonly migrationState: 'custom-active' | 'foundation-incomplete';
 }
 
 export interface WorldManagementConfig {
@@ -179,6 +194,48 @@ function safeBoolean(value: string | undefined, variableName: string): boolean {
   } catch {
     throw new Error(`${variableName} must be either true or false`);
   }
+}
+
+function explicitProvider<T>(
+  value: string | undefined,
+  environment: EnvironmentName,
+  variableName: string,
+  schema: z.ZodType<T>,
+): T {
+  if (environment === 'production' && (value === undefined || value.trim() === '')) {
+    throw new Error(`${variableName} is required in production`);
+  }
+  try {
+    return schema.parse(value ?? 'custom');
+  } catch {
+    throw new Error(`${variableName} must be either custom or supabase`);
+  }
+}
+
+export function loadServiceArchitectureConfig(
+  env: EnvironmentVariables,
+): ServiceArchitectureConfig {
+  const environment = loadEnvironment(env);
+  const realtimeProvider = explicitProvider(
+    env['NEXT_PUBLIC_REALTIME_PROVIDER'],
+    environment,
+    'NEXT_PUBLIC_REALTIME_PROVIDER',
+    realtimeProviderSchema,
+  );
+  const backgroundJobsProvider = explicitProvider(
+    env['STARVILLE_BACKGROUND_JOBS_PROVIDER'],
+    environment,
+    'STARVILLE_BACKGROUND_JOBS_PROVIDER',
+    backgroundJobsProviderSchema,
+  );
+  return {
+    realtimeProvider,
+    backgroundJobsProvider,
+    migrationState:
+      realtimeProvider === 'custom' && backgroundJobsProvider === 'custom'
+        ? 'custom-active'
+        : 'foundation-incomplete',
+  };
 }
 
 export function assertProductionRuntimeSafetyGatesClosed(
@@ -394,6 +451,12 @@ export function loadRealtimeConfig(env: EnvironmentVariables): RealtimeConfig {
 
 export function loadWorkerConfig(env: EnvironmentVariables): WorkerConfig {
   const environment = loadEnvironment(env);
+  const provider = explicitProvider(
+    env['STARVILLE_BACKGROUND_JOBS_PROVIDER'],
+    environment,
+    'STARVILLE_BACKGROUND_JOBS_PROVIDER',
+    backgroundJobsProviderSchema,
+  );
 
   return {
     application: 'worker',
@@ -406,6 +469,7 @@ export function loadWorkerConfig(env: EnvironmentVariables): WorkerConfig {
       baseDelayMs: positiveIntegerSchema.parse(env['WORKER_RETRY_BASE_DELAY_MS'] ?? 1000),
     },
     logLevel: logLevelSchema.parse(env['LOG_LEVEL'] ?? defaultLogLevel(environment)),
+    provider,
   };
 }
 
@@ -434,18 +498,27 @@ export function loadAdminRecoveryConfig(env: EnvironmentVariables): AdminRecover
 
 export function loadOperationsHealthConfig(env: EnvironmentVariables): OperationsHealthConfig {
   const environment = loadEnvironment(env);
-  const realtimeReadyUrl = httpUrlSchema.parse(
-    env['REALTIME_HEALTH_URL'] ?? 'http://127.0.0.1:4001/ready',
-  );
-  const workerReadyUrl = httpUrlSchema.parse(
-    env['WORKER_HEALTH_URL'] ?? 'http://127.0.0.1:4002/ready',
-  );
-  assertSecureUrlForEnvironment(realtimeReadyUrl, environment, 'REALTIME_HEALTH_URL');
-  assertSecureUrlForEnvironment(workerReadyUrl, environment, 'WORKER_HEALTH_URL');
+  const architecture = loadServiceArchitectureConfig(env);
+  const realtimeReadyUrl =
+    architecture.realtimeProvider === 'custom'
+      ? httpUrlSchema.parse(env['REALTIME_HEALTH_URL'] ?? 'http://127.0.0.1:4001/ready')
+      : undefined;
+  const workerReadyUrl =
+    architecture.backgroundJobsProvider === 'custom'
+      ? httpUrlSchema.parse(env['WORKER_HEALTH_URL'] ?? 'http://127.0.0.1:4002/ready')
+      : undefined;
+  if (realtimeReadyUrl !== undefined) {
+    assertSecureUrlForEnvironment(realtimeReadyUrl, environment, 'REALTIME_HEALTH_URL');
+  }
+  if (workerReadyUrl !== undefined) {
+    assertSecureUrlForEnvironment(workerReadyUrl, environment, 'WORKER_HEALTH_URL');
+  }
 
   return {
-    realtimeReadyUrl,
-    workerReadyUrl,
+    realtimeProvider: architecture.realtimeProvider,
+    backgroundJobsProvider: architecture.backgroundJobsProvider,
+    ...(realtimeReadyUrl === undefined ? {} : { realtimeReadyUrl }),
+    ...(workerReadyUrl === undefined ? {} : { workerReadyUrl }),
     timeoutMs: boundedInteger(250, 5_000, 'ADMIN_HEALTH_CHECK_TIMEOUT_MS').parse(
       env['ADMIN_HEALTH_CHECK_TIMEOUT_MS'] ?? 1_500,
     ),

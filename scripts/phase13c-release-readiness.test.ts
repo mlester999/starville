@@ -28,6 +28,8 @@ const productionEnvironment = (): NodeJS.ProcessEnv => ({
   NEXT_PUBLIC_ADMIN_URL: 'https://admin.starville.example',
   NEXT_PUBLIC_API_URL: 'https://api.starville.example',
   NEXT_PUBLIC_REALTIME_URL: 'wss://realtime.starville.example',
+  NEXT_PUBLIC_REALTIME_PROVIDER: 'custom',
+  STARVILLE_BACKGROUND_JOBS_PROVIDER: 'custom',
   NEXT_PUBLIC_REOWN_PROJECT_ID: 'production-project',
   SOLANA_NETWORK: 'mainnet-beta',
   SOLANA_RPC_URL: 'https://rpc.starville.example',
