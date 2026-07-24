@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions, pg_catalog;
 
-select plan(50);
+select plan(51);
 
 select has_table('public', 'supabase_realtime_settings', 'environment-scoped realtime settings exist');
 select has_table(
@@ -84,8 +84,27 @@ select ok(
 select ok(
   has_table_privilege('authenticated', 'realtime.messages', 'select')
   and has_table_privilege('authenticated', 'realtime.messages', 'insert')
-  and not has_table_privilege('anon', 'realtime.messages', 'select'),
-  'authenticated clients have only RLS-gated Realtime access'
+  and (
+    select relrowsecurity
+      and relowner <> 'authenticated'::regrole
+      and relowner <> 'anon'::regrole
+    from pg_class
+    where oid = 'realtime.messages'::regclass
+  )
+  and not (
+    select rolbypassrls from pg_roles where rolname = 'authenticated'
+  )
+  and not (
+    select rolbypassrls from pg_roles where rolname = 'anon'
+  )
+  and not exists (
+    select 1
+    from pg_policies
+    where schemaname = 'realtime'
+      and tablename = 'messages'
+      and roles && array['anon', 'public']::name[]
+  ),
+  'provider-managed Realtime grants remain RLS-gated with no anonymous policy authority'
 );
 select ok(
   has_schema_privilege('authenticated', 'private', 'usage')
@@ -232,20 +251,67 @@ select ok(
   ),
   'client-controlled payload values never participate in topic authorization'
 );
-select ok(
+select is(
   (
-    select count(*) = 4
-    from pg_policies
-    where schemaname = 'realtime'
-      and tablename = 'messages'
-      and policyname like 'starville_private_%'
+    select count(*)::integer
+    from (
+      values
+        ('starville_private_broadcast_read', 'r', 'broadcast', 'SELECT'),
+        ('starville_private_broadcast_write', 'a', 'broadcast', 'INSERT'),
+        ('starville_private_presence_read', 'r', 'presence', 'SELECT'),
+        ('starville_private_presence_write', 'a', 'presence', 'INSERT')
+    ) expected(policy_name, expression_slot, expected_extension, expected_command)
+    join pg_policy policy on policy.polname = expected.policy_name
+    join pg_class relation
+      on relation.oid = policy.polrelid
+     and relation.oid = 'realtime.messages'::regclass
+    where policy.polroles = array[('authenticated'::regrole)::oid]
+      and case expected.expression_slot
+        when 'r' then policy.polqual is not null and policy.polwithcheck is null
+        when 'a' then policy.polqual is null and policy.polwithcheck is not null
+        else false
+      end
+      and case expected.expected_command
+        when 'SELECT' then policy.polcmd = 'r'
+        when 'INSERT' then policy.polcmd = 'a'
+        else false
+      end
+      and pg_get_expr(
+        coalesce(policy.polqual, policy.polwithcheck),
+        policy.polrelid
+      ) like '%' || format('extension = %L::text', expected.expected_extension) || '%'
+      and pg_get_expr(
+        coalesce(policy.polqual, policy.polwithcheck),
+        policy.polrelid
+      ) like
+        '%private.supabase_realtime_topic_authorized(auth.uid(), realtime.topic(), extension)%'
       and (
-        coalesce(qual, with_check) like '%realtime.topic()%'
-        and coalesce(qual, with_check) like '%auth.uid()%'
-        and coalesce(qual, with_check) like '%messages.extension%'
+        select count(distinct dependency.refobjid)
+        from pg_depend dependency
+        where dependency.classid = 'pg_policy'::regclass
+          and dependency.objid = policy.oid
+          and dependency.refclassid = 'pg_proc'::regclass
+          and dependency.refobjid in (
+            'auth.uid()'::regprocedure,
+            'realtime.topic()'::regprocedure,
+            'private.supabase_realtime_topic_authorized(uuid,text,text)'::regprocedure
+          )
+      ) = 3
+      and exists (
+        select 1
+        from pg_depend dependency
+        join pg_attribute attribute
+          on attribute.attrelid = policy.polrelid
+         and attribute.attnum = dependency.refobjsubid
+        where dependency.classid = 'pg_policy'::regclass
+          and dependency.objid = policy.oid
+          and dependency.refclassid = 'pg_class'::regclass
+          and dependency.refobjid = policy.polrelid
+          and attribute.attname = 'extension'
       )
   ),
-  'all four policies derive authority from trusted user, topic, and extension values'
+  4,
+  'all four policies delegate exact user, topic, and extension authority to the trusted helper'
 );
 select lives_ok(
   $$

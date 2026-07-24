@@ -3575,6 +3575,7 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect((await parser.parse(realtimeSql)).stmts?.length ?? 0).toBeGreaterThan(0);
     expect((await parser.parse(permissionFixSql)).stmts?.length ?? 0).toBeGreaterThan(0);
     expect((await parser.parse(cronSql)).stmts?.length ?? 0).toBeGreaterThan(0);
+    expect((await parser.parse(pgtapSql)).stmts?.length ?? 0).toBeGreaterThan(0);
   });
 
   it('treats realtime.messages as provider-managed while preserving four exact policies', () => {
@@ -3675,7 +3676,7 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
   });
 
   it('covers the exact ACL, policy, owner, role-denial, and behavioral matrix', () => {
-    expect(pgtapSql).toContain('select plan(50);');
+    expect(pgtapSql).toContain('select plan(51);');
     expect(pgtapSql).toContain("'authenticated'");
     expect(pgtapSql).toContain('private.supabase_realtime_topic_authorized(uuid,text,text)');
     expect(pgtapSql).toContain('PUBLIC has no execute privilege');
@@ -3686,6 +3687,21 @@ describe('Phase 13E-A Supabase-first migration foundation', () => {
     expect(pgtapSql).toContain('Presence and Broadcast INSERT');
     expect(pgtapSql).toContain('payload values never participate');
     expect(pgtapSql).toContain('anon invocation is rejected');
+    expect(pgtapSql).toContain(
+      'provider-managed Realtime grants remain RLS-gated with no anonymous policy authority',
+    );
+    expect(pgtapSql).toContain("relowner <> 'authenticated'::regrole");
+    expect(pgtapSql).toContain("rolname = 'authenticated'");
+    expect(pgtapSql).toContain("dependency.classid = 'pg_policy'::regclass");
+    expect(pgtapSql).toContain(
+      'private.supabase_realtime_topic_authorized(auth.uid(), realtime.topic(), extension)',
+    );
+    expect(pgtapSql).toContain(
+      'all four policies delegate exact user, topic, and extension authority to the trusted helper',
+    );
+    expect(pgtapSql).not.toContain(
+      "not has_table_privilege('anon', 'realtime.messages', 'select')",
+    );
     expect(executionSql).toContain('an invited home visitor is authorized');
     expect(executionSql).toContain('an expired home invitation fails closed');
     expect(executionSql).toContain('suspended players fail closed');

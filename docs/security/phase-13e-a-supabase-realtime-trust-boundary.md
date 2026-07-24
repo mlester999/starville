@@ -32,6 +32,20 @@ no direct execution. The grant adds no table CRUD, no broad private-function exe
 payload authority. The helper stays `STABLE SECURITY DEFINER`, has `search_path=''`, uses qualified
 objects, and is owned by the trusted migration role.
 
+Supabase owns `realtime.messages` as `supabase_realtime_admin` and manages its base ACL. Hosted
+inspection found effective provider-managed `SELECT`/`INSERT` privileges for both `authenticated`
+and `anon`; Starville neither added nor removed them. These grants do not bypass RLS.
+`realtime.messages` has RLS enabled, both client roles have `BYPASSRLS=false`, neither owns the
+table, and no policy targets `anon` or `PUBLIC`. Only `authenticated` can execute the exact
+policy-entry helper, while all client roles lack direct CRUD on Starville identity, membership,
+invitation, suspension, and audit authority tables.
+
+Each of the four policy objects has catalog dependencies on `auth.uid()`, `realtime.topic()`, the
+exact authorization helper, and the provider-owned `extension` column. PostgreSQL's catalog deparser
+renders that column as `extension`, not `realtime.messages.extension`; security validation therefore
+checks dependency identity, exact helper argument order, command, expression slot, and the
+`broadcast` or `presence` literal rather than requiring a schema-qualified display string.
+
 The hosted retry applied Phase 13B, then the Realtime migration failed at
 `ALTER TABLE realtime.messages ENABLE ROW LEVEL SECURITY` because Supabase owns that
 already-RLS-enabled table as `supabase_realtime_admin`. The Phase 13E transaction fully rolled back

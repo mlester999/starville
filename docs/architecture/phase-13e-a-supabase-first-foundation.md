@@ -139,6 +139,19 @@ are not altered by Starville. The unapplied migration now performs only the four
 drop/create pairs against that table; it contains no table alteration, owner or role change,
 trigger/column change, or table-level grant/revoke.
 
+Hosted catalog evidence after application confirms that Supabase-managed `SELECT` and `INSERT`
+privileges can be effective for both `authenticated` and `anon`. Those object privileges are not
+channel authority: `realtime.messages` has RLS enabled, neither client role owns the table or has
+`BYPASSRLS`, and all four Starville policies apply only to `authenticated`. `anon` has no policy, no
+`private` schema usage, and no helper execution privilege, so it fails closed even though the
+provider retains its base table ACL.
+
+PostgreSQL deparses the policy-owned `realtime.messages.extension` column as the unqualified
+identifier `extension` in `pg_policies`. Catalog validation therefore uses `pg_depend` to prove that
+each policy references the real provider column plus `auth.uid()`, `realtime.topic()`, and the exact
+Starville helper. It separately verifies the Broadcast/Presence extension literal and SELECT/INSERT
+command for each policy instead of relying on source-formatting substrings.
+
 The player-identity and membership tables force RLS and expose no direct `anon`, `authenticated`, or
 `service_role` table privileges. Only service-role RPCs can prepare and bind a non-anonymous
 Supabase Auth UID to the exact wallet-owned player. Anonymous Auth sign-in stays disabled. Enabling
